@@ -29,8 +29,9 @@ services:
       dockerfile: deploy/recognizer.Dockerfile
     ports:
       - "${RECOGNIZER_PORT:-8000}:8000"
-    # P1 起挂载脱敏样本做调试:
-    # volumes: [ "../samples:/samples:ro" ]
+    # P1 起挂载脱敏样本做调试 CLI 与验收(只读,NF-01)
+    volumes:
+      - ../samples:/samples:ro
 
 volumes:
   pgdata:
