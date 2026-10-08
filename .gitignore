@@ -10,3 +10,6 @@ dist/
 
 # Go
 *.test
+
+# git worktree 工作区（AGENTS.md「Git 与提交」）
+.worktree/
