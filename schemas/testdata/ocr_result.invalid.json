@@ -1,0 +1,9 @@
+{
+  "txts": ["血红蛋白", "128"],
+  "boxes": [[[100, 200], [180, 200], [180, 230], [100, 230]]],
+  "scores": [0.99, 1.5],
+  "elapse": -1,
+  "elapse_list": [],
+  "engine": "apple-vision",
+  "model_info": {"det": "PP-OCRv6_small", "cls": "PP-OCRv4_mobile", "rec": "PP-OCRv6_small"}
+}

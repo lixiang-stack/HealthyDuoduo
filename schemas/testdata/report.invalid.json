@@ -1,0 +1,8 @@
+{
+  "report_type": "血常规",
+  "report_date": "2026/10/01",
+  "status": "ok",
+  "items": [
+    {"name": "", "value": "128", "unit": null, "ref_range": null, "flag": "none", "low_confidence": false, "raw_text": ""}
+  ]
+}

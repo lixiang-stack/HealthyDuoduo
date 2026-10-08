@@ -1,0 +1,16 @@
+{
+  "report_type": "血常规",
+  "report_date": "2026-10-01",
+  "status": "success",
+  "items": [
+    {
+      "name": "血红蛋白",
+      "value": 128,
+      "unit": "g/L",
+      "ref_range": "115-150",
+      "flag": "normal",
+      "low_confidence": false,
+      "raw_text": "血红蛋白 128 g/L 115-150"
+    }
+  ]
+}

@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://healthyduoduo.local/schemas/report.schema.json",
+  "title": "Report",
+  "description": "系统对一张图像处理后产出的结构化报告(实施计划 4.2;report_id / image_id 等由 Go 落库时赋予,不在契约内)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["report_type", "report_date", "status", "items"],
+  "properties": {
+    "report_type": {
+      "type": "string",
+      "minLength": 1,
+      "description": "报告类别,如 血常规"
+    },
+    "report_date": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+      "description": "检查日期(YYYY-MM-DD);识别失败且未通过 ingest --date 补录时为 null"
+    },
+    "status": {
+      "enum": ["success", "partial", "failed"],
+      "description": "success=类别与主要指标解析成功;partial=有产出但有指标缺失/低置信/日期未解析;failed=无法产出结构化结果(仍留痕落库)"
+    },
+    "items": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/reportItem"}
+    }
+  },
+  "$defs": {
+    "reportItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "value", "unit", "ref_range", "flag", "low_confidence", "raw_text"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "规范名(词典映射后)"
+        },
+        "value": {
+          "type": ["number", "null"],
+          "description": "数值;非数值或解析失败为 null"
+        },
+        "unit": {
+          "type": ["string", "null"],
+          "description": "单位,如 g/L"
+        },
+        "ref_range": {
+          "type": ["string", "null"],
+          "description": "参考范围,一律从检查单抽取(决策 #8),如 115-150 或 <3.5"
+        },
+        "flag": {
+          "enum": ["normal", "high", "low", "unknown"],
+          "description": "数值与参考范围比较结果;无参考范围或非数值为 unknown"
+        },
+        "low_confidence": {
+          "type": "boolean",
+          "description": "该指标项任一组成行 OCR score < 0.8 时为 true(决策 #7)"
+        },
+        "raw_text": {
+          "type": "string",
+          "minLength": 1,
+          "description": "该指标项对应的原始 OCR 行文本,供人工核对"
+        }
+      }
+    }
+  }
+}

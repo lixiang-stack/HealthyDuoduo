@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://healthyduoduo.local/schemas/ocr_result.schema.json",
+  "title": "OCRResult",
+  "description": "对一张图像执行一次 OCR 得到的原始识别输出(实施计划 4.1;NF-06 双语契约,pydantic 与 Go struct 皆从此出发)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["txts", "boxes", "scores", "elapse", "elapse_list", "engine", "model_info"],
+  "properties": {
+    "txts": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "识别出的文本行,与 boxes / scores 按下标一一对应"
+    },
+    "boxes": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/box"},
+      "description": "每个文本行的四点多边形,顶点为 [x, y] 坐标"
+    },
+    "scores": {
+      "type": "array",
+      "items": {"type": "number", "minimum": 0, "maximum": 1},
+      "description": "每个文本行的识别置信度"
+    },
+    "elapse": {
+      "type": "number",
+      "minimum": 0,
+      "description": "总耗时(秒);非确定量,golden 对比只记录不比对"
+    },
+    "elapse_list": {
+      "type": "array",
+      "items": {"type": "number", "minimum": 0},
+      "description": "各阶段耗时(秒)"
+    },
+    "engine": {
+      "type": "string",
+      "enum": ["onnxruntime"],
+      "description": "推理引擎"
+    },
+    "model_info": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["det", "cls", "rec"],
+      "properties": {
+        "det": {"type": "string"},
+        "cls": {"type": "string"},
+        "rec": {"type": "string"}
+      }
+    }
+  },
+  "$defs": {
+    "point": {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2},
+    "box": {"type": "array", "items": {"$ref": "#/$defs/point"}, "minItems": 4, "maxItems": 4}
+  }
+}

@@ -1,0 +1,37 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: healthyduoduo
+      POSTGRES_PASSWORD: healthyduoduo # 仅本地开发;全链路默认不出本机(NF-01)
+      POSTGRES_DB: healthyduoduo
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  seaweedfs:
+    # 对象存储:S3 兼容网关(`server -s3`,默认端口 8333)。
+    # 官方 minio/minio 镜像已于 2026-09 从 Docker Hub 撤下(改源码分发),
+    # 维护者决策改用 SeaweedFS(ADR-0003);minio-go 客户端作为通用 S3 SDK 保留。
+    image: chrislusf/seaweedfs:latest
+    command: server -dir=/data -s3
+    # 单进程跑 master/volume/filer/S3;重启后 S3 网关需等 raft 收敛,约 15-20 秒才可用
+    ports:
+      - "${SEAWEEDFS_MASTER_PORT:-9333}:9333"
+      - "${S3_API_PORT:-8333}:8333"
+    volumes:
+      - seaweeddata:/data
+
+  recognizer:
+    build:
+      context: ..
+      dockerfile: deploy/recognizer.Dockerfile
+    ports:
+      - "${RECOGNIZER_PORT:-8000}:8000"
+    # P1 起挂载脱敏样本做调试:
+    # volumes: [ "../samples:/samples:ro" ]
+
+volumes:
+  pgdata:
+  seaweeddata:

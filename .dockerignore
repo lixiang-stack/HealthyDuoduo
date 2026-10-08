@@ -1,0 +1,6 @@
+# recognizer 镜像构建上下文:仓库根,但源码只需要 recognizer/
+*
+!recognizer/
+recognizer/tests/
+recognizer/.venv/
+recognizer/**/__pycache__/

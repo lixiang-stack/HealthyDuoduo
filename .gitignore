@@ -1,0 +1,12 @@
+# 忽略用户/工具产物;samples/ 下的 jpg 需要入库,勿加全局 *.jpg
+.venv/
+__pycache__/
+*.py[cod]
+dist/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+
+# Go
+*.test

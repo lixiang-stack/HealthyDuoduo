@@ -14,7 +14,7 @@
 
 1. 医院检查单拍照/导入，OCR 识别（RapidOCR ≥3.9.0 默认配置，onnxruntime CPU 推理）
 2. 规则化后处理（不依赖 LLM）抽取结构化字段，优先支持**血常规**
-3. 三层持久化并可追溯：原图（对象存储 MinIO）、OCR 结果与结构化报告（PostgreSQL）
+3. 三层持久化并可追溯：原图（对象存储 SeaweedFS）、OCR 结果与结构化报告（PostgreSQL）
 4. `hdd` CLI：全流程入库（ingest）、仅重跑后处理（reparse）、查询（list / show）
 5. 识别服务 Docker 化 + HTTP 接口；全链路 `docker compose` 本地一键跑通
 
@@ -53,9 +53,9 @@
 │ 镜像内调试 CLI（图片→OCR JSON）│          │ pgx + sqlc · minio-go          │
 └──────────────────────────────┘          └───────┬────────────────────────┘
                                                   │
-                                  ┌───────────────▼───────────────┐
-                                  │ docker compose: PostgreSQL + MinIO │
-                                  └───────────────────────────────┘
+                                  ┌──────────────────────────────────┐
+                                  │ docker compose: PostgreSQL + SeaweedFS │
+                                  └──────────────────────────────────┘
 ```
 
 **模块布局：**
@@ -63,7 +63,7 @@
 ```text
 /                      # go.mod（module healthyduoduo）
   cmd/hdd/             # hdd 入口：ingest / reparse / list / show
-  internal/…           # 识别服务客户端、PG / MinIO 存储、编排逻辑
+  internal/…           # 识别服务客户端、PG / S3 存储（SeaweedFS）、编排逻辑
   recognizer/          # Python 识别服务（uv 包）：ocr.py、postprocess.py、api.py、__main__.py（调试 CLI）
   schemas/             # ocr_result.schema.json、report.schema.json（双语契约）
   samples/             # 脱敏样本 + expected/（golden 期望输出）
@@ -76,8 +76,8 @@
 | 层 | 选型 |
 |----|------|
 | Python | uv + Python **3.13**（rapidocr 支持区间 3.8–3.13，不用系统 3.14）；rapidocr ≥3.9.0 **默认配置**（Det/Rec: PP-OCRv6 small，Cls: PP-OCRv4 mobile）；onnxruntime（**显式依赖**，rapidocr 不自带）；FastAPI + uvicorn；pydantic（契约源）；pytest + ruff |
-| Go | Go **1.27**；pgx + sqlc；minio-go；goose（SQL 迁移）；标准库 net/http、httptest |
-| 基础设施 | PostgreSQL、MinIO、Docker Compose（本机全部） |
+| Go | Go **1.27**；pgx + sqlc；minio-go（S3 客户端库，服务端为 SeaweedFS）；goose（SQL 迁移）；标准库 net/http、httptest |
+| 基础设施 | PostgreSQL、SeaweedFS（S3 API 网关）、Docker Compose（本机全部） |
 
 > FastAPI / sqlc / goose 为计划推荐，P0 脚手架时若有更顺手替代可换，**契约与验收不变**。
 
@@ -137,7 +137,7 @@
 
 ### 4.4 存储模型
 
-- **MinIO bucket `raw`**：原图对象，键 = 图像内容 sha256
+- **对象存储 bucket `raw`（SeaweedFS，S3 API）**：原图对象，键 = 图像内容 sha256
 - **PostgreSQL 四表**：
   - `images`：id、sha256（**唯一**，去重依据）、object_key、original_filename、created_at
   - `ocr_results`：id、image_id（FK）、engine 输出全量（jsonb）、created_at——**每次识别追加一行**，`--force` 重跑时历史保留（NF-05 重跑对比）
@@ -163,7 +163,7 @@
 | 11 | 验收形态 | 命令级（CLI + 期望输出）+ pytest golden + Go 契约 fixture | 「文档就绪」式弱验收不可执行 |
 | 12 | CI | 双链（ruff+pytest；go vet+gofmt+go test）；Docker 构建/耗时验收本地手动 | 模型 wheel ~29MB，省 CI 额度 |
 | 13 | 工具链 | uv + Python 3.13；Go 1.27 | rapidocr 支持至 3.13；本机已装 |
-| 14 | 存储 | MVP 即 compose 起 PostgreSQL + MinIO，**不经 SQLite 过渡** | 长线已明确，迁移成本 > 起步成本 |
+| 14 | 存储 | MVP 即 compose 起 PostgreSQL + SeaweedFS（对象存储由 MinIO 改设，见 ADR-0003），**不经 SQLite 过渡** | 长线已明确，迁移成本 > 起步成本 |
 | 15 | 流程 | main 只落文档；每阶段一个 worktree + 一次 commit（feat:/test: 前缀）；push 由维护者决定 | 仓库工作规范 |
 | 16 | 依赖事实 | rapidocr ≥3.9.0 默认模型即 PP-OCRv6 small det/rec + PP-OCRv4 mobile cls（已核实）；onnxruntime 需显式安装；RapidOCR 无官方镜像，Dockerfile 自建 | 一级来源核实于 2026-10-08 |
 
@@ -173,9 +173,9 @@
 
 | 阶段 | 目标一句话 | 主要交付物 | 验收一句话 |
 |------|-----------|-----------|-----------|
-| **P0 契约与样本** | 契约、样本、脚手架、空转全链路就绪 | schemas/、samples/、compose 骨架、CI 双链 | compose 起 pg+minio 健康；双链测试绿；样本 ≥5 张 |
+| **P0 契约与样本** | 契约、样本、脚手架、空转全链路就绪 | schemas/、samples/、compose 骨架、CI 双链 | compose 起 pg+seaweedfs 健康；双链测试绿；样本 ≥5 张 |
 | **P1 识别服务跑通** | 图 → OCR JSON 三通道一致 | run_ocr + 镜像 + /ocr + 调试 CLI + golden | 同图本地/容器/HTTP 输出一致且过 schema |
-| **P2 全链路闭环** | 一图进、三层留存、一条报告出 | 后处理 v1（血常规）+ Go hdd + PG/MinIO 落库 | hdd ingest→list/show 端到端演示通过 |
+| **P2 全链路闭环** | 一图进、三层留存、一条报告出 | 后处理 v1（血常规）+ Go hdd + PG/SeaweedFS 落库 | hdd ingest→list/show 端到端演示通过 |
 | **P3 增强** | 更多类别 + 统计 + 回归扩充 | 尿常规、产检关键项、趋势统计 | 样本集全量 golden 回归绿 |
 | **P4 服务化扩展** | Go 常驻 API、LLM 抽取实验 | API 服务、批任务、LLM 增强 | 按产品需要启动时再定 |
 
@@ -185,19 +185,31 @@
 
 **目标：** JSON 契约、脱敏样本、双语脚手架、compose 空转全链路全部就绪，后续阶段在既定轨道上跑。
 
-**为什么：** 契约（NF-06）是双语防漂移的地基——pydantic 与 Go struct 都从同一份 schema 出发；样本（NF-03）是回归测试的眼睛，没有它 P1/P2 的「识别质量」无从验收；空转全链路把基础设施风险（compose、PG、MinIO）最早暴露。
+**为什么：** 契约（NF-06）是双语防漂移的地基——pydantic 与 Go struct 都从同一份 schema 出发；样本（NF-03）是回归测试的眼睛，没有它 P1/P2 的「识别质量」无从验收；空转全链路把基础设施风险（compose、PG、SeaweedFS）最早暴露。
 
 **步骤：**
 
 1. 脚手架：根 `go.mod` + `cmd/hdd`（四命令空实现，仅打印 not implemented）；`recognizer/` uv 包 + FastAPI `/healthz` 占位
 2. `schemas/`：`ocr_result.schema.json`、`report.schema.json`（按 4.1/4.2 字段与枚举）；Python 侧示例校验测试，Go 侧 fixture 反序列化测试（用本文档 4.1/4.2 示例 JSON 作种子）
 3. 样本：5–10 张**脱敏**血常规图像入 `samples/`（暂缺真实脱敏样本则先做 2–3 张仿真单，文件名前缀 `sim_`，P1 前补齐真实样本）；目录约定 `samples/<id>.jpg` + `samples/expected/ocr/<id>.json` + `samples/expected/report/<id>.json`
-4. `deploy/`：`docker-compose.yml`（postgres + minio + recognizer 占位镜像）；`.gitignore`（.venv、__pycache__、dist 等）
+4. `deploy/`：`docker-compose.yml`（postgres + seaweedfs + recognizer 占位镜像）；`.gitignore`（.venv、__pycache__、dist 等）
 5. CI：填入现有 `ci.yml` 占位——双链（uv run ruff+pytest；go vet+gofmt+go test）
 
 **验收（全部可执行）：**
 
-- [ ] `docker compose up -d postgres minio` → `pg_isready` 通过、MinIO 健康端点 200
+- [ ] `docker compose -f deploy/docker-compose.yml up -d postgres seaweedfs` 空转健康（在仓库根目录执行）：
+  ```bash
+  # PostgreSQL:容器内自检(宿主机无需安装 pg 客户端)
+  docker compose -f deploy/docker-compose.yml exec -T postgres \
+    pg_isready -U healthyduoduo -d healthyduoduo
+  # 期望输出 accepting connections,退出码 0
+
+  # SeaweedFS master(默认端口 9333)
+  curl -sf http://localhost:9333/cluster/status      # 200;JSON 含 "IsLeader":true
+  # SeaweedFS S3 API 网关(默认端口 8333)
+  curl -sf http://localhost:8333/                    # 200;ListAllMyBucketsResult XML
+  ```
+  注：①宿主端口被占时用 compose 端口变量覆盖（`POSTGRES_PORT` / `SEAWEEDFS_MASTER_PORT` / `S3_API_PORT`，默认值见 `deploy/docker-compose.yml`）；②seaweedfs 单进程承载 master+volume+filer+S3，S3 网关需等 raft 收敛（冷启或重启约 15-20 秒），验证应轮询重试（如 `for i in 1 2 3 4 5; do curl -sf ... && break; sleep 2; done`），不要在容器刚起时单次 curl 判失败；③`telemetry` 上报日志与 `raft.Server: Not current leader` 为收敛期正常日志，以 curl 结果为准。
 - [ ] `docker compose up -d recognizer` → `curl localhost:8000/healthz` 返回 `{"status":"ok"}`
 - [ ] `uv run pytest`、`go test ./...` 全绿（含 schema 校验 / fixture 用例）
 - [ ] `ls samples/*.jpg | wc -l` ≥ 5（或 ≥2 张 `sim_` 前缀，且计划中标注了补齐时间点）
@@ -231,7 +243,7 @@
 
 ## 9. P2 全链路闭环
 
-**目标：** `hdd ingest` 一图进 → 原图入 MinIO、OCR 结果与报告入 PG → `hdd list / show` 可查；`hdd reparse` 支持规则迭代后重跑历史。
+**目标：** `hdd ingest` 一图进 → 原图入 SeaweedFS、OCR 结果与报告入 PG → `hdd list / show` 可查；`hdd reparse` 支持规则迭代后重跑历史。
 
 **为什么：** MVP 的价值闭环（归档→回看→核对）从这一步成立；reparse 是规则迭代主路径——改词典 / 改正则后历史数据可批量刷新（NF-05），这是「不接 LLM 的规则抽取」策略可持续的前提。
 
@@ -246,7 +258,7 @@ Python（认知层）：
 Go（工程层）：
 
 4. goose 迁移四表（按 4.4）；pgx + sqlc 访问层
-5. minio-go：原图上传（键=sha256）；去重：sha256 命中 → 幂等返回既有报告 ID；`--force` → 重调 `/report` 并更新 reports、**追加** ocr_results
+5. minio-go（S3 客户端）：原图上传（键=sha256）；去重：sha256 命中 → 幂等返回既有报告 ID；`--force` → 重调 `/report` 并更新 reports、**追加** ocr_results
 6. `cmd/hdd`：`ingest <image...> [--date YYYY-MM-DD] [--force]`、`reparse <report-id...>`、`list [--type] [--date]`、`show <report-id>`
 7. 契约测试：Python golden 报告 JSON → Go fixture 反序列化 + schema 校验；httptest mock 识别服务单测编排 / 去重 / 补录逻辑
 
@@ -285,7 +297,7 @@ Go（工程层）：
 
 ## 12. MVP 验收总表
 
-- [ ] `docker compose up -d` 一键起全链路（pg + minio + recognizer）
+- [ ] `docker compose up -d` 一键起全链路（pg + seaweedfs + recognizer）
 - [ ] 图 → OCR JSON：`/ocr` 端点 + 容器内调试 CLI，输出符合 schema
 - [ ] `hdd ingest`：原图 → 对象存储、OCR 结果 + 报告 → PG，三层可追溯
 - [ ] 重复 ingest 幂等；`--force` 更新且 OCR 历史保留
@@ -313,3 +325,6 @@ Go（工程层）：
 | 版本 | 日期 | 说明 |
 |------|------|------|
 | 1.0 | 2026-10-08 | 与维护者三轮对齐后定稿（统一语言、架构、存储、CLI、枚举与阈值、验收形态） |
+| 1.1 | 2026-10-08 | P0 落地注记：①compose 内 MinIO 用社区构建镜像 `coollabsio/minio`（官方 `minio/minio` 镜像 2026-09 起从 Docker Hub 撤下、改源码分发；S3 API 与 minio-go 契约/验收不变）；②真实脱敏样本 P1 起补齐（≥5 张，当前以 3 张 `sim_` 仿真单占位） |
+| 1.2 | 2026-10-08 | 对象存储由 MinIO 改为 SeaweedFS（维护者决策，ADR-0003)：compose 单进程 `server -s3` 起 S3 API 网关；bucket/键设计与 `minio-go` 客户端保持不变，契约与验收不变 |
+| 1.3 | 2026-10-08 | P0 验收第 1 条命令具体化：`pg_isready` 走容器内 exec、SeaweedFS 两个 curl 端点与端口、raft 收敛等待与重试建议 |
