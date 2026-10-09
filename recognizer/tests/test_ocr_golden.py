@@ -15,13 +15,14 @@ from pathlib import Path
 import pytest
 from jsonschema import Draft202012Validator
 
+from recognizer import paths
 from recognizer.contract import OCRResult
 from recognizer.ocr import run_ocr
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-SAMPLES = REPO_ROOT / "samples"
-EXPECTED_OCR = SAMPLES / "expected" / "ocr"
-SCHEMA = REPO_ROOT / "schemas" / "ocr_result.schema.json"
+REPO_ROOT = paths.REPO_ROOT
+SAMPLES = paths.SAMPLES
+EXPECTED_OCR = paths.EXPECTED_OCR
+SCHEMA = paths.SCHEMA_OCR
 
 SCORE_MAE_TOLERANCE = 0.03
 BOX_TOLERANCE_PX = 2.0

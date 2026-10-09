@@ -1,0 +1,110 @@
+# 血常规词典(实施计划 P2-1:词典为数据文件,非硬编码;决策 #8:
+# 只含「规范名 + 别名/缩写 + 已知单位集」,不内置任何参考值——人群差异内置必错,
+# 参考范围一律从检查单抽取)。
+#
+# 【历史的根因与避免措施】本词典最初由人工构造(凭记忆/医学常识),在本需求推进中多次出错:
+#   * 规范名与单据印法颠倒(红细胞平均体积 ← 实际印法 平均红细胞体积);
+#   * 挂了语料里从未出现的别名(白细胞数/HB/超敏C反应蛋白/BAS0# 等);
+#   * 单位集标错(RDW-SD 印 fL 却只登记 %)。
+# 避免措施(此后每次改词典强制执行):
+#   1. 词条必须以 samples/expected/ocr/ 中真实 OCR 文本为证据;observed 而非构造;
+#   2. tests/test_dict_coverage.py 是自动门禁:别名无证据即红;
+#   3. canonical(规范名)是面向报告的维护者选择,可与单据印法不同,但允许别名携带单据印法;
+#   4. 改完词典重跑 `python -m recognizer.golden`,人工核对 raw_text 后再冻结 golden。
+#
+# 分层:
+#   report_type    报告类别(规范名)
+#   category       类别识别规则:title_title_keywords 任一命中即认定;否则按
+#                  min_matched_items 命中词典项数兜底
+#   items          指标项:name=规范名 aliases=别名与缩写 units=已知单位集
+#
+# units 为维护者核对与后续统计规一化用的已知单位字面量(大小写不敏感比较);
+# OCR 损耗单位(如 109/L、1012/L)保留原文记录,不改变置信
+# (low_confidence 仅由 score<0.8 决定,决策 #7;详见 postprocess)。
+report_type: 血常规
+category:
+  title_keywords: ["血常规", "血细胞分析", "血液细胞"]
+  min_matched_items: 10
+items:
+  - name: 白细胞计数
+    aliases: [白细胞, 白细胞计数, WBC]
+    units: ["10^9/L", "*10^9/L", "10~9/L", "*10~9/L"]
+  - name: 红细胞计数
+    aliases: [红细胞, 红细胞计数, RBC]
+    units: ["10^12/L", "*10^12/L", "10~12/L", "*10~12/L"]
+  - name: 血红蛋白
+    aliases: [血红蛋白, HGB]
+    units: [g/L]
+  - name: 红细胞压积
+    aliases: [红细胞压积, HCT]
+    units: ["%"]
+  - name: 平均红细胞体积
+    aliases: [红细胞平均体积, MCV]
+    units: [fL, fl]
+  - name: 平均红细胞血红蛋白量
+    aliases: [平均红细胞血红蛋白量, 平均血红蛋白量, MCH]
+    units: [pg]
+  - name: 平均红细胞血红蛋白浓度
+    aliases: [平均红细胞血红蛋白浓度, 平均血红蛋白浓度, MCHC]
+    units: [g/L]
+  - name: 红细胞分布宽度-CV
+    aliases: ["红细胞分布宽度-CV", "红细胞分布宽度(CV)", "RDW-CV"]
+    units: ["%"]
+  - name: 红细胞分布宽度-SD
+    aliases: ["红细胞分布宽度-SD", "红细胞分布宽度(SD)", "RDW-SD"]
+    units: [fL, fl]
+  - name: 血小板
+    aliases: [血小板, 血小板总数, PLT]
+    units: ["10^9/L", "*10^9/L", "10~9/L", "*10~9/L"]
+  - name: 血小板压积
+    aliases: [血小板压积, 血小板比积, PCT]
+    units: ["%"]
+  - name: 血小板分布宽度
+    aliases: [血小板分布宽度, PDW]
+    units: [fL, fl]
+  - name: 血小板平均体积
+    aliases: [血小板平均体积, MPV]
+    units: [fL, fl]
+  - name: 大型血小板比率
+    aliases: [大型血小板比率, 大血小板比率, P-LCR]
+    units: ["%"]
+  - name: 淋巴细胞比率
+    aliases: [淋巴细胞比率, 淋巴细胞百分比, "LYMP%", "LYMPH%", LYMPHP]
+    units: ["%"]
+  - name: 中性细胞比率
+    aliases: [中性细胞比率, 中性粒细胞百分比, 嗜中性细胞比率, "NEUT%", NEUTP]
+    units: ["%"]
+  - name: 单核细胞比率
+    aliases: [单核细胞比率, 单核细胞百分比, "MONO%", MONOP]
+    units: ["%"]
+  - name: 嗜酸性粒细胞比率
+    aliases: [嗜酸性粒细胞比率, 嗜酸细胞百分比, "EO%", "E0%", EOP]
+    units: ["%"]
+  - name: 嗜碱性粒细胞比率
+    aliases: [嗜碱性粒细胞比率, 嗜碱细胞百分比, "BASO%", "BAS0%", BASOP]
+    units: ["%"]
+  - name: 淋巴细胞数
+    aliases: [淋巴细胞数, 淋巴细胞绝对值, "LYMPH#", LYMPHN, LYP]
+    units: ["10^9/L", "*10^9/L", "10~9/L", "*10~9/L"]
+  - name: 中性细胞数
+  # canonical 取单据印出的「中性细胞+数」;别名含 cbc_04 印法「嗜中性细胞数」
+    aliases: [中性细胞数, 嗜中性细胞数, NEUT, "NEUT#"]
+    units: ["10^9/L", "*10^9/L", "10~9/L", "*10~9/L"]
+  - name: 单核细胞数
+    aliases: [单核细胞数, 单核细胞绝对值, "MONO#", MONON]
+    units: ["10^9/L", "*10^9/L", "10~9/L", "*10~9/L"]
+  - name: 嗜酸性粒细胞数
+    aliases: [嗜酸细胞绝对值, "EO#", "E0#", EON]
+    units: ["10^9/L", "*10^9/L", "10~9/L", "*10~9/L"]
+  - name: 嗜碱性粒细胞数
+    aliases: [嗜碱细胞绝对值, "BASO#", BASON, "BAS0:"]
+    units: ["10^9/L", "*10^9/L", "10~9/L", "*10~9/L"]
+  - name: 血沉
+    aliases: [血沉, ESR]
+    units: [mm/h]
+  - name: C反应蛋白
+    aliases: [C反应蛋白, CRP]
+    units: [mg/L]
+  - name: 血清淀粉样蛋白A
+    aliases: [血清淀粉样蛋白A, SAA]
+    units: [mg/L]

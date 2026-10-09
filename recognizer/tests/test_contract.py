@@ -7,11 +7,11 @@ import pytest
 from jsonschema import Draft202012Validator
 from pydantic import ValidationError
 
+from recognizer import paths
 from recognizer.contract import OCRResult, Report
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-SCHEMA_DIR = REPO_ROOT / "schemas"
-TESTDATA = SCHEMA_DIR / "testdata"
+SCHEMA_DIR = paths.SCHEMAS
+TESTDATA = paths.CONTRACT_TESTDATA
 
 
 def _load(path: Path) -> dict:

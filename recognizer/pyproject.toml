@@ -10,6 +10,7 @@ dependencies = [
     "rapidocr>=3.9.0",
     "onnxruntime>=1.30.0",
     "python-multipart>=0.0.32",
+    "pyyaml>=6.0.3",
 ]
 
 [dependency-groups]

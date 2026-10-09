@@ -523,6 +523,7 @@ dependencies = [
     { name = "onnxruntime" },
     { name = "pydantic" },
     { name = "python-multipart" },
+    { name = "pyyaml" },
     { name = "rapidocr" },
     { name = "uvicorn" },
 ]
@@ -541,6 +542,7 @@ requires-dist = [
     { name = "onnxruntime", specifier = ">=1.30.0" },
     { name = "pydantic", specifier = ">=2.9" },
     { name = "python-multipart", specifier = ">=0.0.32" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "rapidocr", specifier = ">=3.9.0" },
     { name = "uvicorn", specifier = ">=0.30" },
 ]
