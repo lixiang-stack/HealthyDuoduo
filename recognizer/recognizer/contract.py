@@ -72,3 +72,21 @@ class Report(BaseModel):
     report_date: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
     status: Status
     items: list[ReportItem]
+
+
+class ReportBundle(BaseModel):
+    """POST /report 的响应体:一次请求内 OCR 结果 + 结构化报告(实施计划 4.3)。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    ocr_result: OCRResult
+    report: Report
+
+
+class ReparseRequest(BaseModel):
+    """POST /reparse 的请求体:复用已存 OCR 结果重跑后处理(date 为人工补录兜底)。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    ocr_result: OCRResult
+    date: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
