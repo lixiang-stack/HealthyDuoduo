@@ -12,11 +12,11 @@
 """
 
 import json
-from pathlib import Path
 from typing import Any
 
 import pytest
 
+from recognizer import paths
 from recognizer.contract import OCRResult
 from recognizer.postprocess import run_postprocess
 
@@ -194,15 +194,15 @@ def test_score_threshold_boundary() -> None:
     assert run_postprocess(ocr79).status == "partial"
 
 
-def test_garbled_unit_marks_low_confidence_keeps_raw() -> None:
-    """单位不在词典已知单位集 → 保留原文 + low_confidence(cbc_01 的 109/L 版式)。"""
+def test_garbled_unit_kept_raw_without_confidence_mark() -> None:
+    """OCR 损耗单位(109/L 版式)保留原文;low_confidence 仅由 score<0.8 决定(决策 #7)。"""
     ocr = mk_ocr(header_row() + row(30, "血小板", "215", unit="109/L", ref="100--300"))
     r = run_postprocess(ocr)
     it = item_of(r, "血小板")
     assert it.value == 215
     assert it.unit == "109/L"  # 保留原文供人工核对
-    assert it.low_confidence is True
-    assert r.status == "partial"
+    assert it.low_confidence is False
+    assert r.status == "success"
 
 
 # ---------- 日期 ----------
@@ -265,9 +265,9 @@ def test_title_keyword_detects_category() -> None:
 
 # ---------- golden(真实样本,OCR 结果来自 golden 文件,跨架构确定性) ----------
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-EXPECTED_OCR = REPO_ROOT / "samples" / "expected" / "ocr"
-EXPECTED_REPORT = REPO_ROOT / "samples" / "expected" / "report"
+REPO_ROOT = paths.REPO_ROOT
+EXPECTED_OCR = paths.EXPECTED_OCR
+EXPECTED_REPORT = paths.EXPECTED_REPORT
 
 _sample_ids = sorted(p.stem for p in EXPECTED_OCR.glob("*.json")) if EXPECTED_OCR.exists() else []
 

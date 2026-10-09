@@ -1,4 +1,3 @@
-// pipeline 单测:编排/去重/补录 --force 行为,fake 掉 store/识别服务/对象存储。
 package pipeline_test
 
 import (
@@ -32,17 +31,17 @@ func sampleOCR() *contract.OCRResult {
 type fakeStore struct {
 	mu sync.Mutex
 
-	images  map[string]*pipeline.Image
 	nextID  int64
+	images  map[string]bool // 已入库的 sha256 集合(identity 即主键)
 	ocrRows []fakeOCR
-	reports map[int64]*fakeReport
+	reports map[string]*fakeReport
 	listRet []pipeline.ReportRow
 }
 
 type fakeOCR struct {
-	id    int64
-	imgID int64
-	raw   []byte
+	id     int64
+	imgSha string
+	raw    []byte
 }
 
 type fakeReport struct {
@@ -51,56 +50,56 @@ type fakeReport struct {
 }
 
 func newFakeStore() *fakeStore {
-	return &fakeStore{images: map[string]*pipeline.Image{}, reports: map[int64]*fakeReport{}, nextID: 0}
+	return &fakeStore{images: map[string]bool{}, reports: map[string]*fakeReport{}, nextID: 0}
 }
 
 func (f *fakeStore) ImageBySha256(ctx context.Context, sha string) (*pipeline.Image, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	img := f.images[sha]
-	if img == nil {
+	if !f.images[sha] {
 		return nil, nil
 	}
-	c := *img
-	return &c, nil
+	return &pipeline.Image{Sha256: sha}, nil
 }
 
-func (f *fakeStore) CreateImage(ctx context.Context, sha, objectKey, filename string) (int64, error) {
+func (f *fakeStore) ImagesByShaPrefix(ctx context.Context, prefix string) ([]pipeline.Image, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var out []pipeline.Image
+	for sha := range f.images {
+		if len(sha) >= len(prefix) && sha[:len(prefix)] == prefix {
+			out = append(out, pipeline.Image{Sha256: sha})
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeStore) CreateImage(ctx context.Context, sha, filename string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.images[sha] = true
+	return nil
+}
+
+func (f *fakeStore) AppendOCRResult(ctx context.Context, imageSha string, raw []byte) (int64, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.nextID++
-	id := f.nextID
-	f.images[sha] = &pipeline.Image{ID: id, Sha256: sha, ObjectKey: objectKey, OriginalFilename: filename}
-	return id, nil
-}
-
-func (f *fakeStore) AppendOCRResult(ctx context.Context, imageID int64, raw []byte) (int64, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.nextID++
-	f.ocrRows = append(f.ocrRows, fakeOCR{id: f.nextID, imgID: imageID, raw: raw})
+	f.ocrRows = append(f.ocrRows, fakeOCR{id: f.nextID, imgSha: imageSha, raw: raw})
 	return f.nextID, nil
 }
 
-func (f *fakeStore) ReportByImage(ctx context.Context, imageID int64) (*pipeline.ReportRow, bool, error) {
+func (f *fakeStore) ReportByImage(ctx context.Context, imageSha string) (*pipeline.ReportRow, bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	for id := range f.reports {
-		if f.reports[id].row.ImageID == imageID {
-			r := f.reports[id].row
-			return &r, true, nil
-		}
+	if r, ok := f.reports[imageSha]; ok {
+		c := r.row
+		return &c, true, nil
 	}
 	return nil, false, nil
 }
 
 func (f *fakeStore) ReportByID(ctx context.Context, id int64) (*pipeline.ReportRow, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	if r, ok := f.reports[id]; ok {
-		c := r.row
-		return &c, nil
-	}
 	return nil, fmt.Errorf("repo %d missing", id)
 }
 
@@ -108,13 +107,13 @@ func (f *fakeStore) ListReports(ctx context.Context, reportType, date string) ([
 	return f.listRet, nil
 }
 
-func (f *fakeStore) ItemsByReport(ctx context.Context, reportID int64) ([]contract.ReportItem, error) {
+func (f *fakeStore) ItemsByImage(ctx context.Context, reportSha string) ([]contract.ReportItem, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if r, ok := f.reports[reportID]; ok {
+	if r, ok := f.reports[reportSha]; ok {
 		return r.rep.Items, nil
 	}
-	return nil, fmt.Errorf("items %d missing", reportID)
+	return nil, fmt.Errorf("items %s missing", reportSha)
 }
 
 func (f *fakeStore) OCRResultJSON(ctx context.Context, ocrID int64) ([]byte, error) {
@@ -128,26 +127,27 @@ func (f *fakeStore) OCRResultJSON(ctx context.Context, ocrID int64) ([]byte, err
 	return nil, fmt.Errorf("ocr %d missing", ocrID)
 }
 
-func (f *fakeStore) WriteReport(ctx context.Context, reportID, imageID, ocrID int64, report contract.Report) (int64, error) {
+func (f *fakeStore) WriteReport(ctx context.Context, reportSha string, ocrID int64, report contract.Report) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if reportID == 0 {
-		f.nextID++
-		reportID = f.nextID
-	}
 	date := ""
 	if report.ReportDate != nil {
 		date = *report.ReportDate
 	}
-	f.reports[reportID] = &fakeReport{
-		row: pipeline.ReportRow{ID: reportID, ImageID: imageID, OCRResultID: ocrID, ReportType: report.ReportType,
-			ReportDate: newIf(date), Status: report.Status},
+	f.reports[reportSha] = &fakeReport{
+		row: pipeline.ReportRow{Sha256: reportSha, OCRResultID: ocrID, ReportType: report.ReportType,
+			ReportDate: ptrIf(date), Status: report.Status},
 		rep: report,
 	}
-	return reportID, nil
+	return nil
 }
 
-func newIf(s string) *string { return &s }
+func ptrIf(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
 
 type fakeRecognizer struct {
 	mu sync.Mutex
@@ -155,9 +155,10 @@ type fakeRecognizer struct {
 	reportCalls  int
 	reparseCalls int
 
-	imageOfCall map[int][]byte
-	dateOfCall  map[int]string
-	report      contract.Report
+	imageOfCall     map[int][]byte
+	dateOfCall      map[int]string
+	lastReparseHint *string
+	report          contract.Report
 }
 
 func newFakeRecognizer() *fakeRecognizer {
@@ -171,6 +172,12 @@ func (f *fakeRecognizer) Report(ctx context.Context, image []byte, filename, dat
 	f.imageOfCall[f.reportCalls] = image
 	f.dateOfCall[f.reportCalls] = date
 	rep := f.report
+	if date != "" {
+		// 与真实识别服务一致:date 作为解析失败时的人工补录兜底生效
+		d := date
+		rep.ReportDate = &d
+		rep.Status = "success"
+	}
 	return sampleOCR(), &rep, nil
 }
 
@@ -178,6 +185,7 @@ func (f *fakeRecognizer) Reparse(ctx context.Context, ocr *contract.OCRResult, d
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.reparseCalls++
+	f.lastReparseHint = &date
 	rep := f.report
 	if date != "" {
 		d := date

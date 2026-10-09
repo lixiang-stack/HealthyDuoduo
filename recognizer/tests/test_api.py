@@ -3,18 +3,18 @@ P2:/report(image → {ocr_result, report})与 /reparse(golden OCR → report)契
 """
 
 import json
-from pathlib import Path
 
 from fastapi.testclient import TestClient
 from jsonschema import Draft202012Validator
 
+from recognizer import paths
 from recognizer.api import app
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-SAMPLES = REPO_ROOT / "samples"
-SCHEMA = REPO_ROOT / "schemas" / "ocr_result.schema.json"
-REPORT_SCHEMA = REPO_ROOT / "schemas" / "report.schema.json"
-EXPECTED_OCR = SAMPLES / "expected" / "ocr"
+REPO_ROOT = paths.REPO_ROOT
+SAMPLES = paths.SAMPLES
+SCHEMA = paths.SCHEMA_OCR
+REPORT_SCHEMA = paths.SCHEMA_REPORT
+EXPECTED_OCR = paths.EXPECTED_OCR
 
 _golden_ids = sorted(p.stem for p in EXPECTED_OCR.glob("*.json"))
 

@@ -8,14 +8,14 @@
 """
 
 import json
-from pathlib import Path
 
+from . import paths
 from .contract import OCRResult
 from .postprocess import run_postprocess
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-SOURCES = REPO_ROOT / "samples" / "expected" / "ocr"
-TARGETS = REPO_ROOT / "samples" / "expected" / "report"
+REPO_ROOT = paths.REPO_ROOT
+SOURCES = paths.EXPECTED_OCR
+TARGETS = paths.EXPECTED_REPORT
 
 
 def main() -> int:
@@ -25,7 +25,7 @@ def main() -> int:
         TARGETS.mkdir(parents=True, exist_ok=True)
         out = TARGETS / src.name
         out.write_text(report.model_dump_json() + "\n", encoding="utf-8")
-        print(f"{src.name}: {report.status} {len(report.items)} items -> {out.relative_to(REPO_ROOT)}")
+        print(f"{src.name}: {report.status.value} {len(report.items)} items -> {out.relative_to(REPO_ROOT)}")
     return 0
 
 

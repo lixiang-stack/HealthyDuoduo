@@ -10,9 +10,19 @@
   或「代号/缩写」列(名称列失败时用代号兜底,如 cbc_04 的 MCH/名称误写);
 - 熔断行按内容拆解:名熔值(平均血红蛋白浓度324)、单位熔范围(*10~9/L 3.5-9.5)、
   范围熔单位(130--175 g/L)、值熔范围熔单位(11.61|1.1--3.2|10^9/L→OCR 乱珠)。
-低置信:任一组成行 score < LOW_SCORE_THRESHOLD(决策 #7),或单位不在词典
-已知单位集 → 该项 low_confidence;未解析日期且无兜底 → report_date=null+partial;
-类别失败或无产出 → failed(仍留痕,reparse/补录可救)。
+
+低置信(决策 #7 原义,验收轮已收敛):任一组成行 score < LOW_SCORE_THRESHOLD
+→ 该项 low_confidence、报告 ≥partial。单位解析损耗(如 109/L、1012/L)一律
+保留原文记录,不改变置信标记;threshold 与单位语义供人工核对与后续规一化用。
+未解析日期且无兜底 → report_date=null+partial;类别失败或无产出 → failed。
+
+样本收窄边界(review):规则与词典目前由 5 张已入库真实样本驱动;新样本若引入
+新版式/新指标名,预期行为是「未命中的行被跳过、指标缺失 → partial/failed」,
+不会崩溃。扩展点按优先级:
+1. 词典数据文件 cbc_dict.yaml;
+2. 改动后重跑 `python -m recognizer.golden` 并人工核对 raw_text;
+3. 新版式(表头关键词/列距/熔断形态不匹配)才动本文件解析规则,
+   且须先以真实样本落 samples/expected/ocr(golden)后再改。
 """
 
 import re
@@ -22,12 +32,15 @@ from pathlib import Path
 
 import yaml
 
-from .contract import OCRResult, Report, ReportItem
+from .contract import Flag, OCRResult, Report, ReportItem, Status
 
 DICT_PATH = Path(__file__).parent / "cbc_dict.yaml"
 
 # 决策 #7:任一组成行 score < 阈值 → 项 low_confidence、报告 ≥partial(固定常量)
 LOW_SCORE_THRESHOLD = 0.8
+
+# 类别不识别时的报告类别(review 决定用英文占位,区别于「血常规」等正名)
+UNKNOWN_REPORT_TYPE = "unknown"
 
 # 日期标签,按优先级降序取首个命中行里的日期(打印/申请最低;检验最高)
 _DATE_LABELS = (
@@ -35,14 +48,21 @@ _DATE_LABELS = (
     "核收时间", "报告时间", "报告日期", "打印时间", "申请时间",
 )
 _DATE_RE = re.compile(r"(\d{4})[-/.年](\d{1,2})[-/.月]?(\d{1,2})")
-_STANDALONE_DATE_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})\b")
+_DATE_LINE_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})\b")
 
 _NUM = r"\d+(?:\.\d+)?"
-_NUM_RE = re.compile(rf"^{_NUM}$")
-_RANGE_RE = re.compile(rf"({_NUM})\s*[-–—~]{{1,2}}\s*({_NUM})")
-_CMP_RE = re.compile(rf"([<≤>≥])\s*({_NUM})")
+_NUMBER_RE = re.compile(rf"^{_NUM}$")  # 纯正数(含小数)
+_RANGE_RE = re.compile(rf"({_NUM})\s*[-–—~]{{1,2}}\s*({_NUM})")  # a-b / a--b / a~b
+_CMP_RE = re.compile(rf"([<≤>≥])\s*({_NUM})")  # <v / ≤v / >v / ≥v
+_NUMBER_TAIL_RE = re.compile(rf"({_NUM})$")  # 比较式熔断格首部的数值(38.201<8 mg/L)
 _ARROW_RE = re.compile(r"[↑↓▲▼]+")
-_SERIAL_RE = re.compile(r"^\d+[.、．]?[\s]*")
+_SERIAL_RE = re.compile(r"^\d+[.、．]?[\s]*")  # 行首序号前缀(8 嗜酸性粒细胞)
+_STAR_RE = re.compile(r"^[*＊※✱]+")  # 行首星号前缀(*白细胞)
+_SEX_PREFIX_RE = re.compile(r"^[男女][::：]\s*")  # 性别条件范围前缀(男:0-15)
+_SEX_LABEL_RE = re.compile(r"[男女][::：]")  # 独立性别标签(男:/女:)
+_HINT_RE = re.compile(r"[\d%/^~\-–—<≤>≥/]")  # 含任一数值/范围/单位符号 → 值得拆解
+_UNIT_WORD_RE = re.compile(r"[A-Za-z]{1,4}")  # 短纯字母单位(fL、pg)
+_ASCII_UNIT_RE = re.compile(r"[0-9A-Za-z.%^~/*\-]+")  # ASCII 数值/单位字符串(g/L、109/L、1012/L)
 
 # 表头关键词 → 列角色
 ROLE_HEADERS: dict[str, tuple[str, ...]] = {
@@ -52,6 +72,15 @@ ROLE_HEADERS: dict[str, tuple[str, ...]] = {
     "ref": ("参考值", "参考区间", "参考范围"),
     "aux": ("序号", "代码", "代号", "缩写", "简称"),
 }
+
+# 行带容差系数 × 该带当前最大行高;0.7 经 5 张已入库样本实测校准:
+# 过小(≤0.55)会拆散左右半栏垂直错位 ≤ 行高的同一视觉行,过大(≥0.8)会把紧凑排版的相邻行并带。
+_BAND_TOLERANCE_FACTOR = 0.7
+
+# 碎片配对 dy 上限 = 该半栏名称行距中位数 × 系数;防止跨行碎片污染(咬合到错误行)。
+_PIECE_CAP_FACTOR = 0.6
+_PIECE_CAP_MIN_PX = 6.0
+_PIECE_CAP_DEFAULT_PX = 25.0
 
 # cell 归列时允许的最大偏离(像素);页面级垃圾行(标题/落款)不应占用表列
 _ASSIGN_TOLERANCE_PX = 180
@@ -139,7 +168,7 @@ def _bands(cells: list[_Cell]) -> list[list[_Cell]]:
     bands: list[list[_Cell]] = []
     for c in ordered:
         if bands:
-            tol = 0.7 * max(x.h for x in bands[-1])
+            tol = _BAND_TOLERANCE_FACTOR * max(x.h for x in bands[-1])
             if c.cy - bands[-1][0].cy <= tol:
                 bands[-1].append(c)
                 continue
@@ -174,7 +203,7 @@ def _decompose(text: str) -> tuple[float | None, str | None, str | None]:
     # 纯中文非数字文本(如「结果」「审核者：」)不产生任何 fragment,防止伪单位;
     # 短 ASCII 字母串(如 fL、pg)是合法单位形
     if not s or (
-        not re.search(r"[\d%/^~\-–—<≤>≥/]", s) and not re.fullmatch(r"[A-Za-z]{1,4}", s)
+        not _HINT_RE.search(s) and not _UNIT_WORD_RE.fullmatch(s)
     ):
         return None, None, None
     s = _ARROW_RE.sub("", s).strip()
@@ -195,10 +224,10 @@ def _decompose(text: str) -> tuple[float | None, str | None, str | None]:
     if m:
         head, tail = rest[: m.start()].strip(), rest[m.end() :].strip()
         rtext = m.group(0)
-        if head and re.fullmatch(r"[男女][::：]?", head):
+        if head and _SEX_LABEL_RE.fullmatch(head):
             rtext = head + m.group(0)  # 性别前缀参考范围保留原文(如 男:0-15)
         ref = rtext
-        if head and _NUM_RE.fullmatch(head):
+        if head and _NUMBER_RE.fullmatch(head):
             value = float(head)
         if tail:
             unit = tail
@@ -213,13 +242,12 @@ def _decompose(text: str) -> tuple[float | None, str | None, str | None]:
             ref = m.group(0)
             if tail:
                 unit = tail
-        elif _NUM_RE.fullmatch(rest.strip()):
+        elif _NUMBER_RE.fullmatch(rest.strip()):
             value = float(rest.strip())
-        elif rest.strip():
-            # 单位字面:纯 ASCII 数字/字母/%/^~// 形态(如 g/L、fL、pg、f1、109/L、10../L);
+        elif rest.strip() and _ASCII_UNIT_RE.fullmatch(rest.strip()):
+            # 单位字面:ASCII 数字/字母/%/^~// 形态(g/L、fL、pg、f1、109/L、1012/L);
             # 纯中文词(审核者：、结果、赵志佳)或含中文的垃圾不成立
-            if re.fullmatch(r"[0-9A-Za-z.%^~/*\-]+", rest):
-                unit = rest
+            unit = rest.strip()
     return value, ref, unit or unit_from_prefix
 
 
@@ -231,20 +259,22 @@ def _flag(value: float | None, ref: str | None) -> int:
     """
     if value is None or ref is None:
         return "unknown"
-    r = re.sub(r"^[男女][::]\s*", "", ref.strip())
-    m = re.fullmatch(rf"({_NUM})\s*[-–—~]{{1,2}}\s*({_NUM})", r)
+    r = _SEX_PREFIX_RE.sub("", ref.strip())
+    m = _RANGE_RE.fullmatch(r)
     if m:
         lo, hi = float(m.group(1)), float(m.group(2))
         if lo > hi:
-            return "unknown"
-        return "normal" if lo <= value <= hi else ("high" if value > hi else "low")
+            return Flag.UNKNOWN
+        if lo <= value <= hi:
+            return Flag.NORMAL
+        return Flag.HIGH if value > hi else Flag.LOW
     m = _CMP_RE.match(r)
     if m:
         op, v = m.group(1), float(m.group(2))
         if op in "<≤":
-            return "normal" if value < v else "high"
-        return "normal" if value > v else "low"
-    return "unknown"
+            return Flag.NORMAL if value < v else Flag.HIGH
+        return Flag.NORMAL if value > v else Flag.LOW
+    return Flag.UNKNOWN
 
 
 def _match_name(text: str) -> tuple[DictItem | None, float | None]:
@@ -255,8 +285,8 @@ def _match_name(text: str) -> tuple[DictItem | None, float | None]:
     """
     t = text.strip()
     t = _ARROW_RE.sub("", t).strip()
-    t = re.sub(r"^[*＊※✱]+", "", t).strip()
-    t = re.sub(_SERIAL_RE, "", t).strip()
+    t = _STAR_RE.sub("", t).strip()
+    t = _SERIAL_RE.sub("", t).strip()
     d = load_dict()
     it = d.alias_map.get(t)
     if it is not None:
@@ -264,7 +294,7 @@ def _match_name(text: str) -> tuple[DictItem | None, float | None]:
     for alias in sorted(d.alias_map, key=len, reverse=True):
         if t.startswith(alias):
             rest = t[len(alias) :]
-            m = _NUM_RE.fullmatch(rest.strip())
+            m = _NUMBER_RE.fullmatch(rest.strip())
             if m:
                 return d.alias_map[alias], float(m.group(0))
     return None, None
@@ -304,7 +334,7 @@ def _find_date(cells: list[_Cell], date_hint: str | None) -> str | None:
     if date_hint:
         return date_hint
     for c in cells:  # 独立日期行(标签与日期被 OCR 拆开时的兜底,如 cbc_05)
-        m = _STANDALONE_DATE_RE.match(c.text.strip())
+        m = _DATE_LINE_RE.match(c.text.strip())
         if m:
             return m.group(1)
     return None
@@ -375,9 +405,9 @@ def _extract_items(cells: list[_Cell], roles) -> list[tuple[DictItem, _RowPiece]
         # 防止跨行/落款碎片污染)
         if len(rows) >= 2:
             pitches = sorted(b - a for a, b in zip([r.cy for r in rows], [r.cy for r in rows[1:]]))
-            cap = max(6.0, 0.6 * pitches[len(pitches) // 2])
+            cap = max(_PIECE_CAP_MIN_PX, _PIECE_CAP_FACTOR * pitches[len(pitches) // 2])
         else:
-            cap = 25.0
+            cap = _PIECE_CAP_DEFAULT_PX
         pieces: list[tuple[_Cell, _RowPiece, float]] = []
         for role in ("value", "unit", "ref"):
             for c in assigned.get((role, k), []):
@@ -403,9 +433,6 @@ def _extract_items(cells: list[_Cell], roles) -> list[tuple[DictItem, _RowPiece]
         for row in rows:
             if row.value is None and row.fused_value is not None:
                 row.value = row.fused_value
-            # 单位校验(决策 #8 已知单位集):非白名单单位 → 保原文 + 低置信
-            if row.unit is not None and row.item and row.unit.lower() not in row.item.units:
-                row.low_score = True
             items.append((row.item, row))
     return items
 
@@ -429,7 +456,7 @@ def run_postprocess(ocr: OCRResult, date_hint: str | None = None) -> Report:
     category = d.report_type if (title_hit or len(pairs) >= d.min_matched_items) else None
 
     if not title_hit and len(pairs) < d.min_matched_items:
-        return Report(report_type="未知", report_date=date, status="failed", items=[])
+        return Report(report_type=UNKNOWN_REPORT_TYPE, report_date=date, status=Status.FAILED, items=[])
 
     items: list[ReportItem] = []
     partial = False
@@ -452,9 +479,14 @@ def run_postprocess(ocr: OCRResult, date_hint: str | None = None) -> Report:
         if low_conf or piece.value is None:
             partial = True
 
-    status = "failed" if not items else ("partial" if (partial or date is None) else "success")
+    if not items:
+        status = Status.FAILED
+    elif partial or date is None:
+        status = Status.PARTIAL
+    else:
+        status = Status.SUCCESS
     return Report(
-        report_type=category or "未知",
+        report_type=category or UNKNOWN_REPORT_TYPE,
         report_date=date,
         status=status,
         items=items,

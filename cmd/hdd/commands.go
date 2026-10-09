@@ -1,13 +1,19 @@
 package main
 
-// 四个子命令;输出一行一条,演示脚本可直接断言(实施计划决策 #11 命令级验收)。
+// Four subcommands; one line per record so demo scripts can assert on output
+// (implementation plan decision #11, command-level acceptance).
+// Interface text is English per acceptance review; report_type DATA values (血常规)
+// display as CBC when a display alias is known.
+// Identifier: 图像内容 sha256(完整 64 hex 或 ≥8 hex 唯一前缀)。
 
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"strconv"
+	"text/tabwriter"
 
 	"healthyduoduo/internal/contract"
 	"healthyduoduo/internal/pipeline"
@@ -20,14 +26,42 @@ type deps struct {
 	obj   pipeline.ObjectStore
 }
 
-// parseIngestArgs:位置参数与 flag 可混排(--date 需带值,--force 为布尔)。
+// typeDisplay 已知报告类别 → CLI 显示缩写(域数据 storage 中原样保留)。
+var typeDisplay = map[string]string{"血常规": "CBC"}
+
+// typeAlias 显示缩写 → 域数据值(--type 亦接受缩写输入)。
+var typeAlias = map[string]string{"CBC": "血常规"}
+
+func abbrType(t string) string {
+	if a, ok := typeDisplay[t]; ok {
+		return a
+	}
+	return t
+}
+
+func domType(in string) string {
+	if d, ok := typeAlias[in]; ok {
+		return d
+	}
+	return in
+}
+
+// shortSha 为终端可读性取 sha256 前 12 hex(git 风格短标识;show 头行同时给完整值)。
+func shortSha(sha string) string {
+	if len(sha) > 12 {
+		return sha[:12]
+	}
+	return sha
+}
+
+// parseIngestArgs 位置参数与 flag 可混排(--date 需带值,--force 为布尔)。
 func parseIngestArgs(args []string, date *string, force *bool, errOut io.Writer) ([]string, error) {
 	var images []string
 	for i := 0; i < len(args); i++ {
 		switch a := args[i]; {
 		case a == "--date" || a == "-date":
 			if i+1 >= len(args) {
-				fmt.Fprintf(errOut, "ingest: %s 需要一个值(YYYY-MM-DD)\n", a)
+				fmt.Fprintf(errOut, "ingest: %s needs a value (YYYY-MM-DD)\n", a)
 				return nil, errors.New("missing date value")
 			}
 			i++
@@ -35,7 +69,7 @@ func parseIngestArgs(args []string, date *string, force *bool, errOut io.Writer)
 		case a == "--force" || a == "-force":
 			*force = true
 		case len(a) > 1 && a[0] == '-':
-			fmt.Fprintf(errOut, "ingest: 未知参数 %q\n用法:%s\n", a, usage)
+			fmt.Fprintf(errOut, "ingest: unknown flag %q\n%s\n", a, usage)
 			return nil, fmt.Errorf("unknown flag: %q", a)
 		default:
 			images = append(images, a)
@@ -52,11 +86,11 @@ func runIngest(out, errOut io.Writer, d *deps, args []string) int {
 		return 2
 	}
 	if len(images) == 0 {
-		fmt.Fprintln(errOut, "ingest: 至少一张图像\n"+usage)
+		fmt.Fprintf(errOut, "ingest: at least one image is required\n%s\n", usage)
 		return 2
 	}
-	if date != "" && !dateRe.MatchString(date) {
-		fmt.Fprintf(errOut, "ingest: --date 需为 YYYY-MM-DD,得到 %q\n", date)
+	if date != "" && !fullDateRe.MatchString(date) {
+		fmt.Fprintf(errOut, "ingest: --date must be YYYY-MM-DD, got %q\n", date)
 		return 2
 	}
 	exit := 0
@@ -69,11 +103,11 @@ func runIngest(out, errOut io.Writer, d *deps, args []string) int {
 		}
 		switch oc.Kind {
 		case pipeline.KindCached:
-			fmt.Fprintf(out, "report %d: 幂等命中(同一图像已入库;--force 重跑)\n", oc.ReportID)
+			fmt.Fprintf(out, "sha256=%s: idempotent duplicate (same image already ingested; use --force to rerun)\n", shortSha(oc.Sha256))
 		case pipeline.KindBackfilled:
-			fmt.Fprintf(out, "report %d: 已用 --date 补录日期,%s(%d 项)\n", oc.ReportID, summary(oc.Report), len(oc.Report.Items))
+			fmt.Fprintf(out, "sha256=%s: date backfilled via --date, %s (%d items)\n", shortSha(oc.Sha256), summary(oc.Report), len(oc.Report.Items))
 		default:
-			fmt.Fprintf(out, "report %d: %s(%d 项)\n", oc.ReportID, summary(oc.Report), len(oc.Report.Items))
+			fmt.Fprintf(out, "sha256=%s: %s (%d items)\n", shortSha(oc.Sha256), summary(oc.Report), len(oc.Report.Items))
 		}
 	}
 	return exit
@@ -81,105 +115,103 @@ func runIngest(out, errOut io.Writer, d *deps, args []string) int {
 
 func runReparse(out, errOut io.Writer, d *deps, args []string) int {
 	var date string
-	ids := make([]int64, 0, len(args))
+	shas := make([]string, 0, len(args))
 	for i := 0; i < len(args); i++ {
 		switch a := args[i]; {
 		case a == "--date" || a == "-date":
 			if i+1 >= len(args) {
-				fmt.Fprintf(errOut, "reparse: %s 需要一个值(YYYY-MM-DD)\n", a)
+				fmt.Fprintf(errOut, "reparse: %s needs a value (YYYY-MM-DD)\n", a)
 				return 2
 			}
 			i++
 			date = args[i]
 		case len(a) > 1 && a[0] == '-':
-			fmt.Fprintf(errOut, "reparse: 未知参数 %q\n", a)
+			fmt.Fprintf(errOut, "reparse: unknown flag %q\n", a)
 			return 2
 		default:
-			id, err := strconv.ParseInt(a, 10, 64)
-			if err != nil {
-				fmt.Fprintf(errOut, "reparse: report id 需为整数,得到 %q\n", a)
-				return 2
-			}
-			ids = append(ids, id)
+			shas = append(shas, a)
 		}
 	}
-	if len(ids) == 0 {
-		fmt.Fprintln(errOut, "reparse: 至少一个 report id\n"+usage)
+	if len(shas) == 0 {
+		fmt.Fprintf(errOut, "reparse: at least one sha256 is required\n%s\n", usage)
 		return 2
 	}
-	if date != "" && !dateRe.MatchString(date) {
-		fmt.Fprintf(errOut, "reparse: --date 需为 YYYY-MM-DD,得到 %q\n", date)
+	if date != "" && !fullDateRe.MatchString(date) {
+		fmt.Fprintf(errOut, "reparse: --date must be YYYY-MM-DD, got %q\n", date)
 		return 2
 	}
 	exit := 0
-	for _, id := range ids {
-		report, err := pipeline.Reparse(context.Background(), d.store, d.rec, id, date)
+	for _, shaArg := range shas {
+		report, err := pipeline.Reparse(context.Background(), d.store, d.rec, shaArg, date)
 		if err != nil {
-			fmt.Fprintf(errOut, "reparse %d: %v\n", id, err)
+			fmt.Fprintf(errOut, "reparse %s: %v\n", shaArg, err)
 			exit = 1
 			continue
 		}
-		fmt.Fprintf(out, "reparse %d: %s(%d 项)\n", id, summary(report), len(report.Items))
+		fmt.Fprintf(out, "reparse %s: %s (%d items)\n", shortSha(shaArg), summary(report), len(report.Items))
 	}
 	return exit
 }
 
 func runList(out, errOut io.Writer, d *deps, args []string) int {
-	f := fs("list", errOut)
+	listFlags := flag.NewFlagSet("list", flag.ContinueOnError)
+	listFlags.SetOutput(errOut)
 	var reportType, date string
-	f.StringVar(&reportType, "type", "", "按报告类别过滤,如 血常规")
-	f.StringVar(&date, "date", "", "按检查日期过滤(YYYY-MM-DD)")
-	if err := f.Parse(args); err != nil {
+	listFlags.StringVar(&reportType, "type", "", "filter by report type, e.g. CBC (= 血常规)")
+	listFlags.StringVar(&date, "date", "", "filter by check date: YYYY or YYYY-MM or YYYY-MM-DD")
+	if err := listFlags.Parse(args); err != nil {
 		return 2
 	}
-	if date != "" && !dateRe.MatchString(date) {
-		fmt.Fprintf(errOut, "list: --date 需为 YYYY-MM-DD,得到 %q\n", date)
+	if date != "" && !listDateRe.MatchString(date) {
+		fmt.Fprintf(errOut, "list: --date must be YYYY, YYYY-MM or YYYY-MM-DD, got %q\n", date)
 		return 2
 	}
-	rows, err := pipeline.ListReports(context.Background(), d.store, reportType, date)
+	rows, err := pipeline.ListReports(context.Background(), d.store, domType(reportType), date)
 	if err != nil {
 		fmt.Fprintf(errOut, "list: %v\n", err)
 		return 1
 	}
-	fmt.Fprintln(out, "id\timage\tocr\tdate\ttype\tstatus\titems")
+	tw := tabwriter.NewWriter(out, 0, 4, 2, ' ', 0)
+	fmt.Fprintln(tw, "sha256\tocr\tdate\ttype\tstatus\titems")
 	for _, r := range rows {
-		fmt.Fprintf(out, "%d\t%d\t%d\t%s\t%s\t%s\t%d\n",
-			r.ID, r.ImageID, r.OCRResultID, orDash(r.ReportDate), r.ReportType, r.Status, r.ItemsCount)
+		fmt.Fprintf(tw, "%s\t%d\t%s\t%s\t%s\t%d\n",
+			shortSha(r.Sha256), r.OCRResultID, orDash(r.ReportDate), abbrType(r.ReportType), r.Status, r.ItemsCount)
 	}
-	return 0
+	return twError(tw)
 }
 
 func runShow(out, errOut io.Writer, d *deps, args []string) int {
 	if len(args) == 0 {
-		fmt.Fprintln(errOut, "show: 至少一个 report id\n"+usage)
+		fmt.Fprintf(errOut, "show: at least one sha256 is required\n%s\n", usage)
 		return 2
 	}
 	exit := 0
 	for _, arg := range args {
-		id, err := strconv.ParseInt(arg, 10, 64)
+		row, err := pipeline.ShowReport(context.Background(), d.store, arg)
 		if err != nil {
-			fmt.Fprintf(errOut, "show: report id 需为整数,得到 %q\n", arg)
-			exit = 2
-			continue
-		}
-		row, err := pipeline.ShowReport(context.Background(), d.store, id)
-		if err != nil {
-			fmt.Fprintf(errOut, "show %d: %v\n", id, err)
+			fmt.Fprintf(errOut, "show %s: %v\n", arg, err)
 			exit = 1
 			continue
 		}
-		fmt.Fprintf(out, "report %d: %s %s %s (image=%d ocr=%d)\n",
-			row.ID, row.ReportType, orDash(row.ReportDate), row.Status, row.ImageID, row.OCRResultID)
+		fmt.Fprintf(out, "report sha256=%s: %s %s %s (ocr=%d)\n",
+			row.Sha256, abbrType(row.ReportType), orDash(row.ReportDate), row.Status, row.OCRResultID)
 		for _, it := range row.Items {
 			mark := ""
 			if it.LowConfidence {
-				mark = " [低置信]"
+				mark = " [low_confidence]"
 			}
 			fmt.Fprintf(out, "  %s value=%s unit=%s ref_range=%s flag=%s%s raw_text=%q\n",
 				it.Name, orNum(it.Value), orDash(it.Unit), orDash(it.RefRange), it.Flag, mark, it.RawText)
 		}
 	}
 	return exit
+}
+
+func twError(tw *tabwriter.Writer) int {
+	if err := tw.Flush(); err != nil {
+		return 1
+	}
+	return 0
 }
 
 func orDash(p *string) string {
@@ -201,5 +233,5 @@ func summary(r *contract.Report) string {
 	if r.ReportDate != nil {
 		date = *r.ReportDate
 	}
-	return fmt.Sprintf("%s %s %s", r.ReportType, date, r.Status)
+	return fmt.Sprintf("%s %s %s", abbrType(r.ReportType), date, r.Status)
 }

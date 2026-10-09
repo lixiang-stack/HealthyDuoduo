@@ -16,6 +16,10 @@ import (
 //go:embed migrations/*.sql
 var migrationsFS embed.FS
 
+// migrationsDir 内嵌迁移目录名;go:embed 的模式与 goose.UpContext 的路径共用同一目录。
+// //go:embed 指令只能写字面量,无法引用常量:更名目录时须同步改两处(embed 行 + 本常量)。
+const migrationsDir = "migrations"
+
 // Open 打开 PG 连接池并确保迁移到最新(goose 库模式,本地首次运行即建四表)。
 func Open(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 	pool, err := pgxpool.New(ctx, dsn)
@@ -41,7 +45,7 @@ func Migrate(ctx context.Context, dsn string) error {
 	if err := goose.SetDialect("postgres"); err != nil {
 		return fmt.Errorf("goose dialect: %w", err)
 	}
-	if err := goose.UpContext(ctx, db, "migrations"); err != nil {
+	if err := goose.UpContext(ctx, db, migrationsDir); err != nil {
 		return fmt.Errorf("goose migrate: %w", err)
 	}
 	return nil

@@ -4,13 +4,29 @@
 schema/ 下 JSON 文件是双语共用的源头,本文件与其保持字段一一对应。
 """
 
+from enum import Enum
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-# status / flag enums (implementation plan 4.2)
-Status = Literal["success", "partial", "failed"]
-Flag = Literal["normal", "high", "low", "unknown"]
+
+# status / flag 枚举(实施计划 4.2)。str 子类:与 JSON 字面值直接相等(s == "success" 成立),
+# 序列化保持字符串形式,与 schemas/*.schema.json 与 Go 侧字符串契约一致。
+class _Vocabulary(str, Enum):
+    pass
+
+class Status(_Vocabulary):
+    """报告状态(4.2 枚举)。"""
+    SUCCESS = "success"
+    PARTIAL = "partial"
+    FAILED = "failed"
+
+class Flag(_Vocabulary):
+    """指标项标记(数值 vs 参考范围)。"""
+    NORMAL = "normal"
+    HIGH = "high"
+    LOW = "low"
+    UNKNOWN = "unknown"
 
 # Vertex coordinate [x, y]; a text line box is a quadrilateral of four points.
 type Point = tuple[float, float]
@@ -74,8 +90,8 @@ class Report(BaseModel):
     items: list[ReportItem]
 
 
-class ReportBundle(BaseModel):
-    """POST /report 的响应体:一次请求内 OCR 结果 + 结构化报告(实施计划 4.3)。"""
+class ReportResponse(BaseModel):
+    """POST /report 的响应体:一次请求内 OCR 结果 + 结构化报告(实施计划 4.3;与 ReparseRequest 成对)。"""
 
     model_config = ConfigDict(extra="forbid")
 

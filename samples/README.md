@@ -17,3 +17,8 @@
   (规则或词典改动后重新生成;报告对 OCR golden 的产出是确定性的,跨架构可复现。
   示例:cbc_02 全单无日期/时间行 → report_date=null + status=partial,是补录场景载体;
   cbc_03 为单栏清单且缺 血红蛋白/MCH 行(备注行挤占),partial 属正常回放。)
+- 收录新样本时的已知边界:在 `samples/expected/ocr/` 落 golden 后用同一命令生成报告
+  golden 并人工抽查。后处理对**当前 5 张已入库样本**的版式/指标收敛良好;**新样本如出现
+  新版式或新指标名,不会崩溃但会漏抓**(未命中行被跳过 → 指标缺失 → status=partial/failed,
+  供人工核对 raw_text)。扩展顺序:①改 cbc_dict.yaml 数据文件(别名/单位)→ ②重跑 golden
+  → ③仍不命中的版式才动 postprocess 解析规则(以真实样本 golden 锚定后再改)。

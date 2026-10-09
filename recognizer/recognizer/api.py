@@ -10,7 +10,7 @@ from pathlib import Path
 from fastapi import FastAPI, Form, HTTPException, UploadFile, status
 from PIL import UnidentifiedImageError
 
-from .contract import OCRResult, ReparseRequest, Report, ReportBundle
+from .contract import OCRResult, ReparseRequest, Report, ReportResponse
 from .ocr import run_ocr
 from .postprocess import run_postprocess
 
@@ -44,7 +44,7 @@ def ocr(image: UploadFile) -> OCRResult:
 
 
 @app.post("/report")
-def report(image: UploadFile, date: str | None = Form(default=None)) -> ReportBundle:
+def report(image: UploadFile, date: str | None = Form(default=None)) -> ReportResponse:
     """multipart 上传一张图像 → OCR 结果 + 规则化报告。
 
     可选 multipart 字段 date(YYYY-MM-DD):检查单未解析出日期时的人工补录兜底
@@ -52,7 +52,7 @@ def report(image: UploadFile, date: str | None = Form(default=None)) -> ReportBu
     """
     ocr_result = _read_image(image)
     report = run_postprocess(ocr_result, date_hint=date)
-    return ReportBundle(ocr_result=ocr_result, report=report)
+    return ReportResponse(ocr_result=ocr_result, report=report)
 
 
 @app.post("/reparse")

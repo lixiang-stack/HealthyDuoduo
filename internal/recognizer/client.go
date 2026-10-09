@@ -16,20 +16,38 @@ import (
 	"healthyduoduo/internal/contract"
 )
 
+// 端点路径(实施计划 4.3)。
+const (
+	reportPath  = "/report"
+	reparsePath = "/reparse"
+)
+
+// 网络抖动重试:上限(至少一次)与退避间隔。
+const (
+	maxAttempts   = 2
+	retryInterval = 1 * time.Second
+)
+
+// 响应体读取上限(OCR 结果 JSON 含全部文本行/坐标,常规 <5MB)。
+const maxBodyBytes = 32 << 20
+
 type Client struct {
-	base   string
-	client *http.Client
+	reportURL  string
+	reparseURL string
+	client     *http.Client
 }
 
 // New: base 如 http://localhost:8000(超时覆盖模型加载 + 单张 OCR,机内实测远低于 60s)。
 func New(base string) *Client {
+	base = trimSlash(base)
 	return &Client{
-		base:   strings.TrimRight(base, "/"),
-		client: &http.Client{Timeout: 60 * time.Second},
+		reportURL:  base + reportPath,
+		reparseURL: base + reparsePath,
+		client:     &http.Client{Timeout: 60 * time.Second},
 	}
 }
 
-type bundle struct {
+type reportResponse struct {
 	OCRResult contract.OCRResult `json:"ocr_result"`
 	Report    contract.Report    `json:"report"`
 }
@@ -37,7 +55,11 @@ type bundle struct {
 func (c *Client) Report(ctx context.Context, image []byte, filename, date string) (*contract.OCRResult, *contract.Report, error) {
 	var body bytes.Buffer
 	mw := multipart.NewWriter(&body)
-	if err := imageField(mw, filename, image); err != nil {
+	fw, err := mw.CreateFormFile("image", filename)
+	if err != nil {
+		return nil, nil, err
+	}
+	if _, err := fw.Write(image); err != nil {
 		return nil, nil, err
 	}
 	if date != "" {
@@ -48,14 +70,13 @@ func (c *Client) Report(ctx context.Context, image []byte, filename, date string
 	if err := mw.Close(); err != nil {
 		return nil, nil, err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.base+"/report", bytes.NewReader(body.Bytes()))
+	raw, err := c.post(ctx, c.reportURL, mw.FormDataContentType(), body.Bytes())
 	if err != nil {
 		return nil, nil, err
 	}
-	req.Header.Set("Content-Type", mw.FormDataContentType())
-	out, err := c.do(req)
-	if err != nil {
-		return nil, nil, err
+	var out reportResponse
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return nil, nil, fmt.Errorf("parse /report response: %w (body=%s)", err, truncate(raw))
 	}
 	return &out.OCRResult, &out.Report, nil
 }
@@ -72,58 +93,79 @@ func (c *Client) Reparse(ctx context.Context, ocr *contract.OCRResult, date stri
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.base+"/reparse", bytes.NewReader(raw))
+	body, err := c.post(ctx, c.reparseURL, "application/json", raw)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := c.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("识别服务 %s: %w", req.URL, err)
-	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 32<<20))
-	if err != nil {
-		return nil, fmt.Errorf("读响应体: %w", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("识别服务 %d: %s", resp.StatusCode, truncate(body))
-	}
 	var report contract.Report
 	if err := json.Unmarshal(body, &report); err != nil {
-		return nil, fmt.Errorf("解析 /reparse 响应: %w (body=%s)", err, truncate(body))
+		return nil, fmt.Errorf("parse /reparse response: %w (body=%s)", err, truncate(body))
 	}
 	return &report, nil
 }
 
-func imageField(mw *multipart.Writer, filename string, image []byte) error {
-	fw, err := mw.CreateFormFile("image", filename)
-	if err != nil {
-		return err
+// post 发送一次 POST 并读取 200 响应体;网络抖动/5xx 视为可重试(至少重试一次)。
+// bytes.NewReader 让 net/http 自动填充 req.GetBody,重试可安全重建请求体。
+func (c *Client) post(ctx context.Context, url, contentType string, body []byte) ([]byte, error) {
+	var lastErr error
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		if attempt > 0 {
+			select {
+			case <-ctx.Done():
+				return nil, lastErr
+			case <-time.After(retryInterval):
+			}
+		}
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Content-Type", contentType)
+
+		var resp byteResponse
+		resp, err = c.roundTrip(req)
+		if err == nil {
+			return resp.body, nil
+		}
+		lastErr = err
+		if !resp.retryable {
+			return nil, err
+		}
 	}
-	_, err = fw.Write(image)
-	return err
+	return nil, lastErr
 }
 
-func (c *Client) do(req *http.Request) (*bundle, error) {
+// roundTrip 单次 HTTP 请求/读取;retryable 标记是否值得再试(网络错误或 5xx)。
+// 资源释放按 go 规范:defer 关闭响应体。
+type byteResponse struct {
+	body      []byte
+	retryable bool
+}
+
+func (c *Client) roundTrip(req *http.Request) (byteResponse, error) {
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("识别服务 %s: %w", req.URL, err)
+		return byteResponse{}, fmt.Errorf("recognizer %s: %w", req.URL, err)
 	}
 	defer resp.Body.Close()
-	raw, err := io.ReadAll(io.LimitReader(resp.Body, 32<<20))
+	raw, err := readAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("读响应体: %w", err)
+		return byteResponse{}, fmt.Errorf("read response body: %w", err)
+	}
+	if resp.StatusCode >= http.StatusInternalServerError {
+		return byteResponse{retryable: true}, fmt.Errorf("recognizer %d: %s", resp.StatusCode, truncate(raw))
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("识别服务 %d: %s", resp.StatusCode, truncate(raw))
+		return byteResponse{}, fmt.Errorf("recognizer %d: %s", resp.StatusCode, truncate(raw))
 	}
-	var out bundle
-	if err := json.Unmarshal(raw, &out); err != nil {
-		return nil, fmt.Errorf("解析 /report 响应: %w (body=%s)", err, truncate(raw))
-	}
-	return &out, nil
+	return byteResponse{body: raw}, nil
 }
+
+func readAll(r io.Reader) ([]byte, error) {
+	return io.ReadAll(io.LimitReader(r, maxBodyBytes))
+}
+
+func trimSlash(s string) string { return strings.TrimRight(s, "/") }
 
 func truncate(raw []byte) string {
 	s := string(raw)

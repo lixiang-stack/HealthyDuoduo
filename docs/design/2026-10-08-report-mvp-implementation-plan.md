@@ -281,6 +281,8 @@ Go（工程层）：
 
 **为什么：** 血常规验证了词典 / 规则框架的可扩展性，新类别是同一框架的复用；统计是「回看」场景的自然延伸；预处理按坏例再上，避免过早优化。
 
+**候选演进（替代方案调研结论，2026-10-09）：** 新类别带来多样版式时,最近的免 LLM 路径是 PaddleOCR PP-Structure(V3) 表格识别（SLANet）——可在 P3 起**只替换 postprocess 的行带/配对这一层**（表格结构还原交给模型），词典数据文件与 report 契约不动;决定切换时出 ADR 并对照 golden 扩容样本验收。（开源直接可用的同题项目 MediParse / LabReport-Parser / MedClarify 等均依赖多模态 LLM/云 API,不符 NF-01。）
+
 **粗验收：** 新增类别各 ≥3 张样本端到端可演示；`hdd list --type 尿常规` 可查；样本集全量 golden 回归绿。
 
 ---
@@ -327,4 +329,5 @@ Go（工程层）：
 | 1.0 | 2026-10-08 | 与维护者三轮对齐后定稿（统一语言、架构、存储、CLI、枚举与阈值、验收形态） |
 | 1.1 | 2026-10-08 | 对象存储由 MinIO 改为 SeaweedFS：官方 MinIO 镜像从 Docker Hub 撤下、社区镜像存维护风险，维护者决策（详见 ADR-0003）；bucket/键设计与 minio-go 客户端不变，契约与验收不变 |
 | 1.2 | 2026-10-08 | golden 对比规则按跨平台噪声事实修正:txts 由「逐字相等」改为「行数相等 + 忽略空白的行内编辑距离 ≤1」;scores 由行级容差改为全行平均绝对误差 ≤0.03(CI 三轮实测 cbc_04 行级漂移 0.023→0.058 不收敛,置信度为噪声主导维度;MAE 滤除噪声、检出真退化)。同架构三通道逐字一致口径不变 |
-| 1.3 | 2026-10-09 | P2 落地契约补记:①`POST /report` 的 multipart 增可选字段 `date`(YYYY-MM-DD),`POST /reparse` 的 JSON 请求体为 `{ocr_result, date?}`——落实决策 #6 `ingest --date` 人工补录(检查单已解析出日期时 date 不参与,补录后 status 按 4.2 重算);②Go 访问层按「有更顺手替代可换」条款以手写 pgx/v5 替代 sqlc 生成(4 表查询量小,依赖面少)——`goose` 以库模式内嵌 SQL 迁移随 `hdd` 启动执行;③无日期场景载体由 cbc_03 修正为 cbc_02(同步修订 samples/README) |
+| 1.3 | 2026-10-09 | /report 增可选 date 补录(决策 #6),/reparse 请求体 {ocr_result, date?};失败占位 report_type=unknown;pgx/v5+goose 库模式替代 sqlc(决策 #12);无日期样本为 cbc_02;P3 可换 PP-Structure(V3) 行带/配对(§10) |
+| 1.4 | 2026-10-09 | 验收轮修订:① 对外身份统一为图像内容 sha256:images 主键=sha256(删除自增 id 与冗余 object_key 列,对象键=sha256),reports 每图一行、主键=图像 sha256(删除自增 id),ocr_history 仍以内部序号追加;hdd ingest 输出与 show/reparse/list 的入参均为图像 sha256(仅完整 64 位 hex;不支持前缀);② CLI 报告类别展示为英文缩写(血常规→CBC),--type 亦接受 CBC,域数据值不变;③ low_confidence 收敛至决策 #7 原义(仅 score<0.8;单位损耗保留原文),词典 RDW-SD 单位集修正为 fL |

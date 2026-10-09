@@ -13,7 +13,8 @@ import (
 )
 
 // Store 是 pipeline.Store 的 PG 实现(手写 pgx/v5;表 DDL 见 migrations/0001_init.sql)。
-// MVP 手写而未用 sqlc 生成:查询量小、monkey 无参数化面;契约字段在 pipeline 层已固化。
+// MVP 手写而未用 sqlc 生成:查询量小;所有 SQL 集中为本文件常量,用户值一律走参数占位
+// ($1..),无字符串拼接注入面。
 type Store struct {
 	pool *pgxpool.Pool
 }
@@ -24,11 +25,82 @@ func NewStore(pool *pgxpool.Pool) *Store { return &Store{pool: pool} }
 // Close 关闭连接池。
 func (s *Store) Close() { s.pool.Close() }
 
+// 语义化 SQL 常量;占位仅传参,未拼接任何用户值(无注入面)。
+const (
+	sqlImageBySHA256 = `SELECT sha256, original_filename
+		FROM images WHERE sha256 = $1`
+
+	sqlImageInsert = `INSERT INTO images (sha256, original_filename) VALUES ($1,$2)`
+
+	sqlOCRResultInsert = `INSERT INTO ocr_results (image_sha256, engine_output)
+		 VALUES ($1,$2) RETURNING id`
+
+	sqlReportsByImage = `SELECT ` + reportColumnsSQL + ` FROM reports r
+		 WHERE r.image_sha256 = $1`
+
+	sqlReportListNoFilter = `SELECT ` + reportColumnsSQL + ` FROM reports r
+		 ORDER BY r.report_date DESC NULLS LAST, r.image_sha256 ASC`
+
+	sqlReportListByType = `SELECT ` + reportColumnsSQL + ` FROM reports r
+		 WHERE r.report_type = $1
+		 ORDER BY r.report_date DESC NULLS LAST, r.image_sha256 ASC`
+
+	sqlReportListByExactDate = `SELECT ` + reportColumnsSQL + ` FROM reports r
+		 WHERE r.report_date = $1::date
+		 ORDER BY r.report_date DESC NULLS LAST, r.image_sha256 ASC`
+
+	sqlReportListByTypeAndExactDate = `SELECT ` + reportColumnsSQL + ` FROM reports r
+		 WHERE r.report_type = $1 AND r.report_date = $2::date
+		 ORDER BY r.report_date DESC NULLS LAST, r.image_sha256 ASC`
+
+	sqlReportListByMonth = `SELECT ` + reportColumnsSQL + ` FROM reports r
+		 WHERE date_trunc('month', r.report_date) = date_trunc('month', $1::date)
+		 ORDER BY r.report_date DESC NULLS LAST, r.image_sha256 ASC`
+
+	sqlReportListByYear = `SELECT ` + reportColumnsSQL + ` FROM reports r
+		 WHERE date_trunc('year', r.report_date) = date_trunc('year', $1::date)
+		 ORDER BY r.report_date DESC NULLS LAST, r.image_sha256 ASC`
+
+	sqlReportListByTypeAndMonth = `SELECT ` + reportColumnsSQL + ` FROM reports r
+		 WHERE r.report_type = $1 AND date_trunc('month', r.report_date) = date_trunc('month', $2::date)
+		 ORDER BY r.report_date DESC NULLS LAST, r.image_sha256 ASC`
+
+	sqlReportListByTypeAndYear = `SELECT ` + reportColumnsSQL + ` FROM reports r
+		 WHERE r.report_type = $1 AND date_trunc('year', r.report_date) = date_trunc('year', $2::date)
+		 ORDER BY r.report_date DESC NULLS LAST, r.image_sha256 ASC`
+
+	sqlItemsByReport = `SELECT name, value, unit, ref_range, flag, low_confidence, raw_text
+		 FROM report_items WHERE report_sha256 = $1 ORDER BY id`
+
+	sqlOCRResultByID = `SELECT engine_output FROM ocr_results WHERE id = $1`
+
+	// 报告行 upsert:测定 identity = 图像 sha256(每图一行);冲突即原位更新(--force 重跑)。
+	sqlReportUpsert = `INSERT INTO reports (image_sha256, ocr_result_id, report_type, report_date, status)
+		 VALUES ($1,$2,$3,$4::date,$5)
+		 ON CONFLICT (image_sha256) DO UPDATE SET
+		     ocr_result_id = excluded.ocr_result_id,
+		     report_type   = excluded.report_type,
+		     report_date   = excluded.report_date,
+		     status        = excluded.status,
+		     updated_at    = now()`
+
+	sqlItemsDeleteByReport = `DELETE FROM report_items WHERE report_sha256 = $1`
+
+	sqlItemInsert = `INSERT INTO report_items
+		 (report_sha256, name, value, unit, ref_range, flag, low_confidence, raw_text)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`
+)
+
+// reportColumnsSQL 报告行到业务视图(ReportRow)的标准投影;
+// report_date 序列化为 YYYY-MM-DD(缺失为空串),items 计数内联聚合。
+const reportColumnsSQL = `r.image_sha256, r.ocr_result_id, r.report_type,
+	   COALESCE(to_char(r.report_date, 'YYYY-MM-DD'), ''), r.status,
+	   COALESCE((SELECT COUNT(*) FROM report_items i WHERE i.report_sha256 = r.image_sha256), 0)`
+
 func (s *Store) ImageBySha256(ctx context.Context, sha string) (*pipeline.Image, error) {
 	var img pipeline.Image
-	err := s.pool.QueryRow(ctx,
-		`SELECT id, sha256, object_key, original_filename FROM images WHERE sha256 = $1`, sha).
-		Scan(&img.ID, &img.Sha256, &img.ObjectKey, &img.OriginalFilename)
+	err := s.pool.QueryRow(ctx, sqlImageBySHA256, sha).
+		Scan(&img.Sha256, &img.OriginalFilename)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -38,29 +110,21 @@ func (s *Store) ImageBySha256(ctx context.Context, sha string) (*pipeline.Image,
 	return &img, nil
 }
 
-func (s *Store) CreateImage(ctx context.Context, sha, objectKey, filename string) (int64, error) {
+// ImagesByShaPrefix 已废弃移除(身份只接受完整 64 hex)。
+
+func (s *Store) CreateImage(ctx context.Context, sha, filename string) error {
+	_, err := s.pool.Exec(ctx, sqlImageInsert, sha, filename)
+	return err
+}
+
+func (s *Store) AppendOCRResult(ctx context.Context, imageSha string, raw []byte) (int64, error) {
 	var id int64
-	err := s.pool.QueryRow(ctx,
-		`INSERT INTO images (sha256, object_key, original_filename) VALUES ($1,$2,$3) RETURNING id`,
-		sha, objectKey, filename).Scan(&id)
+	err := s.pool.QueryRow(ctx, sqlOCRResultInsert, imageSha, raw).Scan(&id)
 	return id, err
 }
 
-func (s *Store) AppendOCRResult(ctx context.Context, imageID int64, raw []byte) (int64, error) {
-	var id int64
-	err := s.pool.QueryRow(ctx,
-		`INSERT INTO ocr_results (image_id, engine_output) VALUES ($1,$2) RETURNING id`,
-		imageID, raw).Scan(&id)
-	return id, err
-}
-
-const reportColumns = `r.id, r.image_id, r.ocr_result_id, r.report_type,
-	   COALESCE(to_char(r.report_date, 'YYYY-MM-DD'), ''), r.status,
-	   COALESCE((SELECT COUNT(*) FROM report_items i WHERE i.report_id = r.id), 0)`
-
-func (s *Store) queryReports(ctx context.Context, where string, args ...any) ([]pipeline.ReportRow, error) {
-	rows, err := s.pool.Query(ctx,
-		`SELECT `+reportColumns+` FROM reports r `+where, args...)
+func (s *Store) queryReports(ctx context.Context, query string, args ...any) ([]pipeline.ReportRow, error) {
+	rows, err := s.pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +133,7 @@ func (s *Store) queryReports(ctx context.Context, where string, args ...any) ([]
 	for rows.Next() {
 		var r pipeline.ReportRow
 		var date string
-		if err := rows.Scan(&r.ID, &r.ImageID, &r.OCRResultID, &r.ReportType, &date, &r.Status, &r.ItemsCount); err != nil {
+		if err := rows.Scan(&r.Sha256, &r.OCRResultID, &r.ReportType, &date, &r.Status, &r.ItemsCount); err != nil {
 			return nil, err
 		}
 		if date != "" {
@@ -80,8 +144,8 @@ func (s *Store) queryReports(ctx context.Context, where string, args ...any) ([]
 	return out, rows.Err()
 }
 
-func (s *Store) ReportByImage(ctx context.Context, imageID int64) (*pipeline.ReportRow, bool, error) {
-	rows, err := s.queryReports(ctx, `WHERE r.image_id = $1 LIMIT 1`, imageID)
+func (s *Store) ReportByImage(ctx context.Context, imageSha string) (*pipeline.ReportRow, bool, error) {
+	rows, err := s.queryReports(ctx, sqlReportsByImage, imageSha)
 	if err != nil {
 		return nil, false, err
 	}
@@ -91,35 +155,36 @@ func (s *Store) ReportByImage(ctx context.Context, imageID int64) (*pipeline.Rep
 	return &rows[0], true, nil
 }
 
-func (s *Store) ReportByID(ctx context.Context, id int64) (*pipeline.ReportRow, error) {
-	rows, err := s.queryReports(ctx, `WHERE r.id = $1`, id)
-	if err != nil {
-		return nil, err
+// ListReports list [--type/--date] 查询;--date 支持 YYYY / YYYY-MM / YYYY-MM-DD
+// 三种粒度(月/年经 date_trunc 归一),组合均为常量 SQL,无动态拼接。
+func (s *Store) ListReports(ctx context.Context, reportType string, date string) ([]pipeline.ReportRow, error) {
+	grain := dateGranularity(date)
+	switch {
+	case grain == dateNone && reportType != "":
+		return s.queryReports(ctx, sqlReportListByType, reportType)
+	case grain == dateExact:
+		if reportType != "" {
+			return s.queryReports(ctx, sqlReportListByTypeAndExactDate, reportType, date)
+		}
+		return s.queryReports(ctx, sqlReportListByExactDate, date)
+	case grain == dateMonth:
+		first := date + "-01"
+		if reportType != "" {
+			return s.queryReports(ctx, sqlReportListByTypeAndMonth, reportType, first)
+		}
+		return s.queryReports(ctx, sqlReportListByMonth, first)
+	case grain == dateYear:
+		first := date + "-01-01"
+		if reportType != "" {
+			return s.queryReports(ctx, sqlReportListByTypeAndYear, reportType, first)
+		}
+		return s.queryReports(ctx, sqlReportListByYear, first)
 	}
-	if len(rows) == 0 {
-		return nil, fmt.Errorf("report %d: %w", id, pgx.ErrNoRows)
-	}
-	return &rows[0], nil
+	return s.queryReports(ctx, sqlReportListNoFilter)
 }
 
-func (s *Store) ListReports(ctx context.Context, reportType, date string) ([]pipeline.ReportRow, error) {
-	where, args := "WHERE true", []any{}
-	if reportType != "" {
-		where += fmt.Sprintf(" AND r.report_type = $%d", len(args)+1)
-		args = append(args, reportType)
-	}
-	if date != "" {
-		where += fmt.Sprintf(" AND r.report_date = $%d::date", len(args)+1)
-		args = append(args, date)
-	}
-	where += " ORDER BY r.report_date DESC NULLS LAST, r.id DESC"
-	return s.queryReports(ctx, where, args...)
-}
-
-func (s *Store) ItemsByReport(ctx context.Context, reportID int64) ([]contract.ReportItem, error) {
-	rows, err := s.pool.Query(ctx,
-		`SELECT name, value, unit, ref_range, flag, low_confidence, raw_text
-		 FROM report_items WHERE report_id = $1 ORDER BY id`, reportID)
+func (s *Store) ItemsByImage(ctx context.Context, reportSha string) ([]contract.ReportItem, error) {
+	rows, err := s.pool.Query(ctx, sqlItemsByReport, reportSha)
 	if err != nil {
 		return nil, err
 	}
@@ -137,48 +202,59 @@ func (s *Store) ItemsByReport(ctx context.Context, reportID int64) ([]contract.R
 
 func (s *Store) OCRResultJSON(ctx context.Context, ocrID int64) ([]byte, error) {
 	var raw []byte
-	err := s.pool.QueryRow(ctx,
-		`SELECT engine_output FROM ocr_results WHERE id = $1`, ocrID).Scan(&raw)
+	err := s.pool.QueryRow(ctx, sqlOCRResultByID, ocrID).Scan(&raw)
 	return raw, err
 }
 
-// WriteReport 落/更一份报告(items 取自 report.Items,事务式全量替换)。
-// reportID=0 表示新建;>0 表示更新(如 --force 重跑)。report_date 需为 YYYY-MM-DD 或缺失。
-func (s *Store) WriteReport(ctx context.Context, reportID, imageID, ocrID int64, report contract.Report) (int64, error) {
+// dateGranularity --date 输入的粒度;dateNone 表示未传日期。
+const (
+	dateNone  dateGrain = iota
+	dateExact           // YYYY-MM-DD
+	dateMonth           // YYYY-MM
+	dateYear            // YYYY
+)
+
+type dateGrain int
+
+// dateGranularity 判定 --date 字符串粒度(月/年由 date_trunc 在 SQL 里归一);
+// 输入合法性由 CLI 校验,这里只做映射。
+func dateGranularity(date string) dateGrain {
+	switch {
+	case date == "":
+		return dateNone
+	case len(date) == 4:
+		return dateYear
+	case len(date) == 7:
+		return dateMonth
+	default:
+		return dateExact
+	}
+}
+
+// WriteReport 落/更一份报告(items 取自 report.Items,事务式全量替换;
+// 身份 = 图像 sha256,每图一行:首次插入/冲突原位更新,updated_at 恒刷新)。
+func (s *Store) WriteReport(ctx context.Context, reportSha string, ocrID int64, report contract.Report) error {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
-		return 0, err
+		return err
 	}
 	defer tx.Rollback(ctx)
 
-	var id int64
-	if reportID == 0 {
-		err = tx.QueryRow(ctx,
-			`INSERT INTO reports (image_id, ocr_result_id, report_type, report_date, status)
-			 VALUES ($1,$2,$3,$4::date,$5) RETURNING id`,
-			imageID, ocrID, report.ReportType, report.ReportDate, report.Status).Scan(&id)
-	} else {
-		err = tx.QueryRow(ctx,
-			`UPDATE reports SET ocr_result_id=$2, report_type=$3, report_date=$4::date, status=$5, updated_at=now()
-			 WHERE id=$1 RETURNING id`,
-			reportID, ocrID, report.ReportType, report.ReportDate, report.Status).Scan(&id)
+	if _, err := tx.Exec(ctx, sqlReportUpsert,
+		reportSha, ocrID, report.ReportType, report.ReportDate, report.Status); err != nil {
+		return fmt.Errorf("upsert report: %w", err)
 	}
-	if err != nil {
-		return 0, fmt.Errorf("write report: %w", err)
-	}
-	if _, err := tx.Exec(ctx, `DELETE FROM report_items WHERE report_id = $1`, id); err != nil {
-		return 0, err
+	if _, err := tx.Exec(ctx, sqlItemsDeleteByReport, reportSha); err != nil {
+		return err
 	}
 	for _, it := range report.Items {
-		if _, err := tx.Exec(ctx,
-			`INSERT INTO report_items (report_id, name, value, unit, ref_range, flag, low_confidence, raw_text)
-			 VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-			id, it.Name, it.Value, it.Unit, it.RefRange, it.Flag, it.LowConfidence, it.RawText); err != nil {
-			return 0, fmt.Errorf("write report item %q: %w", it.Name, err)
+		if _, err := tx.Exec(ctx, sqlItemInsert,
+			reportSha, it.Name, it.Value, it.Unit, it.RefRange, it.Flag, it.LowConfidence, it.RawText); err != nil {
+			return fmt.Errorf("write report item %q: %w", it.Name, err)
 		}
 	}
 	if err := tx.Commit(ctx); err != nil {
-		return 0, err
+		return err
 	}
-	return id, nil
+	return nil
 }
