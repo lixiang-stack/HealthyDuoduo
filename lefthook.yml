@@ -1,0 +1,23 @@
+# 本地提交前检查,与 .github/workflows/ci.yml 双链一致(Go: gofmt/vet/test;Python: ruff/pytest)。
+# 仅在本地拦截问题,CI 仍是最终门禁(实施计划决策 #12:模型 wheel ~29MB,CI 只跑双链)。
+# 单次跳过:git commit --no-verify(lefthook 也接受 LEFTHOOK=0)。
+pre-commit:
+  parallel: true
+  commands:
+    gofmt:
+      glob: "**/*.go"
+      run: |
+        unformatted=$(gofmt -l .)
+        if [ -n "$unformatted" ]; then echo "需先 gofmt: $unformatted"; exit 1; fi
+    go-vet:
+      glob: "**/*.go"
+      run: go vet ./...
+    go-test:
+      glob: "**/*.go"
+      run: go test ./...
+    ruff:
+      glob: "recognizer/**/*.py"
+      run: cd recognizer && uv run ruff check .
+    pytest:
+      glob: "recognizer/**/*.py"
+      run: cd recognizer && uv run pytest
