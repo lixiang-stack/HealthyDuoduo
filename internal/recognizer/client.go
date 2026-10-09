@@ -28,8 +28,14 @@ const (
 	retryInterval = 1 * time.Second
 )
 
+// 单次请求超时:覆盖模型加载 + 单张 OCR(机内实测远低于 60s)。
+const requestTimeout = 60 * time.Second
+
 // 响应体读取上限(OCR 结果 JSON 含全部文本行/坐标,常规 <5MB)。
 const maxBodyBytes = 32 << 20
+
+// 错误信息中响应体片段的截断上限(定位问题足够,避免整段输出)。
+const maxErrorSnippet = 200
 
 type Client struct {
 	reportURL  string
@@ -37,13 +43,13 @@ type Client struct {
 	client     *http.Client
 }
 
-// New: base 如 http://localhost:8000(超时覆盖模型加载 + 单张 OCR,机内实测远低于 60s)。
+// New: base 如 http://localhost:8000。
 func New(base string) *Client {
 	base = trimSlash(base)
 	return &Client{
 		reportURL:  base + reportPath,
 		reparseURL: base + reparsePath,
-		client:     &http.Client{Timeout: 60 * time.Second},
+		client:     &http.Client{Timeout: requestTimeout},
 	}
 }
 
@@ -169,8 +175,8 @@ func trimSlash(s string) string { return strings.TrimRight(s, "/") }
 
 func truncate(raw []byte) string {
 	s := string(raw)
-	if len(s) > 200 {
-		return s[:200] + "…"
+	if len(s) > maxErrorSnippet {
+		return s[:maxErrorSnippet] + "…"
 	}
 	return s
 }

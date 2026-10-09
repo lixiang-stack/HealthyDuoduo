@@ -4,17 +4,18 @@ P2:/report(image → {ocr_result, report})与 /reparse(golden OCR → report)契
 
 import json
 
+import pytest
 from fastapi.testclient import TestClient
 from jsonschema import Draft202012Validator
 
 from recognizer import paths
 from recognizer.api import app
 
-REPO_ROOT = paths.REPO_ROOT
 SAMPLES = paths.SAMPLES
 SCHEMA = paths.SCHEMA_OCR
 REPORT_SCHEMA = paths.SCHEMA_REPORT
 EXPECTED_OCR = paths.EXPECTED_OCR
+EXPECTED_REPORT = paths.EXPECTED_REPORT
 
 _golden_ids = sorted(p.stem for p in EXPECTED_OCR.glob("*.json"))
 
@@ -91,12 +92,10 @@ def test_report_rejects_non_image() -> None:
 
 def test_reparse_golden_matches_postprocess() -> None:
     """验收 P2:POST /reparse 用 golden OCR 重跑后处理,与 golden report 一致。"""
-    import pytest
-
     if not _golden_ids:
         pytest.skip("no golden OCR files")
     golden = json.loads((EXPECTED_OCR / f"{_golden_ids[0]}.json").read_text(encoding="utf-8"))
-    expected = json.loads((SAMPLES / "expected" / "report" / f"{_golden_ids[0]}.json").read_text(encoding="utf-8"))
+    expected = json.loads((EXPECTED_REPORT / f"{_golden_ids[0]}.json").read_text(encoding="utf-8"))
     with TestClient(app) as client:
         response = client.post("/reparse", json={"ocr_result": golden})
     assert response.status_code == 200

@@ -85,6 +85,10 @@ _PIECE_CAP_DEFAULT_PX = 25.0
 # cell 归列时允许的最大偏离(像素);页面级垃圾行(标题/落款)不应占用表列
 _ASSIGN_TOLERANCE_PX = 180
 
+# 表头行判定:一行命中的 (格, 列角色关键词) 对 ≥ 此值才判为表头带;
+# 3 = 名称+结果+单位/参考值等列角色同时在行内的最少组合。
+_HEADER_MIN_ROLES = 3
+
 
 @dataclass(frozen=True)
 class DictItem:
@@ -251,14 +255,14 @@ def _decompose(text: str) -> tuple[float | None, str | None, str | None]:
     return value, ref, unit or unit_from_prefix
 
 
-def _flag(value: float | None, ref: str | None) -> int:
+def _flag(value: float | None, ref: str | None) -> Flag:
     """数值 vs 参考范围(4.2):normal/high/low/unknown。
 
     支持 a-b(含 --、~、性别前缀 男:0-15)与 <v / ≤v / >v / ≥v;
     范围上下界写反(OCR 乱珠)或不可解析 → unknown,不猜。
     """
     if value is None or ref is None:
-        return "unknown"
+        return Flag.UNKNOWN
     r = _SEX_PREFIX_RE.sub("", ref.strip())
     m = _RANGE_RE.fullmatch(r)
     if m:
@@ -446,7 +450,7 @@ def run_postprocess(ocr: OCRResult, date_hint: str | None = None) -> Report:
     header_bands = [
         b
         for b in _bands(cells)
-        if sum(1 for c in b for role, kws in ROLE_HEADERS.items() if any(kw in c.text.strip() for kw in kws)) >= 3
+        if sum(1 for c in b for role, kws in ROLE_HEADERS.items() if any(kw in c.text.strip() for kw in kws)) >= _HEADER_MIN_ROLES
     ]
     roles = _role_centers(header_bands)
     pairs = _extract_items(cells, roles)

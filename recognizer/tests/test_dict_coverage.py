@@ -16,9 +16,7 @@ import pytest
 import yaml
 
 from recognizer import paths
-
-REPO = paths.REPO_ROOT
-DICT = REPO / "recognizer" / "recognizer" / "cbc_dict.yaml"
+from recognizer.postprocess import DICT_PATH as DICT
 
 # 与 postprocess._match_name 官方语义一致的前缀形态:
 # ①原样 ②去行首星号 ③去行首序号 ④去名称熔断数字尾 ⑤序号+熔断组合剥离
