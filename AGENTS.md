@@ -46,7 +46,8 @@
 
 ## Git 与提交
 
-- **main 分支禁止开发**；每个需求按 **git worktree** 工作流程开独立工作区实现。
+- **main 分支禁止开发**；每个需求按 **git worktree** 工作流程开独立工作区实现，工作区统一创建在**仓库根目录 `.worktree/` 下**（如 `git worktree add .worktree/<需求名> -b <需求名>`）。
+- **禁止直接合并到 main**：需求完成后**必须创建 PR** 合入；不在本地 merge 进 main，也不直接 commit 到 main。
 - commit 带 `feat:` / `fix:` / `test:` 等前缀，**一句话说清意图**；**一个需求保持 1 次 commit**；末尾不加 Co-authored-by 署名。
 - push 由用户决定：**仅当用户明确要求时才 push**；需改写已推送分支时用 `--force-with-lease`。
 

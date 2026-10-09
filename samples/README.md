@@ -5,6 +5,9 @@
   - `samples/<id>.jpg`
   - `samples/expected/ocr/<id>.json`(P1 golden)
   - `samples/expected/report/<id>.json`(P2 golden)
-- `sim_` 前缀 = 系统生成的仿真单。当前 3 张(sim_cbc_01/02/03)为占位;
-  **P1 起需补齐 ≥5 张真实脱敏血常规样本**(P0 验收豁免条款,计划文件修订记录有注)。
-  其中 sim_cbc_03 被有意做成**不含检验日期**,用于 date-null / partial 场景回归。
+- 当前 5 张真实脱敏血常规样本 cbc_01~05(2026-10 入库,原 sim_cbc_01/02/03 占位仿真单已删除)。
+  其中真实样本以维护者确认的脱敏程度为准(NF-01);**cbc_03 有意保留为「无检验日期」版式**,
+  用于 date-null / partial 场景回归。
+- golden(`expected/ocr/<id>.json`)由调试 CLI 生成:
+  `cd recognizer && uv run python -m recognizer ../samples/<id>.<ext> > ../samples/expected/ocr/<id>.json`
+  (stderr 的日志重定向丢弃;对比规则见实施计划 §8-5,elapse 只记录不比对。)
