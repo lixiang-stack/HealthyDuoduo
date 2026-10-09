@@ -29,8 +29,17 @@ type deps struct {
 // typeDisplay 已知报告类别 → CLI 显示缩写(域数据 storage 中原样保留)。
 var typeDisplay = map[string]string{"血常规": "CBC"}
 
-// typeAlias 显示缩写 → 域数据值(--type 亦接受缩写输入)。
-var typeAlias = map[string]string{"CBC": "血常规"}
+// typeAlias 显示缩写 → 域数据值(--type 亦接受缩写输入);由 typeDisplay 反转派生,单一数据源。
+var typeAlias = reverseMap(typeDisplay)
+
+// reverseMap 反转 k↔v(typeDisplay 的缩写与域数据值一一对应)。
+func reverseMap(m map[string]string) map[string]string {
+	out := make(map[string]string, len(m))
+	for k, v := range m {
+		out[v] = k
+	}
+	return out
+}
 
 func abbrType(t string) string {
 	if a, ok := typeDisplay[t]; ok {
@@ -83,22 +92,22 @@ func runIngest(out, errOut io.Writer, d *deps, args []string) int {
 	var force bool
 	images, err := parseIngestArgs(args, &date, &force, errOut)
 	if err != nil {
-		return 2
+		return exitUsage
 	}
 	if len(images) == 0 {
 		fmt.Fprintf(errOut, "ingest: at least one image is required\n%s\n", usage)
-		return 2
+		return exitUsage
 	}
 	if date != "" && !fullDateRe.MatchString(date) {
 		fmt.Fprintf(errOut, "ingest: --date must be YYYY-MM-DD, got %q\n", date)
-		return 2
+		return exitUsage
 	}
 	exit := 0
 	for _, path := range images {
 		oc, err := pipeline.Ingest(context.Background(), d.store, d.rec, d.obj, path, date, force)
 		if err != nil {
 			fmt.Fprintf(errOut, "ingest %s: %v\n", path, err)
-			exit = 1
+			exit = exitError
 			continue
 		}
 		switch oc.Kind {
@@ -121,31 +130,31 @@ func runReparse(out, errOut io.Writer, d *deps, args []string) int {
 		case a == "--date" || a == "-date":
 			if i+1 >= len(args) {
 				fmt.Fprintf(errOut, "reparse: %s needs a value (YYYY-MM-DD)\n", a)
-				return 2
+				return exitUsage
 			}
 			i++
 			date = args[i]
 		case len(a) > 1 && a[0] == '-':
 			fmt.Fprintf(errOut, "reparse: unknown flag %q\n", a)
-			return 2
+			return exitUsage
 		default:
 			shas = append(shas, a)
 		}
 	}
 	if len(shas) == 0 {
 		fmt.Fprintf(errOut, "reparse: at least one sha256 is required\n%s\n", usage)
-		return 2
+		return exitUsage
 	}
 	if date != "" && !fullDateRe.MatchString(date) {
 		fmt.Fprintf(errOut, "reparse: --date must be YYYY-MM-DD, got %q\n", date)
-		return 2
+		return exitUsage
 	}
 	exit := 0
 	for _, shaArg := range shas {
 		report, err := pipeline.Reparse(context.Background(), d.store, d.rec, shaArg, date)
 		if err != nil {
 			fmt.Fprintf(errOut, "reparse %s: %v\n", shaArg, err)
-			exit = 1
+			exit = exitError
 			continue
 		}
 		fmt.Fprintf(out, "reparse %s: %s (%d items)\n", shortSha(shaArg), summary(report), len(report.Items))
@@ -160,16 +169,16 @@ func runList(out, errOut io.Writer, d *deps, args []string) int {
 	listFlags.StringVar(&reportType, "type", "", "filter by report type, e.g. CBC (= 血常规)")
 	listFlags.StringVar(&date, "date", "", "filter by check date: YYYY or YYYY-MM or YYYY-MM-DD")
 	if err := listFlags.Parse(args); err != nil {
-		return 2
+		return exitUsage
 	}
 	if date != "" && !listDateRe.MatchString(date) {
 		fmt.Fprintf(errOut, "list: --date must be YYYY, YYYY-MM or YYYY-MM-DD, got %q\n", date)
-		return 2
+		return exitUsage
 	}
-	rows, err := pipeline.ListReports(context.Background(), d.store, domType(reportType), date)
+	rows, err := d.store.ListReports(context.Background(), domType(reportType), date)
 	if err != nil {
 		fmt.Fprintf(errOut, "list: %v\n", err)
-		return 1
+		return exitError
 	}
 	tw := tabwriter.NewWriter(out, 0, 4, 2, ' ', 0)
 	fmt.Fprintln(tw, "sha256\tocr\tdate\ttype\tstatus\titems")
@@ -183,14 +192,14 @@ func runList(out, errOut io.Writer, d *deps, args []string) int {
 func runShow(out, errOut io.Writer, d *deps, args []string) int {
 	if len(args) == 0 {
 		fmt.Fprintf(errOut, "show: at least one sha256 is required\n%s\n", usage)
-		return 2
+		return exitUsage
 	}
 	exit := 0
 	for _, arg := range args {
 		row, err := pipeline.ShowReport(context.Background(), d.store, arg)
 		if err != nil {
 			fmt.Fprintf(errOut, "show %s: %v\n", arg, err)
-			exit = 1
+			exit = exitError
 			continue
 		}
 		fmt.Fprintf(out, "report sha256=%s: %s %s %s (ocr=%d)\n",
@@ -209,7 +218,7 @@ func runShow(out, errOut io.Writer, d *deps, args []string) int {
 
 func twError(tw *tabwriter.Writer) int {
 	if err := tw.Flush(); err != nil {
-		return 1
+		return exitError
 	}
 	return 0
 }

@@ -4,7 +4,7 @@
   uv run --project recognizer python -m recognizer.golden
 
 把 samples/expected/ocr/<id>.json 跑一遍 postprocess,写 samples/expected/report/<id>.json。
-规则或词典改动后重新生成,并在 tre中有出入时人工抽查( 地址 raw_text 提供核对)。
+规则或词典改动后重新生成,并对有出入的样本人工抽查(raw_text 提供核对依据)。
 """
 
 import json

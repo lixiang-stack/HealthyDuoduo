@@ -22,6 +22,11 @@ func ValidateSha256(sha string) error {
 	return nil
 }
 
+// noReportError 身份无报告行时的统一提示(reparse/show 共用:提示先 ingest)。
+func noReportError(sha string) error {
+	return fmt.Errorf("no report for image %s; ingest first", sha)
+}
+
 // Reparse reparse <sha256...>:复用已存 OCR 结果重跑后处理(规则迭代后历史刷新)。
 func Reparse(ctx context.Context, st Store, rec Recognizer, shaArg, date string) (*contract.Report, error) {
 	if err := ValidateSha256(shaArg); err != nil {
@@ -32,7 +37,7 @@ func Reparse(ctx context.Context, st Store, rec Recognizer, shaArg, date string)
 		return nil, fmt.Errorf("query reports: %w", err)
 	}
 	if !ok {
-		return nil, fmt.Errorf("no report for image %s; ingest first", shaArg)
+		return nil, noReportError(shaArg)
 	}
 	return ReparseStored(ctx, st, rec, row, date)
 }
@@ -62,11 +67,6 @@ func ReparseStored(ctx context.Context, st Store, rec Recognizer, row *ReportRow
 	return report, nil
 }
 
-// ListReports 查询报告列表(可选类别/日期;日期支持 YYYY / YYYY-MM / YYYY-MM-DD)。
-func ListReports(ctx context.Context, st Store, reportType, date string) ([]ReportRow, error) {
-	return st.ListReports(ctx, reportType, date)
-}
-
 // ShowReport 查询单份报告(含指标项)。
 func ShowReport(ctx context.Context, st Store, shaArg string) (*ReportRow, error) {
 	if err := ValidateSha256(shaArg); err != nil {
@@ -77,7 +77,7 @@ func ShowReport(ctx context.Context, st Store, shaArg string) (*ReportRow, error
 		return nil, fmt.Errorf("query reports: %w", err)
 	}
 	if !ok {
-		return nil, fmt.Errorf("no report for image %s; ingest first", shaArg)
+		return nil, noReportError(shaArg)
 	}
 	items, err := st.ItemsByImage(ctx, shaArg)
 	if err != nil {

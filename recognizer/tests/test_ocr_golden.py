@@ -19,7 +19,6 @@ from recognizer import paths
 from recognizer.contract import OCRResult
 from recognizer.ocr import run_ocr
 
-REPO_ROOT = paths.REPO_ROOT
 SAMPLES = paths.SAMPLES
 EXPECTED_OCR = paths.EXPECTED_OCR
 SCHEMA = paths.SCHEMA_OCR

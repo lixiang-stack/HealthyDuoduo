@@ -16,6 +16,12 @@ const usage = `usage: hdd ingest <image...> [--date YYYY-MM-DD] [--force]
        hdd list [--type <report-type>] [--date YYYY|YYYY-MM|YYYY-MM-DD]
        hdd show <sha256>`
 
+// CLI 退出码(POSIX 惯例):2=用法/参数错误,1=运行错误;成功为 0(零值,不单独命名)。
+const (
+	exitUsage = 2
+	exitError = 1
+)
+
 // fullDateRe --date(ingest/reparse 补录的取值)必须为完整日期。
 var fullDateRe = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 
@@ -27,7 +33,7 @@ func main() {
 	d, cleanup, err := openDeps(cfg)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "hdd: failed to initialize services: %v\n", err)
-		os.Exit(1)
+		os.Exit(exitError)
 	}
 	defer cleanup()
 	os.Exit(run(os.Stdout, os.Stderr, d, os.Args[1:]))
@@ -37,7 +43,7 @@ func main() {
 func run(out, errOut io.Writer, d *deps, args []string) int {
 	if len(args) == 0 {
 		fmt.Fprintln(errOut, usage)
-		return 2
+		return exitUsage
 	}
 	cmd, rest := args[0], args[1:]
 	switch cmd {
@@ -51,6 +57,6 @@ func run(out, errOut io.Writer, d *deps, args []string) int {
 		return runShow(out, errOut, d, rest)
 	default:
 		fmt.Fprintf(errOut, "hdd: unknown command %q\n%s\n", cmd, usage)
-		return 2
+		return exitUsage
 	}
 }

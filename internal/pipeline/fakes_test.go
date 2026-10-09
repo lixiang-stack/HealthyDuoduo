@@ -62,18 +62,6 @@ func (f *fakeStore) ImageBySha256(ctx context.Context, sha string) (*pipeline.Im
 	return &pipeline.Image{Sha256: sha}, nil
 }
 
-func (f *fakeStore) ImagesByShaPrefix(ctx context.Context, prefix string) ([]pipeline.Image, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	var out []pipeline.Image
-	for sha := range f.images {
-		if len(sha) >= len(prefix) && sha[:len(prefix)] == prefix {
-			out = append(out, pipeline.Image{Sha256: sha})
-		}
-	}
-	return out, nil
-}
-
 func (f *fakeStore) CreateImage(ctx context.Context, sha, filename string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()

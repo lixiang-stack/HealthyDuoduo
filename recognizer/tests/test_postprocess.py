@@ -265,7 +265,6 @@ def test_title_keyword_detects_category() -> None:
 
 # ---------- golden(真实样本,OCR 结果来自 golden 文件,跨架构确定性) ----------
 
-REPO_ROOT = paths.REPO_ROOT
 EXPECTED_OCR = paths.EXPECTED_OCR
 EXPECTED_REPORT = paths.EXPECTED_REPORT
 
