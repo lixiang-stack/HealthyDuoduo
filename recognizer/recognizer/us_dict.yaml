@@ -1,0 +1,38 @@
+# 超声词典(P3;us_01~03 三张真实样本驱动;决策 #8 与 cbc_dict.yaml 头注释一致)。
+# 叙述体(category.mode=narrative):无表头/行列,关键指标以「别名 + 桥接符 + 数值」
+# 形态散布于检查所见文字行(_extract_narrative 行内配对;值不完整/未提及 → value=None,
+# raw_text 留整行供人工核对)。OCR 损耗行(S/03.53、羊水最大保度、 FI )不命中即漏抓,
+# 报告保 partial 诚实留痕;canonical 是维护者选择的规范名。
+report_type: 超声
+category:
+  mode: narrative
+  title_keywords: ["超声"]
+  min_matched_items: 3
+items:
+  - name: 颈项透明层厚度
+    aliases: [颈项透明层厚度, NT]
+    units: [mm]
+  - name: 头臀长
+    aliases: [头臀长]
+    units: [mm]
+  - name: 双顶径
+    aliases: [双顶径, BPD]
+    units: [mm]
+  - name: 股骨长
+    aliases: [股骨长, FL]
+    units: [mm]
+  - name: 腹围
+    aliases: [AC]
+    units: [mm]
+  - name: 胎心率
+    aliases: [胎心率, 胎儿心率]
+    units: [次/分]
+  - name: 脐动脉S/D
+    aliases: [脐动脉S/D值, S/D]
+    units: []
+  - name: 羊水最大深度
+    aliases: [羊水最大深度, 羊水最大前后径]
+    units: [mm]
+  - name: 宫颈管长度
+    aliases: [子宫颈管长约]
+    units: [mm]

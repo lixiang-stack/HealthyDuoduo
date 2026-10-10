@@ -1,0 +1,151 @@
+# 尿常规词典(P3;ua_01~05 五张真实样本驱动;决策 #8 与 cbc_dict.yaml 头注释一致)。
+# 特征:定性结果为主(阴性/3+/norm.,value=None 留痕 raw_text)+ 沉渣计数(个/uL、/HP、/LP)
+# 与部分定量项(酸碱度/比重/尿钙/尿肌酐/微白蛋白等)。OCR 损耗形按原样收别名
+# (异性红细胞率%、镇检红细胞、粘液铁、结品 等);canonical 是维护者选择的规范名。
+# 量纲语义:镜检(/HP)与计数(个/uL)是不同量纲,拆为独立词条;ua_04 打印双段落
+# (机器段 无星号 vs 沉渣镜检段 *RBC/*WBC/*EC/*CAST/*BACT),同样拆为独立词条,
+# 「(镜检)」后缀 canonical 仅维护者可读。
+report_type: 尿常规
+category:
+  # ua_02 尿液常规标题、ua_05 尿常规(门诊);ua_04 无标题靠命中项数兜底
+  title_keywords: ["尿液", "尿常规"]
+  min_matched_items: 5
+items:
+  - name: 尿潜血
+    aliases: [尿潜血, "尿潜血(BLD)", 尿隐血, "尿隐血(千化学)", 隐血, BLD]
+    units: []
+  - name: 尿白细胞酯酶
+    aliases: [尿粒细胞酯酶, 粒细胞酯酶]
+    units: []
+  - name: 尿蛋白质
+    aliases: ["尿蛋白(PRO)", 尿蛋白, 蛋白质, "尿蛋白质(干化学)"]
+    units: []
+  - name: 尿葡萄糖
+    aliases: ["尿葡萄糖(GLU)", 尿糖, "尿葡萄糖(干化学)", GLU]
+    units: []
+  - name: 尿胆原
+    aliases: [尿胆原, "尿胆原(UBG)", "尿胆原(千化学)", URO]
+    units: [umol/l, umol/L]
+  - name: 尿胆红素
+    aliases: [尿胆红素, "尿胆红素(BIL)", "尿胆红素(干化学)", BIL]
+    units: []
+  - name: 抗坏血酸
+    aliases: [抗坏血酸, 维生素C, "维C(Vc)", Vc]
+    units: []
+  - name: 尿比重
+    aliases: [尿比重, 比重, SG]
+    units: []
+  - name: 尿酮体
+    aliases: [尿酮体, 酮体, "尿酮体(干化学)", KET]
+    units: []
+  - name: 尿亚硝酸盐
+    aliases: [尿亚硝酸盐, 亚硝酸盐, "尿亚硝酸盐(干化学)", NIT]
+    units: []
+  - name: 尿酸碱度
+    aliases: [尿酸碱度, 酸碱度, "尿酸碱度(干化学)", "酸碱度(pH)", "酸碱度(PH)"]
+    units: []
+  - name: 尿液颜色
+    aliases: [尿液颜色, 颜色]
+    units: []
+  - name: 尿透明度
+    aliases: [尿透明度, 透明度, 浊度]
+    units: []
+  - name: 尿白细胞计数
+    aliases: ["白细胞计数(WBC)", 尿白细胞计数]
+    units: [个/uL, 个/ul, /ul]
+  - name: 尿白细胞计数(镜检)
+    aliases: ["白细胞(*WBC)", 白细胞]
+    units: [个/uL, 个/ul, /ul]
+  - name: 尿白细胞镜检
+    aliases: [尿白细胞镜检, 白细胞镜检, 他检白细胞]
+    units: [/HP, 个/HP]
+  - name: 尿红细胞计数
+    aliases: ["红细胞计数(RBC)", 尿红细胞计数]
+    units: [个/uL, 个/ul, /ul]
+  - name: 尿红细胞计数(镜检)
+    aliases: ["红细胞(*RBC)", 红细胞]
+    units: [个/uL, 个/ul, /ul]
+  - name: 红细胞镜检
+    aliases: [红细胞镜检, 尿红细胞镜检, 镜检RBC]
+    units: [/HP]
+  - name: 尿上皮细胞计数
+    aliases: [上皮细胞计数, "上皮细胞计数(EC)"]
+    units: [个/uL, 个/ul, /ul]
+  - name: 尿上皮细胞计数(镜检)
+    aliases: ["上皮细胞(*EC)", 上皮细胞]
+    units: [个/uL, 个/ul, /ul]
+  - name: 上皮细胞镜检
+    aliases: [上皮细胞镜检, "上皮细胞[镜检]"]
+    units: [/HP]
+  - name: 小圆上皮细胞
+    aliases: [小圆上皮细胞, "小圆上皮细胞(SRC)", "小圆上皮细胞[镜检]"]
+    units: [个/uL, 个/ul]
+  - name: 尿透明管型计数
+    aliases: [尿透明管型计数, 透明管型]
+    units: [/LP]
+  - name: 病理管型
+    aliases: [尿病理管型计数]
+    units: [个/ul]
+  - name: 尿管型计数
+    aliases: ["管型计数(CAST)"]
+    units: []
+  - name: 尿管型计数(镜检)
+    aliases: ["管型(*CAST)"]
+    units: []
+  - name: 尿真菌
+    aliases: ["真菌[镜检]"]
+    units: [/HP]
+  - name: 结晶
+    aliases: [结晶, "结晶[镜检]", 结品, 结益]
+    units: [个/uL, 个/ul]
+  - name: 草酸钙结晶
+    aliases: [草酸钙结晶, 草酸码结品]
+    units: []
+  - name: 非晶盐类
+    aliases: [非晶盐类, 非品盐类]
+    units: [个/HP]
+  - name: 细胞管型
+    aliases: [细胞管型]
+    units: [/LP]
+  - name: 颗粒管型
+    aliases: [颗粒管型]
+    units: [/LP]
+  - name: 蜡样管型
+    aliases: [蜡样管型]
+    units: []
+  - name: 尿粘液丝
+    aliases: [粘液丝, 粘液铁]
+    units: [/LP]
+  - name: 滴虫
+    aliases: [滴虫]
+    units: [/HP]
+  - name: 白细胞团
+    aliases: [白细胞团]
+    units: [个/uL]
+  - name: 酵母样菌
+    aliases: [酵母样菌, "酵母菌(YLC)"]
+    units: [个/uL, 个/ul]
+  - name: 尿细菌计数
+    aliases: ["细菌计数(BACT)", 细菌]
+    units: [个/μL, 个/uL, 个/HP]
+  - name: 尿细菌计数(镜检)
+    aliases: ["细菌(*BACT)"]
+    units: [个/uL]
+  - name: 非透明管型
+    aliases: [非透明管型]
+    units: [个/uL]
+  - name: 异形红细胞率
+    aliases: [异性红细胞率%]
+    units: ["%"]
+  - name: 尿钙
+    aliases: [尿钙]
+    units: [mmol/L]
+  - name: 尿肌酐
+    aliases: [尿肌酐]
+    units: [mmol/L]
+  - name: 微白蛋白
+    aliases: [微白蛋白]
+    units: [mg/L]
+  - name: 微白蛋白/尿肌酐
+    aliases: [微白蛋白/尿肌酐]
+    units: [mg/mmol]

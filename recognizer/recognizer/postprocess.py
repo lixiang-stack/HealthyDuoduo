@@ -71,7 +71,7 @@ _ASCII_UNIT_RE = re.compile(r"[0-9A-Za-z.%^~/*\-]+")  # ASCII 数值/单位字�
 # 表头关键词 → 列角色(P3 扩类别后新增印形:中文名称(tft_03)、No项(lft_01 的
 # 序号与项目名合并);测定结果(tft_01)/参考值单位(tft_03) 含既有关键词子串,不需单列)
 ROLE_HEADERS: dict[str, tuple[str, ...]] = {
-    "name": ("项目名称", "检验项目", "中文名称", "No项", "编号项目"),
+    "name": ("项目名称", "检验项目", "中文名称", "No项", "编号项目", "检验项"),
     "value": ("结果", "测定值"),
     "unit": ("单位",),
     "ref": ("参考值", "参考区间", "参考范围"),
@@ -105,7 +105,8 @@ class DictItem:
 @dataclass
 class LabDict:
     """一个报告类别的词典(数据文件 *_dict.yaml 的加载产物);单位字面量与
-    别名索引在加载时一次派生。"""
+    别名索引在加载时一次派生。mode=table(默认,表头带/行带版式)或
+    narrative(超声叙述体:别名 + 后随数值的行内配对,见 _extract_narrative)。"""
 
     report_type: str
     title_keywords: tuple[str, ...]
@@ -113,6 +114,7 @@ class LabDict:
     items: tuple[DictItem, ...]
     alias_map: dict[str, DictItem] = field(default_factory=dict)
     unit_literals: tuple[str, ...] = ()
+    mode: str = "table"
 
 
 @lru_cache(maxsize=1)
@@ -151,6 +153,7 @@ def _build_dict(path: Path) -> LabDict:
         items=items,
         alias_map=alias_map,
         unit_literals=tuple(sorted(set(literals), key=len, reverse=True)),
+        mode=str(raw["category"].get("mode", "table")),
     )
 
 
@@ -477,6 +480,50 @@ def _extract_items(
     return items
 
 
+def _extract_narrative(cells: list[_Cell], d: LabDict) -> list[tuple[DictItem, _RowPiece]]:
+    """超声叙述体抽取(P3;category.mode=narrative):无表头带,别名 + 桥接符 +
+    后随数值的行内配对(如 「（NT）2.6mm」「胎心率159次/分」)。
+
+    值紧密性:别名后仅允许桥接符(冒号/括号/约/'值'/空白/句点等)再出现数字,
+    「NT筛查(省免)、11-14周」之类远距数字不误认。同一 canonical 多次命中时
+    取首个有数值者(标题提及在前、测值在后的版式);raw_text 为整行。
+    """
+    bridge_re = re.compile(r"^[：:()（）约≈。，、.\s值]*")
+    best: dict[str, tuple[DictItem, _RowPiece, float | None]] = {}
+    for c in cells:
+        t = _ARROW_RE.sub("", c.text.strip()).strip()
+        if not t:
+            continue
+        for alias in sorted(d.alias_map, key=len, reverse=True):
+            idx = t.find(alias)
+            if idx < 0:
+                continue
+            it = d.alias_map[alias]
+            head = bridge_re.match(t[idx + len(alias):])
+            value: float | None = None
+            unit: str | None = None
+            if head is not None:
+                rest = t[idx + len(alias) + head.end():]
+                m = re.match(rf"({_NUM})(.*)", rest)
+                if m:
+                    value = float(m.group(1))
+                    tail = m.group(2).strip()
+                    for lit in sorted(it.units, key=len, reverse=True):
+                        if tail.lower().startswith(lit.lower()):
+                            unit = tail[: len(lit)].strip()
+                            break
+            row = best.get(it.name)
+            if row is not None and not (row[2] is None and value is not None):
+                continue
+            best[it.name] = (
+                it,
+                _RowPiece(cy=c.cy, item=it, value=value, unit=unit, raw_cells=[c],
+                          low_score=c.score < LOW_SCORE_THRESHOLD),
+                value,
+            )
+    return [(it, piece) for it, piece, _ in (best[k] for k in sorted(best))]
+
+
 def run_postprocess(ocr: OCRResult, date_hint: str | None = None) -> Report:
     """OCR 结果 → 报告。date_hint:ingest --date 兜底;检查单已解析出日期时兜底不生效。"""
     cells = _cells(ocr)
@@ -540,7 +587,10 @@ def _select_category(
     """
     best: tuple[LabDict, list[tuple[DictItem, _RowPiece]], bool] | None = None
     for d in load_dicts():
-        pairs = _extract_items(cells, header_bands, d)
+        if d.mode == "narrative":
+            pairs = _extract_narrative(cells, d)
+        else:
+            pairs = _extract_items(cells, header_bands, d)
         title = any(kw in c.text for c in cells for kw in d.title_keywords)
         if not title and len(pairs) < d.min_matched_items:
             continue
