@@ -12,12 +12,13 @@ import (
 	"path/filepath"
 )
 
-// Ingest hdd ingest <image...> [--date YYYY-MM-DD] [--force]:
+// Ingest hdd ingest <image...> [--date YYYY-MM-DD] [--force] [--preprocess <steps>]:
 // 图像 sha256 已入库且未 --force → 幂等返回该图像身份(决策 #5);
 // 该报告无日期且 --date 给出 → 在已存 OCR 上重跑补录(决策 #6);
-// 否则重跑识别 /report;--force 重跑同样追加 ocr_results(决策 #7,历史保留)。
+// 否则重跑识别 /report(preprocess 为 P3 预处理开关透传);--force 重跑同样
+// 追加 ocr_results(决策 #7,历史保留)。
 // 出参 Sha256 即本次操作的图像身份(reports 主键与其一致)。
-func Ingest(ctx context.Context, st Store, rec Recognizer, obj ObjectStore, path, date string, force bool) (*IngestOutcome, error) {
+func Ingest(ctx context.Context, st Store, rec Recognizer, obj ObjectStore, path, date, preprocess string, force bool) (*IngestOutcome, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read image %s: %w", path, err)
@@ -48,7 +49,7 @@ func Ingest(ctx context.Context, st Store, rec Recognizer, obj ObjectStore, path
 		}
 	}
 
-	ocr, report, err := rec.Report(ctx, data, filename, date)
+	ocr, report, err := rec.Report(ctx, data, filename, date, preprocess)
 	if err != nil {
 		return nil, err
 	}

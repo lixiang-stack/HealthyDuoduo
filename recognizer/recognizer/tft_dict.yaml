@@ -1,0 +1,36 @@
+# 甲状腺功能词典(P3;tft_01~03 三张真实样本驱动;决策 #8 与 cbc_dict.yaml 头注释一致)。
+# tft_01(西安三院 六项)、tft_02(厦门弘爱 甲功六项)、tft_03(三医院 报告正文双栏);
+# OCR 损耗形按观测原样收别名(T74/F74 为 FT/TT 前缀损耗、淤离为「游离」损耗)。
+report_type: 甲状腺功能
+category:
+  # 两个标题词命中率都极高:tft_01 顶部医嘱串、tft_02「甲功六项」、tft_03 项目名均含 甲状腺
+  title_keywords: ["甲状腺", "甲功"]
+  min_matched_items: 4
+items:
+  - name: 促甲状腺素
+    aliases: [促甲状腺素, 高敏促甲状腺激素(sTSH), TSH]
+    units: [mIU/L, uIU/ml]
+  - name: 甲状腺球蛋白
+    aliases: [甲状腺球蛋白, TG]
+    units: [ng/ml, ng/al]
+  - name: 三碘甲状腺原氨酸
+    aliases: [三碘甲状腺原氨酸, 总三碘甲状腺原氨酸, T3, TT3]
+    units: [nmol/L, mmol/L, ng/ml, ng/d1]
+  - name: 甲状腺素
+    aliases: [甲状腺素, 总甲状腺素, T4, T74]
+    units: [nmol/L, rmol/L, ng/ml]
+  - name: 游离三碘甲状腺原氨酸
+    aliases: [游离T3, FT3, 游离三碘甲状腺原氨酸(FT3), 淤离三碘甲状腺原氨酸FT3]
+    units: [pmol/L, pg/al]
+  - name: 游离甲状腺素
+    aliases: [游离T4, FT4, 游离甲状腺素(FT4), F74]
+    units: [pmo1/L, ng/d1, pg/al]
+  - name: 抗甲状腺过氧化物酶抗体
+    aliases: [抗甲状腺过氧化物酶抗体, 甲状腺过氧化物酶抗体(TPOAb), TPOAb]
+    units: [IU/mL, IU/al, 1U/mL, U/ml]
+  - name: 抗甲状腺球蛋白抗体
+    aliases: [抗甲状腺球蛋白抗体, 抗甲状腺球蛋白抗体(Tg-Ab), TG-Ab, TGAb]
+    units: [IU/mL, 1U/mL, U/ml]
+  - name: 抗促甲状腺素受体抗体
+    aliases: [抗促甲状腺素受体抗体(TRAb)]
+    units: [IU/L]

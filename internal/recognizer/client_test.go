@@ -42,6 +42,12 @@ func newServer(t *testing.T) *httptest.Server {
 		default:
 			t.Errorf("unexpected date field %q", date)
 		}
+		switch pre := r.FormValue("preprocess"); pre {
+		case "": // 未要求预处理
+		case "gray,deskew": // 预处理开关测试取值
+		default:
+			t.Errorf("unexpected preprocess field %q", pre)
+		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(reportBundleJSON))
 	})
@@ -74,7 +80,7 @@ func TestReport_ParsesBundle(t *testing.T) {
 	defer srv.Close()
 	c := healthyduoduo.New(srv.URL)
 
-	ocr, report, err := c.Report(context.Background(), []byte("fake"), "sample.jpeg", "")
+	ocr, report, err := c.Report(context.Background(), []byte("fake"), "sample.jpeg", "", "")
 	if err != nil {
 		t.Fatalf("Report: %v", err)
 	}
@@ -93,8 +99,17 @@ func TestReport_SendsDateField(t *testing.T) {
 	srv := newServer(t)
 	defer srv.Close()
 	c := healthyduoduo.New(srv.URL)
-	if _, _, err := c.Report(context.Background(), []byte("fake"), "j.jpg", "2026-10-01"); err != nil {
+	if _, _, err := c.Report(context.Background(), []byte("fake"), "j.jpg", "2026-10-01", ""); err != nil {
 		t.Fatalf("Report with date: %v", err)
+	}
+}
+
+func TestReport_SendsPreprocessField(t *testing.T) {
+	srv := newServer(t)
+	defer srv.Close()
+	c := healthyduoduo.New(srv.URL)
+	if _, _, err := c.Report(context.Background(), []byte("fake"), "j.jpg", "", "gray,deskew"); err != nil {
+		t.Fatalf("Report with preprocess: %v", err)
 	}
 }
 
@@ -126,7 +141,7 @@ func TestNonJSONErrorBubbles(t *testing.T) {
 		http.Error(w, "boom", http.StatusInternalServerError)
 	}))
 	defer srv.Close()
-	if _, _, err := healthyduoduo.New(srv.URL).Report(context.Background(), []byte("x"), "a.jpg", ""); err == nil {
+	if _, _, err := healthyduoduo.New(srv.URL).Report(context.Background(), []byte("x"), "a.jpg", "", ""); err == nil {
 		t.Fatal("expected error on 500")
 	}
 }

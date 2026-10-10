@@ -19,17 +19,22 @@ app = FastAPI(title="HealthyDuoduo Recognizer")
 _IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tif", ".tiff"}
 
 
-def _read_image(image: UploadFile) -> OCRResult:
-    """multipart 上传校验 + OCR(与调试 CLI 同一实现);失败映射为 4xx。"""
+def _read_image(image: UploadFile, preprocess: str | None = None) -> OCRResult:
+    """multipart 上传校验 + OCR(与调试 CLI 同一实现);失败映射为 4xx。
+
+    preprocess:可选预处理开关(ocr.parse_preprocess 语义);非法步骤名 → 400。
+    """
     if image.filename is None or Path(image.filename).suffix.lower() not in _IMAGE_SUFFIXES:
         raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, "unsupported image type")
     data = image.file.read()
     if not data:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "empty upload")
     try:
-        return run_ocr(data)
+        return run_ocr(data, preprocess)
     except UnidentifiedImageError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"invalid image content: {exc}") from exc
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
 
 
 @app.get("/healthz")
@@ -38,19 +43,27 @@ def healthz() -> dict[str, str]:
 
 
 @app.post("/ocr")
-def ocr(image: UploadFile) -> OCRResult:
-    """multipart 上传一张图像 → OCR 结果 JSON(与调试 CLI 同一实现)。"""
-    return _read_image(image)
+def ocr(image: UploadFile, preprocess: str | None = Form(default=None)) -> OCRResult:
+    """multipart 上传一张图像 → OCR 结果 JSON(与调试 CLI 同一实现)。
+
+    可选 multipart 字段 preprocess:预处理开关(步骤名逗号/空格组合;默认关闭)。
+    """
+    return _read_image(image, preprocess)
 
 
 @app.post("/report")
-def report(image: UploadFile, date: str | None = Form(default=None)) -> ReportResponse:
+def report(
+    image: UploadFile,
+    date: str | None = Form(default=None),
+    preprocess: str | None = Form(default=None),
+) -> ReportResponse:
     """multipart 上传一张图像 → OCR 结果 + 规则化报告。
 
     可选 multipart 字段 date(YYYY-MM-DD):检查单未解析出日期时的人工补录兜底
     (决策 #6;补录后报告不再是「日期缺失」partial);已解析出日期时该参数不生效。
+    可选 multipart 字段 preprocess:预处理开关(P3 坏例驱动;默认关闭)。
     """
-    ocr_result = _read_image(image)
+    ocr_result = _read_image(image, preprocess)
     report = run_postprocess(ocr_result, date_hint=date)
     return ReportResponse(ocr_result=ocr_result, report=report)
 

@@ -16,7 +16,10 @@ import pytest
 import yaml
 
 from recognizer import paths
-from recognizer.postprocess import DICT_PATH as DICT
+from recognizer.postprocess import DICT_DIR, DICT_GLOB
+
+# 词典注册表:每个 *_dict.yaml 一个报告类别(测试在收集期读取文件列表)
+_DICTS = sorted(DICT_DIR.glob(DICT_GLOB))
 
 # 与 postprocess._match_name 官方语义一致的前缀形态:
 # ①原样 ②去行首星号 ③去行首序号 ④去名称熔断数字尾 ⑤序号+熔断组合剥离
@@ -49,25 +52,44 @@ def _witnessed(term: str) -> set[str]:
     return seen
 
 
-@pytest.mark.skipif(not DICT.exists(), reason="cbc_dict.yaml missing")
-def test_every_alias_has_corpus_evidence() -> None:
-    d = yaml.safe_load(DICT.read_text(encoding="utf-8"))
+def _narrative(dict_path) -> bool:
+    """叙述体词典(超声):别名内嵌于叙述行,门禁按子串见证,而非整行等值。"""
+    d = yaml.safe_load(dict_path.read_text(encoding="utf-8"))
+    return str(d.get("category", {}).get("mode", "table")) == "narrative"
+
+
+def _witnessed_sub(term: str) -> set[str]:
+    """门禁路径与 _witnessed 相同(序号/熔断容忍的整行变体),叙述体改为子串匹配。"""
+    seen: set[str] = set()
+    for raw, sids in _corpus().items():
+        if term in raw or any(term in v for v in {
+            re.sub(r"^[*＊※✱]+", "", raw),
+            re.sub(r"^\d+[.、．]?[\s]*", "", raw),
+        }):
+            seen |= sids
+    return seen
+
+
+@pytest.mark.parametrize("dict_path", _DICTS, ids=lambda p: p.stem)
+def test_every_alias_has_corpus_evidence(dict_path) -> None:
+    d = yaml.safe_load(dict_path.read_text(encoding="utf-8"))
     problems = []
     for it in d["items"]:
         for a in set(it.get("aliases", [])):
-            ids = _witnessed(a)
+            ids = _witnessed_sub(a) if _narrative(dict_path) else _witnessed(a)
             if not ids:
                 problems.append(f"{it['name']}: alias {a!r} 无任何样本证据")
     assert not problems, "词典别名与真实样本脱钩:\n" + "\n".join(problems)
 
 
-@pytest.mark.skipif(not DICT.exists(), reason="cbc_dict.yaml missing")
-def test_every_item_has_witnessed_reference() -> None:
+@pytest.mark.skipif(not _DICTS, reason="no *_dict.yaml in recognizer package")
+@pytest.mark.parametrize("dict_path", _DICTS, ids=lambda p: p.stem)
+def test_every_item_has_witnessed_reference(dict_path) -> None:
     """每一词典组(规范名 + 别名)至少有一条真实样本证据,防孤儿词条。"""
-    d = yaml.safe_load(DICT.read_text(encoding="utf-8"))
+    d = yaml.safe_load(dict_path.read_text(encoding="utf-8"))
     problems = []
     for it in d["items"]:
         terms = {it["name"], *it.get("aliases", [])}
-        if not any(_witnessed(t) for t in terms):
+        if not any(_witnessed_sub(t) if _narrative(dict_path) else _witnessed(t) for t in terms):
             problems.append(f"{it['name']}: 规范名与全部别名均无样本证据")
     assert not problems, "孤儿词条:\n" + "\n".join(problems)

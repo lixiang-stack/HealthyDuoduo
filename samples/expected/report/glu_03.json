@@ -1,0 +1,1 @@
+{"report_type":"血糖","report_date":"2012-11-23","status":"success","items":[{"name":"糖化血红蛋白","value":11.0,"unit":"%","ref_range":"3.8-5.8","flag":"high","low_confidence":false,"raw_text":"GHB  糖化血红蛋白  11.0↑  3.8-5.8  %"}]}

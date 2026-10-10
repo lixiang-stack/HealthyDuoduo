@@ -1,0 +1,36 @@
+# 血糖词典(P3:血糖代谢相关检验;决策 #8:只含「规范名 + 别名/缩写 + 已知单位集」,
+# 不内置任何参考值,参考范围一律从检查单抽取)。
+# 词条规则同 cbc_dict.yaml 文件头:每条别名必须能在 samples/expected/ocr/ 真实 OCR
+# 文本中找到(tests/test_dict_coverage.py 门禁);canonical 是维护者选择的规范名。
+# 本类别依据 glu_01~03 三张真实样本;
+# GLUO/GLU1 等代号与 mmol/L 的 OCR 损耗形(unol/1、mnol/L、mmo1/L、mol/L)为观测原样。
+report_type: 血糖
+category:
+  # 标题词规避「葡萄糖」裸词:肝功能报告以「葡萄糖[GLU]」作项目名,裸词会误分发
+  title_keywords: ["葡萄糖测定", "葡萄糖耐量", "糖化血红蛋白"]
+  min_matched_items: 2
+items:
+  - name: 空腹葡萄糖
+    aliases: [GLUO, HR葡萄糖]
+    units: [mmol/L, unol/1, mnol/L, mmo1/L, mol/L]
+  - name: 餐后半小时葡萄糖
+    aliases: [餐后半小时葡萄糖, GLU1/2]
+    units: [mmol/L, mnol/L, mmo1/L, mol/L]
+  - name: 餐后一小时葡萄糖
+    aliases: [餐后一小时葡萄糖, GLUI]
+    units: [mmol/L, mnol/L, mmo1/L, mol/L]
+  - name: 餐后二小时葡萄糖
+    aliases: [餐后二小时葡萄糖, GLU2, 餐后2h血糖, GLU2h]
+    units: [mmol/L, mmo1/L]
+  - name: 餐后三小时葡萄糖
+    aliases: [餐后三小时葡萄糖, GLU3]
+    units: [mmol/L, mol/L]
+  - name: 糖化血红蛋白
+    aliases: [糖化血红蛋白, 糖化血红蛋白HbA1C, HbA1C, GHB]
+    units: ["%"]
+  - name: C肽
+    aliases: [C_P, C_肽]
+    units: [ng/mL]
+  - name: 胰岛素
+    aliases: [胰岛素, IRI]
+    units: [uIU/mL]
