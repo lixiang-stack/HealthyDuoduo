@@ -66,3 +66,20 @@ def test_engine_exception_treated_as_no_output(monkeypatch) -> None:
 def test_both_fail_returns_none(monkeypatch) -> None:
     _patch(monkeypatch, _Engine(exc=True), _Engine(None))
     assert ts.run_table_structure("x", _ocr()) is None
+
+
+def test_produced_event_logged(monkeypatch, caplog) -> None:
+    """可观测:产出时记 tsr-produced(含胜出子模型)。"""
+    _patch(monkeypatch, _Engine(_GOOD), _Engine(None))
+    with caplog.at_level("INFO", logger="recognizer.table_structure"):
+        out = ts.run_table_structure("x", _ocr())
+    assert out is not None and out.model == "wired"
+    assert any("tsr-produced model=wired" in r.getMessage() for r in caplog.records)
+
+
+def test_degenerate_event_logged(monkeypatch, caplog) -> None:
+    """可观测:两子模型皆退化时记 tsr-degenerate(判断启发式能否下线的信号)。"""
+    _patch(monkeypatch, _Engine(_BAD), _Engine(_BAD))
+    with caplog.at_level("INFO", logger="recognizer.table_structure"):
+        assert ts.run_table_structure("x", _ocr()) is None
+    assert any("tsr-degenerate" in r.getMessage() for r in caplog.records)

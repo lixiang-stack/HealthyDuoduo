@@ -28,6 +28,11 @@ class Flag(_Vocabulary):
     LOW = "low"
     UNKNOWN = "unknown"
 
+class TableModel(_Vocabulary):
+    """表结构识别选用的子模型(ADR-0004);取值与 schemas 枚举一致。"""
+    WIRED = "wired"
+    LINELESS = "lineless"
+
 # Vertex coordinate [x, y]; a text line box is a quadrilateral of four points.
 type Point = tuple[float, float]
 
@@ -55,7 +60,7 @@ class TableStructure(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     html: str = Field(min_length=1)
-    model: Literal["wired", "lineless"]
+    model: TableModel
     elapse: float = Field(ge=0)
 
 

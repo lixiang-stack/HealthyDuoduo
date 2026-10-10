@@ -471,6 +471,21 @@ def test_grid_no_header_falls_back_to_heuristic() -> None:
     assert it.unit == "g/L"
 
 
+def test_table_path_decision_logged(caplog) -> None:
+    """可观测:表格类报告产出一条 tsr-decision 日志(路径来源/是否带网格/项数)。"""
+    html = (
+        "<table>"
+        "<tr><td>项目名称</td><td>结果</td></tr>"
+        "<tr><td>血红蛋白</td><td>128</td></tr>"
+        "</table>"
+    )
+    ocr = _with_grid(mk_ocr([{"x": 100, "y": -60, "text": "血常规报告单"}]), html)
+    with caplog.at_level("INFO", logger="recognizer.postprocess"):
+        run_postprocess(ocr)
+    messages = [r.getMessage() for r in caplog.records]
+    assert any(m.startswith("tsr-decision") and "source=grid" in m and "grid_items=" in m for m in messages)
+
+
 # ---------- golden(真实样本,OCR 结果来自 golden 文件,跨架构确定性) ----------
 
 EXPECTED_OCR = paths.EXPECTED_OCR

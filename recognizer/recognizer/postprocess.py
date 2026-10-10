@@ -26,6 +26,7 @@
    且须先以真实样本落 samples/expected/ocr(golden)后再改。
 """
 
+import logging
 import re
 from dataclasses import dataclass, field
 from functools import lru_cache
@@ -34,6 +35,8 @@ from pathlib import Path
 import yaml
 
 from .contract import Flag, OCRResult, Report, ReportItem, Status
+
+logger = logging.getLogger(__name__)
 
 # 词典注册表:每个报告类别一个数据文件(决策 #8:只有规范名/别名/已知单位集,
 # 不内置参考值;参考范围一律从检查单抽取),按文件名序注册。
@@ -668,17 +671,20 @@ def _extract_pairs(
     header_bands: list[list[_Cell]],
     grid: list[list[str]] | None,
     scores: dict[str, float],
-) -> list[tuple[DictItem, _RowPiece]]:
+) -> tuple[list[tuple[DictItem, _RowPiece]], str, int, int]:
     """按词典类别抽取:叙述体走行内配对;表格类取「网格路径」与「现状启发式」
-    的命中项数多者(ADR-0004:网格还原更稳,但不劣化——网格退化/无表头时自动退回)。"""
+    的命中项数多者(ADR-0004:网格还原更稳,但不劣化——网格退化/无表头时自动退回)。
+    返回 (命中项, 路径来源, 网格项数, 启发式项数):来源 ∈ narrative/grid/heuristic,
+    两个项数供 run_postprocess 记日志(判断启发式能否下线)。"""
     if d.mode == "narrative":
-        return _extract_narrative(cells, d)
+        return _extract_narrative(cells, d), "narrative", 0, 0
     heuristic = _extract_items(cells, header_bands, d)
     if grid is not None:
         from_grid = _extract_items_from_grid(grid, d, scores)
         if len(from_grid) > len(heuristic):
-            return from_grid
-    return heuristic
+            return from_grid, "grid", len(from_grid), len(heuristic)
+        return heuristic, "heuristic", len(from_grid), len(heuristic)
+    return heuristic, "heuristic", 0, len(heuristic)
 
 
 def run_postprocess(ocr: OCRResult, date_hint: str | None = None) -> Report:
@@ -701,7 +707,11 @@ def run_postprocess(ocr: OCRResult, date_hint: str | None = None) -> Report:
     selected = _select_category(cells, header_bands, grid, scores)
     if selected is None:
         return Report(report_type=UNKNOWN_REPORT_TYPE, report_date=date, status=Status.FAILED, items=[])
-    d, pairs = selected
+    d, pairs, source, n_grid, n_heur = selected
+    logger.info(
+        "tsr-decision report_type=%s source=%s grid_items=%d heur_items=%d",
+        d.report_type, source, n_grid, n_heur,
+    )
 
     items: list[ReportItem] = []
     partial = False
@@ -766,7 +776,7 @@ def _select_category(
     header_bands: list[list[_Cell]],
     grid: list[list[str]] | None = None,
     scores: dict[str, float] | None = None,
-) -> tuple[LabDict, list[tuple[DictItem, _RowPiece]]] | None:
+) -> tuple[LabDict, list[tuple[DictItem, _RowPiece]], str, int, int] | None:
     """多词典注册表分发(P3 A1 内容优先分类)。
 
     判定由内容驱动:命中项数 ≥ min_matched_items 的词典「达标」;达标者中命中项数
@@ -778,13 +788,14 @@ def _select_category(
     因为报告未达标时往往正是「标题词被印成项目名」的样本(如 glu_03 的糖化血红蛋白)。
 
     grid(ADR-0004):表格类报告若带表结构网格,抽取走网格路径(退化/无果自动回退)。
+    返回 (词典, 命中项, 路径来源, 网格项数, 启发式项数) 或 None。
     """
     scores = scores or {}
     title_cells = _title_region_cells(cells, header_bands)
-    best: tuple[LabDict, list[tuple[DictItem, _RowPiece]]] | None = None
+    best: tuple[LabDict, list[tuple[DictItem, _RowPiece]], str, int, int] | None = None
     best_key: tuple[bool, int, bool] | None = None
     for d in load_dicts():
-        pairs = _extract_pairs(d, cells, header_bands, grid, scores)
+        pairs, source, n_grid, n_heur = _extract_pairs(d, cells, header_bands, grid, scores)
         qualified = len(pairs) >= d.min_matched_items
         if not qualified and not any(kw in c.text for c in cells for kw in d.title_keywords):
             continue
@@ -792,5 +803,5 @@ def _select_category(
         key = (qualified, len(pairs), title_region)
         if best_key is not None and key <= best_key:
             continue
-        best, best_key = (d, pairs), key
+        best, best_key = (d, pairs, source, n_grid, n_heur), key
     return best

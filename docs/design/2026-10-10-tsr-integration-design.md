@@ -53,22 +53,45 @@ OCR results ──┬─(有 table_structure)─► grid → 语义列映射 →
 
 ### 3.4 子模型择优与回退
 
-- 同时跑 `wired_table_rec` 与 `lineless_table_rec`，取「非退化优先、格数多者」为结果。
-- 两者皆退化（行列<2）→ 回退现有启发式抽取（记录日志，供坏例库归档）。
+- **并行**跑 `wired_table_rec` 与 `lineless_table_rec`（模块级 `ThreadPoolExecutor`；两实例无共享可变状态，ONNXRuntime 推理释放 GIL，实测约 1.3–1.4× 提速且输出与串行逐字节一致），取「非退化优先、格数多者」为结果。
+- 两者皆退化（行列<2）→ 回退现有启发式抽取。
 - `table_cls` 单模型路由弃用（原型显示误判率高、且是 lft_05/tft_02 失败的根因）。
+- **可观测**：产出/退化/路径决策记结构化日志 `tsr-produced …`、`tsr-degenerate`、`tsr-decision report_type=… source=grid|heuristic grid_items=… heur_items=…`；服务经 `logging.basicConfig(INFO)` 输出，用 `docker logs | grep` 聚合计数（`source=heuristic` 且 `grid_items>0` 即「网格未能胜过启发式」），供后续判断启发式几何解析能否下线。
 
 ### 3.5 测试与 golden
 
-- 单测：grid 解析（含 rowspan）、语义列映射、择优规则、回退触发。
+- 单测：grid 解析、语义列映射（含左右双栏/熔断）、择优规则、退化回退、日志事件。
 - golden：既有 24 张样本**重基**（TSR 路径产出新结构，人工核对 `raw_text` 后再冻结）；lft_05 期望恢复为完整 19 项。
 - 契约：schema 校验 + Go fixture 双向。
 
-## 4. 怎么验收（状态 2026-10-10）
+## 4. 怎么验收
 
-- [x] 表格类报告走 TSR 路径（`/report` 填充 `table_structure`，退化回退启发式）；**lft_05 恢复全部 19 项**（原 17），其余 23 张报告 golden 不变。
-- [x] TSR 退化自动回退且不劣化：`_extract_pairs` 取「网格 / 启发式」命中项数多者；`tests/test_table_structure.py`（退化/异常/择优）与 `test_postprocess.py`（网格抽取、双栏、熔断、无表头回退）覆盖。
+### 4.1 自动（CI / 可复现，2026-10-10 全绿）
+
+- [x] 表格类报告走 TSR 路径（`/report` 填充 `table_structure`；退化回退启发式）；**lft_05 恢复全部 19 项**（原 17），其余 23 张报告 golden 不变。
+- [x] 退化自动回退且不劣化：`_extract_pairs` 取「网格 / 启发式」命中项数多者；`tests/test_table_structure.py`（择优/退化/异常/日志）与 `test_postprocess.py`（网格抽取、双栏、熔断、无表头回退、日志）覆盖。
 - [x] `/reparse` 仅凭已存 `table_structure`（`expected/ocr` 已含）产出与 `/report` 一致（golden 回归）。
 - [x] 离线/容器：`docker build` 成镜像（模型构建期预下载）；`docker run --network none` 实测 cbc_01/lft_05 端到端出报告，无运行时下载。
 - [x] 契约双语一致：`schemas/ocr_result.schema.json` + Go `internal/contract` + pydantic 同步。
-- [ ] 数值/单位/参考**逐项人工核对**（本轮以 golden 机器回归为主；`flag` 计算由既有单测覆盖）。
 - [x] CI 双链绿：ruff + pytest（140 passed）；go vet + gofmt + go test。
+
+### 4.2 人工抽查（合并前执行；本轮尚未逐项执行）
+
+机器回归只证明「样例稳定」，数值/单位/参考的**正确性**需以原图为依据人工核对。重点与操作：
+
+**重点**
+
+1. **lft_05（本次坏例闭环）**：19 项的 `value` / `unit` / `ref_range` / `flag` 与单据逐项一致——尤其恢复的 `丙氨酸转氨酶` / `天冬氨酸转氨酶` / `谷氨酰转肽酶`。
+2. **每类抽样 1–2 张**（cbc / glu / lft / tft / ua）：名称↔数值不串行；单位与参考范围与单据一致；尿常规定性项 `value=None` 合理；单位损耗（如 `μmo1/L`、`109/L`）按原文留痕。
+3. **无劣化抽查**：血常规 / 尿常规各 1 张，确认网格路径未比旧启发式少项（对照片内总项数）。
+
+**操作**
+
+```bash
+cd recognizer
+uv run python -m recognizer ../samples/<id>.<ext> --tsr    # OCR + table_structure(退化时为 null)
+curl -sF image=@../samples/<id>.<ext> localhost:8000/report | python -m json.tool  # 或起服务取报告
+# 以 report.items[].raw_text 为锚点,逐项对照原图核对 name/value/unit/ref_range/flag
+```
+
+发现问题 → 坏例入 `samples/` → 改词典/规则或 TSR 回退策略 → `uv run python -m recognizer.golden` 重生成 → 重跑双链。

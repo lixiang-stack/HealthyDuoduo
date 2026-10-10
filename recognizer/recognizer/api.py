@@ -7,6 +7,7 @@ P3+(ADR-0004):/report 额外跑表结构识别(TSR);结果随 ocr_result 一并�
 /reparse 复用它免于再读原图。纯 /ocr 与调试 CLI 保持只做 OCR。
 """
 
+import logging
 from pathlib import Path
 
 from fastapi import FastAPI, Form, HTTPException, UploadFile, status
@@ -18,6 +19,9 @@ from .postprocess import run_postprocess
 from .table_structure import run_table_structure
 
 app = FastAPI(title="HealthyDuoduo Recognizer")
+
+# 服务入口配置日志,使 TSR 决策/退化等 INFO 事件可见(header 可 grep 统计,见集成设计 §3)
+logging.basicConfig(level=logging.INFO)
 
 _IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tif", ".tiff"}
 

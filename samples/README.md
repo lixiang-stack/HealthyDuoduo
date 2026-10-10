@@ -15,8 +15,8 @@
     超声叙述体走 postprocess 的 narrative 模式)。
   - 另有 cbc 无前缀 1.jpeg~5.jpg 维护者留底(未入 golden,勿提交)。
 - golden(`expected/ocr/<id>.json`)由调试 CLI 生成:
-  `cd recognizer && uv run python -m recognizer ../samples/<id>.<ext> --table > ../samples/expected/ocr/<id>.json`
-  (stderr 的日志重定向丢弃;`--table` 附加表结构识别结果 ADR-0004,无此字段的旧 golden 会走
+  `cd recognizer && uv run python -m recognizer ../samples/<id>.<ext> --tsr > ../samples/expected/ocr/<id>.json`
+  (stderr 的日志重定向丢弃;`--tsr` 附加表结构识别结果 ADR-0004,无此字段的旧 golden 会走
   启发式回退;对比规则见实施计划 §8-5,elapse 只记录不比对。)
 - golden(`expected/report/<id>.json`,P2)由后处理对 golden OCR 生成:
   `cd recognizer && uv run python -m recognizer.golden`
