@@ -291,7 +291,20 @@ Go（工程层）：
 2. 趋势统计：`hdd trend <指标名> [--type <report-type>]`——同一指标项名（词典规范名）跨报告时序点,列 = date/type/value/unit/delta/flag/sha256（升序;delta 仅在相邻点单位一致时计算,unit 变了显示 "-"）。
 3. 预处理开关（坏例驱动）：`run_ocr(image, preprocess=...)` 支持 `gray` / `autocontrast` / `deskew`,默认关闭——关闭时 OCR 输入与 P1 完全一致,golden 零影响;`/ocr` `/report` 可选 multipart 字段 `preprocess`,调试 CLI 与 `hdd ingest --preprocess` 同一开关透传;OCR 结果 / 报告契约 JSON 不变（NC-06 不动）。
 
-第二波（待真实脱敏样本到位）：尿常规 / 产检词典（以真实 OCR 文本为证据,过门禁）→ golden 生成 → CLI `typeDisplay` 缩写（`尿常规→URINE` 等待定）→ 新类别端到端演示 + ≥20 张全量回归。
+第二波（2026-10-10 起实施,样本已到位）：
+尿常规 UA / 血糖 GLU / 肝肾功能 LFT / 甲状腺功能 TFT / 超声 US 五类词典
+（以真实 OCR 文本为证据,过门禁）→ golden 生成 → CLI `typeDisplay` 缩写 →
+新类别端到端演示 + ≥20 张全量回归。
+
+第二波进展（2026-10-10,维护者提供 19 张真实样本并确认脱敏合格、类别划分为
+尿常规 UA / 血糖 GLU / 肝肾功能 LFT / 甲状腺功能 TFT / 超声 US 五类):
+
+- 表格类先行落地(GLU/LFT/TFT):三个词典文件以 11 张样本 OCR 文本为证据落别名/单位
+  (test_dict_coverage 门禁参数化通过);postprocess 抽取扩展——数据格按「上方最近表头带」
+  分段(垂直堆叠小表互不串位)、本段表头带名称中心数 ≥2 才走左右半栏(整表全池配对);
+  ROLE_HEADERS 增补 中文名称/No项/编号项目 印形。血常规 5 张 golden **零漂移**;
+  glu_01 5/5、lft_02 17/17(success)、lft_04 13/13、lft_05 17 项恢复。
+- CLI `typeDisplay` 扩 5 缩写(域值不变)。
 
 验收口径：第一波以双链测试全绿为证（词典门禁全量参数化、注册表分发 / trend / 预处理均有单测）;新类别粗验收（原文）在第二波样本到位后执行。
 

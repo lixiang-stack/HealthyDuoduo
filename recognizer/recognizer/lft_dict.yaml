@@ -1,0 +1,87 @@
+# 肝肾功能词典(P3;lft_01~05 五张真实样本驱动;决策 #8 与 cbc_dict.yaml 头注释一致)。
+# 覆盖:肝功能常规(浙大妇院)、肝胆功能+肾功能2(eGFR)(华山)、珠海互认【互】前缀印形、
+# 兰大生化(含葡萄糖[GLU])、西苑(肝2+肾2) 套餐;OCR 损耗印形按原样收别名
+# (碱性硫酸酶、谷草转氨酮、问接胆红素[1-Bi1] 等);单位含损耗形(μmo1/L、μnol/L、umol/L)。
+report_type: 肝肾功能
+category:
+  title_keywords: ["肝功", "肾功能"]
+  min_matched_items: 4
+items:
+  - name: 丙氨酸转氨酶
+    aliases: [谷丙转氨酶, "丙氨酸转氨酶(ALT)", "【互】谷丙转氨酶[ALT]", 丙氨酸氨基转移酶]
+    units: [U/L]
+  - name: 天冬氨酸转氨酶
+    aliases: ["天冬氨酸转氨酶(AST)", 天冬氨酸氨基转移, "【互】谷草转氨酶[AST]", 谷草转氨酮]
+    units: [U/L]
+  - name: 谷氨酰转肽酶
+    aliases: [谷氨酰转肽酶, "r-谷氨酰转移酶(GGT)", "【互】γ一谷氨酰转肽酶[γ-GT]", "*Y谷氨酰转肽酶"]
+    units: [U/L]
+  - name: 谷草/谷丙比值
+    aliases: ["谷草/谷丙比值[AST/ALT]", "AST/ALT"]
+    units: []
+  - name: 碱性磷酸酶
+    aliases: ["碱性磷酸酶(ALP)", 碱性硫酸酶, "碱性磷酸酶[ALP]", "*碱性磷酸酶"]
+    units: [U/L]
+  - name: 总蛋白
+    aliases: [总蛋白, "总蛋白(TP)", "总蛋白[TP]", "【互】总蛋白[TP]", "*总蛋白"]
+    units: [g/L]
+  - name: 白蛋白
+    aliases: [白蛋白, "白蛋白(ALB)", "白蛋白[ALB]", "【互】白蛋白[ALB]", "*白蛋白"]
+    units: [g/L]
+  - name: 球蛋白
+    aliases: [球蛋白, "球蛋白(GLO)", "球蛋白[GLB]"]
+    units: [g/L]
+  - name: 白蛋白/球蛋白
+    aliases: [白球比例, "白球比例(A/G)", "白蛋白/球蛋白", "白蛋白/球蛋白[A/G]", "A/G"]
+    units: []
+  - name: 总胆红素
+    aliases: [总胆红素, "总胆红素(TBIL)", "总胆红素[TBIL]", "【互】总胆红素[T-Bi1]", "*总胆红素"]
+    units: ["μmol/L", μmo1/L, "μ mol/L"]
+  - name: 直接胆红素
+    aliases: [直接胆红素, "直接胆红素(DBIL)", "直接胆红素[DBIL]", "【互】直接胆红素[D-Bi1]"]
+    units: ["μmol/L", μmo1/L]
+  - name: 间接胆红素
+    aliases: [间接胆红素, "间接胆红素[IBIL]", "问接胆红素[1-Bi1]"]
+    units: ["μmol/L", μmo1/L, μnol/L, μno1/L]
+  - name: 总胆汁酸
+    aliases: [总胆汁酸, "总胆汁酸(TBA)"]
+    units: ["μmol/L", μmo1/L]
+  - name: 尿素
+    aliases: ["尿素(BUN)"]
+    units: [mmol/L]
+  - name: 肌酐
+    aliases: ["肌酐(CRE)"]
+    units: ["μmol/L", umol/L]
+  - name: 尿酸
+    aliases: ["尿酸(UA)"]
+    units: [mmol/L]
+  - name: 葡萄糖
+    aliases: ["葡萄糖[GLU]"]
+    units: [mmol/L]
+  - name: eGFR
+    aliases: ["eGFR(EPI公式计算)(eGFR)"]
+    units: [ml/min]
+  - name: 血清胱抑素C
+    aliases: ["血清胱抑素C(CysC)"]
+    units: [mg/L]
+  - name: 胆碱酯酶
+    aliases: [胆碱脂酶, CHE]
+    units: [U/L]
+  - name: 前白蛋白
+    aliases: [前白蛋白, "前白蛋白(PA)"]
+    units: [mg/L]
+  - name: 岩藻糖苷酶
+    aliases: [a-L-岩藻糖苷酶]
+    units: [U/L]
+  - name: 甲胎蛋白
+    aliases: ["甲胎蛋白(筛查)", AFP]
+    units: [ug/L]
+  - name: 亮氨酸氨基肽酶
+    aliases: [亮氨酸氨基肽酶, LAP]
+    units: [IU/L]
+  - name: 游离脂肪酸
+    aliases: [游离脂肪酸, FFA]
+    units: [mmol/L]
+  - name: 单胺氧化酶
+    aliases: [单氨氧化酶, MAO]
+    units: [IU/L]

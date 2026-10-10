@@ -126,6 +126,18 @@ func TestRunIngestRejectsMissingPreprocessValue(t *testing.T) {
 	}
 }
 
+// TestTypeDisplayRoundTrip 别名与域值一一对应且回转一致(反转派生的单一数据源)。
+func TestTypeDisplayRoundTrip(t *testing.T) {
+	for domain, abbr := range typeDisplay {
+		if domType(abbr) != domain {
+			t.Errorf("domType(%q) = %q, want %q", abbr, domType(abbr), domain)
+		}
+		if abbrType(domain) != abbr {
+			t.Errorf("abbrType(%q) = %q, want %q", domain, abbrType(domain), abbr)
+		}
+	}
+}
+
 func TestRunListRejectsBadDate(t *testing.T) {
 	var out, errOut bytes.Buffer
 	d := &deps{store: fakeStoreCLI{}, rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}

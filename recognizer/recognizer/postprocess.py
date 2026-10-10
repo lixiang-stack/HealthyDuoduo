@@ -68,9 +68,10 @@ _HINT_RE = re.compile(r"[\d%/^~\-–—<≤>≥/]")  # 含任一数值/范围/�
 _UNIT_WORD_RE = re.compile(r"[A-Za-z]{1,4}")  # 短纯字母单位(fL、pg)
 _ASCII_UNIT_RE = re.compile(r"[0-9A-Za-z.%^~/*\-]+")  # ASCII 数值/单位字符串(g/L、109/L、1012/L)
 
-# 表头关键词 → 列角色
+# 表头关键词 → 列角色(P3 扩类别后新增印形:中文名称(tft_03)、No项(lft_01 的
+# 序号与项目名合并);测定结果(tft_01)/参考值单位(tft_03) 含既有关键词子串,不需单列)
 ROLE_HEADERS: dict[str, tuple[str, ...]] = {
-    "name": ("项目名称", "检验项目"),
+    "name": ("项目名称", "检验项目", "中文名称", "No项", "编号项目"),
     "value": ("结果", "测定值"),
     "unit": ("单位",),
     "ref": ("参考值", "参考区间", "参考范围"),
@@ -368,85 +369,111 @@ def _role_centers(header_bands: list[list[_Cell]]) -> dict[str, list[tuple[float
 
 def _extract_items(
     cells: list[_Cell],
-    roles: dict[str, list[tuple[float, _Cell]]],
+    header_bands: list[list[_Cell]],
     d: LabDict,
 ) -> list[tuple[DictItem, _RowPiece]]:
-    """半栏内抽取:名称(名称列/代号列兜底)→ 与同半栏的结果/单位/参考范围碎片
+    """表内抽取:名称(名称列/代号列兜底)→ 与同表的结果/单位/参考范围碎片
     按 y 距离贪心二分配对(小 |dy| 先占),处理左右半栏行错位与熔断格。
-    同一视觉行的中文名 + 代号命中同一词典项时合并为一行。"""
-    # 1. 逐格归(角色, 半栏)
-    assigned: dict[tuple[str, int], list[_Cell]] = {}
-    for c in cells:
-        best_role, best_k, best_d = None, 0, _ASSIGN_TOLERANCE_PX + 1
-        for role, lst in roles.items():
-            for k, (cx, _) in enumerate(lst):
-                dist = abs(c.cx - cx)
-                if dist < best_d:
-                    best_role, best_k, best_d = role, k, dist
-        if best_role is not None:
-            assigned.setdefault((best_role, best_k), []).append(c)
+    同一视觉行的中文名 + 代号命中同一词典项时合并为一行。
 
+    分段(P3 多类别版式):数据格归属其上方最近的一条表头带——垂直堆叠的小表
+    (如 glu_01 逐项独立小表)互不串位。角色中心取全部表头带的全局合集(P2 语义);
+    每段按「本段表头带的名称中心数」分流:≥2 → 左右半栏(按最近中心归 (role, 半栏 k),
+    半栏内配对,不串栏);≤1 → 整表:半栏 k 恒 0,名称/代号/碎片全池配对(本段表头带
+    缺名称列时,沿用全局中心里其它表头带的名称列,如 lft_05 的第二张表)。"""
+    if not header_bands:
+        return []
+    seg_cells: dict[int, list[_Cell]] = {i: [] for i in range(len(header_bands))}
+    band_tops = [min(c.y0 for c in b) for b in header_bands]
+    for c in cells:
+        seg = 0
+        for i, top in enumerate(band_tops):
+            if c.y0 >= top:
+                seg = i
+        seg_cells[seg].append(c)
+
+    all_roles = _role_centers(header_bands)
     items: list[tuple[DictItem, _RowPiece]] = []
-    halves = {k for (role, k) in assigned if role in ("name", "aux", "value", "unit", "ref")}
-    for k in sorted(halves):
-        # 2. 名称候选(名称列/代号列兜底;结果列的名称熔断格也纳入,如 cbc_04 血清淀粉样蛋白A17.05)
-        names: list[tuple[float, DictItem, float | None, _Cell]] = []
-        for role in ("name", "aux", "value"):
-            for c in assigned.get((role, k), []):
-                it, fv = _match_name(c.text, d)
-                if it is not None:
-                    names.append((c.cy, it, fv, c))
-        names.sort(key=lambda t: t[0])
-        # 3. 相邻(近距)同典名合并为一行;项目名熔断的数值优先作为本行 value
-        rows: list[_RowPiece] = []
-        for cy, it, fv, c in names:
-            if rows and rows[-1].item is not None and rows[-1].item.name == it.name:
-                rows[-1].item = it
-                if rows[-1].fused_value is None:
-                    rows[-1].fused_value = fv
-                rows[-1].raw_cells.append(c)
-                rows[-1].low_score |= c.score < LOW_SCORE_THRESHOLD
+    for si, band in enumerate(header_bands):
+        seg = seg_cells[si]
+        if not seg:
+            continue
+        multi_half = len(_role_centers([band]).get("name", [])) >= 2
+
+        # 1. 逐格归(角色, 半栏)。整表模式一律 k=0(聚合全部角色中心)。
+        assigned: dict[tuple[str, int], list[_Cell]] = {}
+        for c in seg:
+            best_role, best_k, best_d = None, 0, _ASSIGN_TOLERANCE_PX + 1
+            for role, lst in all_roles.items():
+                for k, (cx, _) in enumerate(lst):
+                    dx = abs(c.cx - cx)
+                    if dx < best_d:
+                        best_role, best_k, best_d = role, k, dx
+            if best_role is not None:
+                if not multi_half:
+                    best_k = 0  # 整表模式:本段表头带无/仅单名称中心,无左右半栏错位可言
+                assigned.setdefault((best_role, best_k), []).append(c)
+
+        halves = {k for (role, k) in assigned if role in ("name", "aux", "value", "unit", "ref")}
+        for k in sorted(halves):
+            # 2. 名称候选(名称列/代号列兜底;结果列的名称熔断格也纳入,如 cbc_04 血清淀粉样蛋白A17.05)
+            names: list[tuple[float, DictItem, float | None, _Cell]] = []
+            for role in ("name", "aux", "value"):
+                for c in assigned.get((role, k), []):
+                    it, fv = _match_name(c.text, d)
+                    if it is not None:
+                        names.append((c.cy, it, fv, c))
+            names.sort(key=lambda t: t[0])
+            # 3. 相邻(近距)同典名合并为一行;项目名熔断的数值优先作为本行 value
+            rows: list[_RowPiece] = []
+            for cy, it, fv, c in names:
+                if rows and rows[-1].item is not None and rows[-1].item.name == it.name:
+                    rows[-1].item = it
+                    if rows[-1].fused_value is None:
+                        rows[-1].fused_value = fv
+                    rows[-1].raw_cells.append(c)
+                    rows[-1].low_score |= c.score < LOW_SCORE_THRESHOLD
+                else:
+                    rows.append(
+                        _RowPiece(cy=cy, item=it, fused_value=fv, raw_cells=[c],
+                                  low_score=c.score < LOW_SCORE_THRESHOLD)
+                    )
+            for row in rows:
+                if row.fused_value is not None:
+                    row.value = row.fused_value  # 名称熔断数值优先于外围碎片
+            # 4. 结构化碎片按 y 贪心配对(|dy| 最小先占,上限 0.6×行距;空片不参与,
+            # 防止跨行/落款碎片污染)
+            if len(rows) >= 2:
+                pitches = sorted(b - a for a, b in zip([r.cy for r in rows], [r.cy for r in rows[1:]]))
+                cap = max(_PIECE_CAP_MIN_PX, _PIECE_CAP_FACTOR * pitches[len(pitches) // 2])
             else:
-                rows.append(
-                    _RowPiece(cy=cy, item=it, fused_value=fv, raw_cells=[c],
-                              low_score=c.score < LOW_SCORE_THRESHOLD)
-                )
-        for row in rows:
-            if row.fused_value is not None:
-                row.value = row.fused_value  # 名称熔断数值优先于外围碎片
-        # 4. 结构化碎片按 y 贪心配对(|dy| 最小先占,上限 0.6×行距;空片不参与,
-        # 防止跨行/落款碎片污染)
-        if len(rows) >= 2:
-            pitches = sorted(b - a for a, b in zip([r.cy for r in rows], [r.cy for r in rows[1:]]))
-            cap = max(_PIECE_CAP_MIN_PX, _PIECE_CAP_FACTOR * pitches[len(pitches) // 2])
-        else:
-            cap = _PIECE_CAP_DEFAULT_PX
-        pieces: list[tuple[_Cell, _RowPiece, float]] = []
-        for role in ("value", "unit", "ref"):
-            for c in assigned.get((role, k), []):
-                v, r, u = _decompose(c.text, d)
-                if v is None and r is None and u is None:
+                cap = _PIECE_CAP_DEFAULT_PX
+            pieces: list[tuple[_Cell, _RowPiece, float]] = []
+            for role in ("value", "unit", "ref"):
+                for c in assigned.get((role, k), []):
+                    v, r, u = _decompose(c.text, d)
+                    if v is None and r is None and u is None:
+                        continue
+                    for row in rows:
+                        dy = abs(c.cy - row.cy)
+                        if dy <= cap:
+                            pieces.append((c, row, dy))
+            pieces.sort(key=lambda t: (t[2], t[0].cx))
+            used: set[int] = set()
+            for c, row, _ in pieces:
+                if c in row.raw_cells or id(c) in used:
                     continue
-                for row in rows:
-                    dy = abs(c.cy - row.cy)
-                    if dy <= cap:
-                        pieces.append((c, row, dy))
-        pieces.sort(key=lambda t: (t[2], t[0].cx))
-        used: set[int] = set()
-        for c, row, _ in pieces:
-            if c in row.raw_cells or id(c) in used:
-                continue
-            v, r, u = _decompose(c.text, d)
-            if (v is not None and row.value is None) or (r is not None and row.ref is None) or (
-                u is not None and row.unit is None
-            ):
-                row.absorb(c, v, r, u)
-                used.add(id(c))
-        # 5. 出项
-        for row in rows:
-            if row.value is None and row.fused_value is not None:
-                row.value = row.fused_value
-            items.append((row.item, row))
+                v, r, u = _decompose(c.text, d)
+                if (v is not None and row.value is None) or (r is not None and row.ref is None) or (
+                    u is not None and row.unit is None
+                ):
+                    row.absorb(c, v, r, u)
+                    used.add(id(c))
+            # 5. 出项
+            for row in rows:
+                if row.value is None and row.fused_value is not None:
+                    row.value = row.fused_value
+                items.append((row.item, row))
     return items
 
 
@@ -460,9 +487,8 @@ def run_postprocess(ocr: OCRResult, date_hint: str | None = None) -> Report:
         for b in _bands(cells)
         if sum(1 for c in b for role, kws in ROLE_HEADERS.items() if any(kw in c.text.strip() for kw in kws)) >= _HEADER_MIN_ROLES
     ]
-    roles = _role_centers(header_bands)
 
-    selected = _select_category(cells, roles)
+    selected = _select_category(cells, header_bands)
     if selected is None:
         return Report(report_type=UNKNOWN_REPORT_TYPE, report_date=date, status=Status.FAILED, items=[])
     d, pairs = selected
@@ -504,7 +530,7 @@ def run_postprocess(ocr: OCRResult, date_hint: str | None = None) -> Report:
 
 def _select_category(
     cells: list[_Cell],
-    roles: dict[str, list[tuple[float, _Cell]]],
+    header_bands: list[list[_Cell]],
 ) -> tuple[LabDict, list[tuple[DictItem, _RowPiece]]] | None:
     """多词典注册表分发:标题关键词优先,词典命中项数兜底(P2 决策 #8 语义的多词典推广)。
 
@@ -514,7 +540,7 @@ def _select_category(
     """
     best: tuple[LabDict, list[tuple[DictItem, _RowPiece]], bool] | None = None
     for d in load_dicts():
-        pairs = _extract_items(cells, roles, d)
+        pairs = _extract_items(cells, header_bands, d)
         title = any(kw in c.text for c in cells for kw in d.title_keywords)
         if not title and len(pairs) < d.min_matched_items:
             continue

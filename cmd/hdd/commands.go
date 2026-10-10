@@ -27,7 +27,14 @@ type deps struct {
 }
 
 // typeDisplay 已知报告类别 → CLI 显示缩写(域数据 storage 中原样保留)。
-var typeDisplay = map[string]string{"血常规": "CBC"}
+var typeDisplay = map[string]string{
+	"血常规":   "CBC",
+	"尿常规":   "UA",
+	"血糖":    "GLU",
+	"肝肾功能":  "LFT",
+	"甲状腺功能": "TFT",
+	"超声":    "US",
+}
 
 // typeAlias 显示缩写 → 域数据值(--type 亦接受缩写输入);由 typeDisplay 反转派生,单一数据源。
 var typeAlias = reverseMap(typeDisplay)
@@ -173,7 +180,7 @@ func runList(out, errOut io.Writer, d *deps, args []string) int {
 	listFlags := flag.NewFlagSet("list", flag.ContinueOnError)
 	listFlags.SetOutput(errOut)
 	var reportType, date string
-	listFlags.StringVar(&reportType, "type", "", "filter by report type, e.g. CBC (= 血常规)")
+	listFlags.StringVar(&reportType, "type", "", "filter by report type, e.g. CBC (= 血常规), UA (= 尿常规)")
 	listFlags.StringVar(&date, "date", "", "filter by check date: YYYY or YYYY-MM or YYYY-MM-DD")
 	if err := listFlags.Parse(args); err != nil {
 		return exitUsage
