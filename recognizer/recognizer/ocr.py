@@ -42,7 +42,7 @@ _DESKEW_EST_MAX_DIM = 1000
 
 _PREPROCESS_SPLIT_RE = re.compile(r"[,;\s]+")
 
-__all__ = ["CONFIG_PATH", "ImageInput", "UnidentifiedImageError", "parse_preprocess", "run_ocr"]
+__all__ = ["CONFIG_PATH", "ImageInput", "UnidentifiedImageError", "parse_preprocess", "prepare_image", "run_ocr"]
 
 
 @lru_cache(maxsize=1)
@@ -83,16 +83,23 @@ def parse_preprocess(spec: str | None) -> tuple[str, ...]:
     return tuple(steps)
 
 
+def prepare_image(image: ImageInput, preprocess: str | None = None) -> bytes:
+    """读取图像并应用预处理开关,返回进引擎的字节(OCR 与 TSR 共用同一输入)。
+
+    与 run_ocr 的输入口径一致:默认关闭时即原图字节;开启时按序执行预处理。
+    """
+    steps = parse_preprocess(preprocess)
+    data = Path(image).read_bytes() if isinstance(image, Path) else image
+    return _apply_preprocess(data, steps) if steps else data
+
+
 def run_ocr(image: ImageInput, preprocess: str | None = None) -> OCRResult:
     """对一张图像执行 OCR,产出的 OCRResult 即契约实例(NF-06)。
 
     输入图像路径或字节内容;非图像内容抛 UnidentifiedImageError(rapidocr LoadImage 语义)。
     preprocess:可选预处理开关(步骤名逗号/空格组合;默认关闭,与 P1 输入一致)。
     """
-    steps = parse_preprocess(preprocess)
-    data = Path(image).read_bytes() if isinstance(image, Path) else image
-    if steps:
-        data = _apply_preprocess(data, steps)
+    data = prepare_image(image, preprocess)
     result = _engine()(data)
 
     if result.txts is None:

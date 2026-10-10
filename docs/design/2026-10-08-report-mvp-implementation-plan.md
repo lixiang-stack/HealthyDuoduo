@@ -75,7 +75,7 @@
 
 | 层 | 选型 |
 |----|------|
-| Python | uv + Python **3.13**（rapidocr 支持区间 3.8–3.13，不用系统 3.14）；rapidocr ≥3.9.0 **默认配置**（Det/Rec: PP-OCRv6 small，Cls: PP-OCRv4 mobile）；onnxruntime（**显式依赖**，rapidocr 不自带）；FastAPI + uvicorn；pydantic（契约源）；pytest + ruff |
+| Python | uv + Python **3.12**（P3+ 表结构识别 TableStructureRec 要求 `<3.13`，ADR-0004；rapidocr 支持区间 3.8–3.13）；rapidocr ≥3.9.0 **默认配置**（Det/Rec: PP-OCRv6 small，Cls: PP-OCRv4 mobile）；onnxruntime（**显式依赖**，rapidocr 不自带）；wired-table-rec / lineless-table-rec（**表结构识别**，ONNX）；FastAPI + uvicorn；pydantic（契约源）；pytest + ruff |
 | Go | Go **1.27**；pgx + sqlc；minio-go（S3 客户端库，服务端为 SeaweedFS）；goose（SQL 迁移）；标准库 net/http、httptest |
 | 基础设施 | PostgreSQL、SeaweedFS（S3 API 网关）、Docker Compose（本机全部） |
 
@@ -162,7 +162,7 @@
 | 10 | 样本 | 脱敏样本提交 `samples/`；未脱敏原图永不入库；暂缺则先用仿真单 | NF-01/NF-03 |
 | 11 | 验收形态 | 命令级（CLI + 期望输出）+ pytest golden + Go 契约 fixture | 「文档就绪」式弱验收不可执行 |
 | 12 | CI | 双链（ruff+pytest；go vet+gofmt+go test）；Docker 构建/耗时验收本地手动 | 模型 wheel ~29MB，省 CI 额度 |
-| 13 | 工具链 | uv + Python 3.13；Go 1.27 | rapidocr 支持至 3.13；本机已装 |
+| 13 | 工具链 | uv + Python 3.12；Go 1.27 | P3+ 表结构识别（TableStructureRec）要求 `<3.13`（ADR-0004）；rapidocr 支持 3.8–3.13 |
 | 14 | 存储 | MVP 即 compose 起 PostgreSQL + SeaweedFS（对象存储由 MinIO 改设，见 ADR-0003），**不经 SQLite 过渡** | 长线已明确，迁移成本 > 起步成本 |
 | 15 | 流程 | main 只落文档；每阶段一个 worktree + 一次 commit（feat:/test: 前缀）；push 由维护者决定 | 仓库工作规范 |
 | 16 | 依赖事实 | rapidocr ≥3.9.0 默认模型即 PP-OCRv6 small det/rec + PP-OCRv4 mobile cls（已核实）；onnxruntime 需显式安装；RapidOCR 无官方镜像，Dockerfile 自建 | 一级来源核实于 2026-10-08 |
@@ -283,6 +283,8 @@ Go（工程层）：
 
 **候选演进（替代方案调研结论，2026-10-09）：** 新类别带来多样版式时,最近的免 LLM 路径是 PaddleOCR PP-Structure(V3) 表格识别（SLANet）——可在 P3 起**只替换 postprocess 的行带/配对这一层**（表格结构还原交给模型），词典数据文件与 report 契约不动;决定切换时出 ADR 并对照 golden 扩容样本验收。（开源直接可用的同题项目 MediParse / LabReport-Parser / MedClarify 等均依赖多模态 LLM/云 API,不符 NF-01。）
 
+**演进结论（2026-10-10，ADR-0004 已落地）：** 原型对比后选定 **RapidAI TableStructureRec**（`wired_table_rec` + `lineless_table_rec`，ONNX，**两子模型择优**），**弃用 SLANet_plus**（须裁剪且精度落后）与 `table_cls` 单模型路由（误判率高）。表格类报告抽取前增 TSR 前端（退化回退启发式）；`mode=narrative`（超声）不变。OCR 结果契约增**可选** `table_structure`（`/report` 填充、随 `ocr_results` 落库、`/reparse` 复用）。为兼容两包的 `requires_python <3.13`，识别服务 Python 由 3.13 调整为 **3.12**（决策 #13 修订）。样本 golden 重基：lft_05 由 17 项恢复为 19 项；其余 23 张报告 golden 不变。
+
 **P3 细化记录（2026-10-10 开工,按「无图像依赖 → 有图像依赖」分两波实施）：**
 
 第一波（不依赖新类别样本,已落地）：
@@ -367,3 +369,4 @@ Go（工程层）：
 | 1.6 | 2026-10-10 | P3 第二波落地(§10 细化记录):① 新类别 血糖 GLU / 肝肾功能 LFT / 甲状腺功能 TFT / 尿常规 UA / 超声 US 五词典(19 张真实脱敏样本,别名/单位以 OCR 文本为证据过门禁);② 抽取分段化:按「上方最近表头带」归属数据格,+单名称中心时整表全池配对;③ 尿常规定性值 value=None 留痕,机器/镜检双段 canonical 拆分;④ 超声 category.mode=narrative(别名+桥接符+数值行内配对),词典门禁补 narrative 子串见证;⑤ 粗验收已执行:五类 e2e ingest/list/trend 演示,24 张全量回归绿,血常规 golden 零漂移 |
 | 1.7 | 2026-10-10 | golden txts 容差由 ≤1 放宽至 ≤2:CI(x86_64)实测 us_03 单行漂移 2(增字 + 全/半角标点),arm64↔x86_64 实测上限为 2;失败信息改为输出超容差行明细(§8-5 同步) |
 | 1.8 | 2026-10-10 | review 修复①(分类解耦 A1):`_select_category` 由「标题命中者硬覆盖」改为**内容优先**——命中项数达标者胜出、标题只在达标者并列时(限标题区)裁决、无达标者才回退标题命中(含全页,保住 glu_03 这类「标题词实为项目名」样本);24 张 golden 零漂移,新增 3 条分发单测 |
+| 1.9 | 2026-10-10 | review 修复②(表结构识别 TSR,ADR-0004):① 表格类报告抽取前增 TSR 前端(TableStructureRec `wired+lineless` 择优,ONNX;退化回退启发式),`mode=narrative` 不变;② OCR 结果契约增可选 `table_structure`(html/model/elapse),`/report` 填充并随 `ocr_results` 落库、`/reparse` 复用;schema/Go 契约同步;③ 识别服务 Python 3.13→**3.12**(两包 `requires_python <3.13`;决策 #13 修订);④ Dockerfile 构建期预下载模型(离线可用);⑤ `_match_name` 支持序号/星号任意组合前缀(多形态);⑥ golden 重基:lft_05 由 17 项恢复为 **19 项**,其余 23 张报告 golden 不变,新增 TSR 单测/网格抽取单测 |

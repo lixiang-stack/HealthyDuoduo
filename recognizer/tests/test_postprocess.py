@@ -19,7 +19,7 @@ import yaml
 
 from recognizer import paths
 from recognizer import postprocess as _postprocess
-from recognizer.contract import OCRResult
+from recognizer.contract import OCRResult, TableStructure
 from recognizer.postprocess import _build_dict, run_postprocess
 
 # 真实注册表快照(分发测试在 monkeypatch 前捕获原词典)
@@ -409,6 +409,66 @@ def test_narrative_first_value_wins_over_title_mention() -> None:
     it = item_of(r, "颈项透明层厚度")
     assert it.value == 2.6
     assert "2.6mm" in it.raw_text
+
+
+# ---------- 表结构网格抽取(ADR-0004,ocr.table_structure) ----------
+
+
+def _with_grid(ocr: OCRResult, html: str, model: str = "lineless") -> OCRResult:
+    return ocr.model_copy(update={"table_structure": TableStructure(html=html, model=model, elapse=0.1)})
+
+
+def test_grid_extraction_basic() -> None:
+    html = (
+        "<table>"
+        "<tr><td>项目名称</td><td>结果</td><td>单位</td><td>参考值</td></tr>"
+        "<tr><td>血红蛋白</td><td>128</td><td>g/L</td><td>115-150</td></tr>"
+        "</table>"
+    )
+    ocr = _with_grid(mk_ocr([{"x": 100, "y": -60, "text": "市人民医院血常规报告单"}]), html)
+    r = run_postprocess(ocr)
+    it = item_of(r, "血红蛋白")
+    assert it.value == 128
+    assert it.unit == "g/L"
+    assert it.ref_range == "115-150"
+    assert "128" in it.raw_text
+
+
+def test_grid_two_half_columns() -> None:
+    """左右双栏:名称列 ≥2 时按段配对,互不串位。"""
+    html = (
+        "<table>"
+        "<tr><td>项目名称</td><td>结果</td><td>项目名称</td><td>结果</td></tr>"
+        "<tr><td>血红蛋白</td><td>128</td><td>白细胞</td><td>7.3</td></tr>"
+        "</table>"
+    )
+    ocr = _with_grid(mk_ocr([{"x": 100, "y": -60, "text": "血常规报告单"}]), html)
+    r = run_postprocess(ocr)
+    assert item_of(r, "血红蛋白").value == 128
+    assert item_of(r, "白细胞计数").value == 7.3
+
+
+def test_grid_fused_name_value() -> None:
+    """名称熔断数值在网格里同样成立(名称格含尾随数值)。"""
+    html = (
+        "<table>"
+        "<tr><td>项目名称</td><td>结果</td><td>单位</td><td>参考值</td></tr>"
+        "<tr><td>平均红细胞血红蛋白浓度324</td><td>g/L</td><td>316-354</td><td></td></tr>"
+        "</table>"
+    )
+    ocr = _with_grid(mk_ocr([{"x": 100, "y": -60, "text": "血常规报告单"}]), html)
+    it = item_of(run_postprocess(ocr), "平均红细胞血红蛋白浓度")
+    assert it.value == 324
+    assert it.flag == "normal"
+
+
+def test_grid_no_header_falls_back_to_heuristic() -> None:
+    """网格无表头 → 回退现状启发式,结果与不开网格一致(不劣化)。"""
+    ocr = mk_ocr(header_row() + row(30, "血红蛋白", "128", unit="g/L", ref="115-150"))
+    r = run_postprocess(_with_grid(ocr, "<table><tr><td>血红蛋白</td></tr></table>"))
+    it = item_of(r, "血红蛋白")
+    assert it.value == 128
+    assert it.unit == "g/L"
 
 
 # ---------- golden(真实样本,OCR 结果来自 golden 文件,跨架构确定性) ----------

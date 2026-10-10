@@ -1,6 +1,6 @@
 # 0004 · 表格类报告引入表格结构识别（TSR）前端：选 TableStructureRec
 
-**状态：** 建议采用（2026-10-10；基于原型对比数据，待维护者确认）
+**状态：** 已采用（2026-10-10，维护者决策：D1 接受 TableStructureRec；D2 识别服务降至 Python 3.12；D3 契约方案 A）。已实施。
 
 表格类报告（血常规/尿常规/血糖/肝肾功能/甲状腺功能）的后处理，从「用 OCR 行框启发式重建表格几何」改为「表格结构识别（TSR）模型还原网格 + 语义列映射」。选定 **RapidAI TableStructureRec**（`wired_table_rec` + `lineless_table_rec`，ONNX 推理；**同时运行两个子模型并择优**，不依赖 `table_cls` 单模型路由）。叙述体（超声 `mode=narrative`）**不适用**，保留现有行内配对。词典数据文件与报告契约的字段语义不变。
 
@@ -33,9 +33,9 @@ P3 review 发现：`postprocess._extract_items`/`_role_centers` 的几何重建�
 ## Consequences
 
 - 仅 `mode=table` 走 TSR；`mode=narrative`（超声）不变。
-- TSR 需要**原图**（裁格/复识别），而 `/reparse` 现仅持 OCR 结果 → 需在契约/存储层保存表格结构（或重跑时提供图像），否则 NF-05「复用已存 OCR 结果重跑」闭环被打破。**契约变更**，须同步 `schemas/*.schema.json`（NF-06）。
-- `wired-table-rec`/`lineless-table-rec` 声明 `requires_python <3.13`；本项目锁 3.13。实测 uv 仍可安装且在 3.13 正常运行，但属上游未声明支持——需在「降 Python 至 3.12」与「记录风险、接受 3.13」之间决策。
-- 模型为运行时从 ModelScope 下载 → 离线/容器需自带模型文件并固定路径（NF-01 本机、镜像离线可用）。
-- golden 需重基并扩容：TSR 路径产出新结构，既有 24 张样本的期望输出要重新人工核对（尤其 lft_05 应恢复为完整 19 项）。
+- TSR 需要**原图**（裁格/复识别），而 `/reparse` 原仅持 OCR 结果 → 采用**契约方案 A**：OCR 结果契约增**可选** `table_structure`（`html` + `model` + `elapse`），`/report` 填充并随 `ocr_results` 落库，`/reparse` 复用它（不再读原图），NF-05 闭环保持。已同步 `schemas/ocr_result.schema.json` 与 Go `internal/contract`（NF-06）。（相对原型设计省去 `cell_boxes`/`logic_points`：postprocess 只需 HTML 网格。）
+- `wired-table-rec`/`lineless-table-rec` 声明 `requires_python <3.13`；本项目原锁 3.13 → **决策：识别服务降至 Python 3.12**（官方支持区间）。
+- 模型为运行时从 ModelScope 下载 → 已纳入 `deploy/recognizer.Dockerfile` 构建期预下载，运行时离线可用（NF-01）。
+- golden 已重基：OCR golden 增 `table_structure`；报告 golden 仅 lft_05 变化（17 → **19 项**），其余 23 张不变。
 - 单张新增耗时：TSR 子模型 ~0.7s（CPU）+ 可选检测；仍在 NF-04 <3s 量级内。
 - 指标 `clean` 只衡量「名称独占格」的结构正确性，**不含**数值/单位/参考范围的正确配对；数值解析仍由词典 + `_decompose` 承担，须在集成验收中另行验证。

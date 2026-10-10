@@ -68,6 +68,11 @@ _HINT_RE = re.compile(r"[\d%/^~\-–—<≤>≥/]")  # 含任一数值/范围/�
 _UNIT_WORD_RE = re.compile(r"[A-Za-z]{1,4}")  # 短纯字母单位(fL、pg)
 _ASCII_UNIT_RE = re.compile(r"[0-9A-Za-z.%^~/*\-]+")  # ASCII 数值/单位字符串(g/L、109/L、1012/L)
 
+# 表结构网格(ADR-0004):TSR 产出的 HTML 表 → 单元格文本矩阵
+_GRID_TR_RE = re.compile(r"<tr>(.*?)</tr>", re.DOTALL)
+_GRID_TD_RE = re.compile(r"<td[^>]*>(.*?)</td>", re.DOTALL)
+_GRID_TAG_RE = re.compile(r"<[^>]+>")
+
 # 表头关键词 → 列角色(P3 扩类别后新增印形:中文名称(tft_03)、No项(lft_01 的
 # 序号与项目名合并);测定结果(tft_01)/参考值单位(tft_03) 含既有关键词子串,不需单列)
 ROLE_HEADERS: dict[str, tuple[str, ...]] = {
@@ -295,25 +300,45 @@ def _flag(value: float | None, ref: str | None) -> Flag:
     return Flag.UNKNOWN
 
 
+def _name_forms(text: str) -> list[str]:
+    """名称的候选规范化形态:原样 / 去序号 / 去星号 / 去序号+星号(两种顺序)。
+
+    单据印形里序号与星号可任意组合(如 `1 *丙氨酸氨基转移酶` 需去序号+星号,
+    而 `3*Y谷氨酰转肽酶` 的别名本身含 `*`,只该去序号),故全部形态都试。
+    """
+    t = _ARROW_RE.sub("", text.strip()).strip()
+    cands = (
+        t,
+        _SERIAL_RE.sub("", t).strip(),
+        _STAR_RE.sub("", t).strip(),
+        _STAR_RE.sub("", _SERIAL_RE.sub("", t).strip()).strip(),
+        _SERIAL_RE.sub("", _STAR_RE.sub("", t).strip()).strip(),
+    )
+    forms: list[str] = []
+    for c in cands:
+        if c and c not in forms:
+            forms.append(c)
+    return forms
+
+
 def _match_name(text: str, d: LabDict) -> tuple[DictItem | None, float | None]:
-    """词典名匹配:支持序号/星号前缀剥离与「名称熔断数值」尾缀。
+    """词典名匹配:支持序号/星号前缀剥离(多形态)与「名称熔断数值」尾缀。
 
     返回 (词典项, 熔断出的数值);匹配不上 → (None, None)。
     精确匹配优先(如 嗜酸性粒细胞 vs 嗜酸性粒细胞比率 的并列);熔断时最长别名优先。
     """
-    t = text.strip()
-    t = _ARROW_RE.sub("", t).strip()
-    t = _STAR_RE.sub("", t).strip()
-    t = _SERIAL_RE.sub("", t).strip()
-    it = d.alias_map.get(t)
-    if it is not None:
-        return it, None
-    for alias in sorted(d.alias_map, key=len, reverse=True):
-        if t.startswith(alias):
-            rest = t[len(alias) :]
-            m = _NUMBER_RE.fullmatch(rest.strip())
-            if m:
-                return d.alias_map[alias], float(m.group(0))
+    forms = _name_forms(text)
+    for form in forms:
+        it = d.alias_map.get(form)
+        if it is not None:
+            return it, None
+    for form in forms:
+        for alias in sorted(d.alias_map, key=len, reverse=True):
+            if form.startswith(alias):
+                rest = form[len(alias) :]
+                m = _NUMBER_RE.fullmatch(rest.strip())
+                if m:
+                    return d.alias_map[alias], float(m.group(0))
     return None, None
 
 
@@ -329,6 +354,7 @@ class _RowPiece:
     unit: str | None = None
     low_score: bool = False
     raw_cells: list[_Cell] = field(default_factory=list)
+    raw_text: str | None = None
 
     def absorb(self, cell: _Cell, v: float | None, r: str | None, u: str | None) -> None:
         self.value = self.value if self.value is not None else v
@@ -528,6 +554,133 @@ def _extract_narrative(cells: list[_Cell], d: LabDict) -> list[tuple[DictItem, _
     return [(it, piece) for it, piece, _ in (best[k] for k in sorted(best))]
 
 
+def parse_grid(html: str) -> list[list[str]]:
+    """TSR 的 HTML 表 → 单元格文本矩阵(去标签、去空白);不展开 rowspan/colspan。
+
+    本流程只取文本网格用于按列配对;合并格在 hybrid 择优输出里不构成主要噪声,
+    简化处理以免引入跨模型差异(原型 clean 指标即用同名解析口径)。
+    """
+    return [
+        [_GRID_TAG_RE.sub("", td).strip() for td in _GRID_TD_RE.findall(tr)]
+        for tr in _GRID_TR_RE.findall(html)
+    ]
+
+
+def _grid_header(rows: list[list[str]]) -> tuple[int, dict[int, str]] | None:
+    """定位表头行与 列序号→角色 映射:取命中表头关键词最多的行;
+    需同时含「名称/代号」列与「结果」列,否则视为无表头(回退启发式)。"""
+    best_idx, best_roles, best_n = -1, {}, 0
+    for i, row in enumerate(rows):
+        roles: dict[int, str] = {}
+        for ci, cell in enumerate(row):
+            t = cell.strip()
+            for role, kws in ROLE_HEADERS.items():
+                if any(kw in t for kw in kws):
+                    roles[ci] = role
+                    break
+        if len(roles) > best_n:
+            best_idx, best_roles, best_n = i, roles, len(roles)
+    has_name = any(r in ("name", "aux") for r in best_roles.values())
+    has_value = any(r == "value" for r in best_roles.values())
+    if not (has_name and has_value):
+        return None
+    return best_idx, best_roles
+
+
+def _scores_by_text(ocr: OCRResult) -> dict[str, float]:
+    """OCR 行文本(忽略空白)→ 最低 score:供网格路径复原 low_confidence(决策 #7)。"""
+    out: dict[str, float] = {}
+    for t, s in zip(ocr.txts, ocr.scores):
+        key = "".join(t.split())
+        if key:
+            out[key] = min(out.get(key, 1.0), s)
+    return out
+
+
+def _grid_low_score(row: list[str], scores: dict[str, float]) -> bool:
+    """该网格行的任一格文本命中 OCR 低分行 → 低置信(网格本身不带 score)。"""
+    for c in row:
+        key = "".join(c.split())
+        if key and scores.get(key, 1.0) < LOW_SCORE_THRESHOLD:
+            return True
+    return False
+
+
+def _extract_items_from_grid(
+    rows: list[list[str]],
+    d: LabDict,
+    scores: dict[str, float],
+) -> list[tuple[DictItem, _RowPiece]]:
+    """网格抽取:表头行定位列角色 → 名称列逐行匹配 → 同段(至下一名称列)的
+    结果/单位/参考格 _decompose 配对。左右双栏(名称列 ≥2)按列分段,互不串位。
+
+    名称可印在名称列或代号列;同一行同名(名称+代号双命中)合并为一项;
+    名称熔断进结果格的（kind=名称列无果时整行兜底）用熔断值优先。
+    """
+    header = _grid_header(rows)
+    if header is None:
+        return []
+    header_idx, roles = header
+    name_cols = sorted(ci for ci, role in roles.items() if role in ("name", "aux"))
+    out: list[tuple[DictItem, _RowPiece]] = []
+    for row in rows[header_idx + 1:]:
+        if not any(c.strip() for c in row):
+            continue
+        matches: list[tuple[int, DictItem, float | None]] = []
+        for ci in name_cols:
+            if ci < len(row):
+                it, fv = _match_name(row[ci], d)
+                if it is not None:
+                    matches.append((ci, it, fv))
+        if not matches:  # 名称列无果:整行兜底(名称熔断进结果格)
+            for ci, cell in enumerate(row):
+                it, fv = _match_name(cell, d)
+                if it is not None:
+                    matches.append((ci, it, fv))
+        if not matches:
+            continue
+        merged: dict[str, _RowPiece] = {}
+        for ci, it, fv in matches:
+            piece = merged.get(it.name) or _RowPiece(item=it, cy=float(header_idx))
+            if piece.value is None and fv is not None:
+                piece.value = fv
+            nxt = next((nc for nc in name_cols if nc > ci), len(row))
+            for cc in range(ci + 1, min(nxt, len(row))):
+                if roles.get(cc) not in (None, "value", "unit", "ref"):
+                    continue
+                v, r, u = _decompose(row[cc], d)
+                piece.value = piece.value if piece.value is not None else v
+                piece.ref = piece.ref if piece.ref is not None else r
+                piece.unit = piece.unit if piece.unit is not None else u
+            merged[it.name] = piece
+        raw = "  ".join(c.strip() for c in row if c.strip())
+        low = _grid_low_score(row, scores)
+        for piece in merged.values():
+            piece.raw_text = raw
+            piece.low_score = low
+            out.append((piece.item, piece))
+    return out
+
+
+def _extract_pairs(
+    d: LabDict,
+    cells: list[_Cell],
+    header_bands: list[list[_Cell]],
+    grid: list[list[str]] | None,
+    scores: dict[str, float],
+) -> list[tuple[DictItem, _RowPiece]]:
+    """按词典类别抽取:叙述体走行内配对;表格类取「网格路径」与「现状启发式」
+    的命中项数多者(ADR-0004:网格还原更稳,但不劣化——网格退化/无表头时自动退回)。"""
+    if d.mode == "narrative":
+        return _extract_narrative(cells, d)
+    heuristic = _extract_items(cells, header_bands, d)
+    if grid is not None:
+        from_grid = _extract_items_from_grid(grid, d, scores)
+        if len(from_grid) > len(heuristic):
+            return from_grid
+    return heuristic
+
+
 def run_postprocess(ocr: OCRResult, date_hint: str | None = None) -> Report:
     """OCR 结果 → 报告。date_hint:ingest --date 兜底;检查单已解析出日期时兜底不生效。"""
     cells = _cells(ocr)
@@ -539,7 +692,13 @@ def run_postprocess(ocr: OCRResult, date_hint: str | None = None) -> Report:
         if sum(1 for c in b for role, kws in ROLE_HEADERS.items() if any(kw in c.text.strip() for kw in kws)) >= _HEADER_MIN_ROLES
     ]
 
-    selected = _select_category(cells, header_bands)
+    grid: list[list[str]] | None = None
+    scores: dict[str, float] = {}
+    if ocr.table_structure is not None:
+        grid = parse_grid(ocr.table_structure.html)
+        scores = _scores_by_text(ocr)
+
+    selected = _select_category(cells, header_bands, grid, scores)
     if selected is None:
         return Report(report_type=UNKNOWN_REPORT_TYPE, report_date=date, status=Status.FAILED, items=[])
     d, pairs = selected
@@ -547,8 +706,11 @@ def run_postprocess(ocr: OCRResult, date_hint: str | None = None) -> Report:
     items: list[ReportItem] = []
     partial = False
     for it, piece in pairs:
-        raw_cells = sorted(piece.raw_cells, key=lambda c: c.cx)
-        raw_text = "  ".join(c.text.strip() for c in raw_cells) or (piece.ref or "")
+        if piece.raw_text is not None:
+            raw_text = piece.raw_text
+        else:
+            raw_cells = sorted(piece.raw_cells, key=lambda c: c.cx)
+            raw_text = "  ".join(c.text.strip() for c in raw_cells) or (piece.ref or "")
         flag = _flag(piece.value, piece.ref)
         low_conf = piece.low_score
         items.append(
@@ -602,6 +764,8 @@ def _title_region_cells(
 def _select_category(
     cells: list[_Cell],
     header_bands: list[list[_Cell]],
+    grid: list[list[str]] | None = None,
+    scores: dict[str, float] | None = None,
 ) -> tuple[LabDict, list[tuple[DictItem, _RowPiece]]] | None:
     """多词典注册表分发(P3 A1 内容优先分类)。
 
@@ -612,15 +776,15 @@ def _select_category(
 
     标题区分层(见 _title_region_cells)用于达标者并列裁决;兜底层仍允许全页匹配,
     因为报告未达标时往往正是「标题词被印成项目名」的样本(如 glu_03 的糖化血红蛋白)。
+
+    grid(ADR-0004):表格类报告若带表结构网格,抽取走网格路径(退化/无果自动回退)。
     """
+    scores = scores or {}
     title_cells = _title_region_cells(cells, header_bands)
     best: tuple[LabDict, list[tuple[DictItem, _RowPiece]]] | None = None
     best_key: tuple[bool, int, bool] | None = None
     for d in load_dicts():
-        if d.mode == "narrative":
-            pairs = _extract_narrative(cells, d)
-        else:
-            pairs = _extract_items(cells, header_bands, d)
+        pairs = _extract_pairs(d, cells, header_bands, grid, scores)
         qualified = len(pairs) >= d.min_matched_items
         if not qualified and not any(kw in c.text for c in cells for kw in d.title_keywords):
             continue

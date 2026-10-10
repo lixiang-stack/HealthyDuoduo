@@ -2,13 +2,16 @@
 name = "recognizer"
 version = "0.1.0"
 description = "HealthyDuoduo recognizer service: OCR (RapidOCR) + rule-based post-processing (ADR-0002)"
-requires-python = ">=3.13,<3.14"
+requires-python = ">=3.12,<3.13"
 dependencies = [
     "fastapi>=0.115",
     "uvicorn>=0.30",
     "pydantic>=2.9",
     "rapidocr>=3.9.0",
     "onnxruntime>=1.30.0",
+    # 表格结构识别前端(ADR-0004):wired/lineless 两子模型 ONNX 推理,择优使用
+    "wired-table-rec>=1.2.0",
+    "lineless-table-rec>=0.1.0",
     # 预处理开关(P3)直接 import 的图像栈;原先仅作为 rapidocr 传递依赖存在
     "numpy>=1.26",
     "pillow>=10.0",

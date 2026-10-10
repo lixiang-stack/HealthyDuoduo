@@ -1,7 +1,7 @@
 # 检查报告后处理 · TSR 前端集成设计
 
 **版本：** 0.1（草案，2026-10-10）
-**状态：** 待维护者确认（决策见 [ADR-0004](../adr/0004-table-structure-recognition-frontend.md)）
+**状态：** 已实施（2026-10-10；决策见 [ADR-0004](../adr/0004-table-structure-recognition-frontend.md)）
 
 ## 1. 为什么做
 
@@ -32,16 +32,13 @@ P3 review 暴露三处后处理脆弱性，根因都在**几何层**而非词典
 
 ### 3.1 依赖与离线（NF-01）
 
-- 新增 `wired-table-rec`、`lineless-table-rec`（ONNX，依赖 onnxruntime/opencv/scipy/scikit-image/shapely）。
-- **Python 版本冲突**：两者声明 `requires_python <3.13`，本项目锁 3.13。实测 uv 可安装且 3.13 运行正常，但上游未声明支持。**待决策**：降 recognizer 至 3.12（官方支持）或将风险记录在案、接受 3.13。
-- 模型为运行时从 ModelScope 下载 → 容器/离线需**自带模型并固定路径**（`WiredTableInput(model_path=...)` / `LinelessTableInput(model_path=...)`），纳入 `deploy/` 镜像构建。
+- 新增 `wired-table-rec`、`lineless-table-rec`（ONNX，依赖 onnxruntime/opencv/scipy/scikit-image/shapely），已入 `pyproject`。
+- **Python 版本**：两包声明 `requires_python <3.13` → 已决策**降 recognizer 至 3.12**（`.python-version` / `pyproject` / Dockerfile 同步）。
+- 模型为运行时从 ModelScope 下载 → 已在 `deploy/recognizer.Dockerfile` **构建期预下载**（运行时离线可用，NF-01）。
 
 ### 3.2 契约与 reparse（NF-05/NF-06）
 
-TSR 需要**原图**（裁格/复识别），而 `/reparse` 现仅持 OCR 结果。方案（二选一，建议 A）：
-
-- **A（推荐）**：在识别结果契约中增**可选** `table_structure`（`pred_html` + `cell_boxes` + `logic_points`），随 OCR 结果一同落 `ocr_results` jsonb；`/reparse` 复用已存结构，不需图像。同步改 `schemas/ocr_result.schema.json` 与 Go `internal/contract`。
-- B：`/reparse` 保留图像引用，重跑时重新执行 TSR——需改存储与 CLI，且违反「reparse 只重跑后处理」的轻量语义。
+TSR 需要**原图**（裁格/复识别），而 `/reparse` 原仅持 OCR 结果。**采用方案 A（已实施）**：识别结果契约增**可选** `table_structure`（`html` + `model` + `elapse`），随 OCR 结果一同落 `ocr_results` jsonb；`/reparse` 复用已存结构，不需图像。已同步 `schemas/ocr_result.schema.json` 与 Go `internal/contract`。（相对初稿省去 `cell_boxes`/`logic_points`：postprocess 只需 HTML 网格。）
 
 ### 3.3 抽取管线（新增 TSR 路径）
 
@@ -66,11 +63,12 @@ OCR results ──┬─(有 table_structure)─► grid → 语义列映射 →
 - golden：既有 24 张样本**重基**（TSR 路径产出新结构，人工核对 `raw_text` 后再冻结）；lft_05 期望恢复为完整 19 项。
 - 契约：schema 校验 + Go fixture 双向。
 
-## 4. 怎么验收
+## 4. 怎么验收（状态 2026-10-10）
 
-- [ ] 24 张（或扩至 ≥20 的有效表类样本）走 TSR 路径，`clean`（名称独占格）≥ 0.9、**lft_05 恢复全部指标项**（对照人工核对清单）。
-- [ ] TSR 退化样本自动回退启发式，产出不劣于现状（血常规 5 张既有 golden 人工核对不劣化）。
-- [ ] `/reparse` 在仅有已存 `table_structure`（无图像）前提下产出与 `/report` 一致。
-- [ ] 离线/容器：断网镜像内可跑（模型自带）；单张表类样本 OCR+TSR 端到端 < 3s 量级（NF-04）。
-- [ ] 数值/单位/参考范围正确性：对每类 ≥3 张样本人工核对，`flag` 计算正确。
-- [ ] CI 双链绿（ruff+pytest；go vet+gofmt+go test）。
+- [x] 表格类报告走 TSR 路径（`/report` 填充 `table_structure`，退化回退启发式）；**lft_05 恢复全部 19 项**（原 17），其余 23 张报告 golden 不变。
+- [x] TSR 退化自动回退且不劣化：`_extract_pairs` 取「网格 / 启发式」命中项数多者；`tests/test_table_structure.py`（退化/异常/择优）与 `test_postprocess.py`（网格抽取、双栏、熔断、无表头回退）覆盖。
+- [x] `/reparse` 仅凭已存 `table_structure`（`expected/ocr` 已含）产出与 `/report` 一致（golden 回归）。
+- [x] 离线/容器：`docker build` 成镜像（模型构建期预下载）；`docker run --network none` 实测 cbc_01/lft_05 端到端出报告，无运行时下载。
+- [x] 契约双语一致：`schemas/ocr_result.schema.json` + Go `internal/contract` + pydantic 同步。
+- [ ] 数值/单位/参考**逐项人工核对**（本轮以 golden 机器回归为主；`flag` 计算由既有单测覆盖）。
+- [x] CI 双链绿：ruff + pytest（140 passed）；go vet + gofmt + go test。

@@ -16,7 +16,7 @@ import pytest
 import yaml
 
 from recognizer import paths
-from recognizer.postprocess import DICT_DIR, DICT_GLOB
+from recognizer.postprocess import DICT_DIR, DICT_GLOB, _name_forms
 
 # 词典注册表:每个 *_dict.yaml 一个报告类别(测试在收集期读取文件列表)
 _DICTS = sorted(DICT_DIR.glob(DICT_GLOB))
@@ -38,15 +38,14 @@ def _corpus() -> dict[str, set[str]]:
 
 
 def _witnessed(term: str) -> set[str]:
+    """与 postprocess._match_name 官方语义一致的名称形态(经 _name_forms 派生:
+    原样/去序号/去星号/两种组合),再叠加「名称熔断数值」尾缀剥离。"""
     seen: set[str] = set()
     for raw, sids in _corpus().items():
-        variants = {
-            raw,
-            re.sub(r"^[*＊※✱]+", "", raw),
-            re.sub(r"^\d+[.、．]?[\s]*", "", raw),
-            re.sub(r"\d+(?:\.\d+)?$", "", raw),
-            re.sub(r"\d+(?:\.\d+)?$", "", re.sub(r"^\d+[.、．]?[\s]*", "", raw)),
-        }
+        variants = {raw}
+        for f in _name_forms(raw):
+            variants.add(f)
+            variants.add(re.sub(r"\d+(?:\.\d+)?$", "", f).strip())
         if term in variants:
             seen |= sids
     return seen
