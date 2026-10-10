@@ -343,6 +343,40 @@ def test_registry_tie_follows_registry_order(monkeypatch, tmp_path) -> None:
     assert r.report_type == "尿常规"
 
 
+# ---------- 叙述体抽取(P3 超声,category.mode=narrative) ----------
+
+
+def test_narrative_alias_bridge_value() -> None:
+    cells = [{"x": 100, "y": -40, "text": "本院超声检查报告单"},
+             {"x": 100, "y": 0, "text": "颈项透明层厚度（NT）2.6mm，头臀长59mm。"}]
+    r = run_postprocess(mk_ocr(cells))
+    assert r.report_type == "超声"
+    assert item_of(r, "颈项透明层厚度").value == 2.6
+    assert item_of(r, "颈项透明层厚度").unit == "mm"
+    assert item_of(r, "头臀长").value == 59
+
+
+def test_narrative_remote_number_not_fused() -> None:
+    """远距数字不误认:「NT筛查、11-14周」的 11 不应成为 NT 数值。"""
+    cells = [{"x": 100, "y": -40, "text": "本院超声检查报告单"},
+             {"x": 100, "y": 0, "text": "11-14周NT筛查(省免)、11-14周"}]
+    r = run_postprocess(mk_ocr(cells))
+    it = item_of(r, "颈项透明层厚度")
+    assert it.value is None  # 桥接失败 → 无数值,标题行仅留痕
+    assert "NT筛查" in it.raw_text
+
+
+def test_narrative_first_value_wins_over_title_mention() -> None:
+    """同 canonical 多次命中:标题先行无数值 → 后段有数值者胜。"""
+    cells = [{"x": 100, "y": -40, "text": "本院超声检查报告单"},
+             {"x": 100, "y": 0, "text": "NT筛查(省免)"},
+             {"x": 100, "y": 30, "text": "（NT）2.6mm"}]
+    r = run_postprocess(mk_ocr(cells))
+    it = item_of(r, "颈项透明层厚度")
+    assert it.value == 2.6
+    assert "2.6mm" in it.raw_text
+
+
 # ---------- golden(真实样本,OCR 结果来自 golden 文件,跨架构确定性) ----------
 
 EXPECTED_OCR = paths.EXPECTED_OCR

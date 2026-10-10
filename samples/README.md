@@ -11,7 +11,9 @@
     真实样本不符——cbc_03 含「检验时间：2023-09-08」,以本次修订为准)。
   - glu_01~03 / lft_01~05 / tft_01~03:真实脱敏 血糖 / 肝肾功能 / 甲状腺功能(P3 第二波,
     2026-10-10 维护者提供并口头确认脱敏合格;版式覆盖见各词典文件头注释)。
-    ua_01~05(尿常规) / us_01~03(超声) 已到位待第二波后半段(定性与叙述体版式)。
+  - ua_01~05 / us_01~03:真实脱敏 尿常规 / 超声(P3 第二波后半段;尿常规定性形态,
+    超声叙述体走 postprocess 的 narrative 模式)。
+  - 另有 cbc 无前缀 1.jpeg~5.jpg 维护者留底(未入 golden,勿提交)。
 - golden(`expected/ocr/<id>.json`)由调试 CLI 生成:
   `cd recognizer && uv run python -m recognizer ../samples/<id>.<ext> > ../samples/expected/ocr/<id>.json`
   (stderr 的日志重定向丢弃;对比规则见实施计划 §8-5,elapse 只记录不比对。)

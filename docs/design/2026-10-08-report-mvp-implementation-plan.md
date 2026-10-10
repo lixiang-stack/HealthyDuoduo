@@ -299,14 +299,21 @@ Go（工程层）：
 第二波进展（2026-10-10,维护者提供 19 张真实样本并确认脱敏合格、类别划分为
 尿常规 UA / 血糖 GLU / 肝肾功能 LFT / 甲状腺功能 TFT / 超声 US 五类):
 
-- 表格类先行落地(GLU/LFT/TFT):三个词典文件以 11 张样本 OCR 文本为证据落别名/单位
+- 表格类落地(GLU/LFT/TFT):三个词典文件以 11 张样本 OCR 文本为证据落别名/单位
   (test_dict_coverage 门禁参数化通过);postprocess 抽取扩展——数据格按「上方最近表头带」
   分段(垂直堆叠小表互不串位)、本段表头带名称中心数 ≥2 才走左右半栏(整表全池配对);
   ROLE_HEADERS 增补 中文名称/No项/编号项目 印形。血常规 5 张 golden **零漂移**;
   glu_01 5/5、lft_02 17/17(success)、lft_04 13/13、lft_05 17 项恢复。
-- CLI `typeDisplay` 扩 5 缩写(域值不变)。
+- 行 ua(定性为主)/us(叙述体):ua 词典 ~40 词条(定性形 value=None 留痕;镜检 /HP 与
+  计数个/uL 版式拆分、机器/镜检双段 canonical 拆分);us 走 postprocess narrative 模式
+  (别名 + 桥接符 + 后随数值行内配对,门禁按子串见证);词典覆盖门禁 narrative 分支。
+- CLI `typeDisplay` 扩 5 缩写(域值不变);e2e(compose + hdd)验证:五类样本全量 ingest
+  幂等、`list --type UA` 可查、`trend 血红蛋白/促甲状腺素` 时序+delta 正常;golden 样本
+  合计 24 张(≥20) 全量回归绿。
 
-验收口径：第一波以双链测试全绿为证（词典门禁全量参数化、注册表分发 / trend / 预处理均有单测）;新类别粗验收（原文）在第二波样本到位后执行。
+验收口径：第一波/第二波以双链测试全绿为证（词典门禁全量参数化、注册表分发 / trend /
+预处理 / 抽取分段化 / 叙述体均有单测）;粗验收已执行(e2e 见第二波进展行)——新类别各
+≥3 张样本端到端可演示、`hdd list --type 尿常规` 可查、样本集 24 张全量 golden 回归绿。
 
 **粗验收：** 新增类别各 ≥3 张样本端到端可演示；`hdd list --type 尿常规` 可查；样本集全量 golden 回归绿。
 
@@ -357,3 +364,4 @@ Go（工程层）：
 | 1.3 | 2026-10-09 | /report 增可选 date 补录(决策 #6),/reparse 请求体 {ocr_result, date?};失败占位 report_type=unknown;pgx/v5+goose 库模式替代 sqlc(决策 #12);无日期样本为 cbc_02;P3 可换 PP-Structure(V3) 行带/配对(§10) |
 | 1.4 | 2026-10-09 | 验收轮修订:① 对外身份统一为图像内容 sha256:images 主键=sha256(删除自增 id 与冗余 object_key 列,对象键=sha256),reports 每图一行、主键=图像 sha256(删除自增 id),ocr_history 仍以内部序号追加;hdd ingest 输出与 show/reparse/list 的入参均为图像 sha256(仅完整 64 位 hex;不支持前缀);② CLI 报告类别展示为英文缩写(血常规→CBC),--type 亦接受 CBC,域数据值不变;③ low_confidence 收敛至决策 #7 原义(仅 score<0.8;单位损耗保留原文),词典 RDW-SD 单位集修正为 fL |
 | 1.5 | 2026-10-10 | P3 开工(§10 细化记录):第一波落地——① postprocess 多词典注册表(`*_dict.yaml` 按文件名序,分发=标题命中>命中项数>文件名序);② `hdd trend <指标名> [--type]` 趋势统计;③ OCR 预处理开关 gray/autocontrast/deskew 默认关闭(/ocr /report multipart `preprocess`、调试 CLI、hdd ingest `--preprocess` 透传;契约 JSON 不变),numpy/pillow 提升为显式依赖。第二波(尿常规/产检词典+真实样本+golden)待图像到位 |
+| 1.6 | 2026-10-10 | P3 第二波落地(§10 细化记录):① 新类别 血糖 GLU / 肝肾功能 LFT / 甲状腺功能 TFT / 尿常规 UA / 超声 US 五词典(19 张真实脱敏样本,别名/单位以 OCR 文本为证据过门禁);② 抽取分段化:按「上方最近表头带」归属数据格,+单名称中心时整表全池配对;③ 尿常规定性值 value=None 留痕,机器/镜检双段 canonical 拆分;④ 超声 category.mode=narrative(别名+桥接符+数值行内配对),词典门禁补 narrative 子串见证;⑤ 粗验收已执行:五类 e2e ingest/list/trend 演示,24 张全量回归绿,血常规 golden 零漂移 |
