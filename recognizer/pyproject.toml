@@ -9,6 +9,9 @@ dependencies = [
     "pydantic>=2.9",
     "rapidocr>=3.9.0",
     "onnxruntime>=1.30.0",
+    # 预处理开关(P3)直接 import 的图像栈;原先仅作为 rapidocr 传递依赖存在
+    "numpy>=1.26",
+    "pillow>=10.0",
     "python-multipart>=0.0.32",
     "pyyaml>=6.0.3",
 ]

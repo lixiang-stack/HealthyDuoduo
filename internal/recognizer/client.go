@@ -58,7 +58,7 @@ type reportResponse struct {
 	Report    contract.Report    `json:"report"`
 }
 
-func (c *Client) Report(ctx context.Context, image []byte, filename, date string) (*contract.OCRResult, *contract.Report, error) {
+func (c *Client) Report(ctx context.Context, image []byte, filename, date, preprocess string) (*contract.OCRResult, *contract.Report, error) {
 	var body bytes.Buffer
 	mw := multipart.NewWriter(&body)
 	fw, err := mw.CreateFormFile("image", filename)
@@ -70,6 +70,11 @@ func (c *Client) Report(ctx context.Context, image []byte, filename, date string
 	}
 	if date != "" {
 		if err := mw.WriteField("date", date); err != nil {
+			return nil, nil, err
+		}
+	}
+	if preprocess != "" {
+		if err := mw.WriteField("preprocess", preprocess); err != nil {
 			return nil, nil, err
 		}
 	}
@@ -183,6 +188,6 @@ func truncate(raw []byte) string {
 
 // 编译期接口校验(pipeline.Recognizer 的实现)。
 var _ interface {
-	Report(context.Context, []byte, string, string) (*contract.OCRResult, *contract.Report, error)
+	Report(context.Context, []byte, string, string, string) (*contract.OCRResult, *contract.Report, error)
 	Reparse(context.Context, *contract.OCRResult, string) (*contract.Report, error)
 } = (*Client)(nil)

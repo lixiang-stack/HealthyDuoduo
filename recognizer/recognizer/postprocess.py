@@ -1,8 +1,9 @@
 """规则化后处理 v1(实施计划 P2-1/2):OCR 结果 → 结构化报告。
 
 纯函数、无 IO:输入 contract.OCRResult(+可选日期兜底),输出 contract.Report。
-词典是数据文件 cbc_dict.yaml(决策 #8:只有规范名/别名/已知单位集,不内置参考值;
-参考范围一律从检查单抽取)。
+词典是数据文件注册表 P3 起多类别并存(决策 #8:只有规范名/别名/已知单位集,
+不内置参考值;参考范围一律从检查单抽取):DICT_DIR 下每个 *_dict.yaml 对应
+一个报告类别,分发规则见 _select_category(单词典时 P2 语义不变)。
 
 版式覆盖(P2 的 5 张真实脱敏样本):
 - 表头行(项目名称/检验项目 + 结果 + 单位/参考值/参考区间)定义列角色中心;
@@ -16,10 +17,10 @@
 保留原文记录,不改变置信标记;threshold 与单位语义供人工核对与后续规一化用。
 未解析日期且无兜底 → report_date=null+partial;类别失败或无产出 → failed。
 
-样本收窄边界(review):规则与词典目前由 5 张已入库真实样本驱动;新样本若引入
+样本收窄边界(review):规则与词典由已入库真实样本驱动;新样本若引入
 新版式/新指标名,预期行为是「未命中的行被跳过、指标缺失 → partial/failed」,
 不会崩溃。扩展点按优先级:
-1. 词典数据文件 cbc_dict.yaml;
+1. 词典数据文件 *_dict.yaml(新类别 = 注册表加文件);
 2. 改动后重跑 `python -m recognizer.golden` 并人工核对 raw_text;
 3. 新版式(表头关键词/列距/熔断形态不匹配)才动本文件解析规则,
    且须先以真实样本落 samples/expected/ocr(golden)后再改。
@@ -34,7 +35,10 @@ import yaml
 
 from .contract import Flag, OCRResult, Report, ReportItem, Status
 
-DICT_PATH = Path(__file__).parent / "cbc_dict.yaml"
+# 词典注册表:每个报告类别一个数据文件(决策 #8:只有规范名/别名/已知单位集,
+# 不内置参考值;参考范围一律从检查单抽取),按文件名序注册。
+DICT_DIR = Path(__file__).parent
+DICT_GLOB = "*_dict.yaml"
 
 # 决策 #7:任一组成行 score < 阈值 → 项 low_confidence、报告 ≥partial(固定常量)
 LOW_SCORE_THRESHOLD = 0.8
@@ -98,18 +102,26 @@ class DictItem:
 
 
 @dataclass
-class CBCDict:
+class LabDict:
+    """一个报告类别的词典(数据文件 *_dict.yaml 的加载产物);单位字面量与
+    别名索引在加载时一次派生。"""
+
     report_type: str
     title_keywords: tuple[str, ...]
     min_matched_items: int
     items: tuple[DictItem, ...]
     alias_map: dict[str, DictItem] = field(default_factory=dict)
+    unit_literals: tuple[str, ...] = ()
 
 
 @lru_cache(maxsize=1)
-def load_dict() -> CBCDict:
-    """加载/缓存 cbc_dict.yaml;改词典文件后重启进程即生效。"""
-    raw = yaml.safe_load(DICT_PATH.read_text(encoding="utf-8"))
+def load_dicts() -> tuple[LabDict, ...]:
+    """加载词典注册表(DICT_DIR 下全部 *_dict.yaml,文件名序);改词典文件后重启进程即生效。"""
+    return tuple(_build_dict(p) for p in sorted(DICT_DIR.glob(DICT_GLOB)))
+
+
+def _build_dict(path: Path) -> LabDict:
+    raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     items = tuple(
         DictItem(
             name=it["name"],
@@ -122,15 +134,23 @@ def load_dict() -> CBCDict:
     for it in items:
         for a in it.aliases:
             alias_map.setdefault(a, it)
-    d = CBCDict(
+    # 全部词典单位的字面量(含 * 前缀变体),longest-first 供前缀剥离
+    units: set[str] = set()
+    for it in items:
+        units |= it.units
+    literals: list[str] = []
+    for u in sorted(units):
+        literals.append(u)
+        if not u.startswith("*"):
+            literals.append("*" + u)
+    return LabDict(
         report_type=raw["report_type"],
         title_keywords=tuple(raw["category"]["title_keywords"]),
         min_matched_items=int(raw["category"]["min_matched_items"]),
         items=items,
         alias_map=alias_map,
+        unit_literals=tuple(sorted(set(literals), key=len, reverse=True)),
     )
-    # 同长相位最长别名优先(前缀熔断匹配用)
-    return d
 
 
 @dataclass
@@ -182,21 +202,7 @@ def _bands(cells: list[_Cell]) -> list[list[_Cell]]:
     return bands
 
 
-@lru_cache(maxsize=1)
-def _unit_literals() -> tuple[str, ...]:
-    """全部词典单位的字面量(含 * 前缀变体), longest-first 供前缀剥离。"""
-    units: set[str] = set()
-    for it in load_dict().items:
-        units |= it.units
-    out: list[str] = []
-    for u in units:
-        out.append(u)
-        if not u.startswith("*"):
-            out.append("*" + u)
-    return tuple(sorted(set(out), key=len, reverse=True))
-
-
-def _decompose(text: str) -> tuple[float | None, str | None, str | None]:
+def _decompose(text: str, d: LabDict) -> tuple[float | None, str | None, str | None]:
     """把一格内容尽力拆成 (value, ref_range, unit)。
 
     支持纯值(128)、纯单位(g/L)、纯范围(4--10)、单位熔范围(*10~9/L 3.5-9.5)、
@@ -219,7 +225,7 @@ def _decompose(text: str) -> tuple[float | None, str | None, str | None]:
     # 词典单位字面前缀(含 * 前缀形态);单位按命中的原文切片保留大小写
     rest = s
     unit_from_prefix = None
-    for lit in _unit_literals():
+    for lit in d.unit_literals:
         if rest.lower().startswith(lit.lower()):
             unit_from_prefix = rest[: len(lit)]
             rest = rest[len(lit) :].strip()
@@ -281,7 +287,7 @@ def _flag(value: float | None, ref: str | None) -> Flag:
     return Flag.UNKNOWN
 
 
-def _match_name(text: str) -> tuple[DictItem | None, float | None]:
+def _match_name(text: str, d: LabDict) -> tuple[DictItem | None, float | None]:
     """词典名匹配:支持序号/星号前缀剥离与「名称熔断数值」尾缀。
 
     返回 (词典项, 熔断出的数值);匹配不上 → (None, None)。
@@ -291,7 +297,6 @@ def _match_name(text: str) -> tuple[DictItem | None, float | None]:
     t = _ARROW_RE.sub("", t).strip()
     t = _STAR_RE.sub("", t).strip()
     t = _SERIAL_RE.sub("", t).strip()
-    d = load_dict()
     it = d.alias_map.get(t)
     if it is not None:
         return it, None
@@ -361,7 +366,11 @@ def _role_centers(header_bands: list[list[_Cell]]) -> dict[str, list[tuple[float
     return out
 
 
-def _extract_items(cells: list[_Cell], roles) -> list[tuple[DictItem, _RowPiece]]:
+def _extract_items(
+    cells: list[_Cell],
+    roles: dict[str, list[tuple[float, _Cell]]],
+    d: LabDict,
+) -> list[tuple[DictItem, _RowPiece]]:
     """半栏内抽取:名称(名称列/代号列兜底)→ 与同半栏的结果/单位/参考范围碎片
     按 y 距离贪心二分配对(小 |dy| 先占),处理左右半栏行错位与熔断格。
     同一视觉行的中文名 + 代号命中同一词典项时合并为一行。"""
@@ -371,9 +380,9 @@ def _extract_items(cells: list[_Cell], roles) -> list[tuple[DictItem, _RowPiece]
         best_role, best_k, best_d = None, 0, _ASSIGN_TOLERANCE_PX + 1
         for role, lst in roles.items():
             for k, (cx, _) in enumerate(lst):
-                d = abs(c.cx - cx)
-                if d < best_d:
-                    best_role, best_k, best_d = role, k, d
+                dist = abs(c.cx - cx)
+                if dist < best_d:
+                    best_role, best_k, best_d = role, k, dist
         if best_role is not None:
             assigned.setdefault((best_role, best_k), []).append(c)
 
@@ -384,7 +393,7 @@ def _extract_items(cells: list[_Cell], roles) -> list[tuple[DictItem, _RowPiece]
         names: list[tuple[float, DictItem, float | None, _Cell]] = []
         for role in ("name", "aux", "value"):
             for c in assigned.get((role, k), []):
-                it, fv = _match_name(c.text)
+                it, fv = _match_name(c.text, d)
                 if it is not None:
                     names.append((c.cy, it, fv, c))
         names.sort(key=lambda t: t[0])
@@ -415,19 +424,19 @@ def _extract_items(cells: list[_Cell], roles) -> list[tuple[DictItem, _RowPiece]
         pieces: list[tuple[_Cell, _RowPiece, float]] = []
         for role in ("value", "unit", "ref"):
             for c in assigned.get((role, k), []):
-                v, r, u = _decompose(c.text)
+                v, r, u = _decompose(c.text, d)
                 if v is None and r is None and u is None:
                     continue
                 for row in rows:
-                    d = abs(c.cy - row.cy)
-                    if d <= cap:
-                        pieces.append((c, row, d))
+                    dy = abs(c.cy - row.cy)
+                    if dy <= cap:
+                        pieces.append((c, row, dy))
         pieces.sort(key=lambda t: (t[2], t[0].cx))
         used: set[int] = set()
         for c, row, _ in pieces:
             if c in row.raw_cells or id(c) in used:
                 continue
-            v, r, u = _decompose(c.text)
+            v, r, u = _decompose(c.text, d)
             if (v is not None and row.value is None) or (r is not None and row.ref is None) or (
                 u is not None and row.unit is None
             ):
@@ -443,7 +452,6 @@ def _extract_items(cells: list[_Cell], roles) -> list[tuple[DictItem, _RowPiece]
 
 def run_postprocess(ocr: OCRResult, date_hint: str | None = None) -> Report:
     """OCR 结果 → 报告。date_hint:ingest --date 兜底;检查单已解析出日期时兜底不生效。"""
-    d = load_dict()
     cells = _cells(ocr)
     date = _find_date(cells, date_hint)
 
@@ -453,14 +461,11 @@ def run_postprocess(ocr: OCRResult, date_hint: str | None = None) -> Report:
         if sum(1 for c in b for role, kws in ROLE_HEADERS.items() if any(kw in c.text.strip() for kw in kws)) >= _HEADER_MIN_ROLES
     ]
     roles = _role_centers(header_bands)
-    pairs = _extract_items(cells, roles)
 
-    # 类别识别:标题关键词优先,词典命中项数兜底
-    title_hit = any(kw in c.text for c in cells for kw in d.title_keywords)
-    category = d.report_type if (title_hit or len(pairs) >= d.min_matched_items) else None
-
-    if not title_hit and len(pairs) < d.min_matched_items:
+    selected = _select_category(cells, roles)
+    if selected is None:
         return Report(report_type=UNKNOWN_REPORT_TYPE, report_date=date, status=Status.FAILED, items=[])
+    d, pairs = selected
 
     items: list[ReportItem] = []
     partial = False
@@ -490,8 +495,34 @@ def run_postprocess(ocr: OCRResult, date_hint: str | None = None) -> Report:
     else:
         status = Status.SUCCESS
     return Report(
-        report_type=category or UNKNOWN_REPORT_TYPE,
+        report_type=d.report_type,
         report_date=date,
         status=status,
         items=items,
     )
+
+
+def _select_category(
+    cells: list[_Cell],
+    roles: dict[str, list[tuple[float, _Cell]]],
+) -> tuple[LabDict, list[tuple[DictItem, _RowPiece]]] | None:
+    """多词典注册表分发:标题关键词优先,词典命中项数兜底(P2 决策 #8 语义的多词典推广)。
+
+    单词典时与 P2 完全同义:标题命中或匹配项数 ≥ min_matched_items 才认该类别,
+    都不达 → None(failed)。注册表多词典时:标题命中者胜出;同状态(均命中标题/
+    均仅靠命中数达标)取匹配项数多者;并列取注册表先者(文件名序)。
+    """
+    best: tuple[LabDict, list[tuple[DictItem, _RowPiece]], bool] | None = None
+    for d in load_dicts():
+        pairs = _extract_items(cells, roles, d)
+        title = any(kw in c.text for c in cells for kw in d.title_keywords)
+        if not title and len(pairs) < d.min_matched_items:
+            continue
+        if best is not None:
+            _, best_pairs, best_title = best
+            if (title, len(pairs)) <= (best_title, len(best_pairs)):
+                continue
+        best = (d, pairs, title)
+    if best is None:
+        return None
+    return best[0], best[1]

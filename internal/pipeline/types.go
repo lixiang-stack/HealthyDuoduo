@@ -15,8 +15,8 @@ import (
 
 // Recognizer 识别服务边界(POST /report、/reparse,实施计划 4.3)。
 type Recognizer interface {
-	// Report 上传图像(+可选 date 补录)→ {ocr_result, report}。
-	Report(ctx context.Context, image []byte, filename, date string) (*contract.OCRResult, *contract.Report, error)
+	// Report 上传图像(+可选 date 补录、可选 preprocess 预处理开关)→ {ocr_result, report}。
+	Report(ctx context.Context, image []byte, filename, date, preprocess string) (*contract.OCRResult, *contract.Report, error)
 	// Reparse 已存 OCR 结果(+可选 date 补录)→ report(规则迭代主路径)。
 	Reparse(ctx context.Context, ocr *contract.OCRResult, date string) (*contract.Report, error)
 }
@@ -41,6 +41,8 @@ type Store interface {
 	OCRResultJSON(ctx context.Context, ocrID int64) ([]byte, error)
 	// WriteReport 落/更报告(身份=reportSha;items 取自 report.Items)。
 	WriteReport(ctx context.Context, reportSha string, ocrID int64, report contract.Report) error
+	// TrendByName 同一指标项名的跨报告时序点(升序;reportType 空串 = 不过滤类别)。
+	TrendByName(ctx context.Context, itemName, reportType string) ([]TrendRow, error)
 }
 
 // Image images 表一行的业务视图(identity=内容 sha256)。
@@ -58,6 +60,16 @@ type ReportRow struct {
 	Status      string // success | partial | failed(4.2)
 	ItemsCount  int64  // 仅 ListReports 填充
 	Items       []contract.ReportItem
+}
+
+// TrendRow 单指标项跨报告的时序数据点(hdd trend 查询视图;按报告日期升序)。
+type TrendRow struct {
+	Sha256     string
+	ReportType string
+	ReportDate *string
+	Value      *float64
+	Unit       *string
+	Flag       string // normal | high | low | unknown(4.2)
 }
 
 // IngestOutcome 入库结果(供 CLI 演示输出)。

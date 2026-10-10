@@ -31,11 +31,12 @@ func sampleOCR() *contract.OCRResult {
 type fakeStore struct {
 	mu sync.Mutex
 
-	nextID  int64
-	images  map[string]bool // 已入库的 sha256 集合(identity 即主键)
-	ocrRows []fakeOCR
-	reports map[string]*fakeReport
-	listRet []pipeline.ReportRow
+	nextID   int64
+	images   map[string]bool // 已入库的 sha256 集合(identity 即主键)
+	ocrRows  []fakeOCR
+	reports  map[string]*fakeReport
+	listRet  []pipeline.ReportRow
+	trendRet []pipeline.TrendRow
 }
 
 type fakeOCR struct {
@@ -115,6 +116,10 @@ func (f *fakeStore) OCRResultJSON(ctx context.Context, ocrID int64) ([]byte, err
 	return nil, fmt.Errorf("ocr %d missing", ocrID)
 }
 
+func (f *fakeStore) TrendByName(ctx context.Context, item, reportType string) ([]pipeline.TrendRow, error) {
+	return f.trendRet, nil
+}
+
 func (f *fakeStore) WriteReport(ctx context.Context, reportSha string, ocrID int64, report contract.Report) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -143,22 +148,25 @@ type fakeRecognizer struct {
 	reportCalls  int
 	reparseCalls int
 
-	imageOfCall     map[int][]byte
-	dateOfCall      map[int]string
-	lastReparseHint *string
-	report          contract.Report
+	imageOfCall      map[int][]byte
+	dateOfCall       map[int]string
+	preprocessOfCall map[int]string
+	lastReparseHint  *string
+	report           contract.Report
 }
 
 func newFakeRecognizer() *fakeRecognizer {
-	return &fakeRecognizer{imageOfCall: map[int][]byte{}, dateOfCall: map[int]string{}, report: sampleReport("2024-08-19")}
+	return &fakeRecognizer{imageOfCall: map[int][]byte{}, dateOfCall: map[int]string{},
+		preprocessOfCall: map[int]string{}, report: sampleReport("2024-08-19")}
 }
 
-func (f *fakeRecognizer) Report(ctx context.Context, image []byte, filename, date string) (*contract.OCRResult, *contract.Report, error) {
+func (f *fakeRecognizer) Report(ctx context.Context, image []byte, filename, date, preprocess string) (*contract.OCRResult, *contract.Report, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.reportCalls++
 	f.imageOfCall[f.reportCalls] = image
 	f.dateOfCall[f.reportCalls] = date
+	f.preprocessOfCall[f.reportCalls] = preprocess
 	rep := f.report
 	if date != "" {
 		// 与真实识别服务一致:date 作为解析失败时的人工补录兜底生效
@@ -196,9 +204,9 @@ var _ pipeline.Recognizer = (*fakeRecognizer)(nil)
 var _ pipeline.Store = (*fakeStore)(nil)
 var _ pipeline.ObjectStore = (*fakeObjects)(nil)
 
-func ingest(t *testing.T, st pipeline.Store, rec pipeline.Recognizer, obj pipeline.ObjectStore, path, date string, force bool) *pipeline.IngestOutcome {
+func ingest(t *testing.T, st pipeline.Store, rec pipeline.Recognizer, obj pipeline.ObjectStore, path, date, preprocess string, force bool) *pipeline.IngestOutcome {
 	t.Helper()
-	oc, err := pipeline.Ingest(context.Background(), st, rec, obj, path, date, force)
+	oc, err := pipeline.Ingest(context.Background(), st, rec, obj, path, date, preprocess, force)
 	if err != nil {
 		t.Fatalf("ingest %s: %v", path, err)
 	}

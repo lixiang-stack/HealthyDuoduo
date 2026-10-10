@@ -283,6 +283,18 @@ Go（工程层）：
 
 **候选演进（替代方案调研结论，2026-10-09）：** 新类别带来多样版式时,最近的免 LLM 路径是 PaddleOCR PP-Structure(V3) 表格识别（SLANet）——可在 P3 起**只替换 postprocess 的行带/配对这一层**（表格结构还原交给模型），词典数据文件与 report 契约不动;决定切换时出 ADR 并对照 golden 扩容样本验收。（开源直接可用的同题项目 MediParse / LabReport-Parser / MedClarify 等均依赖多模态 LLM/云 API,不符 NF-01。）
 
+**P3 细化记录（2026-10-10 开工,按「无图像依赖 → 有图像依赖」分两波实施）：**
+
+第一波（不依赖新类别样本,已落地）：
+
+1. 多词典注册表：`recognizer/recognizer/` 下每个 `*_dict.yaml` 对应一个报告类别;分发语义 = 标题命中者胜出 > 双方达标时匹配项数多者 > 并列取文件名序先者（单词典时与 P2 语义完全一致）;词典覆盖门禁 `test_dict_coverage` 参数化到注册表全部文件。
+2. 趋势统计：`hdd trend <指标名> [--type <report-type>]`——同一指标项名（词典规范名）跨报告时序点,列 = date/type/value/unit/delta/flag/sha256（升序;delta 仅在相邻点单位一致时计算,unit 变了显示 "-"）。
+3. 预处理开关（坏例驱动）：`run_ocr(image, preprocess=...)` 支持 `gray` / `autocontrast` / `deskew`,默认关闭——关闭时 OCR 输入与 P1 完全一致,golden 零影响;`/ocr` `/report` 可选 multipart 字段 `preprocess`,调试 CLI 与 `hdd ingest --preprocess` 同一开关透传;OCR 结果 / 报告契约 JSON 不变（NC-06 不动）。
+
+第二波（待真实脱敏样本到位）：尿常规 / 产检词典（以真实 OCR 文本为证据,过门禁）→ golden 生成 → CLI `typeDisplay` 缩写（`尿常规→URINE` 等待定）→ 新类别端到端演示 + ≥20 张全量回归。
+
+验收口径：第一波以双链测试全绿为证（词典门禁全量参数化、注册表分发 / trend / 预处理均有单测）;新类别粗验收（原文）在第二波样本到位后执行。
+
 **粗验收：** 新增类别各 ≥3 张样本端到端可演示；`hdd list --type 尿常规` 可查；样本集全量 golden 回归绿。
 
 ---
@@ -331,3 +343,4 @@ Go（工程层）：
 | 1.2 | 2026-10-08 | golden 对比规则按跨平台噪声事实修正:txts 由「逐字相等」改为「行数相等 + 忽略空白的行内编辑距离 ≤1」;scores 由行级容差改为全行平均绝对误差 ≤0.03(CI 三轮实测 cbc_04 行级漂移 0.023→0.058 不收敛,置信度为噪声主导维度;MAE 滤除噪声、检出真退化)。同架构三通道逐字一致口径不变 |
 | 1.3 | 2026-10-09 | /report 增可选 date 补录(决策 #6),/reparse 请求体 {ocr_result, date?};失败占位 report_type=unknown;pgx/v5+goose 库模式替代 sqlc(决策 #12);无日期样本为 cbc_02;P3 可换 PP-Structure(V3) 行带/配对(§10) |
 | 1.4 | 2026-10-09 | 验收轮修订:① 对外身份统一为图像内容 sha256:images 主键=sha256(删除自增 id 与冗余 object_key 列,对象键=sha256),reports 每图一行、主键=图像 sha256(删除自增 id),ocr_history 仍以内部序号追加;hdd ingest 输出与 show/reparse/list 的入参均为图像 sha256(仅完整 64 位 hex;不支持前缀);② CLI 报告类别展示为英文缩写(血常规→CBC),--type 亦接受 CBC,域数据值不变;③ low_confidence 收敛至决策 #7 原义(仅 score<0.8;单位损耗保留原文),词典 RDW-SD 单位集修正为 fL |
+| 1.5 | 2026-10-10 | P3 开工(§10 细化记录):第一波落地——① postprocess 多词典注册表(`*_dict.yaml` 按文件名序,分发=标题命中>命中项数>文件名序);② `hdd trend <指标名> [--type]` 趋势统计;③ OCR 预处理开关 gray/autocontrast/deskew 默认关闭(/ocr /report multipart `preprocess`、调试 CLI、hdd ingest `--preprocess` 透传;契约 JSON 不变),numpy/pillow 提升为显式依赖。第二波(尿常规/产检词典+真实样本+golden)待图像到位 |

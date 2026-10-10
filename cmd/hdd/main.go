@@ -11,10 +11,11 @@ import (
 	"regexp"
 )
 
-const usage = `usage: hdd ingest <image...> [--date YYYY-MM-DD] [--force]
+const usage = `usage: hdd ingest <image...> [--date YYYY-MM-DD] [--force] [--preprocess <steps>]
        hdd reparse <sha256...> [--date YYYY-MM-DD]
        hdd list [--type <report-type>] [--date YYYY|YYYY-MM|YYYY-MM-DD]
-       hdd show <sha256>`
+       hdd show <sha256>
+       hdd trend <item-name> [--type <report-type>]`
 
 // CLI 退出码(POSIX 惯例):2=用法/参数错误,1=运行错误;成功为 0(零值,不单独命名)。
 const (
@@ -55,6 +56,8 @@ func run(out, errOut io.Writer, d *deps, args []string) int {
 		return runList(out, errOut, d, rest)
 	case "show":
 		return runShow(out, errOut, d, rest)
+	case "trend":
+		return runTrend(out, errOut, d, rest)
 	default:
 		fmt.Fprintf(errOut, "hdd: unknown command %q\n%s\n", cmd, usage)
 		return exitUsage

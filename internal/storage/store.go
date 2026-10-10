@@ -72,6 +72,19 @@ const (
 	sqlItemsByReport = `SELECT name, value, unit, ref_range, flag, low_confidence, raw_text
 		 FROM report_items WHERE report_sha256 = $1 ORDER BY id`
 
+	// trend:同一指标项名(report_items.name = 词典规范名)的跨报告时序点,升序
+	sqlTrendByName = `SELECT r.image_sha256, r.report_type,
+		   COALESCE(to_char(r.report_date, 'YYYY-MM-DD'), ''), i.value, i.unit, i.flag
+		 FROM report_items i JOIN reports r ON r.image_sha256 = i.report_sha256
+		 WHERE i.name = $1
+		 ORDER BY r.report_date ASC, r.image_sha256 ASC`
+
+	sqlTrendByNameAndType = `SELECT r.image_sha256, r.report_type,
+		   COALESCE(to_char(r.report_date, 'YYYY-MM-DD'), ''), i.value, i.unit, i.flag
+		 FROM report_items i JOIN reports r ON r.image_sha256 = i.report_sha256
+		 WHERE i.name = $1 AND r.report_type = $2
+		 ORDER BY r.report_date ASC, r.image_sha256 ASC`
+
 	sqlOCRResultByID = `SELECT engine_output FROM ocr_results WHERE id = $1`
 
 	// 报告行 upsert:测定 identity = 图像 sha256(每图一行);冲突即原位更新(--force 重跑)。
@@ -204,6 +217,36 @@ func (s *Store) OCRResultJSON(ctx context.Context, ocrID int64) ([]byte, error) 
 	var raw []byte
 	err := s.pool.QueryRow(ctx, sqlOCRResultByID, ocrID).Scan(&raw)
 	return raw, err
+}
+
+// TrendByName hdd trend <指标名>:同一指标项名跨报告时序点(升序,--type 过滤类别,
+// 输入缩写经 CLI 的 domType 归一为域值);like list,组合均为常量 SQL。
+func (s *Store) TrendByName(ctx context.Context, itemName, reportType string) ([]pipeline.TrendRow, error) {
+	if reportType != "" {
+		return s.trendRows(ctx, sqlTrendByNameAndType, itemName, reportType)
+	}
+	return s.trendRows(ctx, sqlTrendByName, itemName)
+}
+
+func (s *Store) trendRows(ctx context.Context, query string, args ...any) ([]pipeline.TrendRow, error) {
+	rows, err := s.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []pipeline.TrendRow
+	for rows.Next() {
+		var r pipeline.TrendRow
+		var date string
+		if err := rows.Scan(&r.Sha256, &r.ReportType, &date, &r.Value, &r.Unit, &r.Flag); err != nil {
+			return nil, err
+		}
+		if date != "" {
+			r.ReportDate = &date
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
 }
 
 // dateGranularity --date 输入的粒度;dateNone 表示未传日期。

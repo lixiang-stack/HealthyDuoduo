@@ -15,7 +15,10 @@ import (
 	"healthyduoduo/internal/pipeline"
 )
 
-type fakeStoreCLI struct{}
+// fakeStoreCLI 默认空库;trendRet 注入 trend 查询的期望行集。
+type fakeStoreCLI struct {
+	trendRet []pipeline.TrendRow
+}
 
 func (fakeStoreCLI) ImageBySha256(ctx context.Context, sha string) (*pipeline.Image, error) {
 	return nil, nil
@@ -39,10 +42,13 @@ func (fakeStoreCLI) OCRResultJSON(ctx context.Context, id int64) ([]byte, error)
 func (fakeStoreCLI) WriteReport(ctx context.Context, reportSha string, ocrID int64, report contract.Report) error {
 	return nil
 }
+func (f fakeStoreCLI) TrendByName(ctx context.Context, item, reportType string) ([]pipeline.TrendRow, error) {
+	return f.trendRet, nil
+}
 
 type fakeRecognizerCLI struct{}
 
-func (fakeRecognizerCLI) Report(ctx context.Context, image []byte, filename, date string) (*contract.OCRResult, *contract.Report, error) {
+func (fakeRecognizerCLI) Report(ctx context.Context, image []byte, filename, date, preprocess string) (*contract.OCRResult, *contract.Report, error) {
 	ocr := &contract.OCRResult{Txts: []string{"x"}, Engine: "onnxruntime"}
 	report := &contract.Report{ReportType: "血常规", ReportDate: str("2026-10-01"), Status: "success"}
 	return ocr, report, nil
@@ -112,10 +118,51 @@ func TestRunIngestRejectsBadDate(t *testing.T) {
 	}
 }
 
+func TestRunIngestRejectsMissingPreprocessValue(t *testing.T) {
+	var out, errOut bytes.Buffer
+	d := &deps{store: fakeStoreCLI{}, rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
+	if code := run(&out, &errOut, d, []string{"ingest", "a.jpeg", "--preprocess"}); code != 2 {
+		t.Fatalf("exit = %d, want 2", code)
+	}
+}
+
 func TestRunListRejectsBadDate(t *testing.T) {
 	var out, errOut bytes.Buffer
 	d := &deps{store: fakeStoreCLI{}, rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
 	if code := run(&out, &errOut, d, []string{"list", "--date", "garbage"}); code != 2 {
+		t.Fatalf("exit = %d, want 2", code)
+	}
+}
+
+func TestRunTrendPrintsTrendRows(t *testing.T) {
+	v, v2, unit := 128.0, 136.0, "g/L"
+	d := &deps{store: fakeStoreCLI{trendRet: []pipeline.TrendRow{
+		{Sha256: strings.Repeat("a", 64), ReportType: "血常规", ReportDate: str("2026-01-02"), Value: &v, Unit: &unit, Flag: "normal"},
+		{Sha256: strings.Repeat("b", 64), ReportType: "血常规", ReportDate: str("2026-03-01"), Value: &v2, Unit: &unit, Flag: "high"},
+	}}, rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
+	var out, errOut bytes.Buffer
+	if code := run(&out, &errOut, d, []string{"trend", "血红蛋白"}); code != 0 {
+		t.Fatalf("exit = %d, stderr = %q", code, errOut.String())
+	}
+	for _, col := range []string{"date", "type", "value", "unit", "delta", "flag", "sha256"} {
+		if !strings.Contains(out.String(), col) {
+			t.Fatalf("stdout = %q, want header column %q", out.String(), col)
+		}
+	}
+	for _, want := range []string{"CBC", "128", "136", "g/L", "normal", "high", "+8"} {
+		if !strings.Contains(out.String(), want) {
+			t.Fatalf("stdout = %q, want row content %q", out.String(), want)
+		}
+	}
+}
+
+func TestRunTrendRequiresExactlyOneItemName(t *testing.T) {
+	var out, errOut bytes.Buffer
+	d := &deps{store: fakeStoreCLI{}, rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
+	if code := run(&out, &errOut, d, []string{"trend"}); code != 2 {
+		t.Fatalf("exit = %d, want 2", code)
+	}
+	if code := run(&out, &errOut, d, []string{"trend", "a", "b"}); code != 2 {
 		t.Fatalf("exit = %d, want 2", code)
 	}
 }

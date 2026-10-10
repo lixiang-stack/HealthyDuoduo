@@ -25,7 +25,7 @@ func TestIngestFirstRun_NewReport(t *testing.T) {
 	st, rec, obj := newFakeStore(), newFakeRecognizer(), newObjects()
 	path := writeImage(t, []byte("fake-image-1"))
 
-	oc := ingest(t, st, rec, obj, path, "", false)
+	oc := ingest(t, st, rec, obj, path, "", "", false)
 
 	if oc.Kind != pipeline.KindNew || oc.Sha256 == "" {
 		t.Fatalf("outcome = %+v, want KindNew with sha identity", oc)
@@ -52,8 +52,8 @@ func TestIngestRepeated_Idempotent(t *testing.T) {
 	st, rec, obj := newFakeStore(), newFakeRecognizer(), newObjects()
 	path := writeImage(t, []byte("fake-image-1"))
 
-	first := ingest(t, st, rec, obj, path, "", false)
-	second := ingest(t, st, rec, obj, path, "", false)
+	first := ingest(t, st, rec, obj, path, "", "", false)
+	second := ingest(t, st, rec, obj, path, "", "", false)
 
 	if second.Kind != pipeline.KindCached {
 		t.Fatalf("second outcome kind = %v, want KindCached", second.Kind)
@@ -73,9 +73,9 @@ func TestIngestForce_RerunsAndAppendsOCR(t *testing.T) {
 	st, rec, obj := newFakeStore(), newFakeRecognizer(), newObjects()
 	path := writeImage(t, []byte("fake-image-1"))
 
-	ingest(t, st, rec, obj, path, "", false)
+	ingest(t, st, rec, obj, path, "", "", false)
 	before := len(st.ocrRows)
-	second := ingest(t, st, rec, obj, path, "", true)
+	second := ingest(t, st, rec, obj, path, "", "", true)
 	after := len(st.ocrRows)
 
 	if second.Kind != pipeline.KindForced {
@@ -99,7 +99,7 @@ func TestIngestWithDate_PassedThroughToRecognizer(t *testing.T) {
 	st, rec, obj := newFakeStore(), newFakeRecognizer(), newObjects()
 	path := writeImage(t, []byte("no-date-image"))
 
-	oc := ingest(t, st, rec, obj, path, "2026-10-01", false)
+	oc := ingest(t, st, rec, obj, path, "2026-10-01", "", false)
 
 	if rec.dateOfCall[1] != "2026-10-01" {
 		t.Errorf("date passed to recognizer = %q, want 2026-10-01(解析失败的补录兜底)", rec.dateOfCall[1])
@@ -112,6 +112,17 @@ func TestIngestWithDate_PassedThroughToRecognizer(t *testing.T) {
 	}
 }
 
+func TestIngestPreprocess_PassedThroughToRecognizer(t *testing.T) {
+	st, rec, obj := newFakeStore(), newFakeRecognizer(), newObjects()
+	path := writeImage(t, []byte("blurry-image"))
+
+	ingest(t, st, rec, obj, path, "", "gray,deskew", false)
+
+	if rec.preprocessOfCall[1] != "gray,deskew" {
+		t.Errorf("preprocess passed to recognizer = %q, want gray,deskew", rec.preprocessOfCall[1])
+	}
+}
+
 func TestIngestCachedWithDate_RunsBackfillViaReparse(t *testing.T) {
 	// 先以无日期首次入库(得到 null 日期报告),再 --date 补录;同一图像身份,不再重跑 OCR。
 	rec := newFakeRecognizer()
@@ -119,13 +130,13 @@ func TestIngestCachedWithDate_RunsBackfillViaReparse(t *testing.T) {
 	st, obj := newFakeStore(), newObjects()
 	path := writeImage(t, []byte("fake-image-1"))
 
-	first := ingest(t, st, rec, obj, path, "", false)
+	first := ingest(t, st, rec, obj, path, "", "", false)
 	if first.Report.ReportDate != nil {
 		t.Fatalf("setup: expected null-date report, got %+v", first.Report)
 	}
 	rec.report = sampleReport("2024-08-19") // 补录后重算会以 hint 生效
 
-	backfilled := ingest(t, st, rec, obj, path, "2026-01-02", false)
+	backfilled := ingest(t, st, rec, obj, path, "2026-01-02", "", false)
 
 	if backfilled.Kind != pipeline.KindBackfilled {
 		t.Fatalf("kind = %v, want KindBackfilled", backfilled.Kind)
@@ -144,7 +155,7 @@ func TestReparse_PreservesBackfilledDate(t *testing.T) {
 	st, obj := newFakeStore(), newObjects()
 	path := writeImage(t, []byte("fake-image-1"))
 
-	oc, err := pipeline.Ingest(context.Background(), st, rec, obj, path, "2026-10-01", false)
+	oc, err := pipeline.Ingest(context.Background(), st, rec, obj, path, "2026-10-01", "", false)
 	if err != nil {
 		t.Fatalf("ingest with date: %v", err)
 	}
@@ -183,7 +194,7 @@ func TestReparse_UsesStoredOCRAndReplaceItems(t *testing.T) {
 	st, obj := newFakeStore(), newObjects()
 	path := writeImage(t, []byte("fake-image-1"))
 
-	oc := ingest(t, st, rec, obj, path, "", false)
+	oc := ingest(t, st, rec, obj, path, "", "", false)
 	if _, err := pipeline.Reparse(context.Background(), st, rec, oc.Sha256, ""); err != nil {
 		t.Fatalf("reparse: %v", err)
 	}

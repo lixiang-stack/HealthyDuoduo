@@ -16,7 +16,10 @@ import pytest
 import yaml
 
 from recognizer import paths
-from recognizer.postprocess import DICT_PATH as DICT
+from recognizer.postprocess import DICT_DIR, DICT_GLOB
+
+# 词典注册表:每个 *_dict.yaml 一个报告类别(测试在收集期读取文件列表)
+_DICTS = sorted(DICT_DIR.glob(DICT_GLOB))
 
 # 与 postprocess._match_name 官方语义一致的前缀形态:
 # ①原样 ②去行首星号 ③去行首序号 ④去名称熔断数字尾 ⑤序号+熔断组合剥离
@@ -49,9 +52,10 @@ def _witnessed(term: str) -> set[str]:
     return seen
 
 
-@pytest.mark.skipif(not DICT.exists(), reason="cbc_dict.yaml missing")
-def test_every_alias_has_corpus_evidence() -> None:
-    d = yaml.safe_load(DICT.read_text(encoding="utf-8"))
+@pytest.mark.skipif(not _DICTS, reason="no *_dict.yaml in recognizer package")
+@pytest.mark.parametrize("dict_path", _DICTS, ids=lambda p: p.stem)
+def test_every_alias_has_corpus_evidence(dict_path) -> None:
+    d = yaml.safe_load(dict_path.read_text(encoding="utf-8"))
     problems = []
     for it in d["items"]:
         for a in set(it.get("aliases", [])):
@@ -61,10 +65,11 @@ def test_every_alias_has_corpus_evidence() -> None:
     assert not problems, "词典别名与真实样本脱钩:\n" + "\n".join(problems)
 
 
-@pytest.mark.skipif(not DICT.exists(), reason="cbc_dict.yaml missing")
-def test_every_item_has_witnessed_reference() -> None:
+@pytest.mark.skipif(not _DICTS, reason="no *_dict.yaml in recognizer package")
+@pytest.mark.parametrize("dict_path", _DICTS, ids=lambda p: p.stem)
+def test_every_item_has_witnessed_reference(dict_path) -> None:
     """每一词典组(规范名 + 别名)至少有一条真实样本证据,防孤儿词条。"""
-    d = yaml.safe_load(DICT.read_text(encoding="utf-8"))
+    d = yaml.safe_load(dict_path.read_text(encoding="utf-8"))
     problems = []
     for it in d["items"]:
         terms = {it["name"], *it.get("aliases", [])}

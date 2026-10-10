@@ -15,10 +15,15 @@ import json
 from typing import Any
 
 import pytest
+import yaml
 
 from recognizer import paths
+from recognizer import postprocess as _postprocess
 from recognizer.contract import OCRResult
-from recognizer.postprocess import run_postprocess
+from recognizer.postprocess import _build_dict, run_postprocess
+
+# 真实注册表快照(分发测试在 monkeypatch 前捕获原词典)
+_load_dicts = _postprocess.load_dicts
 
 # ---------- 合成 OCRResult 构造器 ----------
 
@@ -261,6 +266,81 @@ def test_title_keyword_detects_category() -> None:
     cells += [{"x": 100, "y": -40, "text": "市人民医院血常规报告单"}]
     r = run_postprocess(mk_ocr(cells))
     assert r.report_type == "血常规"
+
+
+# ---------- 多词典注册表分发(P3:词典数据文件每个类别一份,分发语义见 _select_category) ----------
+
+
+_CBC_ROW_NAMES = ["白细胞计数", "红细胞计数", "血红蛋白", "红细胞压积", "血小板",
+                  "淋巴细胞比率", "中性细胞比率", "单核细胞比率", "血小板压积", "淋巴细胞数"]
+
+_URINE_ITEM_NAMES = ["尿胆原", "尿糖", "尿蛋白", "尿酮体", "尿潜血",
+                     "尿亚硝酸盐", "尿胆红素", "尿比重", "尿pH", "尿白细胞"]
+
+
+def _urine_dict(tmp_path, min_matched: int):
+    """尿常规词典:数据文件格式与真实词典一致,经 _build_dict 加载(注册表分发测试用)。"""
+    raw = {
+        "report_type": "尿常规",
+        "category": {"title_keywords": ["尿常规"], "min_matched_items": min_matched},
+        "items": [{"name": n, "aliases": [n], "units": ["mmol/L"]} for n in _URINE_ITEM_NAMES],
+    }
+    path = tmp_path / "test_urine_dict.yaml"
+    path.write_text(yaml.safe_dump(raw, allow_unicode=True), encoding="utf-8")
+    return _build_dict(path)
+
+
+def _cbc_rows(y_start: float = 30.0, step: float = 25.0) -> list[dict[str, Any]]:
+    cells: list[dict[str, Any]] = []
+    for i, name in enumerate(_CBC_ROW_NAMES):
+        cells += row(y_start + step * i, name, "1", unit="g/L", ref="1-2")
+    return cells
+
+
+def _bare_roles() -> list[dict[str, Any]]:
+    """仅表头角色行(无报告类别标题行)。"""
+    return [
+        {"x": 20, "y": 0, "text": "序号"},
+        {"x": 160, "y": 0, "text": "项目名称"},
+        {"x": 360, "y": 0, "text": "结果"},
+        {"x": 470, "y": 0, "text": "单位"},
+        {"x": 580, "y": 0, "text": "参考值"},
+    ]
+
+
+def test_registry_prefers_title_hit_over_pair_count(monkeypatch, tmp_path) -> None:
+    """标题命中者胜出:尿常规标题命中但 0 项配对,仍压过 10 项配对达标的血常规。"""
+    urine = _urine_dict(tmp_path, min_matched=3)
+    real = _load_dicts()
+    monkeypatch.setattr(_postprocess, "load_dicts", lambda: (urine, *real))
+    cells = [{"x": 100, "y": -60, "text": "市第二医院尿常规报告单"}] + _bare_roles() + _cbc_rows()
+    r = run_postprocess(mk_ocr(cells))
+    assert r.report_type == "尿常规"
+    assert r.status == "failed"  # 尿常规词典无配对 → 无产出仍留痕 failed
+
+
+def test_registry_pairs_count_decides_without_title(monkeypatch, tmp_path) -> None:
+    """无标题命中:双方都达标时取匹配项数多者(血常规 10 项 > 尿常规 3 项)。"""
+    urine = _urine_dict(tmp_path, min_matched=3)
+    real = _load_dicts()
+    monkeypatch.setattr(_postprocess, "load_dicts", lambda: (urine, *real))
+    cells = _bare_roles() + _cbc_rows()
+    for i, name in enumerate(_URINE_ITEM_NAMES[:3]):
+        cells += row(300 + 25 * i, name, "5.0", unit="mmol/L", ref="1-10")
+    r = run_postprocess(mk_ocr(cells))
+    assert r.report_type == "血常规"
+
+
+def test_registry_tie_follows_registry_order(monkeypatch, tmp_path) -> None:
+    """配对数并列:取注册表先者(文件名序——测试里为注入顺序在前者)。"""
+    urine = _urine_dict(tmp_path, min_matched=10)
+    real = _load_dicts()
+    monkeypatch.setattr(_postprocess, "load_dicts", lambda: (urine, *real))
+    cells = _bare_roles() + _cbc_rows()
+    for i, name in enumerate(_URINE_ITEM_NAMES):
+        cells += row(300 + 25 * i, name, "5.0", unit="mmol/L", ref="1-10")
+    r = run_postprocess(mk_ocr(cells))
+    assert r.report_type == "尿常规"
 
 
 # ---------- golden(真实样本,OCR 结果来自 golden 文件,跨架构确定性) ----------
