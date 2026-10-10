@@ -287,7 +287,7 @@ Go（工程层）：
 
 第一波（不依赖新类别样本,已落地）：
 
-1. 多词典注册表：`recognizer/recognizer/` 下每个 `*_dict.yaml` 对应一个报告类别;分发语义 = 标题命中者胜出 > 双方达标时匹配项数多者 > 并列取文件名序先者（单词典时与 P2 语义完全一致）;词典覆盖门禁 `test_dict_coverage` 参数化到注册表全部文件。
+1. 多词典注册表：`recognizer/recognizer/` 下每个 `*_dict.yaml` 对应一个报告类别;分发为**内容优先(A1)**——命中项数 ≥ min_matched_items 者达标,达标者命中项数多者胜出、并列时标题(限标题区)命中者胜出、再并列取文件名序;无词典达标时才回退标题命中(避免正文偶发提及把报告抢到不相干类别);词典覆盖门禁 `test_dict_coverage` 参数化到注册表全部文件。
 2. 趋势统计：`hdd trend <指标名> [--type <report-type>]`——同一指标项名（词典规范名）跨报告时序点,列 = date/type/value/unit/delta/flag/sha256（升序;delta 仅在相邻点单位一致时计算,unit 变了显示 "-"）。
 3. 预处理开关（坏例驱动）：`run_ocr(image, preprocess=...)` 支持 `gray` / `autocontrast` / `deskew`,默认关闭——关闭时 OCR 输入与 P1 完全一致,golden 零影响;`/ocr` `/report` 可选 multipart 字段 `preprocess`,调试 CLI 与 `hdd ingest --preprocess` 同一开关透传;OCR 结果 / 报告契约 JSON 不变（NC-06 不动）。
 
@@ -366,3 +366,4 @@ Go（工程层）：
 | 1.5 | 2026-10-10 | P3 开工(§10 细化记录):第一波落地——① postprocess 多词典注册表(`*_dict.yaml` 按文件名序,分发=标题命中>命中项数>文件名序);② `hdd trend <指标名> [--type]` 趋势统计;③ OCR 预处理开关 gray/autocontrast/deskew 默认关闭(/ocr /report multipart `preprocess`、调试 CLI、hdd ingest `--preprocess` 透传;契约 JSON 不变),numpy/pillow 提升为显式依赖。第二波(尿常规/产检词典+真实样本+golden)待图像到位 |
 | 1.6 | 2026-10-10 | P3 第二波落地(§10 细化记录):① 新类别 血糖 GLU / 肝肾功能 LFT / 甲状腺功能 TFT / 尿常规 UA / 超声 US 五词典(19 张真实脱敏样本,别名/单位以 OCR 文本为证据过门禁);② 抽取分段化:按「上方最近表头带」归属数据格,+单名称中心时整表全池配对;③ 尿常规定性值 value=None 留痕,机器/镜检双段 canonical 拆分;④ 超声 category.mode=narrative(别名+桥接符+数值行内配对),词典门禁补 narrative 子串见证;⑤ 粗验收已执行:五类 e2e ingest/list/trend 演示,24 张全量回归绿,血常规 golden 零漂移 |
 | 1.7 | 2026-10-10 | golden txts 容差由 ≤1 放宽至 ≤2:CI(x86_64)实测 us_03 单行漂移 2(增字 + 全/半角标点),arm64↔x86_64 实测上限为 2;失败信息改为输出超容差行明细(§8-5 同步) |
+| 1.8 | 2026-10-10 | review 修复①(分类解耦 A1):`_select_category` 由「标题命中者硬覆盖」改为**内容优先**——命中项数达标者胜出、标题只在达标者并列时(限标题区)裁决、无达标者才回退标题命中(含全页,保住 glu_03 这类「标题词实为项目名」样本);24 张 golden 零漂移,新增 3 条分发单测 |
