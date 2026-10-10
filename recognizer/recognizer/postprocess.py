@@ -3,7 +3,7 @@
 纯函数、无 IO:输入 contract.OCRResult(+可选日期兜底),输出 contract.Report。
 词典是数据文件注册表 P3 起多类别并存(决策 #8:只有规范名/别名/已知单位集,
 不内置参考值;参考范围一律从检查单抽取):DICT_DIR 下每个 *_dict.yaml 对应
-一个报告类别,分发规则见 _select_category(单词典时 P2 语义不变)。
+一个报告类别,分发为内容优先(P3 A1;标题仅兜底/并列裁决,见 _select_category)。
 
 版式覆盖(P2 的 5 张真实脱敏样本):
 - 表头行(项目名称/检验项目 + 结果 + 单位/参考值/参考区间)定义列角色中心;
@@ -93,6 +93,10 @@ _ASSIGN_TOLERANCE_PX = 180
 # 表头行判定:一行命中的 (格, 列角色关键词) 对 ≥ 此值才判为表头带;
 # 3 = 名称+结果+单位/参考值等列角色同时在行内的最少组合。
 _HEADER_MIN_ROLES = 3
+
+# 分类标题区(P3 A1 内容优先):类别标题预期出现的页面位置——首条表头带上方;
+# 无表头带(叙述体)时取页面高度上方该比例。标题只在此区匹配,避免正文提及误分发。
+_TITLE_REGION_FRACTION = 0.25
 
 
 @dataclass(frozen=True)
@@ -575,30 +579,54 @@ def run_postprocess(ocr: OCRResult, date_hint: str | None = None) -> Report:
     )
 
 
+def _title_region_cells(
+    cells: list[_Cell],
+    header_bands: list[list[_Cell]],
+) -> list[_Cell]:
+    """标题区:报告类别词预期出现的位置。
+
+    有表头带时取首条表头带顶线之上(标题/抬头行);无表头带(叙述体)时取页面上方
+    _TITLE_REGION_FRACTION 高度。分类标题只在标题区内匹配,正文偶发提及不算数。
+    """
+    if not cells:
+        return []
+    if header_bands:
+        cutoff = min(c.y0 for band in header_bands for c in band)
+    else:
+        y_lo = min(c.y0 for c in cells)
+        y_hi = max(c.y1 for c in cells)
+        cutoff = y_lo + _TITLE_REGION_FRACTION * (y_hi - y_lo)
+    return [c for c in cells if c.cy <= cutoff]
+
+
 def _select_category(
     cells: list[_Cell],
     header_bands: list[list[_Cell]],
 ) -> tuple[LabDict, list[tuple[DictItem, _RowPiece]]] | None:
-    """多词典注册表分发:标题关键词优先,词典命中项数兜底(P2 决策 #8 语义的多词典推广)。
+    """多词典注册表分发(P3 A1 内容优先分类)。
 
-    单词典时与 P2 完全同义:标题命中或匹配项数 ≥ min_matched_items 才认该类别,
-    都不达 → None(failed)。注册表多词典时:标题命中者胜出;同状态(均命中标题/
-    均仅靠命中数达标)取匹配项数多者;并列取注册表先者(文件名序)。
+    判定由内容驱动:命中项数 ≥ min_matched_items 的词典「达标」;达标者中命中项数
+    多者胜出,并列时标题(标题区内)命中者胜出,再并列取注册表先者(文件名序)。
+    仅当没有任何词典达标时,才回退到标题命中的词典——标题不再是「硬覆盖」,正文
+    偶发提及无法把报告抢到不相干类别。
+
+    标题区分层(见 _title_region_cells)用于达标者并列裁决;兜底层仍允许全页匹配,
+    因为报告未达标时往往正是「标题词被印成项目名」的样本(如 glu_03 的糖化血红蛋白)。
     """
-    best: tuple[LabDict, list[tuple[DictItem, _RowPiece]], bool] | None = None
+    title_cells = _title_region_cells(cells, header_bands)
+    best: tuple[LabDict, list[tuple[DictItem, _RowPiece]]] | None = None
+    best_key: tuple[bool, int, bool] | None = None
     for d in load_dicts():
         if d.mode == "narrative":
             pairs = _extract_narrative(cells, d)
         else:
             pairs = _extract_items(cells, header_bands, d)
-        title = any(kw in c.text for c in cells for kw in d.title_keywords)
-        if not title and len(pairs) < d.min_matched_items:
+        qualified = len(pairs) >= d.min_matched_items
+        if not qualified and not any(kw in c.text for c in cells for kw in d.title_keywords):
             continue
-        if best is not None:
-            _, best_pairs, best_title = best
-            if (title, len(pairs)) <= (best_title, len(best_pairs)):
-                continue
-        best = (d, pairs, title)
-    if best is None:
-        return None
-    return best[0], best[1]
+        title_region = any(kw in c.text for c in title_cells for kw in d.title_keywords)
+        key = (qualified, len(pairs), title_region)
+        if best_key is not None and key <= best_key:
+            continue
+        best, best_key = (d, pairs), key
+    return best

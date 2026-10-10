@@ -308,15 +308,49 @@ def _bare_roles() -> list[dict[str, Any]]:
     ]
 
 
-def test_registry_prefers_title_hit_over_pair_count(monkeypatch, tmp_path) -> None:
-    """标题命中者胜出:尿常规标题命中但 0 项配对,仍压过 10 项配对达标的血常规。"""
+def test_registry_content_overrides_title_hit(monkeypatch, tmp_path) -> None:
+    """A1 内容优先:仅标题命中的类别(0 项配对)不得覆盖命中项数达标的类别(血常规 10 项)。"""
     urine = _urine_dict(tmp_path, min_matched=3)
     real = _load_dicts()
     monkeypatch.setattr(_postprocess, "load_dicts", lambda: (urine, *real))
     cells = [{"x": 100, "y": -60, "text": "市第二医院尿常规报告单"}] + _bare_roles() + _cbc_rows()
     r = run_postprocess(mk_ocr(cells))
+    assert r.report_type == "血常规"
+
+
+def test_registry_title_fallback_when_no_dict_qualifies(monkeypatch, tmp_path) -> None:
+    """无词典达标时回退标题命中:标题词也可能印在正文(如 glu_03 的糖化血红蛋白)。"""
+    urine = _urine_dict(tmp_path, min_matched=5)
+    real = _load_dicts()
+    monkeypatch.setattr(_postprocess, "load_dicts", lambda: (urine, *real))
+    cells = _bare_roles() + row(30, "尿胆原", "5.0", unit="mmol/L", ref="1-10")
+    cells += [{"x": 100, "y": -60, "text": "市第二医院尿常规报告单"}]
+    r = run_postprocess(mk_ocr(cells))
     assert r.report_type == "尿常规"
-    assert r.status == "failed"  # 尿常规词典无配对 → 无产出仍留痕 failed
+
+
+def test_registry_title_region_breaks_qualified_tie(monkeypatch, tmp_path) -> None:
+    """两类均达标且命中项数并列:标题(限标题区)命中者胜出。"""
+    def build(report_type: str, title_kw: str, names: list[str]):
+        raw = {
+            "report_type": report_type,
+            "category": {"title_keywords": [title_kw], "min_matched_items": 2},
+            "items": [{"name": n, "aliases": [n], "units": ["mmol/L"]} for n in names],
+        }
+        path = tmp_path / f"{report_type}.yaml"
+        path.write_text(yaml.safe_dump(raw, allow_unicode=True), encoding="utf-8")
+        return _build_dict(path)
+
+    alpha = build("甲类", "甲类标题", ["甲项一", "甲项二"])
+    beta = build("乙类", "乙类标题", ["乙项一", "乙项二"])
+    monkeypatch.setattr(_postprocess, "load_dicts", lambda: (alpha, beta))
+    cells = [{"x": 100, "y": -60, "text": "某某医院甲类标题报告单"}] + _bare_roles()
+    cells += row(30, "甲项一", "1", unit="mmol/L", ref="1-2")
+    cells += row(55, "甲项二", "1", unit="mmol/L", ref="1-2")
+    cells += row(80, "乙项一", "1", unit="mmol/L", ref="1-2")
+    cells += row(105, "乙项二", "1", unit="mmol/L", ref="1-2")
+    r = run_postprocess(mk_ocr(cells))
+    assert r.report_type == "甲类"
 
 
 def test_registry_pairs_count_decides_without_title(monkeypatch, tmp_path) -> None:
