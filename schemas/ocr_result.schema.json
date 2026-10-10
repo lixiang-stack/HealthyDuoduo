@@ -46,10 +46,24 @@
         "cls": {"type": "string"},
         "rec": {"type": "string"}
       }
+    },
+    "table_structure": {
+      "oneOf": [{"type": "null"}, {"$ref": "#/$defs/table_structure"}],
+      "description": "表结构识别结果(ADR-0004);可选,/report 填充,/reparse 复用(免原图)"
     }
   },
   "$defs": {
     "point": {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2},
-    "box": {"type": "array", "items": {"$ref": "#/$defs/point"}, "minItems": 4, "maxItems": 4}
+    "box": {"type": "array", "items": {"$ref": "#/$defs/point"}, "minItems": 4, "maxItems": 4},
+    "table_structure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["html", "model", "elapse"],
+      "properties": {
+        "html": {"type": "string", "minLength": 1},
+        "model": {"type": "string", "enum": ["wired", "lineless"]},
+        "elapse": {"type": "number", "minimum": 0}
+      }
+    }
   }
 }

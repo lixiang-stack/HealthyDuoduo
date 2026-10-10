@@ -10,6 +10,7 @@ from jsonschema import Draft202012Validator
 
 from recognizer import paths
 from recognizer.api import app
+from recognizer.contract import TableStructure
 
 SAMPLES = paths.SAMPLES
 SCHEMA = paths.SCHEMA_OCR
@@ -67,8 +68,12 @@ def test_ocr_rejects_corrupt_content() -> None:
     assert response.status_code == 400
 
 
-def test_report_bundle_contract() -> None:
-    """验收 P2:POST /report 返回 {ocr_result, report},两份都通过各自 schema。"""
+def test_report_bundle_contract(monkeypatch) -> None:
+    """验收 P2:POST /report 返回 {ocr_result, report},两份都通过各自 schema。
+
+    TSR 以桩替换:CI 不加载表结构模型(真实 TSR 由 test_table_structure 与 golden 覆盖)。
+    """
+    monkeypatch.setattr("recognizer.api.run_table_structure", lambda *_a, **_k: None)
     image = next(iter(SAMPLES.glob("cbc_01.*")))
     with TestClient(app) as client:
         response = client.post(
@@ -82,6 +87,24 @@ def test_report_bundle_contract() -> None:
     assert body["report"]["report_type"] == "血常规"
     names = {it["name"] for it in body["report"]["items"]}
     assert "血红蛋白" in names
+
+
+def test_report_attaches_table_structure(monkeypatch) -> None:
+    """/report 把 TSR 结果挂到 ocr_result.table_structure(桩注入,免模型)。"""
+    fake = TableStructure(
+        html="<table><tr><td>项目名称</td><td>结果</td></tr>"
+        "<tr><td>血红蛋白</td><td>128</td></tr></table>",
+        model="lineless",
+        elapse=0.1,
+    )
+    monkeypatch.setattr("recognizer.api.run_table_structure", lambda *_a, **_k: fake)
+    image = next(iter(SAMPLES.glob("cbc_01.*")))
+    with TestClient(app) as client:
+        response = client.post("/report", files={"image": (image.name, image.read_bytes(), "image/jpeg")})
+    assert response.status_code == 200
+    ts = response.json()["ocr_result"]["table_structure"]
+    assert ts["model"] == "lineless"
+    assert ts["html"].startswith("<table>")
 
 
 def test_report_rejects_non_image() -> None:

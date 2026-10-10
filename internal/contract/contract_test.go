@@ -87,3 +87,37 @@ func TestUnmarshalReportNullDateFixture(t *testing.T) {
 		t.Errorf("Items[0].LowConfidence = false, want true")
 	}
 }
+
+// TestTableStructureRoundTrip 覆盖 ADR-0004 新增的可选字段:有值可往返、缺省为 nil。
+func TestTableStructureRoundTrip(t *testing.T) {
+	src := OCRResult{
+		Txts:           []string{"血红蛋白"},
+		Boxes:          []Box{{{0, 0}, {1, 0}, {1, 1}, {0, 1}}},
+		Scores:         []float64{0.9},
+		Elapse:         0.1,
+		ElapseList:     []float64{0.1},
+		Engine:         "onnxruntime",
+		ModelInfo:      ModelInfo{Det: "d", Cls: "c", Rec: "r"},
+		TableStructure: &TableStructure{HTML: "<table></table>", Model: "lineless", Elapse: 0.2},
+	}
+	data, err := json.Marshal(src)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var got OCRResult
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if got.TableStructure == nil || got.TableStructure.HTML != "<table></table>" || got.TableStructure.Model != "lineless" {
+		t.Errorf("TableStructure = %+v", got.TableStructure)
+	}
+
+	var none OCRResult
+	minimal := `{"txts":[],"boxes":[],"scores":[],"elapse":0,"elapse_list":[],"engine":"onnxruntime","model_info":{"det":"d","cls":"c","rec":"r"}}`
+	if err := json.Unmarshal([]byte(minimal), &none); err != nil {
+		t.Fatalf("unmarshal minimal: %v", err)
+	}
+	if none.TableStructure != nil {
+		t.Errorf("TableStructure = %+v, want nil when omitted", none.TableStructure)
+	}
+}

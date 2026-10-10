@@ -75,7 +75,7 @@
 
 | 层 | 选型 |
 |----|------|
-| Python | uv + Python **3.13**（rapidocr 支持区间 3.8–3.13，不用系统 3.14）；rapidocr ≥3.9.0 **默认配置**（Det/Rec: PP-OCRv6 small，Cls: PP-OCRv4 mobile）；onnxruntime（**显式依赖**，rapidocr 不自带）；FastAPI + uvicorn；pydantic（契约源）；pytest + ruff |
+| Python | uv + Python **3.12**（P3+ 表结构识别 TableStructureRec 要求 `<3.13`，ADR-0004；rapidocr 支持区间 3.8–3.13）；rapidocr ≥3.9.0 **默认配置**（Det/Rec: PP-OCRv6 small，Cls: PP-OCRv4 mobile）；onnxruntime（**显式依赖**，rapidocr 不自带）；wired-table-rec / lineless-table-rec（**表结构识别**，ONNX）；FastAPI + uvicorn；pydantic（契约源）；pytest + ruff |
 | Go | Go **1.27**；pgx + sqlc；minio-go（S3 客户端库，服务端为 SeaweedFS）；goose（SQL 迁移）；标准库 net/http、httptest |
 | 基础设施 | PostgreSQL、SeaweedFS（S3 API 网关）、Docker Compose（本机全部） |
 
@@ -162,7 +162,7 @@
 | 10 | 样本 | 脱敏样本提交 `samples/`；未脱敏原图永不入库；暂缺则先用仿真单 | NF-01/NF-03 |
 | 11 | 验收形态 | 命令级（CLI + 期望输出）+ pytest golden + Go 契约 fixture | 「文档就绪」式弱验收不可执行 |
 | 12 | CI | 双链（ruff+pytest；go vet+gofmt+go test）；Docker 构建/耗时验收本地手动 | 模型 wheel ~29MB，省 CI 额度 |
-| 13 | 工具链 | uv + Python 3.13；Go 1.27 | rapidocr 支持至 3.13；本机已装 |
+| 13 | 工具链 | uv + Python 3.12；Go 1.27 | P3+ 表结构识别（TableStructureRec）要求 `<3.13`（ADR-0004）；rapidocr 支持 3.8–3.13 |
 | 14 | 存储 | MVP 即 compose 起 PostgreSQL + SeaweedFS（对象存储由 MinIO 改设，见 ADR-0003），**不经 SQLite 过渡** | 长线已明确，迁移成本 > 起步成本 |
 | 15 | 流程 | main 只落文档；每阶段一个 worktree + 一次 commit（feat:/test: 前缀）；push 由维护者决定 | 仓库工作规范 |
 | 16 | 依赖事实 | rapidocr ≥3.9.0 默认模型即 PP-OCRv6 small det/rec + PP-OCRv4 mobile cls（已核实）；onnxruntime 需显式安装；RapidOCR 无官方镜像，Dockerfile 自建 | 一级来源核实于 2026-10-08 |
@@ -275,47 +275,20 @@ Go（工程层）：
 
 ---
 
-## 10. P3 增强（目标级，启动时再细化）
+## 10. P3 增强（已落地，2026-10-10）
 
 **目标：** 报告类别扩展（尿常规、产检关键项）；简单趋势统计（同一指标跨报告对比）；样本集扩至 ≥20 张全量回归；坏例驱动的图像预处理开关（灰度 / 对比度 / 纠偏）。
 
 **为什么：** 血常规验证了词典 / 规则框架的可扩展性，新类别是同一框架的复用；统计是「回看」场景的自然延伸；预处理按坏例再上，避免过早优化。
 
-**候选演进（替代方案调研结论，2026-10-09）：** 新类别带来多样版式时,最近的免 LLM 路径是 PaddleOCR PP-Structure(V3) 表格识别（SLANet）——可在 P3 起**只替换 postprocess 的行带/配对这一层**（表格结构还原交给模型），词典数据文件与 report 契约不动;决定切换时出 ADR 并对照 golden 扩容样本验收。（开源直接可用的同题项目 MediParse / LabReport-Parser / MedClarify 等均依赖多模态 LLM/云 API,不符 NF-01。）
+**已落地（2026-10-10，要点；细节见 [ADR-0004](../adr/0004-table-structure-recognition-frontend.md) 与 [TSR 集成设计](./2026-10-10-tsr-integration-design.md)）：**
 
-**P3 细化记录（2026-10-10 开工,按「无图像依赖 → 有图像依赖」分两波实施）：**
+1. **报告类别扩展**：血常规 / 血糖 / 肝肾功能 / 甲状腺功能 / 尿常规 / 超声六类词典（`*_dict.yaml`）。分发为**内容优先**：命中项数达标者胜出 > 标题（限标题区） > 文件名序；无词典达标才回退标题命中。超声 `mode=narrative` 行内配对（定性项 `value=None` 留痕）。真实脱敏样本 24 张 + golden 全量回归。
+2. **趋势统计**：`hdd trend <指标名> [--type]`——同一指标名跨报告时序（delta 仅相邻点单位一致时计算）。
+3. **预处理开关（坏例驱动）**：`run_ocr(image, preprocess=gray|autocontrast|deskew)`，默认关闭（OCR 输入与 P1 一致）；`/ocr` `/report` multipart `preprocess`、调试 CLI 与 `hdd ingest --preprocess` 透传。
+4. **表结构识别前端（ADR-0004）**：表格类报告抽取前增 TSR（RapidAI TableStructureRec `wired+lineless` **并行**择优，ONNX；退化回退启发式），`mode=narrative` 不变；识别结果契约增**可选** `table_structure`（`/report` 填充、随 `ocr_results` 落库、`/reparse` 复用）；识别服务 Python 3.13→**3.12**；镜像构建期预下载模型（离线）。坏例 **lft_05 由 17 项恢复为 19 项**，其余 23 张报告 golden 不变。
 
-第一波（不依赖新类别样本,已落地）：
-
-1. 多词典注册表：`recognizer/recognizer/` 下每个 `*_dict.yaml` 对应一个报告类别;分发为**内容优先(A1)**——命中项数 ≥ min_matched_items 者达标,达标者命中项数多者胜出、并列时标题(限标题区)命中者胜出、再并列取文件名序;无词典达标时才回退标题命中(避免正文偶发提及把报告抢到不相干类别);词典覆盖门禁 `test_dict_coverage` 参数化到注册表全部文件。
-2. 趋势统计：`hdd trend <指标名> [--type <report-type>]`——同一指标项名（词典规范名）跨报告时序点,列 = date/type/value/unit/delta/flag/sha256（升序;delta 仅在相邻点单位一致时计算,unit 变了显示 "-"）。
-3. 预处理开关（坏例驱动）：`run_ocr(image, preprocess=...)` 支持 `gray` / `autocontrast` / `deskew`,默认关闭——关闭时 OCR 输入与 P1 完全一致,golden 零影响;`/ocr` `/report` 可选 multipart 字段 `preprocess`,调试 CLI 与 `hdd ingest --preprocess` 同一开关透传;OCR 结果 / 报告契约 JSON 不变（NC-06 不动）。
-
-第二波（2026-10-10 起实施,样本已到位）：
-尿常规 UA / 血糖 GLU / 肝肾功能 LFT / 甲状腺功能 TFT / 超声 US 五类词典
-（以真实 OCR 文本为证据,过门禁）→ golden 生成 → CLI `typeDisplay` 缩写 →
-新类别端到端演示 + ≥20 张全量回归。
-
-第二波进展（2026-10-10,维护者提供 19 张真实样本并确认脱敏合格、类别划分为
-尿常规 UA / 血糖 GLU / 肝肾功能 LFT / 甲状腺功能 TFT / 超声 US 五类):
-
-- 表格类落地(GLU/LFT/TFT):三个词典文件以 11 张样本 OCR 文本为证据落别名/单位
-  (test_dict_coverage 门禁参数化通过);postprocess 抽取扩展——数据格按「上方最近表头带」
-  分段(垂直堆叠小表互不串位)、本段表头带名称中心数 ≥2 才走左右半栏(整表全池配对);
-  ROLE_HEADERS 增补 中文名称/No项/编号项目 印形。血常规 5 张 golden **零漂移**;
-  glu_01 5/5、lft_02 17/17(success)、lft_04 13/13、lft_05 17 项恢复。
-- 行 ua(定性为主)/us(叙述体):ua 词典 ~40 词条(定性形 value=None 留痕;镜检 /HP 与
-  计数个/uL 版式拆分、机器/镜检双段 canonical 拆分);us 走 postprocess narrative 模式
-  (别名 + 桥接符 + 后随数值行内配对,门禁按子串见证);词典覆盖门禁 narrative 分支。
-- CLI `typeDisplay` 扩 5 缩写(域值不变);e2e(compose + hdd)验证:五类样本全量 ingest
-  幂等、`list --type UA` 可查、`trend 血红蛋白/促甲状腺素` 时序+delta 正常;golden 样本
-  合计 24 张(≥20) 全量回归绿。
-
-验收口径：第一波/第二波以双链测试全绿为证（词典门禁全量参数化、注册表分发 / trend /
-预处理 / 抽取分段化 / 叙述体均有单测）;粗验收已执行(e2e 见第二波进展行)——新类别各
-≥3 张样本端到端可演示、`hdd list --type 尿常规` 可查、样本集 24 张全量 golden 回归绿。
-
-**粗验收：** 新增类别各 ≥3 张样本端到端可演示；`hdd list --type 尿常规` 可查；样本集全量 golden 回归绿。
+**验收口径：** 双链测试全绿 + 24 张 golden 全量回归 + 五类端到端演示（`hdd list --type` / `trend`）。TSR 路径的人工核对重点与操作见 [集成设计 §4](./2026-10-10-tsr-integration-design.md)。
 
 ---
 
@@ -362,8 +335,6 @@ Go（工程层）：
 | 1.1 | 2026-10-08 | 对象存储由 MinIO 改为 SeaweedFS：官方 MinIO 镜像从 Docker Hub 撤下、社区镜像存维护风险，维护者决策（详见 ADR-0003）；bucket/键设计与 minio-go 客户端不变，契约与验收不变 |
 | 1.2 | 2026-10-08 | golden 对比规则按跨平台噪声事实修正:txts 由「逐字相等」改为「行数相等 + 忽略空白的行内编辑距离 ≤1」;scores 由行级容差改为全行平均绝对误差 ≤0.03(CI 三轮实测 cbc_04 行级漂移 0.023→0.058 不收敛,置信度为噪声主导维度;MAE 滤除噪声、检出真退化)。同架构三通道逐字一致口径不变 |
 | 1.3 | 2026-10-09 | /report 增可选 date 补录(决策 #6),/reparse 请求体 {ocr_result, date?};失败占位 report_type=unknown;pgx/v5+goose 库模式替代 sqlc(决策 #12);无日期样本为 cbc_02;P3 可换 PP-Structure(V3) 行带/配对(§10) |
-| 1.4 | 2026-10-09 | 验收轮修订:① 对外身份统一为图像内容 sha256:images 主键=sha256(删除自增 id 与冗余 object_key 列,对象键=sha256),reports 每图一行、主键=图像 sha256(删除自增 id),ocr_history 仍以内部序号追加;hdd ingest 输出与 show/reparse/list 的入参均为图像 sha256(仅完整 64 位 hex;不支持前缀);② CLI 报告类别展示为英文缩写(血常规→CBC),--type 亦接受 CBC,域数据值不变;③ low_confidence 收敛至决策 #7 原义(仅 score<0.8;单位损耗保留原文),词典 RDW-SD 单位集修正为 fL |
-| 1.5 | 2026-10-10 | P3 开工(§10 细化记录):第一波落地——① postprocess 多词典注册表(`*_dict.yaml` 按文件名序,分发=标题命中>命中项数>文件名序);② `hdd trend <指标名> [--type]` 趋势统计;③ OCR 预处理开关 gray/autocontrast/deskew 默认关闭(/ocr /report multipart `preprocess`、调试 CLI、hdd ingest `--preprocess` 透传;契约 JSON 不变),numpy/pillow 提升为显式依赖。第二波(尿常规/产检词典+真实样本+golden)待图像到位 |
-| 1.6 | 2026-10-10 | P3 第二波落地(§10 细化记录):① 新类别 血糖 GLU / 肝肾功能 LFT / 甲状腺功能 TFT / 尿常规 UA / 超声 US 五词典(19 张真实脱敏样本,别名/单位以 OCR 文本为证据过门禁);② 抽取分段化:按「上方最近表头带」归属数据格,+单名称中心时整表全池配对;③ 尿常规定性值 value=None 留痕,机器/镜检双段 canonical 拆分;④ 超声 category.mode=narrative(别名+桥接符+数值行内配对),词典门禁补 narrative 子串见证;⑤ 粗验收已执行:五类 e2e ingest/list/trend 演示,24 张全量回归绿,血常规 golden 零漂移 |
-| 1.7 | 2026-10-10 | golden txts 容差由 ≤1 放宽至 ≤2:CI(x86_64)实测 us_03 单行漂移 2(增字 + 全/半角标点),arm64↔x86_64 实测上限为 2;失败信息改为输出超容差行明细(§8-5 同步) |
-| 1.8 | 2026-10-10 | review 修复①(分类解耦 A1):`_select_category` 由「标题命中者硬覆盖」改为**内容优先**——命中项数达标者胜出、标题只在达标者并列时(限标题区)裁决、无达标者才回退标题命中(含全页,保住 glu_03 这类「标题词实为项目名」样本);24 张 golden 零漂移,新增 3 条分发单测 |
+| 1.4 | 2026-10-09 | 验收轮:对外身份统一为图像内容 sha256(images 主键=sha256);CLI 类别展示英文缩写;low_confidence 收敛至「仅 score<0.8」 |
+| 1.5 | 2026-10-10 | **P3 落地**(详见 §10):六类词典 + **内容优先**分发;`hdd trend`;OCR 预处理开关(默认关闭) |
+| 1.6 | 2026-10-10 | **P3 表结构识别**(ADR-0004):TSR 前端(wired+lineless 并行择优,退化回退启发式);OCR 结果契约增可选 `table_structure`(`/reparse` 免图);识别服务 Python 3.13→3.12;镜像构建期预下载模型;golden 重基(lft_05 17→19,其余不变) |

@@ -28,6 +28,11 @@ class Flag(_Vocabulary):
     LOW = "low"
     UNKNOWN = "unknown"
 
+class TableModel(_Vocabulary):
+    """表结构识别选用的子模型(ADR-0004);取值与 schemas 枚举一致。"""
+    WIRED = "wired"
+    LINELESS = "lineless"
+
 # Vertex coordinate [x, y]; a text line box is a quadrilateral of four points.
 type Point = tuple[float, float]
 
@@ -45,8 +50,26 @@ class ModelInfo(BaseModel):
     rec: str
 
 
+class TableStructure(BaseModel):
+    """表结构识别结果(ADR-0004):TSR 模型还原的单元格网格(HTML 表)。
+
+    随 OCR 结果一同落库,`/reparse` 复用它免于再次读取原图(NF-05);
+    `model` 记录胜出的子模型(wired/lineless 择优,见 table_structure.run_table_structure)。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    html: str = Field(min_length=1)
+    model: TableModel
+    elapse: float = Field(ge=0)
+
+
 class OCRResult(BaseModel):
-    """对一张图像执行一次 OCR 得到的原始识别输出(实施计划 4.1)。"""
+    """对一张图像执行一次 OCR 得到的原始识别输出(实施计划 4.1)。
+
+    P3+(ADR-0004):可选携带表结构识别结果 `table_structure`(仅表格类报告由 /report 填充,
+    纯 /ocr 与调试 CLI 保持只做 OCR)。
+    """
 
     model_config = ConfigDict(extra="forbid")
 
@@ -57,6 +80,7 @@ class OCRResult(BaseModel):
     elapse_list: list[float]
     engine: Literal["onnxruntime"]
     model_info: ModelInfo
+    table_structure: TableStructure | None = None
 
     @model_validator(mode="after")
     def _equal_lengths(self) -> "OCRResult":

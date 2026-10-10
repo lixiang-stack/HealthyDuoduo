@@ -15,15 +15,24 @@ type ModelInfo struct {
 	Rec string `json:"rec"`
 }
 
+// TableStructure 是表结构识别结果(ADR-0004):TSR 模型还原的单元格网格(HTML 表)。
+// 随 OCR 结果一同落库,/reparse 复用它免于再次读取原图;可选字段。
+type TableStructure struct {
+	HTML   string  `json:"html"`
+	Model  string  `json:"model"` // wired | lineless
+	Elapse float64 `json:"elapse"`
+}
+
 // OCRResult 对应 schemas/ocr_result.schema.json(实施计划 4.1)。
 type OCRResult struct {
-	Txts       []string  `json:"txts"`
-	Boxes      []Box     `json:"boxes"`
-	Scores     []float64 `json:"scores"`
-	Elapse     float64   `json:"elapse"`
-	ElapseList []float64 `json:"elapse_list"`
-	Engine     string    `json:"engine"`
-	ModelInfo  ModelInfo `json:"model_info"`
+	Txts           []string        `json:"txts"`
+	Boxes          []Box           `json:"boxes"`
+	Scores         []float64       `json:"scores"`
+	Elapse         float64         `json:"elapse"`
+	ElapseList     []float64       `json:"elapse_list"`
+	Engine         string          `json:"engine"`
+	ModelInfo      ModelInfo       `json:"model_info"`
+	TableStructure *TableStructure `json:"table_structure,omitempty"`
 }
 
 // ReportItem 是报告中的单个指标项。
