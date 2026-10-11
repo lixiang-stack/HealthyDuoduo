@@ -1,0 +1,72 @@
+[
+    {
+        "no": "1",
+        "name": "总蛋白",
+        "value": "74.4",
+        "ref_range": "60.0-80.0",
+        "unit": "g/L"
+    },
+    {
+        "no": "2",
+        "name": "白蛋白",
+        "value": "46.7",
+        "ref_range": "35.0-50.0",
+        "unit": "g/L"
+    },
+    {
+        "no": "3",
+        "name": "白球比例",
+        "value": "1.69",
+        "ref_range": "1.35-2.50",
+        "unit": ""
+    },
+    {
+        "no": "4",
+        "name": "谷丙转氨酶",
+        "value": "11",
+        "ref_range": "0-50",
+        "unit": "U/L"
+    },
+    {
+        "no": "5",
+        "name": "谷草转氨酶",
+        "value": "11",
+        "ref_range": "0-40",
+        "unit": "U/L"
+    },
+    {
+        "no": "6",
+        "name": "总胆红素",
+        "value": "12.6",
+        "ref_range": "3.4-20.5",
+        "unit": "μmol/L"
+    },
+    {
+        "no": "7",
+        "name": "直接胆红素",
+        "value": "3.2",
+        "ref_range": "0-6.8",
+        "unit": "μmol/L"
+    },
+    {
+        "no": "8",
+        "name": "间接胆红素",
+        "value": "9.4",
+        "ref_range": "3.4-17.1",
+        "unit": "μmol/L"
+    },
+    {
+        "no": "9",
+        "name": "碱性磷酸酶",
+        "value": "65",
+        "ref_range": "15-200",
+        "unit": "U/L"
+    },
+    {
+        "no": "10",
+        "name": "谷氨酰转肽酶",
+        "value": "12",
+        "ref_range": "0-30",
+        "unit": "U/L"
+    }
+]

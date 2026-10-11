@@ -1,0 +1,52 @@
+[
+    {
+        "no": "1",
+        "abbr": "GLu",
+        "name": "HR 葡萄糖",
+        "value": "7.99",
+        "flag": "high",
+        "unit": "mmol/L",
+        "ref_range": "3.9-6.1",
+        "method": "己糖激酶法"
+    },
+    {
+        "no": "1",
+        "abbr": "GLU2h",
+        "name": "餐后2h血糖",
+        "value": "11.84",
+        "flag": "high",
+        "unit": "mmol/L",
+        "ref_range": "3.89-7.8",
+        "method": "己糖激酶法"
+    },
+    {
+        "no": "1",
+        "abbr": "HbA1C",
+        "name": "糖化血红蛋白HbA1C",
+        "value": "6.50",
+        "flag": "high",
+        "unit": "%",
+        "ref_range": "4-6",
+        "method": "高效液相色谱法"
+    },
+    {
+        "no": "1",
+        "abbr": "C_P",
+        "name": "C_肽",
+        "value": "3.86",
+        "flag": "normal",
+        "unit": "ng/mL",
+        "ref_range": "1.1-4.4",
+        "method": "化学发光法"
+    },
+    {
+        "no": "2",
+        "abbr": "IRI",
+        "name": "胰岛素",
+        "value": "6.83",
+        "flag": "normal",
+        "unit": "uIU/mL",
+        "ref_range": "2.6-24.9",
+        "method": "化学发光法"
+    }
+]

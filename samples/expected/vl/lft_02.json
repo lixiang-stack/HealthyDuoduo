@@ -1,0 +1,138 @@
+[
+    {
+        "name": "丙氨酸转氨酶",
+        "abbr": "ALT",
+        "value": "835",
+        "flag": "high",
+        "unit": "U/L",
+        "ref_range": "7-40"
+    },
+    {
+        "name": "天冬氨酸转氨酶",
+        "abbr": "AST",
+        "value": "488",
+        "flag": "high",
+        "unit": "U/L",
+        "ref_range": "13-35"
+    },
+    {
+        "name": "总胆红素",
+        "abbr": "TBIL",
+        "value": "17.5",
+        "flag": "normal",
+        "unit": "μmol/L",
+        "ref_range": "≤21.0"
+    },
+    {
+        "name": "直接胆红素",
+        "abbr": "DBIL",
+        "value": "7.9",
+        "flag": "normal",
+        "unit": "μmol/L",
+        "ref_range": "≤8.0"
+    },
+    {
+        "name": "总胆汁酸",
+        "abbr": "TBA",
+        "value": "47",
+        "flag": "high",
+        "unit": "μmol/L",
+        "ref_range": "≤10"
+    },
+    {
+        "name": "碱性磷酸酶",
+        "abbr": "ALP",
+        "value": "150",
+        "flag": "high",
+        "unit": "U/L",
+        "ref_range": "50-135"
+    },
+    {
+        "name": "r-谷氨酰转移酶",
+        "abbr": "GGT",
+        "value": "89",
+        "flag": "high",
+        "unit": "U/L",
+        "ref_range": "7-45"
+    },
+    {
+        "name": "总蛋白",
+        "abbr": "TP",
+        "value": "76",
+        "flag": "normal",
+        "unit": "g/L",
+        "ref_range": "65-85"
+    },
+    {
+        "name": "白蛋白",
+        "abbr": "ALB",
+        "value": "42",
+        "flag": "normal",
+        "unit": "g/L",
+        "ref_range": "40-55"
+    },
+    {
+        "name": "球蛋白",
+        "abbr": "GLO",
+        "value": "34",
+        "flag": "normal",
+        "unit": "g/L",
+        "ref_range": "20-40"
+    },
+    {
+        "name": "白球比例",
+        "abbr": "A/G",
+        "value": "1.24",
+        "flag": "normal",
+        "unit": "",
+        "ref_range": "1.20-2.40"
+    },
+    {
+        "name": "前白蛋白",
+        "abbr": "PA",
+        "value": "82",
+        "flag": "low",
+        "unit": "mg/L",
+        "ref_range": "185-350"
+    },
+    {
+        "name": "尿素",
+        "abbr": "BUN",
+        "value": "4.1",
+        "flag": "normal",
+        "unit": "mmol/L",
+        "ref_range": "2.6-7.5"
+    },
+    {
+        "name": "肌酐",
+        "abbr": "CRE",
+        "value": "51",
+        "flag": "normal",
+        "unit": "μmol/L",
+        "ref_range": "41-73"
+    },
+    {
+        "name": "尿酸",
+        "abbr": "UA",
+        "value": "0.246",
+        "flag": "normal",
+        "unit": "mmol/L",
+        "ref_range": "0.100-0.420"
+    },
+    {
+        "name": "eGFR(EPI公式计算)",
+        "abbr": "eGFR",
+        "value": "107.3",
+        "flag": "normal",
+        "unit": "ml/min",
+        "ref_range": "≥90"
+    },
+    {
+        "name": "血清胱抑素C",
+        "abbr": "CysC",
+        "value": "0.75",
+        "flag": "normal",
+        "unit": "mg/L",
+        "ref_range": "0.59-1.03"
+    }
+]

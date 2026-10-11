@@ -1,0 +1,56 @@
+[
+    {
+        "no": "1",
+        "name": "高敏促甲状腺激素（sTSH）",
+        "value": "0.450",
+        "flag": "low",
+        "ref_range": "0.560～5.910",
+        "unit": "mIU/L",
+        "method": "化学发光法（贝克曼）"
+    },
+    {
+        "no": "2",
+        "name": "游离三碘甲状腺原氨酸（FT3）",
+        "value": "5.54",
+        "flag": "normal",
+        "ref_range": "3.80～6.00",
+        "unit": "pmol/L",
+        "method": "化学发光法（贝克曼）"
+    },
+    {
+        "no": "3",
+        "name": "游离甲状腺素（FT4）",
+        "value": "12.52",
+        "flag": "normal",
+        "ref_range": "7.86～14.41",
+        "unit": "pmol/L",
+        "method": "化学发光法（贝克曼）"
+    },
+    {
+        "no": "4",
+        "name": "甲状腺过氧化物酶抗体（TPOAb）",
+        "value": "0.40",
+        "flag": "normal",
+        "ref_range": "<9.0",
+        "unit": "IU/mL",
+        "method": "化学发光法（贝克曼）"
+    },
+    {
+        "no": "5",
+        "name": "抗甲状腺球蛋白抗体（Tg-Ab）",
+        "value": "<0.9",
+        "flag": "normal",
+        "ref_range": "<4.0",
+        "unit": "IU/mL",
+        "method": "化学发光法（贝克曼）"
+    },
+    {
+        "no": "6",
+        "name": "抗促甲状腺素受体抗体（TRAb）",
+        "value": "0.31",
+        "flag": "normal",
+        "ref_range": "<1.75",
+        "unit": "IU/L",
+        "method": "电化学发光仪器法（罗氏）"
+    }
+]
