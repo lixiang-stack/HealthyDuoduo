@@ -70,8 +70,8 @@ func shortSha(sha string) string {
 	return sha
 }
 
-// parseIngestArgs 位置参数与 flag 可混排(--date/--preprocess 需带值,--force 为布尔)。
-func parseIngestArgs(args []string, date, preprocess *string, force *bool, errOut io.Writer) ([]string, error) {
+// parseIngestArgs 位置参数与 flag 可混排(--date 需带值,--force 为布尔)。
+func parseIngestArgs(args []string, date *string, force *bool, errOut io.Writer) ([]string, error) {
 	var images []string
 	for i := 0; i < len(args); i++ {
 		switch a := args[i]; {
@@ -82,13 +82,6 @@ func parseIngestArgs(args []string, date, preprocess *string, force *bool, errOu
 			}
 			i++
 			*date = args[i]
-		case a == "--preprocess" || a == "-preprocess":
-			if i+1 >= len(args) {
-				fmt.Fprintf(errOut, "ingest: %s needs a value (comma-separated steps, e.g. gray,deskew)\n", a)
-				return nil, errors.New("missing preprocess value")
-			}
-			i++
-			*preprocess = args[i]
 		case a == "--force" || a == "-force":
 			*force = true
 		case len(a) > 1 && a[0] == '-':
@@ -102,9 +95,9 @@ func parseIngestArgs(args []string, date, preprocess *string, force *bool, errOu
 }
 
 func runIngest(out, errOut io.Writer, d *deps, args []string) int {
-	var date, preprocess string
+	var date string
 	var force bool
-	images, err := parseIngestArgs(args, &date, &preprocess, &force, errOut)
+	images, err := parseIngestArgs(args, &date, &force, errOut)
 	if err != nil {
 		return exitUsage
 	}
@@ -118,7 +111,7 @@ func runIngest(out, errOut io.Writer, d *deps, args []string) int {
 	}
 	exit := 0
 	for _, path := range images {
-		oc, err := pipeline.Ingest(context.Background(), d.store, d.rec, d.obj, path, date, preprocess, force)
+		oc, err := pipeline.Ingest(context.Background(), d.store, d.rec, d.obj, path, date, force)
 		if err != nil {
 			fmt.Fprintf(errOut, "ingest %s: %v\n", path, err)
 			exit = exitError

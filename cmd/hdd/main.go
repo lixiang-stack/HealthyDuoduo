@@ -11,7 +11,7 @@ import (
 	"regexp"
 )
 
-const usage = `usage: hdd ingest <image...> [--date YYYY-MM-DD] [--force] [--preprocess <steps>]
+const usage = `usage: hdd ingest <image...> [--date YYYY-MM-DD] [--force]
        hdd reparse <sha256...> [--date YYYY-MM-DD]
        hdd list [--type <report-type>] [--date YYYY|YYYY-MM|YYYY-MM-DD]
        hdd show <sha256>
