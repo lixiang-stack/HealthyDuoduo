@@ -1,0 +1,58 @@
+[
+    {
+        "no": "1",
+        "name": "总三碘甲状腺原氨酸",
+        "abbr": "TT3",
+        "value": "1.04",
+        "ref_range": "0.60-1.81",
+        "unit": "ng/ml"
+    },
+    {
+        "no": "2",
+        "name": "总甲状腺素",
+        "abbr": "TT4",
+        "value": "8.60",
+        "ref_range": "4.50-10.9",
+        "unit": "ug/dl"
+    },
+    {
+        "no": "3",
+        "name": "游离三碘甲状腺原氨酸",
+        "abbr": "PT3",
+        "value": "3.19",
+        "ref_range": "2.3-4.2",
+        "unit": "pg/ml"
+    },
+    {
+        "no": "4",
+        "name": "游离甲状腺素",
+        "abbr": "FT4",
+        "value": "1.22",
+        "ref_range": "0.89-1.80",
+        "unit": "ng/dl"
+    },
+    {
+        "no": "5",
+        "name": "促甲状腺素",
+        "abbr": "TSH",
+        "value": "1.99",
+        "ref_range": "0.55-4.78",
+        "unit": "uIU/ml"
+    },
+    {
+        "no": "6",
+        "name": "抗甲状腺球蛋白抗体",
+        "abbr": "TGAb",
+        "value": "201.8",
+        "ref_range": "<60",
+        "unit": "U/ml"
+    },
+    {
+        "no": "7",
+        "name": "抗甲状腺过氧化物酶抗体Ab",
+        "abbr": "MAb",
+        "value": ">1300.0",
+        "ref_range": "<60",
+        "unit": "U/ml"
+    }
+]

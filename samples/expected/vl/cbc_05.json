@@ -1,0 +1,202 @@
+[
+    {
+        "abbr": "WBC",
+        "name": "白细胞",
+        "value": "18.40",
+        "flag": "low",
+        "ref_range": "4.00 ~ 10.00",
+        "unit": "9/L"
+    },
+    {
+        "abbr": "RBC",
+        "name": "红细胞",
+        "value": "5.17",
+        "flag": "normal",
+        "ref_range": "3.50 ~ 5.50",
+        "unit": "12/L"
+    },
+    {
+        "abbr": "HGB",
+        "name": "血红蛋白",
+        "value": "139.0",
+        "flag": "normal",
+        "ref_range": "110.0 ~ 160.0",
+        "unit": "g/L"
+    },
+    {
+        "abbr": "HCT",
+        "name": "红细胞压积",
+        "value": "42.60",
+        "flag": "normal",
+        "ref_range": "37.00 ~ 51.00",
+        "unit": "%"
+    },
+    {
+        "abbr": "MCV",
+        "name": "红细胞平均体积",
+        "value": "82.4",
+        "flag": "normal",
+        "ref_range": "80.0 ~ 95.0",
+        "unit": "fl"
+    },
+    {
+        "abbr": "MCH",
+        "name": "平均血红蛋白含量",
+        "value": "26.90",
+        "flag": "low",
+        "ref_range": "27.00 ~ 31.00",
+        "unit": "pg"
+    },
+    {
+        "abbr": "MCHC",
+        "name": "平均血红蛋白浓度",
+        "value": "326",
+        "flag": "normal",
+        "ref_range": "330 ~ 360",
+        "unit": "g/L"
+    },
+    {
+        "abbr": "PLT",
+        "name": "血小板",
+        "value": "184",
+        "flag": "normal",
+        "ref_range": "100 ~ 300",
+        "unit": "0"
+    },
+    {
+        "abbr": "LYMP%",
+        "name": "淋巴细胞比率",
+        "value": "75.90",
+        "flag": "high",
+        "ref_range": "20.00 ~ 40.00",
+        "unit": "%"
+    },
+    {
+        "abbr": "NEUT%",
+        "name": "中性细胞比率",
+        "value": "18.10",
+        "flag": "low",
+        "ref_range": "50.00 ~ 70.00",
+        "unit": "%"
+    },
+    {
+        "abbr": "MONO%",
+        "name": "单核细胞比率",
+        "value": "5.60",
+        "flag": "normal",
+        "ref_range": "3.00 ~ 8.00",
+        "unit": "%"
+    },
+    {
+        "abbr": "EO%",
+        "name": "嗜酸性粒细胞比率",
+        "value": "0.30",
+        "flag": "low",
+        "ref_range": "0.50 ~ 5.00",
+        "unit": "%"
+    },
+    {
+        "abbr": "BASO%",
+        "name": "嗜碱性粒细胞比率",
+        "value": "0.10",
+        "flag": "low",
+        "ref_range": "0 ~ 1.00",
+        "unit": "%"
+    },
+    {
+        "abbr": "LYMP#",
+        "name": "淋巴细胞数",
+        "value": "13.96",
+        "flag": "high",
+        "ref_range": "0.80 ~ 4.00",
+        "unit": "0.9/L"
+    },
+    {
+        "abbr": "NEUT+",
+        "name": "中性细胞数",
+        "value": "3.35",
+        "flag": "normal",
+        "ref_range": "2.00 ~ 7.00",
+        "unit": ""
+    },
+    {
+        "abbr": "MONO+",
+        "name": "单核细胞数",
+        "value": "1.03",
+        "flag": "high",
+        "ref_range": "0.12 ~ 0.80",
+        "unit": ""
+    },
+    {
+        "abbr": "EO#",
+        "name": "嗜酸性粒细胞",
+        "value": "0.05",
+        "flag": "normal",
+        "ref_range": "0.02 ~ 0.50",
+        "unit": ""
+    },
+    {
+        "abbr": "BASO+",
+        "name": "嗜碱性粒细胞",
+        "value": "0.010",
+        "flag": "normal",
+        "ref_range": "0.0 ~ 0.100",
+        "unit": ""
+    },
+    {
+        "abbr": "RDW-SD",
+        "name": "红细胞分布宽度",
+        "value": "39.20",
+        "flag": "normal",
+        "ref_range": "37.00 ~ 51.00",
+        "unit": ""
+    },
+    {
+        "abbr": "RDW-CV",
+        "name": "红细胞分布宽度",
+        "value": "13.30",
+        "flag": "normal",
+        "ref_range": "11.00 ~ 16.00",
+        "unit": ""
+    },
+    {
+        "abbr": "PCT",
+        "name": "血小板压积",
+        "value": "0.20",
+        "flag": "normal",
+        "ref_range": "0.11 ~ 0.30",
+        "unit": ""
+    },
+    {
+        "abbr": "PDW",
+        "name": "血小板分布宽度",
+        "value": "10.60",
+        "flag": "normal",
+        "ref_range": "9.00 ~ 13.00",
+        "unit": ""
+    },
+    {
+        "abbr": "MPV",
+        "name": "平均血小板体积",
+        "value": "10.80",
+        "flag": "normal",
+        "ref_range": "7.00 ~ 17.00",
+        "unit": ""
+    },
+    {
+        "abbr": "P-LC1",
+        "name": "大型血小板比率",
+        "value": "29.10",
+        "flag": "normal",
+        "ref_range": "13.00 ~ 43.00",
+        "unit": ""
+    },
+    {
+        "abbr": "CRP",
+        "name": "C反应蛋白",
+        "value": "<8",
+        "flag": "normal",
+        "ref_range": "<8",
+        "unit": ""
+    }
+]

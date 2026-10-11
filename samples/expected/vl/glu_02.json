@@ -1,0 +1,47 @@
+[
+    {
+        "no": "1",
+        "abbr": "GLU0",
+        "name": "空腹葡萄糖",
+        "value": "9.8",
+        "flag": "high",
+        "unit": "mmol/L",
+        "ref_range": "3.9 - 6.1"
+    },
+    {
+        "no": "2",
+        "abbr": "GLU1/2",
+        "name": "餐后半小时葡萄糖",
+        "value": "13.09",
+        "flag": "high",
+        "unit": "mmol/L",
+        "ref_range": "1.9 - 10"
+    },
+    {
+        "no": "3",
+        "abbr": "GLU1",
+        "name": "餐后一小时葡萄糖",
+        "value": "17.73",
+        "flag": "high",
+        "unit": "mmol/L",
+        "ref_range": "3.9 - 10"
+    },
+    {
+        "no": "4",
+        "abbr": "GLU2",
+        "name": "餐后二小时葡萄糖",
+        "value": "19.48",
+        "flag": "high",
+        "unit": "mmol/L",
+        "ref_range": "3.9 - 7.8"
+    },
+    {
+        "no": "5",
+        "abbr": "GLU3",
+        "name": "餐后三小时葡萄糖",
+        "value": "17.04",
+        "flag": "high",
+        "unit": "mmol/L",
+        "ref_range": "3.9 - 6.1"
+    }
+]

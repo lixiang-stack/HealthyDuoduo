@@ -48,7 +48,7 @@ func (f fakeStoreCLI) TrendByName(ctx context.Context, item, reportType string) 
 
 type fakeRecognizerCLI struct{}
 
-func (fakeRecognizerCLI) Report(ctx context.Context, image []byte, filename, date, preprocess string) (*contract.OCRResult, *contract.Report, error) {
+func (fakeRecognizerCLI) Report(ctx context.Context, image []byte, filename, date string) (*contract.OCRResult, *contract.Report, error) {
 	ocr := &contract.OCRResult{Txts: []string{"x"}, Engine: "onnxruntime"}
 	report := &contract.Report{ReportType: "血常规", ReportDate: str("2026-10-01"), Status: "success"}
 	return ocr, report, nil
@@ -118,7 +118,8 @@ func TestRunIngestRejectsBadDate(t *testing.T) {
 	}
 }
 
-func TestRunIngestRejectsMissingPreprocessValue(t *testing.T) {
+// 未知 flag(--preprocess 已移除)→ usage 错误(exit 2)。
+func TestRunIngestRejectsUnknownFlag(t *testing.T) {
 	var out, errOut bytes.Buffer
 	d := &deps{store: fakeStoreCLI{}, rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
 	if code := run(&out, &errOut, d, []string{"ingest", "a.jpeg", "--preprocess"}); code != 2 {

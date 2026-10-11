@@ -1,0 +1,110 @@
+[
+    {
+        "name": "谷丙转氨酶",
+        "abbr": "ALT",
+        "value": "17.50",
+        "flag": "normal",
+        "unit": "U/L",
+        "ref_range": "9-50",
+        "method": "丙氨酸底物法"
+    },
+    {
+        "name": "谷草转氨酶",
+        "abbr": "AST",
+        "value": "23.60",
+        "flag": "normal",
+        "unit": "U/L",
+        "ref_range": "15-40",
+        "method": "天门冬氨酸底物法"
+    },
+    {
+        "name": "谷草-谷丙比值",
+        "abbr": "AST/ALT",
+        "value": "1.35",
+        "flag": "normal",
+        "unit": "",
+        "ref_range": "",
+        "method": "计算法"
+    },
+    {
+        "name": "总胆红素",
+        "abbr": "T-B1",
+        "value": "15.50",
+        "flag": "normal",
+        "unit": "μmol/L",
+        "ref_range": "0-26",
+        "method": "抗酸盐氧化法"
+    },
+    {
+        "name": "直接胆红素",
+        "abbr": "D-B1",
+        "value": "5.50",
+        "flag": "normal",
+        "unit": "μmol/L",
+        "ref_range": "0-8",
+        "method": "抗酸盐氧化法"
+    },
+    {
+        "name": "同接胆红素",
+        "abbr": "L-B1",
+        "value": "10.00",
+        "flag": "normal",
+        "unit": "μmol/L",
+        "ref_range": "",
+        "method": "计算法"
+    },
+    {
+        "name": "总蛋白",
+        "abbr": "TP",
+        "value": "83.00",
+        "flag": "normal",
+        "unit": "g/L",
+        "ref_range": "65-85",
+        "method": "双缩脲终法"
+    },
+    {
+        "name": "白蛋白",
+        "abbr": "ALB",
+        "value": "46.30",
+        "flag": "normal",
+        "unit": "g/L",
+        "ref_range": "40-55",
+        "method": "溴甲酚绿法"
+    },
+    {
+        "name": "绿蛋白",
+        "abbr": "GDS",
+        "value": "26.70",
+        "flag": "normal",
+        "unit": "g/L",
+        "ref_range": "20-40",
+        "method": "计算法"
+    },
+    {
+        "name": "白蛋白/球蛋白",
+        "abbr": "A/G",
+        "value": "1.20",
+        "flag": "normal",
+        "unit": "",
+        "ref_range": "1.2-2.4",
+        "method": "计算法"
+    },
+    {
+        "name": "总胆汁酸",
+        "abbr": "TBA",
+        "value": "2.78",
+        "flag": "normal",
+        "unit": "μmol/L",
+        "ref_range": "0-10",
+        "method": "酯循环法"
+    },
+    {
+        "name": "γ-谷氨酰转肽酶",
+        "abbr": "γ-GT",
+        "value": "33.00",
+        "flag": "normal",
+        "unit": "U/L",
+        "ref_range": "10-60",
+        "method": "速单法"
+    }
+]

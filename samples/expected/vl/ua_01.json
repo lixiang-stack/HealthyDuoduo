@@ -1,0 +1,165 @@
+[
+    {
+        "name": "尿潜血",
+        "value": "3+",
+        "unit": "",
+        "ref_range": "阴性"
+    },
+    {
+        "name": "尿粒细胞酯酶",
+        "value": "-",
+        "unit": "",
+        "ref_range": "阴性"
+    },
+    {
+        "name": "蛋白质",
+        "value": "+-",
+        "unit": "",
+        "ref_range": "阴性"
+    },
+    {
+        "name": "葡萄糖",
+        "value": "-",
+        "unit": "",
+        "ref_range": "阴性"
+    },
+    {
+        "name": "尿胆原",
+        "value": "norm.",
+        "unit": "",
+        "ref_range": "阴性"
+    },
+    {
+        "name": "尿胆红素",
+        "value": "-",
+        "unit": "",
+        "ref_range": "阴性"
+    },
+    {
+        "name": "抗坏血酸",
+        "value": "3+",
+        "unit": "",
+        "ref_range": "阴性"
+    },
+    {
+        "name": "尿比重",
+        "value": "1.020",
+        "unit": "",
+        "ref_range": "1.003-1.030"
+    },
+    {
+        "name": "酮体",
+        "value": "-",
+        "unit": "",
+        "ref_range": "阴性"
+    },
+    {
+        "name": "亚硝酸盐",
+        "value": "-",
+        "unit": "",
+        "ref_range": "阴性"
+    },
+    {
+        "name": "尿酸碱度",
+        "value": "6.0",
+        "unit": "",
+        "ref_range": "4.5-8.0"
+    },
+    {
+        "name": "颜色",
+        "value": "淡黄",
+        "unit": "",
+        "ref_range": ""
+    },
+    {
+        "name": "浊度",
+        "value": "清澈",
+        "unit": "",
+        "ref_range": ""
+    },
+    {
+        "name": "红细胞",
+        "value": "459",
+        "flag": "high",
+        "unit": "个/uL",
+        "ref_range": "0-7"
+    },
+    {
+        "name": "异性红细胞率%",
+        "value": "31%",
+        "unit": "%",
+        "ref_range": ""
+    },
+    {
+        "name": "白细胞",
+        "value": "10",
+        "unit": "个/uL",
+        "ref_range": "0-12"
+    },
+    {
+        "name": "白细胞团",
+        "value": "0",
+        "unit": "个/uL",
+        "ref_range": "0-1"
+    },
+    {
+        "name": "小圆上皮细胞",
+        "value": "0",
+        "unit": "个/uL",
+        "ref_range": "0-2"
+    },
+    {
+        "name": "结晶",
+        "value": "0",
+        "unit": "个/uL",
+        "ref_range": "0-3"
+    },
+    {
+        "name": "酵母样菌",
+        "value": "0",
+        "unit": "个/uL",
+        "ref_range": "0-3"
+    },
+    {
+        "name": "上皮细胞",
+        "value": "0",
+        "unit": "个/uL",
+        "ref_range": "0-28"
+    },
+    {
+        "name": "透明管型",
+        "value": "0",
+        "unit": "/LP",
+        "ref_range": "0-1"
+    },
+    {
+        "name": "非透明管型",
+        "value": "0",
+        "unit": "个/uL",
+        "ref_range": "0"
+    },
+    {
+        "name": "滴虫",
+        "value": "未见",
+        "unit": "/HP",
+        "ref_range": "未见"
+    },
+    {
+        "name": "粘液丝",
+        "value": "未见",
+        "unit": "/LP",
+        "ref_range": "未见"
+    },
+    {
+        "name": "尿白细胞镜检",
+        "value": "1-2",
+        "unit": "/HP",
+        "ref_range": "<5"
+    },
+    {
+        "name": "尿红细胞镜检",
+        "value": "70-80",
+        "unit": "/HP",
+        "ref_range": "0-3"
+    }
+]

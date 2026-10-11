@@ -1,0 +1,106 @@
+[
+    {
+        "name": "天冬氨酸氨基转移",
+        "abbr": "",
+        "value": "24",
+        "flag": "normal",
+        "ref_range": "1～49",
+        "unit": "U/L"
+    },
+    {
+        "name": "丙氨酸氨基转移酶",
+        "abbr": "",
+        "value": "28",
+        "flag": "normal",
+        "ref_range": "1～49",
+        "unit": "U/L"
+    },
+    {
+        "name": "AST/ALT",
+        "abbr": "AST/ALT",
+        "value": "0.86",
+        "flag": "normal",
+        "ref_range": "",
+        "unit": ""
+    },
+    {
+        "name": "总蛋白",
+        "abbr": "TP",
+        "value": "81.40",
+        "flag": "normal",
+        "ref_range": "60.0～82.0",
+        "unit": "g/L"
+    },
+    {
+        "name": "白蛋白",
+        "abbr": "ALB",
+        "value": "44.8",
+        "flag": "normal",
+        "ref_range": "32.0～55.0",
+        "unit": "g/L"
+    },
+    {
+        "name": "球蛋白",
+        "abbr": "GLB",
+        "value": "36.6",
+        "flag": "normal",
+        "ref_range": "20.0～38.0",
+        "unit": "g/L"
+    },
+    {
+        "name": "A/G",
+        "abbr": "A/G",
+        "value": "1.22",
+        "flag": "normal",
+        "ref_range": "1.1～2.5",
+        "unit": ""
+    },
+    {
+        "name": "总胆红素",
+        "abbr": "TBIL",
+        "value": "41.00",
+        "flag": "high",
+        "ref_range": "9.10～30.10",
+        "unit": "umol/L"
+    },
+    {
+        "name": "直接胆红素",
+        "abbr": "DBIL",
+        "value": "10.20",
+        "flag": "high",
+        "ref_range": "0.00～6.80",
+        "unit": "umol/L"
+    },
+    {
+        "name": "同接胆红素",
+        "abbr": "IBIL",
+        "value": "30.80",
+        "flag": "high",
+        "ref_range": "0.00～19.00",
+        "unit": "umol/L"
+    },
+    {
+        "name": "碱性磷酸酶",
+        "abbr": "ALP",
+        "value": "85.20",
+        "flag": "normal",
+        "ref_range": "20～125",
+        "unit": "U/L"
+    },
+    {
+        "name": "谷氨酰转肽酶",
+        "abbr": "",
+        "value": "22",
+        "flag": "normal",
+        "ref_range": "3～69",
+        "unit": "U/L"
+    },
+    {
+        "name": "葡萄糖",
+        "abbr": "GLU",
+        "value": "4.08",
+        "flag": "normal",
+        "ref_range": "3.90～6.10",
+        "unit": "mmol/L"
+    }
+]

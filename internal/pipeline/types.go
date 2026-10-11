@@ -15,8 +15,8 @@ import (
 
 // Recognizer 识别服务边界(POST /report、/reparse,实施计划 4.3)。
 type Recognizer interface {
-	// Report 上传图像(+可选 date 补录、可选 preprocess 预处理开关)→ {ocr_result, report}。
-	Report(ctx context.Context, image []byte, filename, date, preprocess string) (*contract.OCRResult, *contract.Report, error)
+	// Report 上传图像(+可选 date 补录)→ {ocr_result, report}。
+	Report(ctx context.Context, image []byte, filename, date string) (*contract.OCRResult, *contract.Report, error)
 	// Reparse 已存 OCR 结果(+可选 date 补录)→ report(规则迭代主路径)。
 	Reparse(ctx context.Context, ocr *contract.OCRResult, date string) (*contract.Report, error)
 }

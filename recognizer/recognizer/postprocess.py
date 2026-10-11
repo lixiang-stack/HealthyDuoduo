@@ -295,25 +295,45 @@ def _flag(value: float | None, ref: str | None) -> Flag:
     return Flag.UNKNOWN
 
 
+def _name_forms(text: str) -> list[str]:
+    """名称的候选规范化形态:原样 / 去序号 / 去星号 / 去序号+星号(两种顺序)。
+
+    单据印形里序号与星号可任意组合(如 `1 *丙氨酸氨基转移酶` 需去序号+星号,
+    而 `3*Y谷氨酰转肽酶` 的别名本身含 `*`,只该去序号),故全部形态都试。
+    """
+    t = _ARROW_RE.sub("", text.strip()).strip()
+    cands = (
+        t,
+        _SERIAL_RE.sub("", t).strip(),
+        _STAR_RE.sub("", t).strip(),
+        _STAR_RE.sub("", _SERIAL_RE.sub("", t).strip()).strip(),
+        _SERIAL_RE.sub("", _STAR_RE.sub("", t).strip()).strip(),
+    )
+    forms: list[str] = []
+    for c in cands:
+        if c and c not in forms:
+            forms.append(c)
+    return forms
+
+
 def _match_name(text: str, d: LabDict) -> tuple[DictItem | None, float | None]:
-    """词典名匹配:支持序号/星号前缀剥离与「名称熔断数值」尾缀。
+    """词典名匹配:支持序号/星号前缀剥离(多形态)与「名称熔断数值」尾缀。
 
     返回 (词典项, 熔断出的数值);匹配不上 → (None, None)。
     精确匹配优先(如 嗜酸性粒细胞 vs 嗜酸性粒细胞比率 的并列);熔断时最长别名优先。
     """
-    t = text.strip()
-    t = _ARROW_RE.sub("", t).strip()
-    t = _STAR_RE.sub("", t).strip()
-    t = _SERIAL_RE.sub("", t).strip()
-    it = d.alias_map.get(t)
-    if it is not None:
-        return it, None
-    for alias in sorted(d.alias_map, key=len, reverse=True):
-        if t.startswith(alias):
-            rest = t[len(alias) :]
-            m = _NUMBER_RE.fullmatch(rest.strip())
-            if m:
-                return d.alias_map[alias], float(m.group(0))
+    forms = _name_forms(text)
+    for form in forms:
+        it = d.alias_map.get(form)
+        if it is not None:
+            return it, None
+    for form in forms:
+        for alias in sorted(d.alias_map, key=len, reverse=True):
+            if form.startswith(alias):
+                rest = form[len(alias) :]
+                m = _NUMBER_RE.fullmatch(rest.strip())
+                if m:
+                    return d.alias_map[alias], float(m.group(0))
     return None, None
 
 
@@ -448,16 +468,35 @@ def _extract_items(
             for row in rows:
                 if row.fused_value is not None:
                     row.value = row.fused_value  # 名称熔断数值优先于外围碎片
-            # 4. 结构化碎片按 y 贪心配对(|dy| 最小先占,上限 0.6×行距;空片不参与,
-            # 防止跨行/落款碎片污染)
+            # 4. 碎片配对:先「结果」列做**互最近直配**——名称格常印在数据行上方,若结果格
+            #    与某行互为最近且偏移 > 0.25×行距,直接落该行并用其 y 作为该行数据行 y
+            #    (避免最近 y 把上一行的参考配到下一行,如 lft_05 顶部);其余碎片按 |dy|
+            #    贪心配对(上限 0.6×行距)。
             if len(rows) >= 2:
                 pitches = sorted(b - a for a, b in zip([r.cy for r in rows], [r.cy for r in rows[1:]]))
-                cap = max(_PIECE_CAP_MIN_PX, _PIECE_CAP_FACTOR * pitches[len(pitches) // 2])
+                pitch = pitches[len(pitches) // 2]
+                cap = max(_PIECE_CAP_MIN_PX, _PIECE_CAP_FACTOR * pitch)
             else:
+                pitch = _PIECE_CAP_DEFAULT_PX
                 cap = _PIECE_CAP_DEFAULT_PX
+            used: set[int] = set()
+            value_cells = [c for c in assigned.get(("value", k), []) if any(_decompose(c.text, d))]
+            if value_cells and rows:
+                row_of = {id(c): min(rows, key=lambda r: abs(c.cy - r.cy)) for c in value_cells}
+                cell_of = {id(r): min(value_cells, key=lambda c: abs(c.cy - r.cy)) for r in rows}
+                for c in value_cells:
+                    row = row_of[id(c)]
+                    if cell_of.get(id(row)) is c and (c.cy - row.cy) > 0.25 * pitch:
+                        v, _, _ = _decompose(c.text, d)
+                        if v is not None and row.value is None:
+                            row.absorb(c, v, None, None)
+                            row.cy = c.cy
+                            used.add(id(c))
             pieces: list[tuple[_Cell, _RowPiece, float]] = []
             for role in ("value", "unit", "ref"):
                 for c in assigned.get((role, k), []):
+                    if id(c) in used:
+                        continue
                     v, r, u = _decompose(c.text, d)
                     if v is None and r is None and u is None:
                         continue
@@ -466,7 +505,6 @@ def _extract_items(
                         if dy <= cap:
                             pieces.append((c, row, dy))
             pieces.sort(key=lambda t: (t[2], t[0].cx))
-            used: set[int] = set()
             for c, row, _ in pieces:
                 if c in row.raw_cells or id(c) in used:
                     continue

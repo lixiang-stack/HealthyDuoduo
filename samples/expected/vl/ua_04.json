@@ -1,0 +1,218 @@
+[
+    {
+        "no": "1",
+        "name": "尿葡萄糖",
+        "abbr": "GLU",
+        "value": "阴性",
+        "judge": "",
+        "ref_range": "阴性",
+        "unit": ""
+    },
+    {
+        "no": "2",
+        "name": "尿胆红素",
+        "abbr": "BIL",
+        "value": "阴性",
+        "judge": "",
+        "ref_range": "阴性",
+        "unit": ""
+    },
+    {
+        "no": "3",
+        "name": "尿潜血",
+        "abbr": "BLD",
+        "value": "+",
+        "judge": "-",
+        "ref_range": "阴性",
+        "unit": ""
+    },
+    {
+        "no": "4",
+        "name": "尿蛋白",
+        "abbr": "PRO",
+        "value": "阴性",
+        "judge": "",
+        "ref_range": "阴性",
+        "unit": ""
+    },
+    {
+        "no": "5",
+        "name": "尿酮体",
+        "abbr": "KET",
+        "value": "阴性",
+        "judge": "",
+        "ref_range": "阴性",
+        "unit": ""
+    },
+    {
+        "no": "6",
+        "name": "尿亚硝酸盐",
+        "abbr": "NIT",
+        "value": "阴性",
+        "judge": "",
+        "ref_range": "阴性",
+        "unit": ""
+    },
+    {
+        "no": "7",
+        "name": "比重",
+        "abbr": "SG",
+        "value": "1.0200",
+        "judge": "1.010 - 1.025",
+        "ref_range": "",
+        "unit": ""
+    },
+    {
+        "no": "8",
+        "name": "酸碱度",
+        "abbr": "PH",
+        "value": "6.50",
+        "judge": "4.6 - 8.0",
+        "ref_range": "",
+        "unit": ""
+    },
+    {
+        "no": "9",
+        "name": "尿胆原",
+        "abbr": "UBG",
+        "value": "3.4",
+        "judge": "3.2 - 18",
+        "ref_range": "",
+        "unit": "umol/l"
+    },
+    {
+        "no": "10",
+        "name": "白细胞酶活性",
+        "abbr": "LEU",
+        "value": "1+",
+        "judge": "阴性",
+        "ref_range": "",
+        "unit": ""
+    },
+    {
+        "no": "11",
+        "name": "维C",
+        "abbr": "Vc",
+        "value": "0.0",
+        "judge": "0.0",
+        "ref_range": "",
+        "unit": ""
+    },
+    {
+        "no": "12",
+        "name": "红细胞计数",
+        "abbr": "RBC",
+        "value": "38.90",
+        "judge": "↑ 0.00 - 25",
+        "ref_range": "",
+        "unit": "/ul"
+    },
+    {
+        "no": "13",
+        "name": "红细胞",
+        "abbr": "×RBC",
+        "value": "7.0",
+        "judge": "↑",
+        "ref_range": "0.0 - 5.0",
+        "unit": ""
+    },
+    {
+        "no": "14",
+        "name": "白细胞计数",
+        "abbr": "WBC",
+        "value": "20.10",
+        "judge": "",
+        "ref_range": "0.00 - 25",
+        "unit": ""
+    },
+    {
+        "no": "15",
+        "name": "白细胞",
+        "abbr": "×WBC",
+        "value": "3.6",
+        "judge": "",
+        "ref_range": "0.0 - 5.0",
+        "unit": ""
+    },
+    {
+        "no": "16",
+        "name": "上皮细胞计数",
+        "abbr": "EC",
+        "value": "62.70",
+        "judge": "↑",
+        "ref_range": "0.00 - 25.0",
+        "unit": ""
+    },
+    {
+        "no": "17",
+        "name": "上皮细胞",
+        "abbr": "×EC",
+        "value": "11.30",
+        "judge": "↑",
+        "ref_range": "0 - 5",
+        "unit": ""
+    },
+    {
+        "no": "18",
+        "name": "管型计数",
+        "abbr": "CAST",
+        "value": "0.24",
+        "judge": "",
+        "ref_range": "0.00 - 5.0",
+        "unit": ""
+    },
+    {
+        "no": "19",
+        "name": "管型",
+        "abbr": "×CAST",
+        "value": "0.7",
+        "judge": "",
+        "ref_range": "0.0 - 15",
+        "unit": ""
+    },
+    {
+        "no": "20",
+        "name": "细菌计数",
+        "abbr": "BACT",
+        "value": "195",
+        "judge": "",
+        "ref_range": "0 - 2570",
+        "unit": ""
+    },
+    {
+        "no": "21",
+        "name": "细菌",
+        "abbr": "×BACT",
+        "value": "35.1",
+        "judge": "",
+        "ref_range": "0.0 - 504",
+        "unit": ""
+    },
+    {
+        "no": "22",
+        "name": "小圆上皮细胞",
+        "abbr": "SRC",
+        "value": "4.2",
+        "judge": "↑",
+        "ref_range": "0.0 - 2.0",
+        "unit": ""
+    },
+    {
+        "no": "23",
+        "name": "酵母菌",
+        "abbr": "YLC",
+        "value": "0.0",
+        "judge": "",
+        "ref_range": "0.0 - 25.0",
+        "unit": ""
+    },
+    {
+        "no": "24",
+        "name": "结晶检查",
+        "abbr": "XTAL",
+        "value": "0.9",
+        "judge": "",
+        "ref_range": "0.0 - 50",
+        "unit": ""
+    }
+]

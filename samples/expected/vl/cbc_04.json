@@ -1,0 +1,194 @@
+[
+    {
+        "abbr": "REC",
+        "name": "红细胞",
+        "value": "4.53",
+        "flag": "normal",
+        "ref_range": "4.3--5.8",
+        "unit": "10^12/L"
+    },
+    {
+        "abbr": "HGB",
+        "name": "血红蛋白",
+        "value": "118",
+        "flag": "normal",
+        "ref_range": "130--175",
+        "unit": "g/L"
+    },
+    {
+        "abbr": "HCT",
+        "name": "红细胞压积",
+        "value": "36.1",
+        "flag": "normal",
+        "ref_range": "40--50",
+        "unit": "%"
+    },
+    {
+        "abbr": "MCV",
+        "name": "红细胞平均体积",
+        "value": "79.7",
+        "flag": "normal",
+        "ref_range": "82--100",
+        "unit": "fL"
+    },
+    {
+        "abbr": "MCH",
+        "name": "平均血红蛋白量",
+        "value": "26.0",
+        "flag": "normal",
+        "ref_range": "27--34",
+        "unit": "pg"
+    },
+    {
+        "abbr": "MCHC",
+        "name": "平均血红蛋白浓度",
+        "value": "327",
+        "flag": "normal",
+        "ref_range": "316--354",
+        "unit": "g/L"
+    },
+    {
+        "abbr": "RDW-SD",
+        "name": "红细胞分布宽度",
+        "value": "40.5",
+        "flag": "normal",
+        "ref_range": "37--50",
+        "unit": "%"
+    },
+    {
+        "abbr": "PLT",
+        "name": "血小板",
+        "value": "126",
+        "flag": "normal",
+        "ref_range": "125--350",
+        "unit": "10^9/L"
+    },
+    {
+        "abbr": "MPV",
+        "name": "平均血小板体积",
+        "value": "10.2",
+        "flag": "normal",
+        "ref_range": "9.4--13.5",
+        "unit": "fL"
+    },
+    {
+        "abbr": "PDW",
+        "name": "血小板分布宽度",
+        "value": "12.5",
+        "flag": "normal",
+        "ref_range": "9--17",
+        "unit": "%"
+    },
+    {
+        "abbr": "PCT",
+        "name": "血小板压积",
+        "value": "0.1",
+        "flag": "normal",
+        "ref_range": "0.1--0.4",
+        "unit": "%"
+    },
+    {
+        "abbr": "WBC",
+        "name": "白细胞",
+        "value": "17.3",
+        "flag": "normal",
+        "ref_range": "3.5--9.5",
+        "unit": "10^9/L"
+    },
+    {
+        "abbr": "NEUT%",
+        "name": "嗜中性细胞比率",
+        "value": "16.3",
+        "flag": "normal",
+        "ref_range": "40--75",
+        "unit": "%"
+    },
+    {
+        "abbr": "LYMPH%",
+        "name": "淋巴细胞比率",
+        "value": "67.1",
+        "flag": "normal",
+        "ref_range": "20--50",
+        "unit": "%"
+    },
+    {
+        "abbr": "MONO%",
+        "name": "单核细胞比率",
+        "value": "15.6",
+        "flag": "normal",
+        "ref_range": "3--10",
+        "unit": "%"
+    },
+    {
+        "abbr": "EO%",
+        "name": "嗜酸性粒细胞比率",
+        "value": "0.2",
+        "flag": "normal",
+        "ref_range": "0.4--8",
+        "unit": "%"
+    },
+    {
+        "abbr": "BASO%",
+        "name": "嗜碱性粒细胞比率",
+        "value": "0.8",
+        "flag": "normal",
+        "ref_range": "0--1",
+        "unit": "%"
+    },
+    {
+        "abbr": "NEUT#",
+        "name": "嗜中性细胞数",
+        "value": "2.82",
+        "flag": "normal",
+        "ref_range": "1.8--6.3",
+        "unit": "10^9/L"
+    },
+    {
+        "abbr": "LYMPH#",
+        "name": "淋巴细胞数",
+        "value": "11.61",
+        "flag": "normal",
+        "ref_range": "1.1--3.2",
+        "unit": "10^9/L"
+    },
+    {
+        "abbr": "MONO#",
+        "name": "单核细胞",
+        "value": "2.70",
+        "flag": "normal",
+        "ref_range": "0.1--0.6",
+        "unit": "10^9/L"
+    },
+    {
+        "abbr": "EO#",
+        "name": "嗜酸性粒细胞",
+        "value": "0.03",
+        "flag": "normal",
+        "ref_range": "0.02--0.52",
+        "unit": "10^9/L"
+    },
+    {
+        "abbr": "BASO#",
+        "name": "嗜碱性粒细胞",
+        "value": "0.14",
+        "flag": "normal",
+        "ref_range": "0--0.06",
+        "unit": "10^9/L"
+    },
+    {
+        "abbr": "CRP",
+        "name": "C反应蛋白",
+        "value": "38.20",
+        "flag": "normal",
+        "ref_range": "<8",
+        "unit": "mg/L"
+    },
+    {
+        "abbr": "SAA",
+        "name": "血清淀粉样蛋白A",
+        "value": "17.05",
+        "flag": "normal",
+        "ref_range": "≤10",
+        "unit": ""
+    }
+]
