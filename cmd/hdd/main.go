@@ -1,5 +1,5 @@
 // hdd 是检查报告管理 MVP 的数据工程 CLI(实施计划决策 #9)。
-// 四命令:ingest(全流程入库)/ reparse(仅重跑后处理)/ list(查询)/ show(单报告)。
+// 五命令:ingest(全流程入库)/ reparse(仅重跑后处理)/ list(查询)/ show(单报告)/ trend(指标时序)。
 // 编排逻辑在 internal/pipeline;HTTP 识别服务、PG、S3 适配器在 config.go 的 openDeps 注入。
 // 用户可读输出(usage/错误信息)统一英文(review #18);report_type 等域值按数据原样保留。
 package main
@@ -14,7 +14,7 @@ import (
 const usage = `usage: hdd ingest <image...> [--date YYYY-MM-DD] [--force]
        hdd reparse <sha256...> [--date YYYY-MM-DD]
        hdd list [--type <report-type>] [--date YYYY|YYYY-MM|YYYY-MM-DD]
-       hdd show <sha256>
+       hdd show <sha256...>
        hdd trend <item-name> [--type <report-type>]`
 
 // CLI 退出码(POSIX 惯例):2=用法/参数错误,1=运行错误;成功为 0(零值,不单独命名)。

@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	"healthyduoduo/internal/recognizer"
@@ -40,14 +41,19 @@ func fromEnv(key, def string) string {
 
 // openDeps 打开 PG(含 goose 内嵌迁移)与 S3;defer 返回的 cleanup 释放连接池。
 func openDeps(c config) (*deps, func(), error) {
-	pool, err := storage.Open(context.Background(), c.databaseURL)
+	ctx := context.Background()
+	pool, err := storage.Open(ctx, c.databaseURL)
 	if err != nil {
 		return nil, nil, err
 	}
-	obj, err := storage.NewS3ObjectStore(c.s3Endpoint, c.s3AccessKey, c.s3SecretKey, c.s3Bucket, false)
+	obj, err := storage.NewS3ObjectStore(c.s3Endpoint, c.s3AccessKey, c.s3SecretKey, c.s3Bucket)
 	if err != nil {
 		pool.Close()
 		return nil, nil, err
+	}
+	if err := obj.EnsureBucket(ctx); err != nil {
+		pool.Close()
+		return nil, nil, fmt.Errorf("ensure bucket %s: %w", c.s3Bucket, err)
 	}
 	d := &deps{
 		store: storage.NewStore(pool),

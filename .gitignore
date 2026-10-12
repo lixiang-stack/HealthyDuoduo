@@ -17,5 +17,8 @@ dist/
 # 手工 go build 的 CLI 产物(名为 hdd 的任何路径)
 hdd
 
+# macOS 元数据
+.DS_Store
+
 # git worktree 工作区（AGENTS.md「Git 与提交」）
 .worktree/

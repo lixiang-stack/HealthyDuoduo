@@ -88,10 +88,6 @@ func (f *fakeStore) ReportByImage(ctx context.Context, imageSha string) (*pipeli
 	return nil, false, nil
 }
 
-func (f *fakeStore) ReportByID(ctx context.Context, id int64) (*pipeline.ReportRow, error) {
-	return nil, fmt.Errorf("repo %d missing", id)
-}
-
 func (f *fakeStore) ListReports(ctx context.Context, reportType, date string) ([]pipeline.ReportRow, error) {
 	return f.listRet, nil
 }
