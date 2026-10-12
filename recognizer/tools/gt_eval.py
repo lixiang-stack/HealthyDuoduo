@@ -22,7 +22,7 @@ from recognizer import paths
 from recognizer import postprocess as pp
 from recognizer.contract import OCRResult
 
-PREFIX = {"cbc": "血常规", "glu": "血糖", "lft": "肝肾功能", "tft": "甲状腺功能", "ua": "尿常规"}
+PREFIX = {"cbc": "临检", "glu": "生化", "lft": "生化", "tft": "激素", "ua": "临检"}
 VL = paths.REPO_ROOT / "samples" / "expected" / "vl"
 
 
@@ -83,24 +83,37 @@ def _match(g: dict, p: dict, d) -> bool:
     gn = g.get("name") or ""
     if gn and (gn in p["name"] or p["name"] in gn):
         return True
-    gv = _num(g.get("value", ""))
-    return gv is not None and p["value"] is not None and abs(gv - p["value"]) < 1e-6
+    gv, pv = _num(g.get("value", "")), _num(p["value"])
+    if gv is not None and pv is not None:
+        return abs(gv - pv) < 1e-6
+    # 非数值 value(检出限比较式/范围型/定性)按印刷原样字符串等值比对(value 已为 string 契约)
+    return (g.get("value") or "").strip() == (p["value"] or "").strip() and (p["value"] or "") != ""
 
 
 def _align(gt: list, preds: list[dict], d) -> list[tuple]:
+    """有序对齐(LCS 动态规划):在保序前提下最大化 gt↔pred 匹配数。
+
+    贪心逐位推进在抽取漏掉靠前项时会整体错位(后续本可匹配的项全被判不匹配),
+    LCS 对齐只承担真实漏抽的代价,不漏判可匹配项。
+    """
+    n, m = len(gt), len(preds)
+    dp = [[0] * (m + 1) for _ in range(n + 1)]
+    for i in range(n - 1, -1, -1):
+        for j in range(m - 1, -1, -1):
+            best = max(dp[i + 1][j], dp[i][j + 1])
+            if _match(gt[i], preds[j], d):
+                best = max(best, 1 + dp[i + 1][j + 1])
+            dp[i][j] = best
+    pairs: list[tuple] = []
     i = j = 0
-    pairs = []
-    while i < len(gt) and j < len(preds):
-        if _match(gt[i], preds[j], d):
+    while i < n and j < m:
+        if _match(gt[i], preds[j], d) and dp[i][j] == 1 + dp[i + 1][j + 1]:
             pairs.append((gt[i], preds[j]))
             i += 1
             j += 1
-        elif j + 1 < len(preds) and _match(gt[i], preds[j + 1], d):
-            j += 1
-        elif i + 1 < len(gt) and _match(gt[i + 1], preds[j], d):
+        elif dp[i + 1][j] >= dp[i][j + 1]:
             i += 1
         else:
-            i += 1
             j += 1
     return pairs
 
@@ -109,11 +122,11 @@ def _score(gt: list, preds: list[dict], d) -> dict:
     pairs = _align(gt, preds, d)
     vok = uok = rok = 0
     for g, p in pairs:
-        gv = _num(g.get("value", ""))
-        if gv is not None:
-            if p["value"] is not None and abs(gv - p["value"]) < 1e-6:
+        gv, pv = _num(g.get("value", "")), _num(p["value"])
+        if gv is not None and pv is not None:
+            if abs(gv - pv) < 1e-6:
                 vok += 1
-        elif p["value"] is None:
+        elif (g.get("value") or "").strip() == (p["value"] or "").strip():
             vok += 1
         if _norm_unit(g.get("unit")) == _norm_unit(p["unit"]):
             uok += 1
@@ -126,10 +139,7 @@ def _ctx(sid: str, dicts: dict):
     ocr = OCRResult.model_validate(json.loads((paths.EXPECTED_OCR / f"{sid}.json").read_text(encoding="utf-8")))
     d = dicts[PREFIX[sid.split("_")[0]]]
     cells = pp._cells(ocr)
-    bands = [
-        b for b in pp._bands(cells)
-        if sum(1 for c in b for _r, kws in pp.ROLE_HEADERS.items() if any(kw in c.text.strip() for kw in kws)) >= pp._HEADER_MIN_ROLES
-    ]
+    bands = pp._header_bands(cells)
     return d, cells, bands
 
 
