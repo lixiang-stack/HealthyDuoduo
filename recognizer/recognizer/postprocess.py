@@ -356,7 +356,7 @@ def _decompose(text: str, d: LabDict) -> tuple[str | None, str | None, str | Non
             m = _CMP_RE.search(rest)
             if m:
                 head, tail = rest[: m.start()].strip(), rest[m.end() :].strip()
-                hv = re.search(rf"({_NUM})$", head)
+                hv = _NUMBER_TAIL_RE.search(head)
                 if hv:
                     value = hv.group(1)
                 ref = m.group(0)
@@ -508,16 +508,24 @@ class _RowPiece:
         self.raw_cells.append(cell)
 
 
+def _date_match(text: str) -> str | None:
+    """日期文本 → YYYY-MM-DD;月/日形态非法(>12/>31)丢弃,不猜。"""
+    m = _DATE_RE.search(text)
+    if m:
+        y, mo, day = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        if 1 <= mo <= 12 and 1 <= day <= 31:
+            return f"{y:04d}-{mo:02d}-{day:02d}"
+    return None
+
+
 def _find_date(cells: list[_Cell], date_hint: str | None) -> str | None:
     """检查单日期:按标签优先级在行文本里搜日期;解析失败 → 用 date_hint 兜底。"""
     for label in _DATE_LABELS:
         for c in cells:
             if label in c.text:
-                m = _DATE_RE.search(c.text)
-                if m:
-                    y, mo, day = int(m.group(1)), int(m.group(2)), int(m.group(3))
-                    if 1 <= mo <= 12 and 1 <= day <= 31:
-                        return f"{y:04d}-{mo:02d}-{day:02d}"
+                d = _date_match(c.text)
+                if d:
+                    return d
     # 标签与日期分格(webwxgetmsgimg_23):标签行(如「报告时间：」)右侧同带最近
     # 的含日期格兜底。标签与值竖直错位 ≤10px,水平近距扫描 300px。
     for label in _DATE_LABELS:
@@ -531,11 +539,9 @@ def _find_date(cells: list[_Cell], date_hint: str | None) -> str | None:
             ]
             if not cands:
                 continue
-            m = _DATE_RE.search(min(cands, key=lambda d2: d2.cx).text)
-            if m:
-                y, mo, day = int(m.group(1)), int(m.group(2)), int(m.group(3))
-                if 1 <= mo <= 12 and 1 <= day <= 31:
-                    return f"{y:04d}-{mo:02d}-{day:02d}"
+            d = _date_match(min(cands, key=lambda d2: d2.cx).text)
+            if d:
+                return d
     if date_hint:
         return date_hint
     for c in cells:  # 独立日期行(标签与日期被 OCR 拆开时的兜底,如 cbc_05)
@@ -927,7 +933,8 @@ def run_postprocess(ocr: OCRResult, date_hint: str | None = None) -> Report:
             status = Status.PARTIAL
         else:
             status = Status.SUCCESS
-    return Report(        report_type=d.report_type,
+    return Report(
+        report_type=d.report_type,
         report_date=date,
         status=status,
         items=items,
