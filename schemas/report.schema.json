@@ -10,7 +10,7 @@
     "report_type": {
       "type": "string",
       "minLength": 1,
-      "description": "报告类别,如 血常规"
+      "description": "报告大类(临检/生化/免疫/激素/影像/其他专项;临检及后续按需为 logical merge——同大类可能由多个词典文件分发)"
     },
     "report_date": {
       "type": ["string", "null"],
@@ -38,8 +38,8 @@
           "description": "规范名(词典映射后)"
         },
         "value": {
-          "type": ["number", "null"],
-          "description": "数值;非数值或解析失败为 null"
+          "type": ["string", "null"],
+          "description": "印刷原样数值字符串(如 '18.40'、'<2.00'、'70-80');无结果或解析失败为 null"
         },
         "unit": {
           "type": ["string", "null"],
@@ -48,6 +48,10 @@
         "ref_range": {
           "type": ["string", "null"],
           "description": "参考范围,一律从检查单抽取(决策 #8),如 115-150 或 <3.5"
+        },
+        "method": {
+          "type": ["string", "null"],
+          "description": "检测方法/实验方法列原样(如 '化学发光法');无该列或解析失败为 null"
         },
         "flag": {
           "enum": ["normal", "high", "low", "unknown"],

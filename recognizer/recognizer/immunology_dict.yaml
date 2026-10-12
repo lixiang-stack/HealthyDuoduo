@@ -1,0 +1,130 @@
+# 免疫词典(2026-10 分组方案:物理合并 ana_dict.yaml + infectious_dict.yaml + fibrosis_dict.yaml。
+# 临检组为 logical merge、不适用本文件。report_type 输出为 免疫
+# (原 自身抗体/传染病/肝纤维化);min_matched_items 取各源最小值。
+# 条目体逐字来自源文件,条目注释与决策 #8 头注释随之搬运,分节 banner 留来源元信息。
+
+report_type: 免疫
+category:
+  title_keywords: [抗核抗体, 自免肝, 自身抗体, 术前八项, 乙肝, 肝炎, 肝纤维化]
+  min_matched_items: 2
+items:
+
+# ==== ana_dict.yaml(原 自身抗体;min=2;titles=['抗核抗体', '自免肝', '自身抗体']) ====
+  - name: 抗RNP抗体
+    aliases: [抗RNP抗体(RNP)]
+    units: [AU]
+  - name: 抗Sm抗体
+    aliases: [抗Sm抗体(Sm)]
+    units: [AU]
+  - name: 抗SS-A 60抗体
+    aliases: [抗SS—A 60抗体, 抗SS—A 60抗体(SS-A 60)]
+    units: [AU]
+  - name: 抗SS-A 52抗体
+    aliases: [抗SS—A 52抗体, 抗SS—A 52抗体(SS-A 52)]
+    units: [AU]
+  - name: 抗SS-B抗体
+    aliases: [抗SS—B抗体, 抗SS—B抗体(SS-B)]
+    units: [AU]
+  - name: 抗Scl-70抗体
+    aliases: [抗Scl-70抗体(Sc1-70)]
+    units: [AU]
+  - name: 抗PM-Scl抗体
+    aliases: [抗PM—Scl抗体, 抗PM—Scl抗体(PM-Scl)]
+    units: [AU]
+  - name: 抗Jo-1抗体
+    aliases: [抗Jo-1抗体(Jo-1)]
+    units: [AU]
+  - name: 抗CENP B抗体
+    aliases: [抗CENP B抗体(CENP B)]
+    units: [AU]
+  - name: 抗PCNA抗体
+    aliases: [抗PCNA抗体(PCNA)]
+    units: [AU]
+  - name: 抗Nucleosome抗体
+    aliases: [抗Nucleosome抗体(Nucleosome)]
+    units: [AU]
+  - name: 抗Histone抗体
+    aliases: [抗Histone抗体(Histone)]
+    units: [AU]
+  - name: 抗Ribosomal P抗体
+    aliases: [抗Ribosomal P抗体(Ribosomal P)]
+    units: [AU]
+  - name: 抗AMA-M2抗体
+    aliases: [抗AMA—M2抗体, 抗AMA—M2抗体(AMA-M2)]
+    units: [AU]
+  - name: 抗C1q抗体
+    aliases: [抗C1q抗体(C1q)]
+    units: [U/mL]
+  - name: 抗dsDNA抗体
+    aliases: [抗dsDNA抗体(dsDNA)]
+    units: [IU/mL]
+  - name: ANA(IIF)
+    aliases: [ANA(IIF)(ANA(IIF)), "ANA(I IF)(ANA(IIF))"]
+    units: []
+  - name: 抗核抗体主荧光核型
+    aliases: [抗核抗体主荧光核型(ZHX2)]
+    units: []
+  - name: 抗线粒体抗体
+    aliases: [抗线粒体抗体(AMA)]
+    units: []
+  - name: 抗平滑肌抗体
+    aliases: [抗平滑肌抗体(ASMA)]
+    units: []
+  - name: 抗sp100抗体
+    aliases: [抗sp100抗体(sp100)]
+    units: [AU]
+  - name: 抗LC-1抗体
+    aliases: [抗LC—1抗体, 抗LC—1抗体(LC-1)]
+    units: [AU]
+  - name: 抗LKM-1抗体
+    aliases: [抗LKM—1抗体, 抗LKM—1抗体(LKM-1)]
+    units: [AU]
+  - name: 抗SLA/LP抗体
+    aliases: [抗SLA/LP抗体(SLA/LP)]
+    units: [AU]
+  - name: 抗AMA-M2-3E抗体
+    aliases: [抗AMA—M2—3E抗体, 抗AMA—M2—3E抗体(AMA-M2-3E)]
+    units: [U/mL]
+  - name: 抗gp210抗体
+    aliases: [抗gp210抗体(gp210)]
+    units: [AU]
+
+# ==== infectious_dict.yaml(原 传染病;min=2;titles=['术前八项', '乙肝', '肝炎']) ====
+  - name: 乙肝表面抗原
+    aliases: [乙肝病毒表面抗原定量(HBsAg), 乙型肝炎表面抗原（HBsAg)]
+    units: [IU/mL]
+  - name: 乙肝表面抗体
+    aliases: [乙肝表面抗体定量(HBsAb), 乙型肝炎表面抗体（HBsAb）]
+    units: [mIU/mL]
+  - name: 乙肝e抗原
+    aliases: [乙肝e抗原定量(HBeAg), 乙型肝炎e抗原]
+    units: [s/co, S/CO]
+  - name: 乙肝e抗体
+    aliases: [乙肝e抗体定量(HBeAb), 乙型肝炎e抗体]
+    units: [s/co, S/CO]
+  - name: 乙肝核心抗体
+    aliases: [乙肝核心抗体定量(HBcAb), 乙型肝炎核心抗体（HBcAb)]
+    units: [s/co, S/CO]
+  - name: 丙肝抗体
+    aliases: [丙肝病毒抗体(HCV-Ab)]
+    units: [S/CO]
+  - name: 艾滋病抗体抗原
+    aliases: [人免疫缺陷病毒抗体/抗原(HIV-Ab/Ag)]
+    units: [S/CO]
+  - name: 梅毒螺旋体抗体
+    aliases: [梅毒螺旋体抗体(TP-Ab)]
+    units: [S/CO]
+
+# ==== fibrosis_dict.yaml(原 肝纤维化;min=2;titles=['肝纤维化']) ====
+  - name: 透明质酸
+    aliases: [透明质酸(HA)]
+    units: ["μg/L"]
+  - name: 层粘连蛋白
+    aliases: [层粘连蛋白(LN)]
+    units: ["μg/L"]
+  - name: 三型前胶原N端肽
+    aliases: [三型前胶原N端肽(PIIINP)]
+    units: ["μg/L"]
+  - name: 四型前胶原
+    aliases: [四型前胶原(IV-Col)]
+    units: ["μg/L"]

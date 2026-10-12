@@ -1,5 +1,8 @@
 # 忽略用户/工具产物;samples/ 下的 jpg 需要入库,勿加全局 *.jpg
 .venv/
+
+# 未脱敏真实数据(NF-01):仅本机迭代用,永不提交入库
+/data/
 __pycache__/
 *.py[cod]
 dist/

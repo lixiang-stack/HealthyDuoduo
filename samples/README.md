@@ -1,10 +1,20 @@
 # samples · 样本库
 
+- **报告大类分组**(2026-10 词典重组):`report_type` 输出为大类 **临检/生化/免疫/激素/影像/其他专项**
+  (临检=cbc/ua/coag/bloodtype 走 logical merge 未并文件;生化=chemistry(lft/glu/vitanemia)、
+  免疫=immunology(ana/infectious/fibrosis)、激素=endocrine(tft/proghcg)、影像=imaging(us,叙述体)、
+  其他专项=special(产筛,narrative mode;无创DNA/基因检测/微生物按需续录)。
+  样本 id 前缀仍按细类语义命名,与 report_type 解耦;掩码语料无原图、编号接续该细类图像样本。)
+
 - 只收**脱敏**图像(NF-01);未脱敏原图永不入库、永不提交本目录。
 - 目录约定(实施计划 §7-3):
   - `samples/<id>.jpg`
   - `samples/expected/ocr/<id>.json`(P1 golden)
   - `samples/expected/report/<id>.json`(P2 golden)
+  - `samples/expected/ocr/<id>.json` 亦可承载 **脱敏 OCR 语料条目**:本地未脱敏真实报告
+    经 `recognizer/tools/local_golden.py mask` 脱敏(表格主体外的姓名/证件号/机构/地址/
+    时间一律置 `◆`),**不附原图**(未脱敏原图永不提交)。该类条目 `test_ocr_golden`
+    自动跳过,`expected/report/<id>.json` 照常由 `python -m recognizer.golden` 生成并回归。
 - 当前样本(P3 起按报告类别前缀分目录 …… 沿用 `samples/<id>.<ext>` 平铺):
   - cbc_01~05:真实脱敏血常规(P2 入库)。**cbc_02 全单无日期/时间行**,用于
     date-null / partial 场景回归(P2 golden 已验证;P0 时曾记 cbc_03 为无日期版式,与
@@ -15,6 +25,12 @@
     超声叙述体走 postprocess 的 narrative 模式)。**ua_02/ua_03 为异常图像,已移出样本集**
     (其别名证据一并从 `ua_dict.yaml` 清理)。
   - 另有 cbc 无前缀 1.jpeg~5.jpg 维护者留底(未入 golden,勿提交)。
+  - **掩码 OCR 语料**(`mask` 产物,无原图):ana_01~03 / bloodtype_01 / cbc_06~09 / coag_01 /
+    fibrosis_01 / glu_04 / infectious_01~02 / lft_06~09 / proghcg_01 / tft_04~05 / ua_06 /
+    unknown_01 / vitanemia_01~02(共 24 条,细类编号接在该类别图像样本之后;id 只作样本编号,
+    与 report_type 解耦)。
+    unknown_01(产前筛查)已由 其他专项 词典收录,narrative 模式逐格收录项目名、
+    value=None 留痕 raw_text(status=partial 属诚实落痕,漏值待行内配对规则扩展)。
 - **真实数据基准 `expected/vl/<id>.json`**:由视觉模型 + LLM 结构化得到的**逐项真值**
   (`name/abbr/value/unit/ref_range`,印刷原样),**禁改**;抽取/规则迭代以它为对照基准,
   评测脚本 `recognizer/tools/gt_eval.py`(启发式 vs 网格等方案)。

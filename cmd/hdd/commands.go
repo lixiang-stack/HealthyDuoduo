@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
 	"text/tabwriter"
 
 	"healthyduoduo/internal/contract"
@@ -221,15 +222,17 @@ func runTrend(out, errOut io.Writer, d *deps, args []string) int {
 	var prev *pipeline.TrendRow
 	for _, r := range rows {
 		delta := "-"
-		if prev != nil && sameUnit(prev.Unit, r.Unit) && prev.Value != nil && r.Value != nil {
-			diff := *r.Value - *prev.Value
+		pv, ok1 := numOfTrend(prev)
+		cv, ok2 := numVal(r.Value)
+		if prev != nil && sameUnit(prev.Unit, r.Unit) && ok1 && ok2 {
+			diff := cv - pv
 			delta = strconv.FormatFloat(diff, 'f', -1, 64)
 			if diff > 0 {
 				delta = "+" + delta
 			}
 		}
 		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-			orDash(r.ReportDate), abbrType(r.ReportType), orNum(r.Value), orDash(r.Unit), delta, r.Flag, shortSha(r.Sha256))
+			orDash(r.ReportDate), abbrType(r.ReportType), orDash(r.Value), orDash(r.Unit), delta, r.Flag, shortSha(r.Sha256))
 		prev = &r
 	}
 	return twError(tw)
@@ -255,8 +258,8 @@ func runShow(out, errOut io.Writer, d *deps, args []string) int {
 			if it.LowConfidence {
 				mark = " [low_confidence]"
 			}
-			fmt.Fprintf(out, "  %s value=%s unit=%s ref_range=%s flag=%s%s raw_text=%q\n",
-				it.Name, orNum(it.Value), orDash(it.Unit), orDash(it.RefRange), it.Flag, mark, it.RawText)
+			fmt.Fprintf(out, "  %s value=%s unit=%s ref_range=%s method=%s flag=%s%s raw_text=%q\n",
+				it.Name, orDash(it.Value), orDash(it.Unit), orDash(it.RefRange), orDash(it.Method), it.Flag, mark, it.RawText)
 		}
 	}
 	return exit
@@ -284,11 +287,23 @@ func orDash(p *string) string {
 	return *p
 }
 
-func orNum(p *float64) string {
+// numVal 印刷原样 value 字符串 → 数值(delta/trend 计算);解析失败(如 '<2.00')不参与差值。
+func numVal(p *string) (float64, bool) {
 	if p == nil {
-		return "-"
+		return 0, false
 	}
-	return strconv.FormatFloat(*p, 'f', -1, 64)
+	f, err := strconv.ParseFloat(strings.TrimSpace(*p), 64)
+	if err != nil {
+		return 0, false
+	}
+	return f, true
+}
+
+func numOfTrend(r *pipeline.TrendRow) (float64, bool) {
+	if r == nil {
+		return 0, false
+	}
+	return numVal(r.Value)
 }
 
 func summary(r *contract.Report) string {
