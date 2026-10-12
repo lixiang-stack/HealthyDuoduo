@@ -69,7 +69,7 @@ const (
 		 WHERE r.report_type = $1 AND date_trunc('year', r.report_date) = date_trunc('year', $2::date)
 		 ORDER BY r.report_date DESC NULLS LAST, r.image_sha256 ASC`
 
-	sqlItemsByReport = `SELECT name, value, unit, ref_range, flag, low_confidence, raw_text
+	sqlItemsByReport = `SELECT name, value, unit, ref_range, method, flag, low_confidence, raw_text
 		 FROM report_items WHERE report_sha256 = $1 ORDER BY id`
 
 	// trend:同一指标项名(report_items.name = 词典规范名)的跨报告时序点,升序
@@ -100,8 +100,8 @@ const (
 	sqlItemsDeleteByReport = `DELETE FROM report_items WHERE report_sha256 = $1`
 
 	sqlItemInsert = `INSERT INTO report_items
-		 (report_sha256, name, value, unit, ref_range, flag, low_confidence, raw_text)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`
+		 (report_sha256, name, value, unit, ref_range, method, flag, low_confidence, raw_text)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`
 )
 
 // reportColumnsSQL 报告行到业务视图(ReportRow)的标准投影;
@@ -205,7 +205,7 @@ func (s *Store) ItemsByImage(ctx context.Context, reportSha string) ([]contract.
 	var items []contract.ReportItem
 	for rows.Next() {
 		var it contract.ReportItem
-		if err := rows.Scan(&it.Name, &it.Value, &it.Unit, &it.RefRange, &it.Flag, &it.LowConfidence, &it.RawText); err != nil {
+		if err := rows.Scan(&it.Name, &it.Value, &it.Unit, &it.RefRange, &it.Method, &it.Flag, &it.LowConfidence, &it.RawText); err != nil {
 			return nil, err
 		}
 		items = append(items, it)
@@ -292,7 +292,7 @@ func (s *Store) WriteReport(ctx context.Context, reportSha string, ocrID int64, 
 	}
 	for _, it := range report.Items {
 		if _, err := tx.Exec(ctx, sqlItemInsert,
-			reportSha, it.Name, it.Value, it.Unit, it.RefRange, it.Flag, it.LowConfidence, it.RawText); err != nil {
+			reportSha, it.Name, it.Value, it.Unit, it.RefRange, it.Method, it.Flag, it.LowConfidence, it.RawText); err != nil {
 			return fmt.Errorf("write report item %q: %w", it.Name, err)
 		}
 	}

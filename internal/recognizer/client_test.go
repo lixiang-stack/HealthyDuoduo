@@ -16,7 +16,7 @@ const (
 	reportPath  = "/report"
 	reparsePath = "/reparse"
 
-	reportBundleJSON  = `{"ocr_result":{"txts":["血红蛋白","128","g/L"],"boxes":[[[100,200],[180,200],[180,230],[100,230]],[[300,200],[360,200],[360,230],[300,230]],[[400,200],[460,200],[460,230],[400,230]]],"scores":[0.99,0.98,0.97],"elapse":1.23,"elapse_list":[0.4,0.05,0.78],"engine":"onnxruntime","model_info":{"det":"PP-OCRv6_small","cls":"PP-OCRv4_mobile","rec":"PP-OCRv6_small"}},"report":{"report_type":"血常规","report_date":"2026-10-01","status":"success","items":[{"name":"血红蛋白","value":128,"unit":"g/L","ref_range":"115-150","flag":"normal","low_confidence":false,"raw_text":"血红蛋白 128 g/L 115-150"}]}}`
+	reportBundleJSON  = `{"ocr_result":{"txts":["血红蛋白","128","g/L"],"boxes":[[[100,200],[180,200],[180,230],[100,230]],[[300,200],[360,200],[360,230],[300,230]],[[400,200],[460,200],[460,230],[400,230]]],"scores":[0.99,0.98,0.97],"elapse":1.23,"elapse_list":[0.4,0.05,0.78],"engine":"onnxruntime","model_info":{"det":"PP-OCRv6_small","cls":"PP-OCRv4_mobile","rec":"PP-OCRv6_small"}},"report":{"report_type":"血常规","report_date":"2026-10-01","status":"success","items":[{"name":"血红蛋白","value":"128","unit":"g/L","ref_range":"115-150","flag":"normal","low_confidence":false,"raw_text":"血红蛋白 128 g/L 115-150"}]}}`
 	reparseReportJSON = `{"report_type":"血常规","report_date":null,"status":"partial","items":[]}`
 )
 
@@ -84,7 +84,7 @@ func TestReport_ParsesBundle(t *testing.T) {
 	if report.ReportType != "血常规" || report.Status != "success" {
 		t.Errorf("report header = %+v", report)
 	}
-	if report.Items[0].Value == nil || *report.Items[0].Value != 128 {
+	if report.Items[0].Value == nil || *report.Items[0].Value != "128" {
 		t.Errorf("item value = %+v", report.Items[0])
 	}
 }

@@ -61,11 +61,14 @@ func TestUnmarshalReportFixture(t *testing.T) {
 	if item.Name != "血红蛋白" || item.Flag != "normal" || item.LowConfidence {
 		t.Errorf("Item = %+v", item)
 	}
-	if item.Value == nil || *item.Value != 128 {
-		t.Errorf("Item.Value = %v, want 128", item.Value)
+	if item.Value == nil || *item.Value != "128" {
+		t.Errorf("Item.Value = %v, want \"128\"", item.Value)
 	}
 	if item.Unit == nil || *item.Unit != "g/L" || item.RefRange == nil || *item.RefRange != "115-150" {
 		t.Errorf("Item unit/ref = %+v", item)
+	}
+	if item.Method == nil || *item.Method != "化学发光法" {
+		t.Errorf("Item.Method = %v, want \"化学发光法\"", item.Method)
 	}
 	if item.RawText != "血红蛋白 128 g/L 115-150" {
 		t.Errorf("Item.RawText = %q", item.RawText)

@@ -11,11 +11,11 @@ import (
 )
 
 func sampleReport(date string) contract.Report {
-	v := 128.0
+	v, method := "128", "荧光免疫测定法"
 	unit, ref := "g/L", "115-150"
 	items := []contract.ReportItem{{
-		Name: "血红蛋白", Value: &v, Unit: &unit, RefRange: &ref,
-		Flag: "normal", LowConfidence: false, RawText: "血红蛋白 128 g/L 115-150",
+		Name: "血红蛋白", Value: &v, Unit: &unit, RefRange: &ref, Method: &method,
+		Flag: "normal", LowConfidence: false, RawText: "血红蛋白 128 g/L 115-150 荧光免疫测定法",
 	}}
 	var d *string
 	if date != "" {

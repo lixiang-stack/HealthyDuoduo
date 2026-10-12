@@ -71,9 +71,13 @@ class ReportItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str = Field(min_length=1, description="canonical item name (after dictionary mapping)")
-    value: float | None = None
+    value: str | None = Field(
+        None,
+        description="value as printed (e.g. '128', '0.43', '<2.00'); None when the cell has no value-like content",
+    )
     unit: str | None = None
     ref_range: str | None = None
+    method: str | None = Field(None, description="detection/experimental method as printed (检测方法/实验方法 column)")
     flag: Flag
     low_confidence: bool
     raw_text: str = Field(min_length=1, description="matching raw OCR line text for manual review")

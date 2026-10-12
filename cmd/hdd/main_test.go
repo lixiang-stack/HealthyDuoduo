@@ -148,7 +148,7 @@ func TestRunListRejectsBadDate(t *testing.T) {
 }
 
 func TestRunTrendPrintsTrendRows(t *testing.T) {
-	v, v2, unit := 128.0, 136.0, "g/L"
+	v, v2, unit := "128", "136", "g/L"
 	d := &deps{store: fakeStoreCLI{trendRet: []pipeline.TrendRow{
 		{Sha256: strings.Repeat("a", 64), ReportType: "血常规", ReportDate: str("2026-01-02"), Value: &v, Unit: &unit, Flag: "normal"},
 		{Sha256: strings.Repeat("b", 64), ReportType: "血常规", ReportDate: str("2026-03-01"), Value: &v2, Unit: &unit, Flag: "high"},

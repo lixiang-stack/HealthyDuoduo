@@ -27,14 +27,18 @@ type OCRResult struct {
 }
 
 // ReportItem 是报告中的单个指标项。
+// Value 为印刷原样数值字符串(如 '128'、'0.43'、'<2.00');低于检出限等定性结果可直接
+// 承载;需要数值消费侧(如 trend delta)自行 ParseFloat(解析失败不计 delta)。
 type ReportItem struct {
-	Name          string   `json:"name"`
-	Value         *float64 `json:"value"`
-	Unit          *string  `json:"unit"`
-	RefRange      *string  `json:"ref_range"`
-	Flag          string   `json:"flag"`
-	LowConfidence bool     `json:"low_confidence"`
-	RawText       string   `json:"raw_text"`
+	Name     string  `json:"name"`
+	Value    *string `json:"value"`
+	Unit     *string `json:"unit"`
+	RefRange *string `json:"ref_range"`
+	// Method 是检测方法/实验方法列原样(如 '化学发光法');无该列或解析失败为 null。
+	Method        *string `json:"method"`
+	Flag          string  `json:"flag"`
+	LowConfidence bool    `json:"low_confidence"`
+	RawText       string  `json:"raw_text"`
 }
 
 // Report 对应 schemas/report.schema.json(实施计划 4.2)。
