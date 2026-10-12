@@ -5,10 +5,10 @@
 - 名称 = 词典名或别名,支持「名称熔断数值」(如 平均血红蛋白浓度324);
 - 参考范围一律从检查单抽取,支持 115-150 / 4--10 / <3.5 / 男:0-15;
 - 单位 ∈ 词典已知单位集,否则该项 low_confidence(值仍保留原文供人工核对);
-- 任一组成行 score < 0.8 → 该项 low_confidence、报告 ≥partial;
+- 任一组成行 score < 0.8 → 该项 low_confidence(不压整单 status);
 - 日期:标签行(检验时间 > … > 报告时间)抽取,解析失败时用 date_hint 兜底;
 - 类别失败或无指标 → failed;
-- 类别命中且有产出:日期缺失/低置信/数值缺失 → partial,否则 success。
+- 类别命中且有产出:数值缺失/日期缺失 → partial,否则 success(低置信留在条目标记)。
 """
 
 import json
@@ -20,6 +20,7 @@ import yaml
 from recognizer import paths
 from recognizer import postprocess as _postprocess
 from recognizer.contract import OCRResult
+from recognizer.golden import date_hint_for
 from recognizer.postprocess import _build_dict, run_postprocess
 
 # 真实注册表快照(分发测试在 monkeypatch 前捕获原词典)
@@ -92,7 +93,7 @@ def test_basic_row_to_item() -> None:
     r = run_postprocess(ocr)
     assert r.status == "success"
     it = item_of(r, "血红蛋白")
-    assert it.value == 128
+    assert it.value == "128"
     assert it.unit == "g/L"
     assert it.ref_range == "115-150"
     assert it.flag == "normal"
@@ -104,8 +105,116 @@ def test_alias_and_serial_strip() -> None:
     ocr = mk_ocr(header_row() + row(30, "3 白细胞", "7.33", unit="*10^9/L", ref="4-10"))
     r = run_postprocess(ocr)
     it = item_of(r, "白细胞计数")
-    assert it.value == 7.33
+    assert it.value == "7.33"
     assert it.flag == "normal"
+
+
+def test_value_column_comparison_keeps_real_ref() -> None:
+    """值列纯比较式(<2.00,结果低于检出限)不进 ref 位,参考列真格(0-30)正常配对。
+
+    实测 webwxgetmsgimg_1 抗dsDNA抗体:值列 "<2.00" 曾把参考列的 "0-30" 挤掉,
+    上报成 ref_range="<2.00" + value=None;正确语义是 value=None(检出限非数值)、
+    ref_range="0-30"、raw_text 保留 "<2.00"。
+    """
+    ocr = mk_ocr(
+        header_row()
+        + row(30, "16 抗dsDNA抗体(dsDNA)", "<2.00", unit="IU/mL", ref="0-30")
+        + row(50, "抗C1q抗体(C1q)", "0.47", unit="U/mL", ref="0-10")
+    )
+    r = run_postprocess(ocr)
+    it = item_of(r, "抗dsDNA抗体")
+    # string 契约:检出限比较式 '<2.00' 直接作为 value(印刷原样);参考列真值 0-30 正常配对。
+    assert it.value == "<2.00"
+    assert it.ref_range == "0-30"
+    assert "<2.00" in it.raw_text
+    # 对照:比较式印在参考列时仍是合法参考区间(A 类,如 总胆红素 "<23")
+    it2 = item_of(r, "抗C1q抗体")
+    assert it2.value == "0.47"
+    assert it2.ref_range == "0-10"
+
+
+def test_name_decoration_marker_and_method_suffix() -> None:
+    """名称印形装饰(互认标记 / 方法后缀 / 尾随缩写)只影响印形,不影响规范名匹配。
+
+    真实院区版式:「血红蛋白(8-HR)」「白细胞计数测定(9-HR)」应仍命中词典项。
+    """
+    ocr = mk_ocr(
+        header_row()
+        + row(30, "血红蛋白(8-HR)", "128", unit="g/L", ref="115-150")
+        + row(50, "白细胞计数测定(9-HR)", "7.33", unit="*10^9/L", ref="4-10")
+        + row(70, "红细胞计数测定(9-HR)RBC", "4.76", unit="*10^12/L", ref="3.5--5.5")
+    )
+    r = run_postprocess(ocr)
+    assert item_of(r, "血红蛋白").value == "128"
+    assert item_of(r, "白细胞计数").value == "7.33"
+    assert item_of(r, "红细胞计数").value == "4.76"
+
+
+def test_two_name_columns_per_block_pair_within_block() -> None:
+    """双栏版式:每块含「项目名称(缩写)+检验项目(中文)」两个名称列,按表头角色序列的
+    最小周期分块,块内配对。若不按周期分块,缩写列会把半栏下标整体错位,参考/单位串到
+    相邻块(实测 lft_09)。"""
+    cells = [
+        {"x": 100, "y": -30, "text": "某院肝肾功能报告单"},
+        {"x": 148, "y": 0, "text": "项目名称"},
+        {"x": 328, "y": 0, "text": "检验项目"},
+        {"x": 487, "y": 0, "text": "结果"},
+        {"x": 728, "y": 0, "text": "单位 结果提示参考范围"},
+        {"x": 983, "y": 0, "text": "项目名称"},
+        {"x": 1150, "y": 0, "text": "检验项目"},
+        {"x": 1328, "y": 0, "text": "结果"},
+        {"x": 1541, "y": 0, "text": "单位结果提示参考范围"},
+        {"x": 96, "y": 30, "text": "ALT"},
+        {"x": 260, "y": 30, "w": 130, "text": "丙氨酸氨基转移酶"},
+        {"x": 476, "y": 30, "text": "13.8"},
+        {"x": 587, "y": 30, "text": "U/L"},
+        {"x": 823, "y": 30, "text": "7.0-40.0"},
+        {"x": 96, "y": 62, "text": "T-Bil"},
+        {"x": 260, "y": 62, "w": 130, "text": "总胆红素"},
+        {"x": 476, "y": 62, "text": "14.08"},
+        {"x": 587, "y": 62, "text": "μmol/L"},
+        {"x": 823, "y": 62, "text": "≤21.00"},
+        {"x": 931, "y": 30, "text": "AST"},
+        {"x": 1095, "y": 30, "w": 130, "text": "天门冬氨酸氨基转移酶"},
+        {"x": 1310, "y": 30, "text": "12.5"},
+        {"x": 1421, "y": 30, "text": "U/L"},
+        {"x": 1657, "y": 30, "text": "13.0-35.0"},
+    ]
+    r = run_postprocess(mk_ocr(cells))
+    alt = item_of(r, "丙氨酸转氨酶")
+    assert (alt.value, alt.unit, alt.ref_range) == ("13.8", "U/L", "7.0-40.0")
+    tbil = item_of(r, "总胆红素")
+    assert (tbil.value, tbil.ref_range) == ("14.08", "≤21.00")
+    ast = item_of(r, "天冬氨酸转氨酶")
+    assert (ast.value, ast.ref_range) == ("12.5", "13.0-35.0")
+
+
+def test_offset_columns_pair_by_header_baseline() -> None:
+    """名称列 OCR box 整体低于结果/单位/参考列时,按表头行基准对齐列 y,参考范围不串行。
+
+    真实院区版式实测:同一视觉行内名称格比结果/参考格低约半行,若直接按中心距离
+    配对会把下一行的参考范围配给上一行。
+    """
+    cells = [
+        {"x": 100, "y": -30, "text": "某院血常规报告单"},
+        {"x": 150, "y": 12, "text": "序号 项目名称", "h": 40},
+        {"x": 360, "y": 0, "text": "结果", "h": 30},
+        {"x": 470, "y": 0, "text": "单位", "h": 30},
+        {"x": 580, "y": 0, "text": "参考值", "h": 30},
+        {"x": 150, "y": 40, "w": 120, "text": "血红蛋白", "h": 40},
+        {"x": 355, "y": 26, "text": "128", "h": 30},
+        {"x": 465, "y": 26, "text": "g/L", "h": 30},
+        {"x": 575, "y": 26, "text": "115-150", "h": 30},
+        {"x": 150, "y": 72, "w": 120, "text": "白细胞", "h": 40},
+        {"x": 355, "y": 58, "text": "7.3", "h": 30},
+        {"x": 465, "y": 58, "text": "*10^9/L", "h": 30},
+        {"x": 575, "y": 58, "text": "4-10", "h": 30},
+    ]
+    r = run_postprocess(mk_ocr(cells))
+    assert item_of(r, "血红蛋白").ref_range == "115-150"
+    assert item_of(r, "血红蛋白").flag == "normal"
+    assert item_of(r, "白细胞计数").ref_range == "4-10"
+    assert item_of(r, "白细胞计数").flag == "normal"
 
 
 def test_fused_name_value() -> None:
@@ -113,7 +222,7 @@ def test_fused_name_value() -> None:
     ocr = mk_ocr(header_row() + row(30, "平均红细胞血红蛋白浓度324", "g/L", unit="g/L", ref="316-354"))
     r = run_postprocess(ocr)
     it = item_of(r, "平均红细胞血红蛋白浓度")
-    assert it.value == 324
+    assert it.value == "324"
     assert it.unit == "g/L"
     assert it.flag == "normal"
 
@@ -123,7 +232,7 @@ def test_fused_unit_ref_in_unit_cell() -> None:
     ocr = mk_ocr(header_row() + row(30, "*白细胞计数", "6.01", unit="*10~9/L 3.5-9.5"))
     r = run_postprocess(ocr)
     it = item_of(r, "白细胞计数")
-    assert it.value == 6.01
+    assert it.value == "6.01"
     assert it.unit == "*10~9/L"
     assert it.ref_range == "3.5-9.5"
 
@@ -133,7 +242,7 @@ def test_fused_ref_unit_in_ref_cell() -> None:
     ocr = mk_ocr(header_row() + row(30, "血红蛋白", "118", unit="", ref="130--175 g/L"))
     r = run_postprocess(ocr)
     it = item_of(r, "血红蛋白")
-    assert it.value == 118
+    assert it.value == "118"
     assert it.unit == "g/L"
     assert it.ref_range == "130--175"
     assert it.flag == "low"
@@ -183,20 +292,27 @@ def test_missing_value_flag_unknown_keeps_item() -> None:
 # ---------- 低置信 ----------
 
 
-def test_low_score_line_marks_low_confidence_and_partial() -> None:
+def test_low_score_line_marks_low_confidence_not_partial() -> None:
+    """低置信(score<0.8)只留在条目 low_confidence 标记上,不再压整单 partial
+    (2026-10 状态策略:partial 仅由 value 缺失/日期缺失触发;真实样本要求
+    结果齐备即 success,人工核对看 per-item 标记)。"""
     ocr = mk_ocr(header_row() + row(30, "血红蛋白", "128", unit="g/L", ref="115-150", score=0.79))
     r = run_postprocess(ocr)
     it = item_of(r, "血红蛋白")
     assert it.low_confidence is True
-    assert r.status == "partial"
+    assert r.status == "success"
 
 
 def test_score_threshold_boundary() -> None:
-    """决策 #7:score < 0.8 判低置信;恰为 0.8 不是。"""
+    """决策 #7:score < 0.8 打 low_confidence 标;恰为 0.8 不是(不再影响 status)。"""
     ocr80 = mk_ocr(header_row() + row(30, "血红蛋白", "128", unit="g/L", ref="115-150", score=0.80))
-    assert run_postprocess(ocr80).status == "success"
+    r80 = run_postprocess(ocr80)
+    assert r80.status == "success"
+    assert item_of(r80, "血红蛋白").low_confidence is False
     ocr79 = mk_ocr(header_row() + row(30, "血红蛋白", "128", unit="g/L", ref="115-150", score=0.7999))
-    assert run_postprocess(ocr79).status == "partial"
+    r79 = run_postprocess(ocr79)
+    assert item_of(r79, "血红蛋白").low_confidence is True
+    assert r79.status == "success"
 
 
 def test_garbled_unit_kept_raw_without_confidence_mark() -> None:
@@ -204,7 +320,7 @@ def test_garbled_unit_kept_raw_without_confidence_mark() -> None:
     ocr = mk_ocr(header_row() + row(30, "血小板", "215", unit="109/L", ref="100--300"))
     r = run_postprocess(ocr)
     it = item_of(r, "血小板")
-    assert it.value == 215
+    assert it.value == "215"
     assert it.unit == "109/L"  # 保留原文供人工核对
     assert it.low_confidence is False
     assert r.status == "success"
@@ -265,7 +381,7 @@ def test_title_keyword_detects_category() -> None:
     cells = header_row() + row(30, "血红蛋白", "128", unit="g/L", ref="115-150")
     cells += [{"x": 100, "y": -40, "text": "市人民医院血常规报告单"}]
     r = run_postprocess(mk_ocr(cells))
-    assert r.report_type == "血常规"
+    assert r.report_type == "临检"
 
 
 # ---------- 多词典注册表分发(P3:词典数据文件每个类别一份,分发语义见 _select_category) ----------
@@ -309,13 +425,13 @@ def _bare_roles() -> list[dict[str, Any]]:
 
 
 def test_registry_content_overrides_title_hit(monkeypatch, tmp_path) -> None:
-    """A1 内容优先:仅标题命中的类别(0 项配对)不得覆盖命中项数达标的类别(血常规 10 项)。"""
+    """A1 内容优先:仅标题命中的类别(0 项配对)不得覆盖命中项数达标的类别(临检 10 项)。"""
     urine = _urine_dict(tmp_path, min_matched=3)
     real = _load_dicts()
     monkeypatch.setattr(_postprocess, "load_dicts", lambda: (urine, *real))
     cells = [{"x": 100, "y": -60, "text": "市第二医院尿常规报告单"}] + _bare_roles() + _cbc_rows()
     r = run_postprocess(mk_ocr(cells))
-    assert r.report_type == "血常规"
+    assert r.report_type == "临检"
 
 
 def test_registry_title_fallback_when_no_dict_qualifies(monkeypatch, tmp_path) -> None:
@@ -354,7 +470,7 @@ def test_registry_title_region_breaks_qualified_tie(monkeypatch, tmp_path) -> No
 
 
 def test_registry_pairs_count_decides_without_title(monkeypatch, tmp_path) -> None:
-    """无标题命中:双方都达标时取匹配项数多者(血常规 10 项 > 尿常规 3 项)。"""
+    """无标题命中:双方都达标时取匹配项数多者(临检 10 项 > 尿常规 3 项)。"""
     urine = _urine_dict(tmp_path, min_matched=3)
     real = _load_dicts()
     monkeypatch.setattr(_postprocess, "load_dicts", lambda: (urine, *real))
@@ -362,7 +478,7 @@ def test_registry_pairs_count_decides_without_title(monkeypatch, tmp_path) -> No
     for i, name in enumerate(_URINE_ITEM_NAMES[:3]):
         cells += row(300 + 25 * i, name, "5.0", unit="mmol/L", ref="1-10")
     r = run_postprocess(mk_ocr(cells))
-    assert r.report_type == "血常规"
+    assert r.report_type == "临检"
 
 
 def test_registry_tie_follows_registry_order(monkeypatch, tmp_path) -> None:
@@ -377,17 +493,17 @@ def test_registry_tie_follows_registry_order(monkeypatch, tmp_path) -> None:
     assert r.report_type == "尿常规"
 
 
-# ---------- 叙述体抽取(P3 超声,category.mode=narrative) ----------
+# ---------- 叙述体抽取(P3,category.mode=narrative,现 影像词典) ----------
 
 
 def test_narrative_alias_bridge_value() -> None:
     cells = [{"x": 100, "y": -40, "text": "本院超声检查报告单"},
              {"x": 100, "y": 0, "text": "颈项透明层厚度（NT）2.6mm，头臀长59mm。"}]
     r = run_postprocess(mk_ocr(cells))
-    assert r.report_type == "超声"
-    assert item_of(r, "颈项透明层厚度").value == 2.6
+    assert r.report_type == "影像"
+    assert item_of(r, "颈项透明层厚度").value == "2.6"
     assert item_of(r, "颈项透明层厚度").unit == "mm"
-    assert item_of(r, "头臀长").value == 59
+    assert item_of(r, "头臀长").value == "59"
 
 
 def test_narrative_remote_number_not_fused() -> None:
@@ -407,7 +523,7 @@ def test_narrative_first_value_wins_over_title_mention() -> None:
              {"x": 100, "y": 30, "text": "（NT）2.6mm"}]
     r = run_postprocess(mk_ocr(cells))
     it = item_of(r, "颈项透明层厚度")
-    assert it.value == 2.6
+    assert it.value == "2.6"
     assert "2.6mm" in it.raw_text
 
 
@@ -423,6 +539,6 @@ _sample_ids = sorted(p.stem for p in EXPECTED_OCR.glob("*.json")) if EXPECTED_OC
 @pytest.mark.parametrize("sample_id", _sample_ids)
 def test_report_matches_golden(sample_id: str) -> None:
     ocr_data = json.loads((EXPECTED_OCR / f"{sample_id}.json").read_text(encoding="utf-8"))
-    report = run_postprocess(OCRResult.model_validate(ocr_data))
+    report = run_postprocess(OCRResult.model_validate(ocr_data), date_hint=date_hint_for(sample_id))
     golden = json.loads((EXPECTED_REPORT / f"{sample_id}.json").read_text(encoding="utf-8"))
     assert json.loads(report.model_dump_json()) == golden

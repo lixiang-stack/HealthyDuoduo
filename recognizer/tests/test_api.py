@@ -10,6 +10,7 @@ from jsonschema import Draft202012Validator
 
 from recognizer import paths
 from recognizer.api import app
+from recognizer.golden import date_hint_for
 
 SAMPLES = paths.SAMPLES
 SCHEMA = paths.SCHEMA_OCR
@@ -79,7 +80,7 @@ def test_report_bundle_contract() -> None:
     body = response.json()
     Draft202012Validator(json.loads(SCHEMA.read_text(encoding="utf-8"))).validate(body["ocr_result"])
     Draft202012Validator(json.loads(REPORT_SCHEMA.read_text(encoding="utf-8"))).validate(body["report"])
-    assert body["report"]["report_type"] == "血常规"
+    assert body["report"]["report_type"] == "临检"
     names = {it["name"] for it in body["report"]["items"]}
     assert "血红蛋白" in names
 
@@ -94,10 +95,14 @@ def test_reparse_golden_matches_postprocess() -> None:
     """验收 P2:POST /reparse 用 golden OCR 重跑后处理,与 golden report 一致。"""
     if not _golden_ids:
         pytest.skip("no golden OCR files")
-    golden = json.loads((EXPECTED_OCR / f"{_golden_ids[0]}.json").read_text(encoding="utf-8"))
-    expected = json.loads((EXPECTED_REPORT / f"{_golden_ids[0]}.json").read_text(encoding="utf-8"))
+    sample_id = _golden_ids[0]
+    golden = json.loads((EXPECTED_OCR / f"{sample_id}.json").read_text(encoding="utf-8"))
+    expected = json.loads((EXPECTED_REPORT / f"{sample_id}.json").read_text(encoding="utf-8"))
+    payload = {"ocr_result": golden}
+    if (hint := date_hint_for(sample_id)) is not None:
+        payload["date"] = hint
     with TestClient(app) as client:
-        response = client.post("/reparse", json={"ocr_result": golden})
+        response = client.post("/reparse", json=payload)
     assert response.status_code == 200
     assert response.json() == expected
 
