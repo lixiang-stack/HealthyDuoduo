@@ -5,7 +5,7 @@
 - 名称 = 词典名或别名,支持「名称熔断数值」(如 平均血红蛋白浓度324);
 - 参考范围一律从检查单抽取,支持 115-150 / 4--10 / <3.5 / 男:0-15;
 - 单位 ∈ 词典已知单位集,否则该项 low_confidence(值仍保留原文供人工核对);
-- 任一组成行 score < 0.8 → 该项 low_confidence(不压整单 status);
+- 任一组成行 score < 0.8 → 该项 low_confidence;占比过半(≥50%)→ 整单 partial;
 - 日期:标签行(检验时间 > … > 报告时间)抽取,解析失败时用 date_hint 兜底;
 - 类别失败或无指标 → failed;
 - 类别命中且有产出:数值缺失/日期缺失 → partial,否则 success(低置信留在条目标记)。
@@ -293,26 +293,62 @@ def test_missing_value_flag_unknown_keeps_item() -> None:
 
 
 def test_low_score_line_marks_low_confidence_not_partial() -> None:
-    """低置信(score<0.8)只留在条目 low_confidence 标记上,不再压整单 partial
-    (2026-10 状态策略:partial 仅由 value 缺失/日期缺失触发;真实样本要求
-    结果齐备即 success,人工核对看 per-item 标记)。"""
-    ocr = mk_ocr(header_row() + row(30, "血红蛋白", "128", unit="g/L", ref="115-150", score=0.79))
+    """低置信(score<0.8)留在条目 low_confidence 标记上;占比未过半时不压整单
+    (真实样本要求结果齐备即 success,人工核对看 per-item 标记)。"""
+    ocr = mk_ocr(
+        header_row()
+        + row(30, "血红蛋白", "128", unit="g/L", ref="115-150", score=0.79)
+        + row(50, "白细胞", "6.01", unit="*10^9/L", ref="4-10")
+        + row(70, "红细胞", "4.76", unit="*10^12/L", ref="3.5--5.5")
+    )
     r = run_postprocess(ocr)
-    it = item_of(r, "血红蛋白")
-    assert it.low_confidence is True
+    assert item_of(r, "血红蛋白").low_confidence is True
+    assert item_of(r, "白细胞计数").low_confidence is False
+    assert item_of(r, "红细胞计数").low_confidence is False
     assert r.status == "success"
+
+
+def test_low_score_majority_marks_partial() -> None:
+    """低置信占比 ≥ 50% → 整单 partial(过半指标不可靠,降级人工甄别)。"""
+    ocr = mk_ocr(
+        header_row()
+        + row(30, "血红蛋白", "128", unit="g/L", ref="115-150", score=0.79)
+        + row(50, "白细胞", "6.01", unit="*10^9/L", ref="4-10", score=0.79)
+    )
+    r = run_postprocess(ocr)
+    assert r.status == "partial"
+    # 整单 partial 为低置信所致:value 齐备、条目标记仍在
+    assert all(it.value is not None for it in r.items)
+    assert all(it.low_confidence for it in r.items)
+    # 恰一半(1/2)同样触发(≥50%)
+    r_half = run_postprocess(
+        mk_ocr(
+            header_row()
+            + row(30, "血红蛋白", "128", unit="g/L", ref="115-150", score=0.79)
+            + row(50, "白细胞", "6.01", unit="*10^9/L", ref="4-10")
+        )
+    )
+    assert r_half.status == "partial"
 
 
 def test_score_threshold_boundary() -> None:
     """决策 #7:score < 0.8 打 low_confidence 标;恰为 0.8 不是(不再影响 status)。"""
-    ocr80 = mk_ocr(header_row() + row(30, "血红蛋白", "128", unit="g/L", ref="115-150", score=0.80))
+    ocr80 = mk_ocr(
+        header_row() + row(30, "血红蛋白", "128", unit="g/L", ref="115-150", score=0.80)
+        + row(50, "白细胞", "6.01", unit="*10^9/L", ref="4-10", score=0.80)
+    )
     r80 = run_postprocess(ocr80)
     assert r80.status == "success"
     assert item_of(r80, "血红蛋白").low_confidence is False
-    ocr79 = mk_ocr(header_row() + row(30, "血红蛋白", "128", unit="g/L", ref="115-150", score=0.7999))
+    assert item_of(r80, "白细胞计数").low_confidence is False
+    ocr79 = mk_ocr(
+        header_row() + row(30, "血红蛋白", "128", unit="g/L", ref="115-150", score=0.7999)
+        + row(50, "白细胞", "6.01", unit="*10^9/L", ref="4-10", score=0.7999)
+    )
     r79 = run_postprocess(ocr79)
     assert item_of(r79, "血红蛋白").low_confidence is True
-    assert r79.status == "success"
+    assert item_of(r79, "白细胞计数").low_confidence is True
+    assert r79.status == "partial"
 
 
 def test_garbled_unit_kept_raw_without_confidence_mark() -> None:

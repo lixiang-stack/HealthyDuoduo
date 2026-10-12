@@ -77,7 +77,7 @@ class ReportItem(BaseModel):
     )
     unit: str | None = None
     ref_range: str | None = None
-    method: str | None = Field(None, description="detection/experimental method as printed (检测方法/实验方法 column)")
+    method: str | None = Field(None, description="detection/experimental method as printed")
     flag: Flag
     low_confidence: bool
     raw_text: str = Field(min_length=1, description="matching raw OCR line text for manual review")

@@ -12,9 +12,9 @@
 - 熔断行按内容拆解:名熔值(平均血红蛋白浓度324)、单位熔范围(*10~9/L 3.5-9.5)、
   范围熔单位(130--175 g/L)、值熔范围熔单位(11.61|1.1--3.2|10^9/L→OCR 乱珠)。
 
-低置信(决策 #7,2026-10 状态策略调整):任一组成行 score < LOW_SCORE_THRESHOLD
-→ 该项 low_confidence 标记保留,**不再压整单 partial**;partial 仅由
-指标 value 缺失或日期缺失触发(业务要求结果齐备即 success,人工核对看条目标记)。
+低置信:任一组成行 score < LOW_SCORE_THRESHOLD → 该项 low_confidence 标记保留;
+partial 触发(review 2026-10-12 收敛 + 低置信占比补丁):指标 value 缺失、日期缺失,
+或 **low_confidence 占比 ≥ 50%**(过半指标不可靠 → 整单降级,供人工甄别)。
 单位解析损耗(如 109/L、1012/L)一律保留原文记录,不改变置信标记;
 threshold 与单位语义供人工核对与后续规一化用。
 未解析日期且无兜底 → report_date=null+partial;类别失败或无产出 → failed。
@@ -42,8 +42,13 @@ from .contract import Flag, OCRResult, Report, ReportItem, Status
 DICT_DIR = Path(__file__).parent
 DICT_GLOB = "*_dict.yaml"
 
-# 决策 #7:任一组成行 score < 阈值 → 项 low_confidence、报告 ≥partial(固定常量)
+# 决策 #7:任一组成行 score < 阈值 → 项 low_confidence(固定常量);报告级触发见
+# LOW_CONF_PARTIAL_RATIO。
 LOW_SCORE_THRESHOLD = 0.8
+
+# 低置信占比 ≥ 此值(过半指标不可靠)→ 整单 partial,供人工甄别(review 新增,
+# 2026-10-12);值缺失/日期缺失仍是另一 partial 触发源。
+LOW_CONF_PARTIAL_RATIO = 0.5
 
 # 类别不识别时的报告类别(review 决定用英文占位,区别于「临检」等正名)
 UNKNOWN_REPORT_TYPE = "unknown"
@@ -914,10 +919,14 @@ def run_postprocess(ocr: OCRResult, date_hint: str | None = None) -> Report:
 
     if not items:
         status = Status.FAILED
-    elif partial or date is None:
-        status = Status.PARTIAL
     else:
-        status = Status.SUCCESS
+        low_conf_majority = (
+            sum(1 for it in items if it.low_confidence) / len(items) >= LOW_CONF_PARTIAL_RATIO
+        )
+        if partial or date is None or low_conf_majority:
+            status = Status.PARTIAL
+        else:
+            status = Status.SUCCESS
     return Report(        report_type=d.report_type,
         report_date=date,
         status=status,

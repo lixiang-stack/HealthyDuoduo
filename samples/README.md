@@ -28,7 +28,7 @@
   - **掩码 OCR 语料**(`mask` 产物,无原图):ana_01~03 / bloodtype_01 / cbc_06~09 / coag_01 /
     fibrosis_01 / glu_04 / infectious_01~02 / lft_06~09 / proghcg_01 / tft_04~05 / ua_06 /
     unknown_01 / vitanemia_01~02(共 24 条,细类编号接在该类别图像样本之后;id 只作样本编号,
-    与 report_type 解耦;命名此前为微信临时文件名 `webwxgetmsgimg(_N)`,已按类别语义化)。
+    与 report_type 解耦)。
     unknown_01(产前筛查)已由 其他专项 词典收录,narrative 模式逐格收录项目名、
     value=None 留痕 raw_text(status=partial 属诚实落痕,漏值待行内配对规则扩展)。
 - **真实数据基准 `expected/vl/<id>.json`**:由视觉模型 + LLM 结构化得到的**逐项真值**
