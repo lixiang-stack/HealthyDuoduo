@@ -83,7 +83,10 @@ def txt_drift_report(actual: list[str], golden: list[str]) -> str:
 @pytest.mark.skipif(not _sample_ids, reason="no golden files under samples/expected/ocr/")
 @pytest.mark.parametrize("sample_id", _sample_ids)
 def test_ocr_matches_golden(sample_id: str) -> None:
-    image_path = next(iter(SAMPLES.glob(f"{sample_id}.*")))
+    # 脱敏 OCR 语料条目(未脱敏原图不提交)没有对应图像,只在报告 golden 里回归,跳过 OCR 对比
+    image_path = next(iter(SAMPLES.glob(f"{sample_id}.*")), None)
+    if image_path is None:
+        pytest.skip(f"{sample_id}: no sample image (desensitized OCR corpus only)")
     ocr = run_ocr(image_path)
     _assert_matches_golden(ocr, _load(EXPECTED_OCR / f"{sample_id}.json"))
 

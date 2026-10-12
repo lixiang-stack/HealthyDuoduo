@@ -1,0 +1,34 @@
+# 凝血词典(真实语料:coag_01 凝血六项(掩码语料);决策 #8 同上)。
+# 名称带互认标记/方法后缀/括号缩写(凝血酶原时间测定(PT)),去装饰后等价规范名。
+report_type: 临检
+category:
+  title_keywords: ["凝血"]
+  min_matched_items: 2
+items:
+  - name: 凝血酶原时间
+    aliases: []
+    units: [秒, s]
+  - name: 凝血酶原时间比值
+    aliases: [凝血酶原时间比值(PTR)]
+    units: []
+  - name: 国际标准化比值
+    aliases: []
+    units: []
+  - name: 凝血酶原活动度
+    aliases: [凝血酶原活动度(PTA)]
+    units: ["%"]
+  - name: 活化部分凝血活酶时间
+    aliases: []
+    units: [秒, s]
+  - name: 纤维蛋白原
+    aliases: []
+    units: [g/L]
+  - name: 凝血酶时间
+    aliases: []
+    units: [秒, s]
+  - name: D-二聚体
+    aliases: [D一二聚体]
+    units: [ng/mL]
+  - name: 纤维蛋白原降解产物
+    aliases: [纤维蛋白（原）降解产物, 纤维蛋白（原）降解产物(FDP)]
+    units: ["μg/mL"]

@@ -1,0 +1,16 @@
+# 血型词典(真实语料:bloodtype_01 卡式血型+抗体筛查(掩码语料);决策 #8 同上)。
+# 定性结果(B型 / RhD(+) / 阴性),value=None 留痕 raw_text。
+report_type: 临检
+category:
+  title_keywords: ["血型"]
+  min_matched_items: 2
+items:
+  - name: ABO血型
+    aliases: [ABO血型鉴定(ABO血型)]
+    units: []
+  - name: RH血型
+    aliases: [RH血型鉴定(RH血型)]
+    units: []
+  - name: 抗体筛查
+    aliases: []
+    units: []
