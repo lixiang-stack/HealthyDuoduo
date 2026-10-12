@@ -1,10 +1,10 @@
 package main
 
-// Four subcommands; one line per record so demo scripts can assert on output
+// Five subcommands; one line per record so demo scripts can assert on output
 // (implementation plan decision #11, command-level acceptance).
 // Interface text is English per acceptance review; report_type DATA values (血常规)
 // display as CBC when a display alias is known.
-// Identifier: 图像内容 sha256(完整 64 hex 或 ≥8 hex 唯一前缀)。
+// Identifier: 图像内容 sha256(完整 64 hex)。
 
 import (
 	"context"

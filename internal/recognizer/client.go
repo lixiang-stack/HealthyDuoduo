@@ -22,11 +22,10 @@ const (
 	reparsePath = "/reparse"
 )
 
-// 网络抖动重试:上限(至少一次)与退避间隔。
-const (
-	maxAttempts   = 2
-	retryInterval = 1 * time.Second
-)
+// 网络抖动重试:上限(至少一次)与退避间隔;retryInterval 为可变值,供测试缩短退避。
+const maxAttempts = 2
+
+var retryInterval = 1 * time.Second
 
 // 单次请求超时:覆盖模型加载 + 单张 OCR(机内实测远低于 60s)。
 const requestTimeout = 60 * time.Second
