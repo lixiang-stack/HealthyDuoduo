@@ -1,7 +1,11 @@
 # 数据服务 HTTP 契约唯一源(OpenAPI 3.1 单文件;viz-and-client spec「契约与 API 面」)。
-# M0 冻结起点:API 前缀 /api/v1 + health 端点;后续 12 端点由票 02 一次定稿;
-# 识别端既有 JSON Schema(schemas/*.schema.json)以 $ref 复用,识别端契约文件本身不动。
-# App 侧 codegen 生成的 TS 类型与本文件为准;HTTP 契约测试(票 02)以本文件为锚。
+# M0 冻结(票 02):12 端点全形状一次定稿——成员(显示名+是否孩子)、报告(归属可空+fail_reason)、
+# 指标项(item_id 不透明句柄+核对状态+ocr_lines 行号与框坐标+prev B2-lite)、修正对表形状、
+# trend 单位门控。识别端既有 JSON Schema(schemas/*.schema.json) 与 pydantic/Go 互证、
+# 存量识别 golden 完全不动;HTTP 指标项字段与识别端 reportItem 同源,由互证测试
+# (internal/httpapi)锁死逐字段子树相等——reportItem additionalProperties:false 冻结,
+# 无法 allOf 扩展,故 HTTP 侧镜像而非 $ref(见 ReportItem 描述)。
+# App 侧 codegen 生成的 TS 类型以本文件为准;HTTP fixtures(schemas/testdata/http)为 golden。
 openapi: 3.1.0
 info:
   title: HealthyDuoduo Data Service API
@@ -27,7 +31,302 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Health"
+  /members:
+    get:
+      operationId: listMembers
+      summary: 成员列表(B1)
+      description: 家庭档案入口;排序客户端做(孩子优先、其余按创建序)。
+      responses:
+        "200":
+          description: 全部成员
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MembersList"
+    post:
+      operationId: createMember
+      summary: 建成员
+      description: name + is_child 两档信息,几十秒配好全家档案;member_id/created_at 服务端产生。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MemberCreate"
+      responses:
+        "201":
+          description: 已创建
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Member"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /members/{member_id}:
+    patch:
+      operationId: updateMember
+      summary: 改名 / 改是否孩子
+      description: 至少一项;不提供成员删除。
+      parameters:
+        - $ref: "#/components/parameters/MemberID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MemberUpdate"
+      responses:
+        "200":
+          description: 已更新
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Member"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /reports:
+    get:
+      operationId: listReports
+      summary: 报告时间线(按成员过滤)
+      description: |
+        member_id 缺省 = 全部报告(含存量无主)。每张卡片含状态、未核对低置信计数
+        (响应派生,见 ReportSummary)与按 flag 异常计数徽标口径。
+      parameters:
+        - name: member_id
+          in: query
+          description: 过滤归属成员;缺省返回全部成员与无主存量报告
+          schema: { type: integer, format: int64 }
+      responses:
+        "200":
+          description: 时间线卡片列表(排序客户端做:dateless 沉底不受排序破坏)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportsList"
+    post:
+      operationId: createReport
+      summary: 上传检查单(multipart:图像 + 成员)
+      description: |
+        multipart 原子接收(无分片、无断点续传),同步等待识别,响应即完整报告(NF-04 <3s)。
+        图像内容 sha256 幂等:命中已有报告按 status 回分岔矩阵——
+        · 已有报告不含核对决策 → 200 + duplicate:true(离线队列重试安全);
+        · 已含核对决策(任一指标项 review_status ≠ unreviewed)→ 409:
+          已确信的数字不被同图重传悄悄覆盖/重跑(离线队列不重传已归档件,不踩此分支);
+          显式覆盖才放行:multipart override=true 重跑识别并重置归档,
+          指标项 item_id 全部更换、review_status 全部回 unreviewed(单向派生的显式豁免)。
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [image, member_id]
+              properties:
+                image:
+                  type: string
+                  format: binary
+                  description: 一张检查单的数字图像(单图,对应一张检查单)
+                member_id:
+                  type: integer
+                  format: int64
+                  description: 归属成员
+                override:
+                  type: boolean
+                  default: false
+                  description: 显式覆盖:同图命中且已有报告含核对决策时重跑识别的唯一入口
+      responses:
+        "200":
+          description: sha 命中已有报告(幂等,duplicate:true)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadResult"
+        "201":
+          description: 新报告归档(或显式 override 重跑后归档)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: 同图命中但已有报告含核对决策(detail 见 operation 描述)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /reports/{report_id}:
+    get:
+      operationId: getReport
+      summary: 报告详情
+      description: |
+        指标项含稳定外部句柄 item_id、核对状态、OCR 行链接与 B2-lite 上一值。
+        报告状态派生单调:failed / success 恒定;partial → success 当且仅当
+        unreviewed_low_confidence_count = 0,单向永不回退;无「撤销回未核对」。
+      parameters:
+        - $ref: "#/components/parameters/ReportID"
+      responses:
+        "200":
+          description: 完整报告
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: reassignReport
+      summary: 改归属
+      description: 传错成员不必删档重传;硬删之外的全部字段不变。
+      parameters:
+        - $ref: "#/components/parameters/ReportID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [member_id]
+              properties:
+                member_id:
+                  type: integer
+                  format: int64
+                  description: 目标成员
+      responses:
+        "200":
+          description: 已改派(返回刷新后的报告头部)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportSummary"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deleteReport
+      summary: 删除报告
+      description: |
+        硬删报告与指标项与修正对(级联);原始图像与 OCR 识别历史留痕保留,
+        同图日后可重新上传入档(下上传回 201 新报告,内容哈希不再命中)。无回收站。
+      parameters:
+        - $ref: "#/components/parameters/ReportID"
+      responses:
+        "204":
+          description: 已删除
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /reports/{report_id}/items/{item_id}:
+    patch:
+      operationId: reviewItem
+      summary: 核对(确认 / 修正)
+      description: |
+        家长逐项确信的落库动作:确认(认可解析结果,不产生记录)或修正
+        (改 value/unit/name/ref_range 四个纸面事实)。flag 由服务端按修正后的
+        value × ref_range 重算,契约无手改入口。决策可重复(已确认可再修正、已修正
+        可再修正/再确认),每次修正 append 一条修正对;响应返回报告级状态与
+        未核对低置信计数(单响应刷新整屏)。任意指标项均可发起(高置信亦然)。
+      parameters:
+        - $ref: "#/components/parameters/ReportID"
+        - $ref: "#/components/parameters/ItemID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviewRequest"
+      responses:
+        "200":
+          description: 已落库(report_items 装最终生效值;partial → success 单向派生)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /images/{sha256}:
+    get:
+      operationId: getImage
+      summary: 图像(后端代理对象存储)
+      parameters:
+        - name: sha256
+          in: path
+          required: true
+          description: 图像内容 sha256(64 hex)
+          schema: { type: string, pattern: "^[0-9a-f]{64}$" }
+      responses:
+        "200":
+          description: 图像字节流(局域网直出)
+          content:
+            image/*:
+              schema: { type: string, format: binary }
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /members/{member_id}/indicators/{name}/trend:
+    get:
+      operationId: getTrend
+      summary: B2 趋势时序(单位门控)
+      description: |
+        同成员下指定指标项(词典规范名,name URL 编码)的跨报告时序点,按
+        report_date 升序;日期为 null 的点排最后且不参与连线。unit 门控:?unit=
+        指定归一单位 → 只返回同单位点;缺省返回全部单位族的点(连接键 = 规范名 +
+        归一单位,跨单位族不连线不提示;不存在运行时换算与换算系数表)。
+        本端点 M4 消费、M0 冻结。
+      parameters:
+        - $ref: "#/components/parameters/MemberID"
+        - name: unit
+          in: query
+          description: 门控归一单位(如 g/L);缺省 = 全部单位族的点
+          schema: { type: string }
+      responses:
+        "200":
+          description: 时序点列
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrendResult"
+        "404":
+          $ref: "#/components/responses/NotFound"
 components:
+  parameters:
+    MemberID:
+      name: member_id
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+    ReportID:
+      name: report_id
+      in: path
+      required: true
+      description: 图像内容 sha256(64 hex,对外身份)
+      schema: { type: string, pattern: "^[0-9a-f]{64}$" }
+    ItemID:
+      name: item_id
+      in: path
+      required: true
+      description: 指标项不透明句柄(BIGSERIAL;重跑识别后全换)
+      schema: { type: integer, format: int64 }
+  responses:
+    BadRequest:
+      description: 请求体或参数不合法(message 说明原因)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: 目标不存在(unknown member/report/item/image;或 trend name 未收录)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
   schemas:
     Health:
       type: object
@@ -42,3 +341,372 @@ components:
           type: string
           description: 数据服务版本,与 serve 实现常量及 info.version 同源(0.1.0)
           example: "0.1.0"
+    MembersList:
+      type: object
+      additionalProperties: false
+      required: [members]
+      properties:
+        members:
+          type: array
+          items: { $ref: "#/components/schemas/Member" }
+    Member:
+      type: object
+      additionalProperties: false
+      required: [member_id, name, is_child, created_at]
+      properties:
+        member_id:
+          type: integer
+          format: int64
+          description: 外部句柄(数据库自增);不重用、不删除
+        name:
+          type: string
+          minLength: 1
+          description: 显示名(家庭真实称呼)
+        is_child:
+          type: boolean
+          description: 是否孩子(两档:孩子/成人)
+        created_at:
+          type: string
+          format: date-time
+          description: 创建时间(RFC3339;列表其余排序口径由客户端做)
+    MemberCreate:
+      type: object
+      additionalProperties: false
+      required: [name, is_child]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        is_child:
+          type: boolean
+    MemberUpdate:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name: { type: string, minLength: 1 }
+        is_child: { type: boolean }
+    ReportsList:
+      type: object
+      additionalProperties: false
+      required: [reports]
+      properties:
+        reports:
+          type: array
+          items: { $ref: "#/components/schemas/ReportSummary" }
+    ReportStatus:
+      type: string
+      enum: [success, partial, failed]
+      description: |
+        与识别端 report.schema.json 同一枚举。状态由后端按核对进度派生(派生单调):
+        failed / success 恒定;partial → success 当且仅当未核对低置信计数 = 0,
+        单向永不回退;无「撤销回未核对」。唯显式 override 重跑重置归档例外(见 POST /reports)。
+    FlagCounts:
+      type: object
+      additionalProperties: false
+      required: [high, low, unknown]
+      description: 按 flag 异常计数徽标口径(时间线卡片);缺档即 0。
+      properties:
+        high: { type: integer, minimum: 0 }
+        low: { type: integer, minimum: 0 }
+        unknown: { type: integer, minimum: 0 }
+    ReportSummary:
+      description: 时间线卡片;详情响应复用本头部字段(ReportDetail 加 items)。
+      type: object
+      additionalProperties: false
+      required:
+        [report_id, member_id, report_type, report_date, status, fail_reason,
+         flag_counts, unreviewed_low_confidence_count]
+      properties:
+        report_id:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+          description: 图像内容 sha256(对外身份,全仓统一;每图一行)
+        member_id:
+          type: [integer, "null"]
+          format: int64
+          description: 归属成员;null = 存量 CLI 时代报告无主(可后续改派)
+        report_type:
+          type: string
+          minLength: 1
+          description: 报告类别(与识别端 report_type 同契约)
+        report_date:
+          type: [string, "null"]
+          pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+          description: 检查日期 YYYY-MM-DD;识别失败且未补录为 null(dateless 卡片沉底不破坏排序)
+        status:
+          $ref: "#/components/schemas/ReportStatus"
+        fail_reason:
+          type: [string, "null"]
+          description: 识别失败原因(pipeline 产出;仅 failed 报告有值)
+        flag_counts:
+          $ref: "#/components/schemas/FlagCounts"
+        unreviewed_low_confidence_count:
+          type: integer
+          minimum: 0
+          description: |
+            「剩余 N 项未核对」徽标。响应派生值(不落列,ADR-0005):只统计 partial
+            报告中 review_status=unreviewed 且 low_confidence 的指标项;
+            failed 报告无可核对项恒为 0(不进待核对);success 报告恒为 0。
+    ReportDetail:
+      type: object
+      additionalProperties: false
+      required: [report_id, member_id, report_type, report_date, status, fail_reason,
+        flag_counts, unreviewed_low_confidence_count, items]
+      properties:
+        report_id:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        member_id:
+          type: [integer, "null"]
+          format: int64
+        report_type:
+          type: string
+          minLength: 1
+        report_date:
+          type: [string, "null"]
+          pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        status:
+          $ref: "#/components/schemas/ReportStatus"
+        fail_reason:
+          type: [string, "null"]
+        flag_counts:
+          $ref: "#/components/schemas/FlagCounts"
+        unreviewed_low_confidence_count:
+          type: integer
+          minimum: 0
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/ReportItem" }
+    OcrLineLink:
+      type: object
+      additionalProperties: false
+      required: [line, box]
+      description: 图像区域 ↔ 原始 OCR 行文 ↔ 解析值三方对照的行链接。
+      properties:
+        line:
+          type: integer
+          minimum: 0
+          description: OCR 行下标(0-based,与 ocr_result 的 boxes/txts 下标一致)
+        box:
+          type: array
+          minItems: 4
+          maxItems: 4
+          items:
+            type: array
+            minItems: 2
+            maxItems: 2
+            items: { type: number }
+          description: 该行四点多边形顶点 [x,y](识别端识别坐标系同源)
+    ItemIDHandle:
+      type: integer
+      format: int64
+      description: BIGSERIAL 不透明句柄;重跑识别后全部更换,客户端不可当持久主键
+    ReviewStatus:
+      type: string
+      enum: [unreviewed, confirmed, corrected]
+      description: |
+        核对状态机:未核对 --确认|修正--> 已确认|已修正。任何状态可再次确认或修正
+        (决策可重复);每次修正 append 一条修正对(before = 上次生效值);确认不产生
+        修正对记录;最终状态 = 最后一次动作;无「撤销回未核对」——误确认的出口是修正。
+    ReportItem:
+      description: |
+        单个指标项的 HTTP 形状。name/value/unit/ref_range/method/flag/low_confidence/
+        raw_text 八字段与识别端 schemas/report.schema.json 的 reportItem 逐字段同源
+        (该 schema additionalProperties:false 已冻结,无法 allOf 扩展,故此处镜像;
+        互证测试锁死共享字段子树逐字节相等,防两份定义漂移);后四项为 HTTP 侧扩展
+        (item_id / review_status / ocr_lines / prev)。
+      type: object
+      additionalProperties: false
+      required: [item_id, name, value, unit, ref_range, method, flag,
+        low_confidence, raw_text, review_status, ocr_lines, prev]
+      properties:
+        item_id:
+          $ref: "#/components/schemas/ItemIDHandle"
+        name:
+          type: string
+          minLength: 1
+          description: 规范名(词典映射后)
+        value:
+          type: [string, "null"]
+          description: "印刷原样数值字符串(如 '18.40'、'<2.00'、'70-80');无结果或解析失败为 null"
+        unit:
+          type: [string, "null"]
+          description: '单位,如 g/L'
+        ref_range:
+          type: [string, "null"]
+          description: '参考范围,一律从检查单抽取(决策 #8),如 115-150 或 <3.5'
+        method:
+          type: [string, "null"]
+          description: "检测方法/实验方法列原样(如 '化学发光法');无该列或解析失败为 null"
+        flag:
+          enum: [normal, high, low, unknown]
+          description: 数值与参考范围比较结果;无参考范围或非数值为 unknown
+        low_confidence:
+          type: boolean
+          description: '该指标项任一组成行 OCR score < 0.8 时为 true(决策 #7)'
+        raw_text:
+          type: string
+          minLength: 1
+          description: 该指标项对应的原始 OCR 行文本,供人工核对
+        review_status:
+          $ref: "#/components/schemas/ReviewStatus"
+        ocr_lines:
+          type: array
+          items: { $ref: "#/components/schemas/OcrLineLink" }
+          description: 该指标项对应的 OCR 行链接(缩放到对应区域的定位依据)
+        prev:
+          oneOf:
+            - $ref: "#/components/schemas/PrevValue"
+            - type: "null"
+          description: B2-lite「较上次」Δ 上一值(见 PrevValue);无有效基线为 null
+    PrevValue:
+      type: object
+      additionalProperties: false
+      required: [report_date, value, unit]
+      description: 同成员 + 同规范名 + 同归一单位、report_date 严格早于当前报告的最近一份
+        (与上传先后无关);任一侧无日期或仅有同日报告 → 不提供(宁缺毋错)。
+      properties:
+        report_date:
+          type: string
+          pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        value:
+          type: string
+          description: 印刷原样数值(与 value 同契约;Δ 由客户端 ParseFloat)
+        unit:
+          type: [string, "null"]
+          description: 同指标自身的归一单位;Δ 同单位才可比,故基线值携带
+    UploadResult:
+      type: object
+      additionalProperties: false
+      required: [duplicate, report]
+      properties:
+        duplicate:
+          type: boolean
+          description: sha 命中已有报告(幂等重试)为 true;false = 新建归档或显式 override 重跑
+        report:
+          $ref: "#/components/schemas/ReportDetail"
+    ReviewRequest:
+      description: |
+        核对请求体(单一契约字段集):confirm 分支只带 action(确认不产生修正对);
+        correct 分支必带 action 且至少一项 value/unit/name/ref_range。
+        无 flag 字段——additionalProperties:false 直接拒绝手改 flag 请求。
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [action]
+          properties:
+            action:
+              const: confirm
+        - type: object
+          additionalProperties: false
+          required: [action]
+          anyOf:
+            - { required: [value] }
+            - { required: [unit] }
+            - { required: [name] }
+            - { required: [ref_range] }
+          properties:
+            action:
+              const: correct
+            value:
+              type: string
+              description: 修正后的印刷数值字符串(家长照纸面事实直书)
+            unit:
+              type: string
+            name:
+              type: string
+              minLength: 1
+            ref_range:
+              type: string
+              description: 参考范围照纸补录;flag 随修正后 value×ref_range 重算
+    ReviewResult:
+      type: object
+      additionalProperties: false
+      required: [report_id, status, unreviewed_low_confidence_count, item]
+      properties:
+        report_id: { type: string, pattern: "^[0-9a-f]{64}$" }
+        status:
+          $ref: "#/components/schemas/ReportStatus"
+        unreviewed_low_confidence_count: { type: integer, minimum: 0 }
+        item:
+          $ref: "#/components/schemas/ReportItem"
+      description: 单响应刷新整屏:核对后整份报告的最新派生状态 + 本次动作的指标项。
+    CorrectionValues:
+      type: object
+      additionalProperties: false
+      required: [name, value, unit, ref_range]
+      properties:
+        name: { type: [string, "null"] }
+        value: { type: [string, "null"] }
+        unit: { type: [string, "null"] }
+        ref_range: { type: [string, "null"] }
+    CorrectionPair:
+      description: |
+        修正对 append-only 表形状(落库:correction_pairs;本期只存不回流,ADR-0005):
+        before→after 全集(四项纸面事实字段各一份快照)+ 原始行文 + OCR 行下标 +
+        时间。确认不产生记录,只有修正 append;按可回流设计,未来直接喂 gt_eval 零迁移。
+      type: object
+      additionalProperties: false
+      required: [item_id, before, after, raw_text, ocr_line_numbers, created_at]
+      properties:
+        item_id: { $ref: "#/components/schemas/ItemIDHandle" }
+        before:
+          $ref: "#/components/schemas/CorrectionValues"
+        after:
+          $ref: "#/components/schemas/CorrectionValues"
+        raw_text:
+          type: string
+          minLength: 1
+          description: 该指标项修正前后的原始行文(同一份,修正不改行文归属)
+        ocr_line_numbers:
+          type: array
+          items: { type: integer, minimum: 0 }
+          description: raw_text 对应的 OCR 行下标(0-based,与 ocr_lines 同下标口径)
+        created_at:
+          type: string
+          format: date-time
+    TrendResult:
+      type: object
+      additionalProperties: false
+      required: [member_id, name, points]
+      properties:
+        member_id: { type: integer, format: int64 }
+        name: { type: string, minLength: 1 }
+        points:
+          type: array
+          items: { $ref: "#/components/schemas/TrendPoint" }
+    TrendPoint:
+      type: object
+      additionalProperties: false
+      required: [report_id, report_date, value, unit, ref_range, method, flag,
+        low_confidence, reviewed]
+      properties:
+        report_id: { type: string, pattern: "^[0-9a-f]{64}$" }
+        report_date:
+          type: [string, "null"]
+          pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+          description: null 的点不参与画线,客户端在图下以「缺日期 N 份」提示
+        value:
+          type: [string, "null"]
+          description: 印刷原样数值(与指标项 value 同契约);Δ 自行 ParseFloat
+        unit: { type: [string, "null"] }
+        ref_range: { type: [string, "null"], description: 参考范围淡带铺图依据 }
+        method: { type: [string, "null"], description: 解释跨院参考范围差异 }
+        flag:
+          type: string
+          enum: [normal, high, low, unknown]
+        low_confidence: { type: boolean }
+        reviewed:
+          type: boolean
+          description: |
+            响应派生信任标记(review_status ∈ {confirmed, corrected}):实心 =
+            reviewed 或非低置信;空心 = 未核对低置信点——不隐藏数据、不冒充可信。
+    Error:
+      type: object
+      additionalProperties: false
+      required: [message]
+      properties:
+        message:
+          type: string
+          description: 中性事实侧错误说明(不诊断、不猜测)

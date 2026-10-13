@@ -1,0 +1,42 @@
+{
+  "duplicate": true,
+  "report": {
+    "report_id": "ce9a85874d67a20586aabc090a43142aa51b0d951e294f0b4f5daba864ec4d75",
+    "member_id": 1,
+    "report_type": "临检",
+    "report_date": null,
+    "status": "partial",
+    "fail_reason": null,
+    "flag_counts": {
+      "high": 5,
+      "low": 2,
+      "unknown": 1
+    },
+    "unreviewed_low_confidence_count": 1,
+    "items": [
+      {
+        "item_id": 7,
+        "name": "单核细胞比率",
+        "value": "10.8",
+        "unit": "%",
+        "ref_range": "3-10",
+        "method": null,
+        "flag": "high",
+        "low_confidence": true,
+        "raw_text": "单核细胞百分比  10.8  ↑ %  3-10",
+        "review_status": "unreviewed",
+        "ocr_lines": [
+          {
+            "line": 2,
+            "box": [[400, 200], [460, 200], [460, 230], [400, 230]]
+          }
+        ],
+        "prev": {
+          "report_date": "2009-03-21",
+          "value": "9.10",
+          "unit": "%"
+        }
+      }
+    ]
+  }
+}

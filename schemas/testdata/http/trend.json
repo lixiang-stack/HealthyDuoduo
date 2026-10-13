@@ -1,0 +1,50 @@
+{
+  "member_id": 1,
+  "name": "血红蛋白",
+  "points": [
+    {
+      "report_id": "139fde0e0b0c2114b556bd4462aead8e8d64c44fe24906f87e7bfabc0e4b93b3",
+      "report_date": "2009-03-21",
+      "value": "151",
+      "unit": "g/L",
+      "ref_range": "110--160",
+      "method": null,
+      "flag": "normal",
+      "low_confidence": false,
+      "reviewed": false
+    },
+    {
+      "report_id": "b3f4e24ed0372a39ee0838457414993e1349ef73776332a6aefd085f955f3424",
+      "report_date": "2019-08-07",
+      "value": "139.0",
+      "unit": "g/L",
+      "ref_range": "110.0~160.0",
+      "method": null,
+      "flag": "normal",
+      "low_confidence": false,
+      "reviewed": false
+    },
+    {
+      "report_id": "7051a0e384cc40687fafaaed9964a46b959426eef237fecad4d35d5e876cbcc8",
+      "report_date": "2024-08-19",
+      "value": "118",
+      "unit": "g/L",
+      "ref_range": "130--175",
+      "method": null,
+      "flag": "low",
+      "low_confidence": false,
+      "reviewed": false
+    },
+    {
+      "report_id": "ce9a85874d67a20586aabc090a43142aa51b0d951e294f0b4f5daba864ec4d75",
+      "report_date": null,
+      "value": "135",
+      "unit": "g/L",
+      "ref_range": "130--175",
+      "method": null,
+      "flag": "normal",
+      "low_confidence": false,
+      "reviewed": false
+    }
+  ]
+}
