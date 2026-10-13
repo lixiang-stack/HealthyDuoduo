@@ -1,0 +1,53 @@
+# 单位族规范印形表(单位规一化的数据源;postprocess.load_unit_families 加载)。
+#
+# 【为什么存在】上标印形(10^9/L)与低分辨率源图(600px 微信截图/手机拍照件)令 OCR
+# 读出一批不可比单位字面(109/L、7/6.0、1/6.0…);词典 units 的多印形注册解决
+# 「匹配」,不解决「展示一致」:同一指标项跨单印形不同 → hdd trend 的 sameUnit
+# 判不等,delta 全 "-",时序不可比。本表把同一物理单位的全部已知印形收敛到唯一
+# 规范印形(canonical),在 postprocess 落报告时替换 unit 字段。
+#
+# 【证据规则】与 *_dict.yaml 同源,每条 form 须有真实语料证据
+# (samples/expected/ocr 或 data/masked/ocr,行尾 [样本 id] 注明)或已由词典
+# units 登记背书;证据不足或映射链可疑的不收录(rmol/L、ag/L、ng/al、10/a1、
+# IU/al 等保留原文,列在 docs/design/2026-10-15-unit-normalization.md)。
+#
+# 【语义】canonical = 报告 unit 字段的唯一印形;forms = 同族规范印形 + OCR 损耗形
+# (匹配小写、大小写不敏感;同 form 可属多族,归一时由该项注册集裁决唯一生效者,
+# 见 postprocess._normalize_unit:仅当该项 units 已注册 canonical 才替换)。
+families:
+  - canonical: "10^9/L"
+    forms:
+      - "*10^9/L"     # [webwxgetmsgimg_19, cbc_08]
+      - "10~9/L"      # [cbc_02, cbc_06, webwxgetmsgimg_9/19/20]
+      - "*10~9/L"     # [cbc_03, webwxgetmsgimg_19]
+      - "109/L"       # 上标 9 拍平 [cbc_01, cbc_04, cbc_07, cbc_09, webwxgetmsgimg_10/20]
+      - "7/6.0"       # [cbc_05 微信 600px 截图]
+      - "7/6.01"      # [cbc_05]
+      - "1/6.0"       # [cbc_04 拍照件, cbc_05]
+      - "1/6.01"      # [cbc_05]
+      - ".09/L"       # [cbc_05 淋巴细胞数 熔断尾片]
+      - "~9/L"        # [cbc_02, cbc_05 熔断格尾]
+      - "f1"          # [cbc_05 嗜碱粒细胞数;l→1 形,仅对 10^9 注册项生效]
+  - canonical: "10^12/L"
+    forms:
+      - "*10^12/L"    # [cbc_08, webwxgetmsgimg_19]
+      - "10~12/L"     # [cbc_02, cbc_03, cbc_07, webwxgetmsgimg_10]
+      - "1012/L"      # 上标拍平 [cbc_01]
+      - ")12/L"       # [cbc_05 尾片]
+  - canonical: "μmol/L"
+    forms:
+      - "μ mol/L"     # [lft_01, lft_08, webwxgetmsgimg_11]
+      - "μmo1/L"      # [lft_03, lft_05]
+      - "μnol/L"      # [lft_03]
+      - "μno1/L"      # [lft_03]
+      - "umol/L"      # [lft_04]
+  - canonical: "fL"
+    forms:
+      - "fl"          # [cbc_05 等多册小写印]
+      - "f1"          # l→1 [cbc_05 MPV/红细胞平均体积]
+  - canonical: "pmol/L"
+    forms:
+      - "pmo1/L"      # [tft_01 游离甲状腺素]
+  - canonical: "mIU/L"
+    forms:
+      - "uIU/ml"      # [endocrine 词典登记;µIU/mL 与 mIU/L 数值等价(×10³ 约分)]

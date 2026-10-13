@@ -27,7 +27,7 @@ items:
     units: [pmol/L, pg/al]
   - name: 游离甲状腺素
     aliases: [游离T4, FT4, 游离甲状腺素(FT4), F74]
-    units: [pmo1/L, ng/d1, pg/al]
+    units: [pmol/L, pmo1/L, ng/d1, pg/al]
   - name: 抗甲状腺过氧化物酶抗体
     aliases: [甲状腺过氧化物酶抗体(TPOAb), TPOAb]
     units: [IU/mL, IU/al, 1U/mL, U/ml]

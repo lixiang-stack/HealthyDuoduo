@@ -197,13 +197,17 @@ func runList(out, errOut io.Writer, d *deps, args []string) int {
 	return twError(tw)
 }
 
-// runTrend hdd trend <指标名> [--type]:同一指标项跨报告时序对比(P3);
+// runTrend hdd trend <指标名> [--type] [--all]:同一指标项跨报告时序对比(P3);
 // 行升序,delta 为相邻点差值(单位一致才计,否则 "-")。
+// 质量门:低置信(决策 #7)或 flag=unknown 的点默认排除——不可信点混入时序会拉歪
+// delta 比对;--all 关闭过滤全量展示,被滤行数注明到 stderr。
 func runTrend(out, errOut io.Writer, d *deps, args []string) int {
 	trendFlags := flag.NewFlagSet("trend", flag.ContinueOnError)
 	trendFlags.SetOutput(errOut)
 	var reportType string
+	var showAll bool
 	trendFlags.StringVar(&reportType, "type", "", "filter by report type, e.g. CBC (= 血常规)")
+	trendFlags.BoolVar(&showAll, "all", false, "include low-confidence / unknown-flag points")
 	if err := trendFlags.Parse(args); err != nil {
 		return exitUsage
 	}
@@ -216,6 +220,18 @@ func runTrend(out, errOut io.Writer, d *deps, args []string) int {
 	if err != nil {
 		fmt.Fprintf(errOut, "trend: %v\n", err)
 		return exitError
+	}
+	if !showAll {
+		kept := rows[:0]
+		for _, r := range rows {
+			if !low_quality(r) {
+				kept = append(kept, r)
+			}
+		}
+		if dropped := len(rows) - len(kept); dropped > 0 {
+			fmt.Fprintf(errOut, "trend: %d low-quality point(s) hidden (--all to show)\n", dropped)
+		}
+		rows = kept
 	}
 	tw := tabwriter.NewWriter(out, 0, 4, 2, ' ', 0)
 	fmt.Fprintln(tw, "date\ttype\tvalue\tunit\tdelta\tflag\tsha256")
@@ -271,6 +287,11 @@ func sameUnit(a, b *string) bool {
 		return a == b
 	}
 	return *a == *b
+}
+
+// low_quality 项级质量门:trend 排除口径 = 低置信透传(决策 #7)或 flag=unknown。
+func low_quality(r pipeline.TrendRow) bool {
+	return r.LowConfidence || r.Flag == "unknown"
 }
 
 func twError(tw *tabwriter.Writer) int {

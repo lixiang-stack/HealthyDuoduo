@@ -228,12 +228,12 @@ def test_fused_name_value() -> None:
 
 
 def test_fused_unit_ref_in_unit_cell() -> None:
-    """单位熔断参考范围(cbc_02 版式):*10~9/L 3.5-9.5。"""
+    """单位熔断参考范围(cbc_02 版式):*10~9/L 3.5-9.5;单位归一为规范印形。"""
     ocr = mk_ocr(header_row() + row(30, "*白细胞计数", "6.01", unit="*10~9/L 3.5-9.5"))
     r = run_postprocess(ocr)
     it = item_of(r, "白细胞计数")
     assert it.value == "6.01"
-    assert it.unit == "*10~9/L"
+    assert it.unit == "10^9/L"
     assert it.ref_range == "3.5-9.5"
 
 
@@ -352,12 +352,13 @@ def test_score_threshold_boundary() -> None:
 
 
 def test_garbled_unit_kept_raw_without_confidence_mark() -> None:
-    """OCR 损耗单位(109/L 版式)保留原文;low_confidence 仅由 score<0.8 决定(决策 #7)。"""
+    """OCR 损耗单位(109/L)归一为注册印形 10^9/L;low_confidence 仅由 score<0.8 决定(决策 #7)。"""
     ocr = mk_ocr(header_row() + row(30, "血小板", "215", unit="109/L", ref="100--300"))
     r = run_postprocess(ocr)
     it = item_of(r, "血小板")
     assert it.value == "215"
-    assert it.unit == "109/L"  # 保留原文供人工核对
+    assert it.unit == "10^9/L"  # 展示归一,原文留痕在 raw_text
+    assert "109/L" in it.raw_text
     assert it.low_confidence is False
     assert r.status == "success"
 
@@ -561,6 +562,49 @@ def test_narrative_first_value_wins_over_title_mention() -> None:
     it = item_of(r, "颈项透明层厚度")
     assert it.value == "2.6"
     assert "2.6mm" in it.raw_text
+
+
+# ---------- 单位规一化(印刷损耗形 → 词典注册的规范印形,unit_families.yaml) ----------
+
+
+def test_loss_form_normalized_to_registered_canonical() -> None:
+    """cbc_01 真实形态:上标 9 拍平成 109/L → 归一为注册印形 10^9/L。"""
+    ocr = mk_ocr(header_row() + row(30, "血小板", "136", unit="109/L", ref="125-350"))
+    it = item_of(run_postprocess(ocr), "血小板")
+    assert it.unit == "10^9/L"
+    assert "109/L" in it.raw_text
+
+
+def test_wechat_loss_form_normalized() -> None:
+    """cbc_05 真实形态:600px 截图把 10^9/L 读成 7/6.0 → 归一为 10^9/L。"""
+    ocr = mk_ocr(header_row() + row(30, "血小板", "184", unit="7/6.0", ref="100~300"))
+    assert item_of(run_postprocess(ocr), "血小板").unit == "10^9/L"
+
+
+def test_loss_form_dispatched_by_item_registration() -> None:
+    """同损耗形跨族(f1 ∈ fL 族与 10^9 族)由该项注册集裁决唯一生效者。"""
+    ocr = mk_ocr(
+        header_row()
+        + row(30, "平均红细胞体积", "92.6", unit="f1", ref="82-100")
+        + row(50, "嗜碱性粒细胞数", "0.010", unit="f1")
+    )
+    r = run_postprocess(ocr)
+    assert item_of(r, "平均红细胞体积").unit == "fL"
+    assert item_of(r, "嗜碱性粒细胞数").unit == "10^9/L"
+
+
+def test_unknown_unit_kept_as_printed() -> None:
+    """注册集与单位族之外的乱珠不归一,保留原文供人工核对。"""
+    ocr = mk_ocr(header_row() + row(30, "血红蛋白", "128", unit="xw/L", ref="115-150"))
+    assert item_of(run_postprocess(ocr), "血红蛋白").unit == "xw/L"
+
+
+def test_family_map_chosen_by_item_membership() -> None:
+    """同族损耗形跨类别生效:μ 家族(lft_03/05 证据)按生化词典项归一。"""
+    chem = next(d for d in _postprocess.load_dicts() if d.report_type == "生化")
+    bilirubin = next(i for i in chem.items if i.name == "总胆红素")
+    assert _postprocess._normalize_unit("μmo1/L", bilirubin) == "μmol/L"
+    assert _postprocess._normalize_unit("μnol/L", bilirubin) == "μmol/L"
 
 
 # ---------- golden(真实样本,OCR 结果来自 golden 文件,跨架构确定性) ----------

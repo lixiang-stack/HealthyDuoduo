@@ -15,8 +15,10 @@
 低置信:任一组成行 score < LOW_SCORE_THRESHOLD → 该项 low_confidence 标记保留;
 partial 触发(review 2026-10-12 收敛 + 低置信占比补丁):指标 value 缺失、日期缺失,
 或 **low_confidence 占比 ≥ 50%**(过半指标不可靠 → 整单降级,供人工甄别)。
-单位解析损耗(如 109/L、1012/L)一律保留原文记录,不改变置信标记;
-threshold 与单位语义供人工核对与后续规一化用。
+单位解析损耗(如 109/L、7/6.0)经单位族规范印形表(unit_families.yaml)归一:
+仅当该项词典 units 已注册 canonical 才替换 unit 字段(项上下文裁决),未注册
+印形保留原文;归一只改展示一致性(hdd trend sameUnit/delta),原文留痕在
+raw_text,不改变置信标记(决策 #7)。
 未解析日期且无兜底 → report_date=null+partial;类别失败或无产出 → failed。
 
 样本收窄边界(review):规则与词典由已入库真实样本驱动;新样本若引入
@@ -41,6 +43,9 @@ from .contract import Flag, OCRResult, Report, ReportItem, Status
 # 不内置参考值;参考范围一律从检查单抽取),按文件名序注册。
 DICT_DIR = Path(__file__).parent
 DICT_GLOB = "*_dict.yaml"
+
+# 单位族规范印形表(数据文件注册表内,与类别 *_dict.yaml 平行;语义见文件头)
+UNIT_FAMILIES_FILE = DICT_DIR / "unit_families.yaml"
 
 # 决策 #7:任一组成行 score < 阈值 → 项 low_confidence(固定常量);报告级触发见
 # LOW_CONF_PARTIAL_RATIO。
@@ -419,6 +424,40 @@ def _flag(value: str | None, ref: str | None) -> Flag:
             return Flag.NORMAL if vnum < v else Flag.HIGH
         return Flag.NORMAL if vnum > v else Flag.LOW
     return Flag.UNKNOWN
+
+
+@lru_cache(maxsize=1)
+def load_unit_families() -> dict[str, tuple[str, ...]]:
+    """单位族规范印形表:单位字面(小写)→ 候选规范印形列表;载入一次缓存。
+
+    数据文件 unit_families.yaml(证据规则见文件头);与 *_dict.yaml 类别注册表
+    相互独立——单位家族是跨类别的字形级事实(印形/损耗),类别词典只负责
+    「该项合法单位集」的注册与裁决。
+    """
+    raw = yaml.safe_load(UNIT_FAMILIES_FILE.read_text(encoding="utf-8"))
+    out: dict[str, list[str]] = {}
+    for fam in raw["families"]:
+        canon = str(fam["canonical"])
+        for form in fam["forms"]:
+            out.setdefault(str(form).strip().lower(), []).append(canon)
+    return {k: tuple(v) for k, v in out.items()}
+
+
+def _normalize_unit(unit: str | None, item: DictItem | None) -> str | None:
+    """印刷单位 → 家族规范印形(unit_families.yaml;展示一致性归一)。
+
+    仅当该项词典 units 已注册 canonical 才替换(如 f1 对 fL 注册项 → fL、
+    对 10^9 家族注册项不生效);未注册印形或无词典项 → 原文保留,不猜。
+    原文留痕在 raw_text;报告字段重合成 golden 后由人工核对。
+    """
+    if unit is None:
+        return None
+    cands = load_unit_families().get(unit.strip().lower())
+    if cands and item is not None:
+        for canon in cands:
+            if canon.lower() in item.units:
+                return canon
+    return unit
 
 
 def _undecorate(text: str) -> str:
@@ -912,7 +951,7 @@ def run_postprocess(ocr: OCRResult, date_hint: str | None = None) -> Report:
             ReportItem(
                 name=it.name,
                 value=piece.value,
-                unit=piece.unit,
+                unit=_normalize_unit(piece.unit, piece.item),
                 ref_range=piece.ref,
                 method=piece.method,
                 flag=flag,

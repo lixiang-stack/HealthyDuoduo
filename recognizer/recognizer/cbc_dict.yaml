@@ -18,9 +18,9 @@
 #                  min_matched_items 命中词典项数兜底
 #   items          指标项:name=规范名 aliases=别名与缩写 units=已知单位集
 #
-# units 为维护者核对与后续统计规一化用的已知单位字面量(大小写不敏感比较);
-# OCR 损耗单位(如 109/L、1012/L)保留原文记录,不改变置信
-# (low_confidence 仅由 score<0.8 决定,决策 #7;详见 postprocess)。
+# units 为维护者核对用的已知单位字面量(大小写不敏感比较;匹配语义);
+# 印刷后的展示归一见 recognizer/unit_families.yaml(损耗形如 109/L、7/6.0
+# 经项注册集裁决收敛到规范印形;未注册印形保留原文,详见 postprocess)。
 report_type: 临检
 category:
   title_keywords: ["血常规", "血细胞分析", "血液细胞"]

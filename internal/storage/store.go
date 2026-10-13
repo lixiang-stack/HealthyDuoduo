@@ -72,15 +72,16 @@ const (
 	sqlItemsByReport = `SELECT name, value, unit, ref_range, method, flag, low_confidence, raw_text
 		 FROM report_items WHERE report_sha256 = $1 ORDER BY id`
 
-	// trend:同一指标项名(report_items.name = 词典规范名)的跨报告时序点,升序
+	// trend:同一指标项名(report_items.name = 词典规范名)的跨报告时序点,升序;
+	// low_confidence 为项级质量信号(决策 #7),CLI 默认排除不可信点(--all 关闭)。
 	sqlTrendByName = `SELECT r.image_sha256, r.report_type,
-		   COALESCE(to_char(r.report_date, 'YYYY-MM-DD'), ''), i.value, i.unit, i.flag
+		   COALESCE(to_char(r.report_date, 'YYYY-MM-DD'), ''), i.value, i.unit, i.flag, i.low_confidence
 		 FROM report_items i JOIN reports r ON r.image_sha256 = i.report_sha256
 		 WHERE i.name = $1
 		 ORDER BY r.report_date ASC, r.image_sha256 ASC`
 
 	sqlTrendByNameAndType = `SELECT r.image_sha256, r.report_type,
-		   COALESCE(to_char(r.report_date, 'YYYY-MM-DD'), ''), i.value, i.unit, i.flag
+		   COALESCE(to_char(r.report_date, 'YYYY-MM-DD'), ''), i.value, i.unit, i.flag, i.low_confidence
 		 FROM report_items i JOIN reports r ON r.image_sha256 = i.report_sha256
 		 WHERE i.name = $1 AND r.report_type = $2
 		 ORDER BY r.report_date ASC, r.image_sha256 ASC`
@@ -238,7 +239,7 @@ func (s *Store) trendRows(ctx context.Context, query string, args ...any) ([]pip
 	for rows.Next() {
 		var r pipeline.TrendRow
 		var date string
-		if err := rows.Scan(&r.Sha256, &r.ReportType, &date, &r.Value, &r.Unit, &r.Flag); err != nil {
+		if err := rows.Scan(&r.Sha256, &r.ReportType, &date, &r.Value, &r.Unit, &r.Flag, &r.LowConfidence); err != nil {
 			return nil, err
 		}
 		if date != "" {
