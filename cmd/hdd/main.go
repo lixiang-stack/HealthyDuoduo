@@ -15,7 +15,7 @@ const usage = `usage: hdd ingest <image...> [--date YYYY-MM-DD] [--force]
        hdd reparse <sha256...> [--date YYYY-MM-DD]
        hdd list [--type <report-type>] [--date YYYY|YYYY-MM|YYYY-MM-DD]
        hdd show <sha256...>
-       hdd trend <item-name> [--type <report-type>]`
+       hdd trend <item-name> [--type <report-type>] [--all]`
 
 // CLI 退出码(POSIX 惯例):2=用法/参数错误,1=运行错误;成功为 0(零值,不单独命名)。
 const (

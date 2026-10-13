@@ -65,12 +65,13 @@ type ReportRow struct {
 // TrendRow 单指标项跨报告的时序数据点(hdd trend 查询视图;按报告日期升序)。
 // Value 为印刷原样字符串(与 ReportItem.value 同契约);delta 需 ParseFloat。
 type TrendRow struct {
-	Sha256     string
-	ReportType string
-	ReportDate *string
-	Value      *string
-	Unit       *string
-	Flag       string // normal | high | low | unknown(4.2)
+	Sha256        string
+	ReportType    string
+	ReportDate    *string
+	Value         *string
+	Unit          *string
+	Flag          string // normal | high | low | unknown(4.2)
+	LowConfidence bool   // 任一组成行 score < LOW_SCORE_THRESHOLD(决策 #7 透传)
 }
 
 // IngestOutcome 入库结果(供 CLI 演示输出)。

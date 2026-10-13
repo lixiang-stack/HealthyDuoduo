@@ -25,5 +25,5 @@ _Avoid_: 记录、结果
 _Avoid_: 报告类型、单据类型
 
 **指标项**：
-报告中单个检验指标：名称、数值、单位、参考范围与标记（normal/high/low/unknown）。
+报告中单个检验指标：名称、数值、单位、参考范围与标记（normal/high/low/unknown）。单位取词典注册的规范印形（unit_families.yaml 归一；未注册印形保留原文）。
 _Avoid_: 项目、字段

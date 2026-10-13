@@ -179,3 +179,35 @@ func TestRunTrendRequiresExactlyOneItemName(t *testing.T) {
 		t.Fatalf("exit = %d, want 2", code)
 	}
 }
+
+func TestRunTrendExcludesLowQualityPointsByDefault(t *testing.T) {
+	// 质量门:低置信(决策 #7)或 flag=unknown 的点默认隐藏,--all 全量展示。
+	v1, v2, unit := "128", "136", "g/L"
+	d := &deps{store: fakeStoreCLI{trendRet: []pipeline.TrendRow{
+		{Sha256: strings.Repeat("a", 64), ReportType: "血常规", ReportDate: str("2026-01-02"), Value: &v1, Unit: &unit, Flag: "unknown"},
+		{Sha256: strings.Repeat("b", 64), ReportType: "血常规", ReportDate: str("2026-02-02"), Value: &v1, Unit: &unit, Flag: "normal", LowConfidence: true},
+		{Sha256: strings.Repeat("c", 64), ReportType: "血常规", ReportDate: str("2026-03-01"), Value: &v2, Unit: &unit, Flag: "normal"},
+	}}, rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
+	var out, errOut bytes.Buffer
+	if code := run(&out, &errOut, d, []string{"trend", "血红蛋白"}); code != 0 {
+		t.Fatalf("exit = %d, stderr = %q", code, errOut.String())
+	}
+	if !strings.Contains(errOut.String(), "2 low-quality") {
+		t.Fatalf("stderr = %q, want hidden-point note", errOut.String())
+	}
+	if body := out.String(); strings.Count(body, "g/L") != 1 {
+		t.Fatalf("stdout = %q, want exactly one kept row", body)
+	}
+
+	out.Reset()
+	errOut.Reset()
+	if code := run(&out, &errOut, d, []string{"trend", "--all", "血红蛋白"}); code != 0 {
+		t.Fatalf("exit = %d, stderr = %q", code, errOut.String())
+	}
+	if strings.Contains(errOut.String(), "low-quality") {
+		t.Fatalf("--all stderr = %q, want no hidden-point note", errOut.String())
+	}
+	if body := out.String(); strings.Count(body, "g/L") != 3 {
+		t.Fatalf("--all stdout = %q, want all three rows", body)
+	}
+}
