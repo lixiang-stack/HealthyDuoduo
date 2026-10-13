@@ -1,6 +1,12 @@
-# recognizer 镜像构建上下文:仓库根,但源码只需要 recognizer/
+# 仓库根 = 两个镜像的共享构建上下文(recognizer/hdd):白名单只放进镜像 S 所需源码,
+# 未列入(datas/samples/hdd 二进制等)一律排除。recognizer 镜像只 COPY recognizer/,
+# hdd 镜像只 COPY cmd/internal 与 go.mod/sum——上下文放宽不改变各自镜像内容。
 *
 !recognizer/
+!cmd/
+!internal/
+!go.mod
+!go.sum
 recognizer/tests/
 recognizer/.venv/
 recognizer/**/__pycache__/
