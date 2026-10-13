@@ -9,7 +9,7 @@
 # 【证据规则】与 *_dict.yaml 同源,每条 form 须有真实语料证据
 # (samples/expected/ocr 或 data/masked/ocr,行尾 [样本 id] 注明)或已由词典
 # units 登记背书;证据不足或映射链可疑的不收录(rmol/L、ag/L、ng/al、10/a1、
-# IU/al 等保留原文,列在 docs/design/2026-10-15-unit-normalization.md)。
+# IU/al 等保留原文,列在 docs/design/2026-10-12-unit-normalization.md)。
 #
 # 【语义】canonical = 报告 unit 字段的唯一印形;forms = 同族规范印形 + OCR 损耗形
 # (匹配小写、大小写不敏感;同 form 可属多族,归一时由该项注册集裁决唯一生效者,
