@@ -1,0 +1,44 @@
+# 数据服务 HTTP 契约唯一源(OpenAPI 3.1 单文件;viz-and-client spec「契约与 API 面」)。
+# M0 冻结起点:API 前缀 /api/v1 + health 端点;后续 12 端点由票 02 一次定稿;
+# 识别端既有 JSON Schema(schemas/*.schema.json)以 $ref 复用,识别端契约文件本身不动。
+# App 侧 codegen 生成的 TS 类型与本文件为准;HTTP 契约测试(票 02)以本文件为锚。
+openapi: 3.1.0
+info:
+  title: HealthyDuoduo Data Service API
+  version: 0.1.0
+  description: |
+    家长 App 的后端数据服务(既有 hdd 二进制的 serve 子命令,复用 openDeps 编排依赖层)。
+    局域网先行、不做鉴权(ADR-0006);所有路径挂在 /api/v1 前缀下(见 servers)。
+# 前缀经 servers 表达:路径键保持无前缀,部署方换 IP/端口不碰契约;
+# 与设计文档 6 的「GET /api/v1/health」按 servers + paths 拼接读法对应。
+servers:
+  - url: /api/v1
+    description: 数据服务前缀(路由器 DHCP 保留 IP + 固定端口下的路径基座)
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      summary: 配对后连通性校验
+      description: 进程级存活与版本;依赖未就绪时服务不启动(fail-fast),故应答即健康。
+      responses:
+        "200":
+          description: 服务存活
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+components:
+  schemas:
+    Health:
+      type: object
+      additionalProperties: false
+      required: [ok, version]
+      properties:
+        ok:
+          type: boolean
+          const: true
+          description: 恒为 true(非 200 即不可用,无 ok:false 形态)
+        version:
+          type: string
+          description: 数据服务版本,与 serve 实现常量及 info.version 同源(0.1.0)
+          example: "0.1.0"

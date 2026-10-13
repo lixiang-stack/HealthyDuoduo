@@ -14,8 +14,8 @@ dist/
 # Go
 *.test
 
-# 手工 go build 的 CLI 产物(名为 hdd 的任何路径)
-hdd
+# 手工 go build 的 CLI 产物(仅仓库根;必须 / 锚定,否则会吞掉 cmd/hdd 下新建的文件)
+/hdd
 
 # macOS 元数据
 .DS_Store

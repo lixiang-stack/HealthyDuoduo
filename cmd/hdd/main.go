@@ -1,5 +1,6 @@
 // hdd 是检查报告管理 MVP 的数据工程 CLI(实施计划决策 #9)。
-// 五命令:ingest(全流程入库)/ reparse(仅重跑后处理)/ list(查询)/ show(单报告)/ trend(指标时序)。
+// 数据命令:ingest(全流程入库)/ reparse(仅重跑后处理)/ list(查询)/ show(单报告)/ trend(指标时序);
+// serve 为常驻 HTTP 形态(/api/v1,viz-and-client 起步)。
 // 编排逻辑在 internal/pipeline;HTTP 识别服务、PG、S3 适配器在 config.go 的 openDeps 注入。
 // 用户可读输出(usage/错误信息)统一英文(review #18);report_type 等域值按数据原样保留。
 package main
@@ -15,7 +16,8 @@ const usage = `usage: hdd ingest <image...> [--date YYYY-MM-DD] [--force]
        hdd reparse <sha256...> [--date YYYY-MM-DD]
        hdd list [--type <report-type>] [--date YYYY|YYYY-MM|YYYY-MM-DD]
        hdd show <sha256...>
-       hdd trend <item-name> [--type <report-type>] [--all]`
+       hdd trend <item-name> [--type <report-type>] [--all]
+       hdd serve [--addr <host:port>]`
 
 // CLI 退出码(POSIX 惯例):2=用法/参数错误,1=运行错误;成功为 0(零值,不单独命名)。
 const (
@@ -58,6 +60,8 @@ func run(out, errOut io.Writer, d *deps, args []string) int {
 		return runShow(out, errOut, d, rest)
 	case "trend":
 		return runTrend(out, errOut, d, rest)
+	case "serve":
+		return runServe(out, errOut, d, rest)
 	default:
 		fmt.Fprintf(errOut, "hdd: unknown command %q\n%s\n", cmd, usage)
 		return exitUsage

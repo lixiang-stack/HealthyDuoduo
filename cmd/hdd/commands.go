@@ -1,6 +1,7 @@
 package main
 
-// Five subcommands; one line per record so demo scripts can assert on output
+// Data subcommands (ingest/reparse/list/show/trend) plus serve (HTTP, see serve.go);
+// data commands keep one line per record so demo scripts can assert on output
 // (implementation plan decision #11, command-level acceptance).
 // Interface text is English per acceptance review; report_type DATA values (血常规)
 // display as CBC when a display alias is known.
