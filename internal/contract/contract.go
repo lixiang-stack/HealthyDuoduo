@@ -8,6 +8,13 @@ type Point [2]float64
 // Box 是一个文本行的四点多边形。
 type Box [4]Point
 
+// 报告状态 4.2 枚举(schemas/report.schema.json);字符串契约,比较用常量不裸写字面值。
+const (
+	StatusSuccess = "success"
+	StatusPartial = "partial"
+	StatusFailed  = "failed"
+)
+
 // ModelInfo 描述 OCR 使用的模型。
 type ModelInfo struct {
 	Det string `json:"det"`

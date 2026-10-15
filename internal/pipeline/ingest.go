@@ -68,7 +68,7 @@ func Ingest(ctx context.Context, st Store, rec Recognizer, obj ObjectStore, path
 	if err != nil {
 		return nil, fmt.Errorf("write ocr_results: %w", err)
 	}
-	if err := st.WriteReport(ctx, sha, ocrID, *report); err != nil {
+	if err := st.WriteReport(ctx, sha, ocrID, *report, applyFailInvariant(report)); err != nil {
 		return nil, fmt.Errorf("write reports/report_items: %w", err)
 	}
 	kind := KindNew

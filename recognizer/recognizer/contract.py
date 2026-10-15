@@ -93,6 +93,14 @@ class Report(BaseModel):
     status: Status
     items: list[ReportItem]
 
+    @model_validator(mode="after")
+    def _empty_items_must_be_failed(self) -> "Report":
+        # 不变量(viz-and-client 票 03):零指标项的报告一律 failed——「成功且零指标项」
+        # 连构造都不可能,与识别端后处理规则(空产出 → failed)互为表里,契约层锁死。
+        if not self.items and self.status is not Status.FAILED:
+            raise ValueError("report with no items must have status=failed (empty-items invariant)")
+        return self
+
 
 class ReportResponse(BaseModel):
     """POST /report 的响应体:一次请求内 OCR 结果 + 结构化报告(实施计划 4.3;与 ReparseRequest 成对)。"""

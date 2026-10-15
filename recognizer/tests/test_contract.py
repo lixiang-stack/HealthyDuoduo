@@ -69,3 +69,23 @@ def test_invalid_report_rejected() -> None:
     with pytest.raises(ValidationError):
         Report.model_validate(instance)
     assert Draft202012Validator(_load(SCHEMA_DIR / "report.schema.json")).is_valid(instance) is False
+
+
+def _report(status: str, items: list[dict]) -> dict:
+    return {"report_type": "血常规", "report_date": "2026-10-01", "status": status, "items": items}
+
+
+def test_report_empty_items_must_be_failed() -> None:
+    """不变量(viz-and-client 票 03):空 items ⇒ failed——「成功且零指标项」连构造都不可能。"""
+    assert Report.model_validate(_report("failed", [])) is not None
+    for status in ("success", "partial"):
+        with pytest.raises(ValidationError, match="no items"):
+            Report.model_validate(_report(status, []))
+
+
+def test_report_with_items_accepts_every_status() -> None:
+    """非空 items 与三种 status 的组合全部合法(不变量只约束空 items 一侧)。"""
+    item = {"name": "血红蛋白", "value": "128", "unit": "g/L", "ref_range": "115-150",
+            "flag": "normal", "low_confidence": False, "raw_text": "血红蛋白 128 g/L 115-150"}
+    for status in ("success", "partial", "failed"):
+        assert Report.model_validate(_report(status, [item])) is not None
