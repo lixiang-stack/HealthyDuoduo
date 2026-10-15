@@ -5,11 +5,14 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
+
+	"healthyduoduo/internal/httpapi"
 )
 
 // version 数据服务版本(serve 健康检查与 OpenAPI info.version 同源对齐;升级随 PR 维护)。
@@ -31,12 +34,43 @@ type healthResponse struct {
 func newServeHandler(d *deps, corsOrigin string) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
 		// 进程能应答即健康:deps 未就绪时 serve 根本不启动(openDeps fail-fast)。
-		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(healthResponse{OK: true, Version: version})
+		writeJSON(w, http.StatusOK, healthResponse{OK: true, Version: version})
 	})
+	// 成员端点(票 05):建/列/改;无删除(契约冻结)。
+	mux.HandleFunc("GET /api/v1/members", handleListMembers(d.members))
+	mux.HandleFunc("POST /api/v1/members", handleCreateMember(d.members))
+	mux.HandleFunc("PATCH /api/v1/members/{member_id}", handleUpdateMember(d.members))
 	return withCORS(mux, corsOrigin)
+}
+
+// writeJSON /api/v1 的 JSON 响应写出(状态码 + Content-Type 一次收口)。
+func writeJSON(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(v)
+}
+
+// writeErrorJSON 非 2xx 统一契约形状(httpapi.Error;message 中性事实侧)。
+func writeErrorJSON(w http.ResponseWriter, status int, message string) {
+	writeJSON(w, status, httpapi.Error{Message: message})
+}
+
+// decodeJSONBody 严格解码单个 JSON 对象请求体:未知字段拒绝(契约 additionalProperties:false
+// 的端侧执行)、拒绝尾随数据。错误文案面向调试,中性事实侧。
+func decodeJSONBody(r *http.Request, dst any) error {
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(dst); err != nil {
+		if errors.Is(err, io.EOF) {
+			return errors.New("request body is required")
+		}
+		return err
+	}
+	if err := dec.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		return errors.New("request body must be a single JSON object")
+	}
+	return nil
 }
 
 // withCORS 按配置给全部响应加跨源头,并直接应答 OPTIONS 预检(204)。

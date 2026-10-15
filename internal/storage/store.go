@@ -105,6 +105,16 @@ const (
 	sqlItemInsert = `INSERT INTO report_items
 		 (report_sha256, name, value, unit, ref_range, method, flag, low_confidence, raw_text)
 		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`
+
+	// 成员(迁移 0004;显示名 + 是否孩子两档,无删除):列表按 id 升序 = 创建序返回,
+	// 孩子优先由客户端做;改动用 COALESCE 只覆盖传入字段(nil = 保持不变)。
+	sqlMemberInsert = `INSERT INTO members (name, is_child) VALUES ($1,$2)
+		 RETURNING id, created_at`
+
+	sqlMembersList = `SELECT id, name, is_child, created_at FROM members ORDER BY id`
+
+	sqlMemberUpdate = `UPDATE members SET name = COALESCE($2, name), is_child = COALESCE($3, is_child)
+		 WHERE id = $1 RETURNING id, name, is_child, created_at`
 )
 
 // reportColumnsSQL 报告行到业务视图(ReportRow)的标准投影;
@@ -308,4 +318,55 @@ func (s *Store) WriteReport(ctx context.Context, reportSha string, ocrID int64, 
 		return err
 	}
 	return nil
+}
+
+// CreateMember 建成员(name + is_child 两档;id/created_at 由库产生,viz-and-client 票 05)。
+// 名字过领域规则镜像(HTTP 边界已校验;直连存储的路径在此兜底,票 03 双保险惯例)。
+func (s *Store) CreateMember(ctx context.Context, name string, isChild bool) (*pipeline.Member, error) {
+	if err := pipeline.ValidateMemberName(name); err != nil {
+		return nil, err
+	}
+	m := pipeline.Member{Name: name, IsChild: isChild}
+	if err := s.pool.QueryRow(ctx, sqlMemberInsert, name, isChild).Scan(&m.MemberID, &m.CreatedAt); err != nil {
+		return nil, err
+	}
+	return &m, nil
+}
+
+// ListMembers 全量成员按创建序(id 升序);孩子优先由客户端做(契约排序口径)。
+func (s *Store) ListMembers(ctx context.Context) ([]pipeline.Member, error) {
+	rows, err := s.pool.Query(ctx, sqlMembersList)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []pipeline.Member
+	for rows.Next() {
+		var m pipeline.Member
+		if err := rows.Scan(&m.MemberID, &m.Name, &m.IsChild, &m.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, m)
+	}
+	return out, rows.Err()
+}
+
+// UpdateMember 只更新传入字段(至少一项由 HTTP 层校验);nil,nil = 成员不存在
+// (与 ImageBySha256 的缺失口径一致)。名字过领域规则镜像(同 CreateMember)。
+func (s *Store) UpdateMember(ctx context.Context, id int64, name *string, isChild *bool) (*pipeline.Member, error) {
+	if name != nil {
+		if err := pipeline.ValidateMemberName(*name); err != nil {
+			return nil, err
+		}
+	}
+	var m pipeline.Member
+	err := s.pool.QueryRow(ctx, sqlMemberUpdate, id, name, isChild).
+		Scan(&m.MemberID, &m.Name, &m.IsChild, &m.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &m, nil
 }

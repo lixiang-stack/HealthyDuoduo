@@ -23,9 +23,10 @@ import (
 
 // deps 编排层依赖(接口在 internal/pipeline,实现在 internal/storage、internal/recognizer)。
 type deps struct {
-	store pipeline.Store
-	rec   pipeline.Recognizer
-	obj   pipeline.ObjectStore
+	store   pipeline.Store
+	members pipeline.MemberStore
+	rec     pipeline.Recognizer
+	obj     pipeline.ObjectStore
 }
 
 // typeDisplay 已知报告类别 → CLI 显示缩写(域数据 storage 中原样保留)。
