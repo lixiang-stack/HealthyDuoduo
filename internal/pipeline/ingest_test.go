@@ -199,3 +199,86 @@ func TestReparse_UsesStoredOCRAndReplaceItems(t *testing.T) {
 		t.Errorf("stored ocr = %+v", ocr)
 	}
 }
+
+// ---------- 空指标项不变量(viz-and-client 票 03)----------
+// 报告级别产出「成功且零指标项」不可能:items 为空一律判 failed,pipeline 产出失败原因,
+// 与识别端契约校验及存储镜像校验构成防线;直灌绕过识别端也在此挡住。
+
+func TestIngestEmptyItems_CoercedFailedWithReason(t *testing.T) {
+	// 假识别器回归/绕过:success + 零指标项 → 一律判 failed + 失败原因落库。
+	for _, bogus := range []string{"success", "partial"} {
+		rec := newFakeRecognizer()
+		rec.report = contract.Report{ReportType: "血常规", Status: bogus} // items 空
+		st, obj := newFakeStore(), newObjects()
+		path := writeImage(t, []byte("fake-image-1"))
+
+		oc := ingest(t, st, rec, obj, path, "", false)
+
+		if oc.Report.Status != "failed" {
+			t.Errorf("empty items with status %q: ingested status = %q, want failed", bogus, oc.Report.Status)
+		}
+		want := "no metric items recognized"
+		got := st.reports[oc.Sha256].failReason
+		if got == nil || *got != want {
+			t.Errorf("empty items with status %q: fail_reason = %v, want %q", bogus, got, want)
+		}
+	}
+}
+
+func TestIngestFailedEmpty_KeepsFailedAndSetsReason(t *testing.T) {
+	// 真实识别端行为(拍糊/空白图):failed + 零指标项 → 原因照样产出;
+	// report_type 取识别端类别失败占位符 unknown(postprocess.UNKNOWN_REPORT_TYPE)。
+	rec := newFakeRecognizer()
+	rec.report = contract.Report{ReportType: "unknown", Status: "failed"}
+	st, obj := newFakeStore(), newObjects()
+	path := writeImage(t, []byte("fake-image-1"))
+
+	oc := ingest(t, st, rec, obj, path, "", false)
+
+	if oc.Report.Status != "failed" {
+		t.Fatalf("status = %q, want failed untouched", oc.Report.Status)
+	}
+	want := "no metric items recognized"
+	if got := st.reports[oc.Sha256].failReason; got == nil || *got != want {
+		t.Errorf("fail_reason = %v, want %q", got, want)
+	}
+}
+
+func TestIngestWithItems_NoFailReason(t *testing.T) {
+	// 正常有产出报告:fail_reason 必须为 nil(仅 failed 报告有值)。
+	st, rec, obj := newFakeStore(), newFakeRecognizer(), newObjects()
+	path := writeImage(t, []byte("fake-image-1"))
+
+	oc := ingest(t, st, rec, obj, path, "", false)
+
+	if got := st.reports[oc.Sha256].failReason; got != nil {
+		t.Errorf("fail_reason = %v, want nil for success report with items", got)
+	}
+	if st.reports[oc.Sha256].row.Status != "success" {
+		t.Errorf("status = %q, want success untouched", st.reports[oc.Sha256].row.Status)
+	}
+}
+
+func TestReparseRecovers_FailReasonCleared(t *testing.T) {
+	// 规则迭代把历史 failed 空报告算好 → 原 failed 报告的失败原因必须清空。
+	rec := newFakeRecognizer()
+	rec.report = contract.Report{ReportType: "血常规", Status: "failed"} // 历史失败落库
+	st, obj := newFakeStore(), newObjects()
+	path := writeImage(t, []byte("fake-image-1"))
+	oc := ingest(t, st, rec, obj, path, "", false)
+	if got := st.reports[oc.Sha256].failReason; got == nil {
+		t.Fatalf("setup: fail_reason = nil, want set on failed ingest")
+	}
+
+	rec.report = sampleReport("2024-08-19") // 重算后有产出
+	rep, err := pipeline.Reparse(context.Background(), st, rec, oc.Sha256, "")
+	if err != nil {
+		t.Fatalf("reparse: %v", err)
+	}
+	if rep.Status != "success" {
+		t.Errorf("reparse status = %q, want success", rep.Status)
+	}
+	if got := st.reports[oc.Sha256].failReason; got != nil {
+		t.Errorf("fail_reason after reparse = %v, want nil (recovered report)", got)
+	}
+}

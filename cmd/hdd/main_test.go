@@ -39,7 +39,7 @@ func (fakeStoreCLI) ItemsByImage(ctx context.Context, reportSha string) ([]contr
 func (fakeStoreCLI) OCRResultJSON(ctx context.Context, id int64) ([]byte, error) {
 	return []byte("{}"), nil
 }
-func (fakeStoreCLI) WriteReport(ctx context.Context, reportSha string, ocrID int64, report contract.Report) error {
+func (fakeStoreCLI) WriteReport(ctx context.Context, reportSha string, ocrID int64, report contract.Report, _ *string) error {
 	return nil
 }
 func (f fakeStoreCLI) TrendByName(ctx context.Context, item, reportType string) ([]pipeline.TrendRow, error) {

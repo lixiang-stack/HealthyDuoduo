@@ -89,13 +89,15 @@ const (
 	sqlOCRResultByID = `SELECT engine_output FROM ocr_results WHERE id = $1`
 
 	// 报告行 upsert:测定 identity = 图像 sha256(每图一行);冲突即原位更新(--force 重跑)。
-	sqlReportUpsert = `INSERT INTO reports (image_sha256, ocr_result_id, report_type, report_date, status)
-		 VALUES ($1,$2,$3,$4::date,$5)
+	// fail_reason 全量更新(pipeline 产出,非 failed 一律 NULL:重算复原时旧原因清除)。
+	sqlReportUpsert = `INSERT INTO reports (image_sha256, ocr_result_id, report_type, report_date, status, fail_reason)
+		 VALUES ($1,$2,$3,$4::date,$5,$6)
 		 ON CONFLICT (image_sha256) DO UPDATE SET
 		     ocr_result_id = excluded.ocr_result_id,
 		     report_type   = excluded.report_type,
 		     report_date   = excluded.report_date,
 		     status        = excluded.status,
+		     fail_reason   = excluded.fail_reason,
 		     updated_at    = now()`
 
 	sqlItemsDeleteByReport = `DELETE FROM report_items WHERE report_sha256 = $1`
@@ -277,7 +279,12 @@ func dateGranularity(date string) dateGrain {
 
 // WriteReport 落/更一份报告(items 取自 report.Items,事务式全量替换;
 // 身份 = 图像 sha256,每图一行:首次插入/冲突原位更新,updated_at 恒刷新)。
-func (s *Store) WriteReport(ctx context.Context, reportSha string, ocrID int64, report contract.Report) error {
+// 镜像校验(viz-and-client 票 03 双保险):空指标项⇒failed——绕过识别端直灌
+// 的违规形状(status=success/partial 且零 items)在此拒绝,不写库。
+func (s *Store) WriteReport(ctx context.Context, reportSha string, ocrID int64, report contract.Report, failReason *string) error {
+	if len(report.Items) == 0 && report.Status != contract.StatusFailed {
+		return fmt.Errorf("report invariant violated: %d items with status %q — report with no items must be failed", len(report.Items), report.Status)
+	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return err
@@ -285,7 +292,7 @@ func (s *Store) WriteReport(ctx context.Context, reportSha string, ocrID int64, 
 	defer tx.Rollback(ctx)
 
 	if _, err := tx.Exec(ctx, sqlReportUpsert,
-		reportSha, ocrID, report.ReportType, report.ReportDate, report.Status); err != nil {
+		reportSha, ocrID, report.ReportType, report.ReportDate, report.Status, failReason); err != nil {
 		return fmt.Errorf("upsert report: %w", err)
 	}
 	if _, err := tx.Exec(ctx, sqlItemsDeleteByReport, reportSha); err != nil {

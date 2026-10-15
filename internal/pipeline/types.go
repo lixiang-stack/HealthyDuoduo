@@ -40,7 +40,9 @@ type Store interface {
 	ItemsByImage(ctx context.Context, reportSha string) ([]contract.ReportItem, error)
 	OCRResultJSON(ctx context.Context, ocrID int64) ([]byte, error)
 	// WriteReport 落/更报告(身份=reportSha;items 取自 report.Items)。
-	WriteReport(ctx context.Context, reportSha string, ocrID int64, report contract.Report) error
+	// failReason 失败原因由 pipeline 产出(viz-and-client 票 03 空指标项不变量),
+	// nil = 非 failed 报告;随 upsert 全量写,重算复原时旧原因一并清除。
+	WriteReport(ctx context.Context, reportSha string, ocrID int64, report contract.Report, failReason *string) error
 	// TrendByName 同一指标项名的跨报告时序点(升序;reportType 空串 = 不过滤类别)。
 	TrendByName(ctx context.Context, itemName, reportType string) ([]TrendRow, error)
 }

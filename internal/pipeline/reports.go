@@ -27,6 +27,25 @@ func noReportError(sha string) error {
 	return fmt.Errorf("no report for image %s; ingest first", sha)
 }
 
+// failReasonNoItems 零指标项失败的固定原因(词表锚定票 02 冻结的 HTTP fixture
+// schemas/testdata/http/report.summary.failed.json)。
+const failReasonNoItems = "no metric items recognized"
+
+// applyFailInvariant 空指标项不变量(viz-and-client 票 03):报告级产出「成功且零指标项」
+// 不可能出现——items 为空一律判 failed。归一化就地生效,返回应写入 reports.fail_reason
+// 的值(nil = 非 failed;随 upsert 全量写,重算复原时旧原因一并清除)。识别端契约校验与
+// 存储镜像校验是双保险,绕过识别端直灌的写入也在此挡下。
+func applyFailInvariant(report *contract.Report) *string {
+	if len(report.Items) == 0 && report.Status != contract.StatusFailed {
+		report.Status = contract.StatusFailed
+	}
+	if report.Status == contract.StatusFailed && len(report.Items) == 0 {
+		reason := failReasonNoItems
+		return &reason
+	}
+	return nil
+}
+
 // Reparse reparse <sha256...>:复用已存 OCR 结果重跑后处理(规则迭代后历史刷新)。
 func Reparse(ctx context.Context, st Store, rec Recognizer, shaArg, date string) (*contract.Report, error) {
 	if err := ValidateSha256(shaArg); err != nil {
@@ -61,7 +80,7 @@ func ReparseStored(ctx context.Context, st Store, rec Recognizer, row *ReportRow
 	if err != nil {
 		return nil, fmt.Errorf("call /reparse: %w", err)
 	}
-	if err := st.WriteReport(ctx, row.Sha256, row.OCRResultID, *report); err != nil {
+	if err := st.WriteReport(ctx, row.Sha256, row.OCRResultID, *report, applyFailInvariant(report)); err != nil {
 		return nil, fmt.Errorf("update reports/report_items: %w", err)
 	}
 	return report, nil

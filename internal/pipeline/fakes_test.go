@@ -46,8 +46,9 @@ type fakeOCR struct {
 }
 
 type fakeReport struct {
-	row pipeline.ReportRow
-	rep contract.Report
+	row        pipeline.ReportRow
+	rep        contract.Report
+	failReason *string // 最近一次 WriteReport 收到的失败原因(pipeline 产出)
 }
 
 func newFakeStore() *fakeStore {
@@ -116,7 +117,7 @@ func (f *fakeStore) TrendByName(ctx context.Context, item, reportType string) ([
 	return f.trendRet, nil
 }
 
-func (f *fakeStore) WriteReport(ctx context.Context, reportSha string, ocrID int64, report contract.Report) error {
+func (f *fakeStore) WriteReport(ctx context.Context, reportSha string, ocrID int64, report contract.Report, failReason *string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	date := ""
@@ -126,7 +127,8 @@ func (f *fakeStore) WriteReport(ctx context.Context, reportSha string, ocrID int
 	f.reports[reportSha] = &fakeReport{
 		row: pipeline.ReportRow{Sha256: reportSha, OCRResultID: ocrID, ReportType: report.ReportType,
 			ReportDate: ptrIf(date), Status: report.Status},
-		rep: report,
+		rep:        report,
+		failReason: failReason,
 	}
 	return nil
 }
