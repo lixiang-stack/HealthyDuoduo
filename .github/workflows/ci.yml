@@ -41,3 +41,24 @@ jobs:
           python-version: "3.13"
       - run: uv run ruff check .
       - run: uv run pytest
+
+  mobile:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+      - run: npm ci
+      # 契约唯一源(schemas/openapi.yaml)与 TS 生成物必须同步(M0 完成判据)。
+      - name: codegen in sync with OpenAPI
+        run: |
+          npm run codegen
+          git diff --exit-code -- src/api/schema.d.ts
+      - run: npm run typecheck
+      - run: npm test

@@ -21,3 +21,12 @@ pre-commit:
     pytest:
       glob: "recognizer/**/*.py"
       run: cd recognizer && uv run pytest
+    mobile-typecheck:
+      glob: "apps/mobile/**/*.{ts,tsx}"
+      run: cd apps/mobile && npm run typecheck
+    mobile-test:
+      glob: "apps/mobile/**/*.{ts,tsx}"
+      run: cd apps/mobile && npm test -- --silent
+    mobile-codegen-sync:
+      glob: "{apps/mobile/**/*.{ts,tsx},schemas/openapi.yaml}"
+      run: cd apps/mobile && npm run codegen && git diff --exit-code -- src/api/schema.d.ts
