@@ -1,0 +1,14 @@
+{
+  "report_id": "139fde0e0b0c2114b556bd4462aead8e8d64c44fe24906f87e7bfabc0e4b93b3",
+  "member_id": null,
+  "report_type": "其他专项",
+  "report_date": null,
+  "status": "failed",
+  "fail_reason": "no metric items recognized",
+  "flag_counts": {
+    "high": 0,
+    "low": 0,
+    "unknown": 0
+  },
+  "unreviewed_low_confidence_count": 0
+}

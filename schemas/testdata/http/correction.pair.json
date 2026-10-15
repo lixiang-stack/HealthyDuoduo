@@ -1,0 +1,18 @@
+{
+  "item_id": 7,
+  "before": {
+    "name": "单核细胞比率",
+    "value": "10.8",
+    "unit": "%",
+    "ref_range": "3-10"
+  },
+  "after": {
+    "name": "单核细胞比率",
+    "value": "5.6",
+    "unit": "%",
+    "ref_range": "3-10"
+  },
+  "raw_text": "单核细胞百分比  10.8  ↑ %  3-10",
+  "ocr_line_numbers": [2],
+  "created_at": "2026-10-13T08:05:00Z"
+}
