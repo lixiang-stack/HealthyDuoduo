@@ -57,6 +57,56 @@ type MemberStore interface {
 	ListMembers(ctx context.Context) ([]Member, error)
 	// UpdateMember 改名/改是否孩子(至少一项非 nil);返回 nil = 成员不存在。
 	UpdateMember(ctx context.Context, id int64, name *string, isChild *bool) (*Member, error)
+	// MemberByID 按 id 取成员(上传归属校验;缺失返回 nil,nil,与 ImageBySha256 同口径)。
+	MemberByID(ctx context.Context, id int64) (*Member, error)
+}
+
+// ReportStore 报告域持久化边界(serve 上传/时间线;viz-and-client 票 06)。
+// 与 MemberStore 同惯例:独立窄接口,serve 经 deps.reports 注入同一 *storage.Store,
+// CLI 侧既有 fake 不承担这些方法(ISP)。
+type ReportStore interface {
+	// ListTimeline 时间线摘要(成员过滤:nil = 全部,含存量无主报告;服务端排序
+	// 日期降序、dateless 沉底,客户端展示仍会再排序一次)。
+	ListTimeline(ctx context.Context, memberID *int64) ([]ReportSummary, error)
+	// SummaryByImage 单份报告摘要(缺失返回 nil,nil;上传响应回读用)。
+	SummaryByImage(ctx context.Context, imageSha string) (*ReportSummary, error)
+	// ItemsWithReviewStatus 指标项含外部句柄与核对状态(上传响应回读;按 id 升序)。
+	ItemsWithReviewStatus(ctx context.Context, reportSha string) ([]ReportItemRow, error)
+	// SetReportMember 只改报告归属(上传新建/无主归档时赋值;不碰其他字段)。
+	SetReportMember(ctx context.Context, reportSha string, memberID int64) error
+}
+
+// ReviewStatusUnreviewed 指标项核对状态机(ADR-0005)的初始态;任一指标项
+// review_status ≠ 本值即视为报告已有核对决策(同图重传 409 的判定依据)。
+const ReviewStatusUnreviewed = "unreviewed"
+
+// FlagCounts 「异常」计数徽标口径 = 偏高/偏低/未知三档;normal 不计(详情页逐项染色)。
+type FlagCounts struct {
+	High    int
+	Low     int
+	Unknown int
+}
+
+// ReportSummary 时间线卡片/上传响应头部的业务视图(serve 报告域;票 06)。
+// 计数字段为响应派生(不落列,ADR-0005):FlagCounts 按指标项当前 flag 聚合;
+// UnreviewedLowConfidenceCount 只统计 partial 报告的未核对低置信项(failed 无项、
+// success 免核对均恒 0)。
+type ReportSummary struct {
+	Sha256                       string
+	MemberID                     *int64
+	ReportType                   string
+	ReportDate                   *string
+	Status                       string
+	FailReason                   *string
+	FlagCounts                   FlagCounts
+	UnreviewedLowConfidenceCount int
+}
+
+// ReportItemRow 指标项含 HTTP 外部句柄与核对状态(嵌入识别端形状的八个字段)。
+type ReportItemRow struct {
+	ItemID       int64
+	ReviewStatus string
+	contract.ReportItem
 }
 
 // Member 成员最小模型的业务视图:显示名 + 是否孩子两档,仅此;无生日/头像,

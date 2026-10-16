@@ -59,6 +59,7 @@ func openDeps(c config) (*deps, func(), error) {
 	d := &deps{
 		store:   st,
 		members: st,
+		reports: st,
 		rec:     recognizer.New(c.recognizerURL),
 		obj:     obj,
 	}

@@ -44,6 +44,12 @@ export default function HomeScreen() {
       <Link href="/members" style={styles.link}>
         家庭成员
       </Link>
+      <Link href="/timeline" style={styles.link}>
+        报告时间线
+      </Link>
+      <Link href="/upload" style={styles.link}>
+        上传检查单
+      </Link>
     </View>
   );
 }

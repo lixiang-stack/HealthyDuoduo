@@ -49,6 +49,18 @@ func (f *fakeMemberStore) ListMembers(ctx context.Context) ([]pipeline.Member, e
 	return append([]pipeline.Member(nil), f.rows...), nil
 }
 
+func (f *fakeMemberStore) MemberByID(ctx context.Context, id int64) (*pipeline.Member, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for i := range f.rows {
+		if f.rows[i].MemberID == id {
+			m := f.rows[i]
+			return &m, nil
+		}
+	}
+	return nil, nil
+}
+
 func (f *fakeMemberStore) UpdateMember(ctx context.Context, id int64, name *string, isChild *bool) (*pipeline.Member, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
