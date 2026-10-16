@@ -1,4 +1,3 @@
-import Constants from 'expo-constants';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -6,10 +5,11 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { createApiClient } from '../api/client';
 import type { HealthState } from '../api/connectivity';
 import { checkHealth } from '../api/health';
+import { resolveApiClient } from '../api/resolveClient';
 import { ConnectivityStatus } from '../components/ConnectivityStatus';
 import { colors } from '../components/theme';
-import { deriveDefaultBaseUrl, normalizeBaseUrl } from '../settings/baseUrl';
-import { loadBaseUrl, saveBaseUrl } from '../settings/baseUrlStore';
+import { normalizeBaseUrl } from '../settings/baseUrl';
+import { saveBaseUrl } from '../settings/baseUrlStore';
 
 // 手输 Base URL 兜底(二维码配对见后续票):保存即持久化,连通校验统一走 health。
 export default function SettingsScreen() {
@@ -20,11 +20,11 @@ export default function SettingsScreen() {
   useFocusEffect(
     useCallback(() => {
       void (async () => {
-        const effective = (await loadBaseUrl()) ?? deriveDefaultBaseUrl(Constants.expoConfig?.hostUri);
-        setInput(effective ?? '');
-        if (effective) {
+        const resolved = await resolveApiClient();
+        setInput(resolved?.baseUrl ?? '');
+        if (resolved) {
           setState({ status: 'checking' });
-          setState(await checkHealth(createApiClient(effective)));
+          setState(await checkHealth(resolved.client));
         }
       })();
     }, []),

@@ -5,6 +5,7 @@ package pipeline
 
 import (
 	"context"
+	"time"
 
 	"healthyduoduo/internal/contract"
 )
@@ -45,6 +46,26 @@ type Store interface {
 	WriteReport(ctx context.Context, reportSha string, ocrID int64, report contract.Report, failReason *string) error
 	// TrendByName 同一指标项名的跨报告时序点(升序;reportType 空串 = 不过滤类别)。
 	TrendByName(ctx context.Context, itemName, reportType string) ([]TrendRow, error)
+}
+
+// MemberStore 成员持久化边界(serve 成员端点;viz-and-client 票 05)。
+// 列表按创建序返回,孩子优先由客户端做(契约排序口径);无删除操作——契约不提供。
+type MemberStore interface {
+	// CreateMember 建成员(名 + 是否孩子两档;id/created_at 由存储产生)。
+	CreateMember(ctx context.Context, name string, isChild bool) (*Member, error)
+	// ListMembers 全部成员(创建序:id 升序;BIGSERIAL 不重用,id 序即创建序)。
+	ListMembers(ctx context.Context) ([]Member, error)
+	// UpdateMember 改名/改是否孩子(至少一项非 nil);返回 nil = 成员不存在。
+	UpdateMember(ctx context.Context, id int64, name *string, isChild *bool) (*Member, error)
+}
+
+// Member 成员最小模型的业务视图:显示名 + 是否孩子两档,仅此;无生日/头像,
+// 不支持删除(可改名)。CreatedAt 为库中创建时刻,HTTP 侧序列化为 RFC3339。
+type Member struct {
+	MemberID  int64
+	Name      string
+	IsChild   bool
+	CreatedAt time.Time
 }
 
 // Image images 表一行的业务视图(identity=内容 sha256)。

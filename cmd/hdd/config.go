@@ -55,10 +55,12 @@ func openDeps(c config) (*deps, func(), error) {
 		pool.Close()
 		return nil, nil, fmt.Errorf("ensure bucket %s: %w", c.s3Bucket, err)
 	}
+	st := storage.NewStore(pool)
 	d := &deps{
-		store: storage.NewStore(pool),
-		rec:   recognizer.New(c.recognizerURL),
-		obj:   obj,
+		store:   st,
+		members: st,
+		rec:     recognizer.New(c.recognizerURL),
+		obj:     obj,
 	}
 	return d, func() { pool.Close() }, nil
 }
