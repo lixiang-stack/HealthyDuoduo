@@ -9,6 +9,8 @@ export type PickedImage = {
   uri: string;
   mimeType?: string;
   fileName?: string;
+  /** Web 文件选择通道返回的 File(expo-image-picker web 提供);原生上传走 uri 形态。 */
+  file?: File;
 };
 
 export type PickImageResult =
@@ -43,6 +45,11 @@ export async function pickImage(source: ImageSource): Promise<PickImageResult> {
   }
   return {
     kind: 'picked',
-    image: { uri: asset.uri, mimeType: asset.mimeType, fileName: asset.fileName ?? undefined },
+    image: {
+      uri: asset.uri,
+      mimeType: asset.mimeType,
+      fileName: asset.fileName ?? undefined,
+      file: asset.file ?? undefined,
+    },
   };
 }

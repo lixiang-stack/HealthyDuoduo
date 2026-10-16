@@ -1,0 +1,256 @@
+import { Link, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+
+import { listMembers, type Member } from '../api/members';
+import { uploadReport, type UploadResult } from '../api/reports';
+import { resolveApiClient } from '../api/resolveClient';
+import { colors } from '../components/theme';
+import { MemberChips } from '../members/components';
+import { useCurrentMember } from '../members/CurrentMemberContext';
+import { sortMembers } from '../members/order';
+import { pickImage, type ImageSource, type PickedImage } from '../platform/imagePicker';
+import { uploadResultText, uploadWaitText } from '../reports/status';
+
+// 上传页(票 06):选图 → 确认归属成员(默认当前成员)→ multipart 直传、同步等待识别;
+// 等待可感知(计时 + 超时提示),结果轻提示(成功/待核对/失败原因/重复归档)。
+type ScreenState =
+  | { status: 'loading' }
+  | { status: 'unconfigured' }
+  | { status: 'error'; detail: string }
+  | { status: 'ready'; members: Member[] };
+
+type UploadState =
+  | { status: 'idle' }
+  | { status: 'uploading' }
+  | { status: 'done'; result: UploadResult }
+  | { status: 'failed'; message: string };
+
+export default function UploadScreen() {
+  const { currentMemberId, selectMember } = useCurrentMember();
+  const [state, setState] = useState<ScreenState>({ status: 'loading' });
+  const [image, setImage] = useState<PickedImage>();
+  const [pickMessage, setPickMessage] = useState<string>();
+  const [upload, setUpload] = useState<UploadState>({ status: 'idle' });
+  const [elapsedMs, setElapsedMs] = useState(0);
+
+  const reload = useCallback(async () => {
+    const resolved = await resolveApiClient();
+    if (!resolved) {
+      setState({ status: 'unconfigured' });
+      return;
+    }
+    try {
+      setState({ status: 'ready', members: await listMembers(resolved.client) });
+    } catch (error) {
+      setState({ status: 'error', detail: error instanceof Error ? error.message : String(error) });
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void reload();
+    }, [reload]),
+  );
+
+  // 上传等待计时:超时阈值后上传页展示确认后端可达的提示(请求不中止,幂等重试安全)。
+  useEffect(() => {
+    if (upload.status !== 'uploading') {
+      return;
+    }
+    const startedAt = Date.now();
+    setElapsedMs(0);
+    const timer = setInterval(() => setElapsedMs(Date.now() - startedAt), 1000);
+    return () => clearInterval(timer);
+  }, [upload.status]);
+
+  const onPick = useCallback(async (source: ImageSource) => {
+    setPickMessage(undefined);
+    setUpload({ status: 'idle' });
+    const result = await pickImage(source);
+    switch (result.kind) {
+      case 'picked':
+        setImage(result.image);
+        break;
+      case 'cancelled':
+        break;
+      case 'denied':
+        setPickMessage('需要相机/相册权限才能选择检查单照片');
+        break;
+      case 'unsupported':
+        setPickMessage(result.reason);
+        break;
+    }
+  }, []);
+
+  const onUpload = useCallback(() => {
+    if (!image || currentMemberId === undefined) {
+      return;
+    }
+    void (async () => {
+      setUpload({ status: 'uploading' });
+      try {
+        const resolved = await resolveApiClient();
+        if (!resolved) {
+          setState({ status: 'unconfigured' });
+          setUpload({ status: 'idle' });
+          return;
+        }
+        setUpload({ status: 'done', result: await uploadReport(resolved.client, currentMemberId, image) });
+      } catch (error) {
+        setUpload({ status: 'failed', message: error instanceof Error ? error.message : String(error) });
+      }
+    })();
+  }, [image, currentMemberId]);
+
+  const members = state.status === 'ready' ? sortMembers(state.members) : [];
+  const canUpload =
+    state.status === 'ready' &&
+    members.length > 0 &&
+    image !== undefined &&
+    currentMemberId !== undefined &&
+    upload.status !== 'uploading';
+
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      {state.status === 'loading' ? (
+        <View style={styles.horizontal}>
+          <ActivityIndicator />
+          <Text style={styles.muted}>正在加载…</Text>
+        </View>
+      ) : null}
+
+      {state.status === 'unconfigured' ? (
+        <Text style={styles.muted}>
+          尚未配置后端地址,请先到<Link href="/settings" style={styles.link}>设置</Link>填写。
+        </Text>
+      ) : null}
+
+      {state.status === 'error' ? (
+        <View style={styles.stack}>
+          <Text style={styles.fail}>加载失败:{state.detail}</Text>
+          <Pressable style={styles.button} onPress={() => void reload()}>
+            <Text style={styles.buttonText}>重试</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
+      {state.status === 'ready' ? (
+        <View style={styles.stack}>
+          {members.length === 0 ? (
+            <Text style={styles.muted}>
+              还没有家庭成员。先到<Link href="/members" style={styles.link}>家庭成员</Link>建一个,再上传检查单。
+            </Text>
+          ) : (
+            <>
+              <Text style={styles.label}>归属成员</Text>
+              <MemberChips
+                members={members}
+                selectedId={currentMemberId}
+                disabled={upload.status === 'uploading'}
+                onSelect={selectMember}
+              />
+              {currentMemberId === undefined ? (
+                <Text style={styles.muted}>先选择这张检查单归属哪位成员。</Text>
+              ) : null}
+
+              <Text style={styles.label}>检查单照片</Text>
+              {image ? (
+                <View style={styles.previewRow}>
+                  <Image source={{ uri: image.uri }} style={styles.preview} />
+                  <Text style={styles.muted}>{image.fileName ?? '已选择照片'}</Text>
+                </View>
+              ) : null}
+              <View style={styles.horizontal}>
+                <Pressable
+                  style={styles.buttonGhost}
+                  onPress={() => void onPick('camera')}
+                  disabled={upload.status === 'uploading'}
+                >
+                  <Text style={styles.link}>拍照</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.buttonGhost}
+                  onPress={() => void onPick('library')}
+                  disabled={upload.status === 'uploading'}
+                >
+                  <Text style={styles.link}>从相册选择</Text>
+                </Pressable>
+              </View>
+              {pickMessage ? <Text style={styles.muted}>{pickMessage}</Text> : null}
+
+              <Pressable
+                style={[styles.button, !canUpload && styles.buttonDisabled]}
+                onPress={onUpload}
+                disabled={!canUpload}
+              >
+                <Text style={styles.buttonText}>上传并识别</Text>
+              </Pressable>
+
+              {upload.status === 'uploading' ? (
+                <View style={styles.horizontal}>
+                  <ActivityIndicator />
+                  <Text style={styles.muted}>{uploadWaitText(elapsedMs)}</Text>
+                </View>
+              ) : null}
+
+              {upload.status === 'done' ? (
+                <View style={styles.card}>
+                  <Text
+                    style={
+                      upload.result.report.status === 'failed' ? styles.fail : styles.success
+                    }
+                  >
+                    {uploadResultText(upload.result)}
+                  </Text>
+                  <View style={styles.horizontal}>
+                    <Link href="/timeline" style={styles.link}>
+                      去时间线查看
+                    </Link>
+                    <Pressable style={styles.buttonGhost} onPress={() => setUpload({ status: 'idle' })}>
+                      <Text style={styles.link}>再传一张</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              ) : null}
+
+              {upload.status === 'failed' ? (
+                <View style={styles.card}>
+                  <Text style={styles.fail}>上传失败:{upload.message}</Text>
+                  <Pressable style={styles.buttonGhost} onPress={onUpload}>
+                    <Text style={styles.link}>重试</Text>
+                  </Pressable>
+                </View>
+              ) : null}
+            </>
+          )}
+        </View>
+      ) : null}
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
+  content: { padding: 24, gap: 12 },
+  stack: { gap: 12 },
+  horizontal: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  label: { fontSize: 13, color: colors.muted },
+  muted: { fontSize: 13, color: colors.muted, lineHeight: 20 },
+  fail: { fontSize: 13, color: colors.fail, lineHeight: 20 },
+  success: { fontSize: 13, color: colors.ok, lineHeight: 20 },
+  link: { color: colors.accent, fontSize: 15 },
+  card: { borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, gap: 8 },
+  previewRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  preview: { width: 96, height: 96, borderRadius: 8, borderWidth: 1, borderColor: colors.border },
+  button: {
+    alignSelf: 'flex-start',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    backgroundColor: colors.accent,
+    borderRadius: 8,
+  },
+  buttonDisabled: { backgroundColor: colors.border },
+  buttonGhost: { paddingVertical: 10, paddingHorizontal: 12 },
+  buttonText: { color: colors.onAccent, fontSize: 15 },
+});

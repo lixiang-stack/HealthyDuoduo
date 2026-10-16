@@ -130,8 +130,41 @@ function ChildPicker({ isChild, onChange }: { isChild: boolean; onChange: (isChi
   );
 }
 
+// 成员选择条(时间线过滤与上传归属共用的紧凑控件):点按切换选中成员;
+// 排序由调用方先做(sortMembers),组件只呈现。
+export function MemberChips({
+  members,
+  selectedId,
+  disabled,
+  onSelect,
+}: {
+  members: Member[];
+  selectedId: number | undefined;
+  disabled?: boolean;
+  onSelect: (memberId: number) => void;
+}) {
+  return (
+    <View style={styles.chipsRow}>
+      {members.map((m) => {
+        const active = m.member_id === selectedId;
+        return (
+          <Pressable
+            key={m.member_id}
+            style={[styles.chip, active && styles.chipActive]}
+            onPress={() => onSelect(m.member_id)}
+            disabled={disabled}
+          >
+            <Text style={active ? styles.chipTextActive : styles.chipText}>{m.name}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   horizontal: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   sectionTitle: { fontSize: 13, color: colors.muted },
   input: {
     borderWidth: 1,

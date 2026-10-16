@@ -86,6 +86,25 @@ const (
 		 WHERE i.name = $1 AND r.report_type = $2
 		 ORDER BY r.report_date ASC, r.image_sha256 ASC`
 
+	// 报告摘要(serve 时间线/上传响应回读;票 06):flag 聚合与未核对低置信计数
+	// 响应派生、不落列(ADR-0005)——unreviewed 只统计 partial 报告,失败/免核对恒 0。
+	sqlTimeline = `SELECT ` + reportSummaryColumnsSQL + ` FROM reports r
+		 LEFT JOIN LATERAL (` + reportAggregateSQL + `) agg ON TRUE
+		 WHERE ($1::bigint IS NULL OR r.member_id = $1)
+		 ORDER BY r.report_date DESC NULLS LAST, r.image_sha256 ASC`
+
+	sqlReportSummaryByImage = `SELECT ` + reportSummaryColumnsSQL + ` FROM reports r
+		 LEFT JOIN LATERAL (` + reportAggregateSQL + `) agg ON TRUE
+		 WHERE r.image_sha256 = $1`
+
+	// 指标项含外部句柄与核对状态(上传响应回读;行序 = id 升序与写入序一致)。
+	sqlItemsWithReviewStatus = `SELECT id, name, value, unit, ref_range, method, flag, low_confidence, raw_text, review_status
+		 FROM report_items WHERE report_sha256 = $1 ORDER BY id`
+
+	// 归属只写 member_id(failed/success/识别历史不动;改归属端点同用)。
+	sqlReportSetMember = `UPDATE reports SET member_id = $2, updated_at = now()
+		 WHERE image_sha256 = $1`
+
 	sqlOCRResultByID = `SELECT engine_output FROM ocr_results WHERE id = $1`
 
 	// 报告行 upsert:测定 identity = 图像 sha256(每图一行);冲突即原位更新(--force 重跑)。
@@ -113,6 +132,8 @@ const (
 
 	sqlMembersList = `SELECT id, name, is_child, created_at FROM members ORDER BY id`
 
+	sqlMemberByID = `SELECT id, name, is_child, created_at FROM members WHERE id = $1`
+
 	sqlMemberUpdate = `UPDATE members SET name = COALESCE($2, name), is_child = COALESCE($3, is_child)
 		 WHERE id = $1 RETURNING id, name, is_child, created_at`
 )
@@ -122,6 +143,20 @@ const (
 const reportColumnsSQL = `r.image_sha256, r.ocr_result_id, r.report_type,
 	   COALESCE(to_char(r.report_date, 'YYYY-MM-DD'), ''), r.status,
 	   COALESCE((SELECT COUNT(*) FROM report_items i WHERE i.report_sha256 = r.image_sha256), 0)`
+
+// reportSummaryColumnsSQL 报告摘要(ReportSummary)投影:头部 + 聚合列(见 reportAggregateSQL)。
+const reportSummaryColumnsSQL = `r.image_sha256, r.member_id, r.report_type,
+	   COALESCE(to_char(r.report_date, 'YYYY-MM-DD'), ''), r.status, r.fail_reason,
+	   agg.high, agg.low, agg.unknown, agg.unreviewed_low`
+
+// reportAggregateSQL 单报告的 flag 聚合与未核对低置信计数(横向子查询,逐报告就地聚合)。
+// unreviewed_low 以报告 status = partial 为门:success 免核对、failed 无项均恒 0(契约口径)。
+const reportAggregateSQL = `SELECT
+		   COUNT(*) FILTER (WHERE i.flag = 'high') AS high,
+		   COUNT(*) FILTER (WHERE i.flag = 'low') AS low,
+		   COUNT(*) FILTER (WHERE i.flag = 'unknown') AS unknown,
+		   COUNT(*) FILTER (WHERE r.status = 'partial' AND i.review_status = 'unreviewed' AND i.low_confidence) AS unreviewed_low
+	   FROM report_items i WHERE i.report_sha256 = r.image_sha256`
 
 func (s *Store) ImageBySha256(ctx context.Context, sha string) (*pipeline.Image, error) {
 	var img pipeline.Image
@@ -262,6 +297,79 @@ func (s *Store) trendRows(ctx context.Context, query string, args ...any) ([]pip
 	return out, rows.Err()
 }
 
+// ListTimeline 时间线摘要(serve GET /reports;viz-and-client 票 06):memberID nil =
+// 全部报告(含存量无主);排序日期降序、dateless 沉底,同日期按 sha 升序(客户端展示再排一次)。
+func (s *Store) ListTimeline(ctx context.Context, memberID *int64) ([]pipeline.ReportSummary, error) {
+	return s.querySummaries(ctx, sqlTimeline, memberID)
+}
+
+// SummaryByImage 单份报告摘要(上传响应回读;缺失返回 nil, nil)。
+func (s *Store) SummaryByImage(ctx context.Context, imageSha string) (*pipeline.ReportSummary, error) {
+	rows, err := s.querySummaries(ctx, sqlReportSummaryByImage, imageSha)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, nil
+	}
+	return &rows[0], nil
+}
+
+// querySummaries 摘要投影的公共扫描(时间线与单报告查询共用同一专栏集)。
+func (s *Store) querySummaries(ctx context.Context, query string, args ...any) ([]pipeline.ReportSummary, error) {
+	rows, err := s.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []pipeline.ReportSummary
+	for rows.Next() {
+		var r pipeline.ReportSummary
+		var date string
+		if err := rows.Scan(&r.Sha256, &r.MemberID, &r.ReportType, &date, &r.Status, &r.FailReason,
+			&r.FlagCounts.High, &r.FlagCounts.Low, &r.FlagCounts.Unknown, &r.UnreviewedLowConfidenceCount); err != nil {
+			return nil, err
+		}
+		if date != "" {
+			r.ReportDate = &date
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+// ItemsWithReviewStatus 指标项含外部句柄与核对状态(上传响应回读;id 升序,票 06)。
+func (s *Store) ItemsWithReviewStatus(ctx context.Context, reportSha string) ([]pipeline.ReportItemRow, error) {
+	rows, err := s.pool.Query(ctx, sqlItemsWithReviewStatus, reportSha)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []pipeline.ReportItemRow
+	for rows.Next() {
+		var it pipeline.ReportItemRow
+		if err := rows.Scan(&it.ItemID, &it.Name, &it.Value, &it.Unit, &it.RefRange, &it.Method,
+			&it.Flag, &it.LowConfidence, &it.RawText, &it.ReviewStatus); err != nil {
+			return nil, err
+		}
+		out = append(out, it)
+	}
+	return out, rows.Err()
+}
+
+// SetReportMember 只改报告归属(上传新建/无主归档时赋值,票 06;改归属端点同用)。
+// 报告不存在返回错误(不静默虚报成功)。
+func (s *Store) SetReportMember(ctx context.Context, reportSha string, memberID int64) error {
+	tag, err := s.pool.Exec(ctx, sqlReportSetMember, reportSha, memberID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("report %s not found", reportSha)
+	}
+	return nil
+}
+
 // dateGranularity --date 输入的粒度;dateNone 表示未传日期。
 const (
 	dateNone  dateGrain = iota
@@ -349,6 +457,19 @@ func (s *Store) ListMembers(ctx context.Context) ([]pipeline.Member, error) {
 		out = append(out, m)
 	}
 	return out, rows.Err()
+}
+
+// MemberByID 按 id 取成员(serve 上传归属校验,票 06);nil, nil = 不存在。
+func (s *Store) MemberByID(ctx context.Context, id int64) (*pipeline.Member, error) {
+	var m pipeline.Member
+	err := s.pool.QueryRow(ctx, sqlMemberByID, id).Scan(&m.MemberID, &m.Name, &m.IsChild, &m.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &m, nil
 }
 
 // UpdateMember 只更新传入字段(至少一项由 HTTP 层校验);nil,nil = 成员不存在

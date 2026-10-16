@@ -1,0 +1,61 @@
+// 报告状态与徽标文案(纯逻辑,spec 固定映射):success→识别完成、partial→待核对、
+// failed→识别失败;徽标按 flag 聚合计数 + 「待核对 N 项」。文案中性事实侧,不做解读。
+import type { FlagCounts, ReportSummary, UploadResult } from '../api/reports';
+
+export type ReportStatus = ReportSummary['status'];
+
+const STATUS_LABELS: Record<ReportStatus, string> = {
+  success: '识别完成',
+  partial: '待核对',
+  failed: '识别失败',
+};
+
+export function statusLabel(status: ReportStatus): string {
+  return STATUS_LABELS[status];
+}
+
+/** 异常徽标(偏高/偏低/未知;normal 不计,为 0 的档不出现)。 */
+export function flagBadges(counts: FlagCounts): string[] {
+  const badges: string[] = [];
+  if (counts.high > 0) {
+    badges.push(`偏高 ${counts.high}`);
+  }
+  if (counts.low > 0) {
+    badges.push(`偏低 ${counts.low}`);
+  }
+  if (counts.unknown > 0) {
+    badges.push(`未知 ${counts.unknown}`);
+  }
+  return badges;
+}
+
+/** 「待核对 N 项」徽标;N=0(failed 恒 0、success 免核对)不出徽标。 */
+export function unreviewedBadge(count: number): string | undefined {
+  return count > 0 ? `待核对 ${count} 项` : undefined;
+}
+
+/** 上传等待达到此毫秒数后提示核对后端可达性(NF-04 预期 <3s,此为超时提示阈值)。 */
+export const SLOW_UPLOAD_HINT_MS = 10_000;
+
+/** 上传等待文案:秒级等待可感知;超时阈值后提示确认后端与识别服务可达。 */
+export function uploadWaitText(elapsedMs: number): string {
+  return elapsedMs >= SLOW_UPLOAD_HINT_MS
+    ? '识别用时较长,请确认后端与识别服务可达(可离开本页,时间线刷新后可见结果)'
+    : '正在上传并识别(通常几秒)…';
+}
+
+/** 上传结果轻提示(同步响应驱动):重复/成功/待核对/失败各一分岔,failed 展示后端失败原因。 */
+export function uploadResultText(result: UploadResult): string {
+  if (result.duplicate) {
+    return '这张图已经归档过,未重复上传';
+  }
+  const { status, unreviewed_low_confidence_count: unreviewed, fail_reason: failReason } = result.report;
+  switch (status) {
+    case 'success':
+      return '识别完成,已归档';
+    case 'partial':
+      return `已归档,有 ${unreviewed} 项待核对`;
+    case 'failed':
+      return `识别失败:${failReason ?? '未识别出指标项'}(已留痕,可重新拍照)`;
+  }
+}

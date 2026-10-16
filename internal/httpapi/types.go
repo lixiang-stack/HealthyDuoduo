@@ -28,6 +28,11 @@ type MembersList struct {
 	Members []Member `json:"members"`
 }
 
+// ReportsList GET /reports 响应信封(时间线卡片;排序客户端做:dateless 沉底不受排序破坏)。
+type ReportsList struct {
+	Reports []ReportSummary `json:"reports"`
+}
+
 // FlagCounts components/FlagCounts:「异常」计数徽标口径 = 偏高 / 偏低 / 未知三档
 // 非负整数;normal 不计(详情页逐项染色)。
 type FlagCounts struct {

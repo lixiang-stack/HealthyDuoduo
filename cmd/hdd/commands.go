@@ -22,9 +22,12 @@ import (
 )
 
 // deps 编排层依赖(接口在 internal/pipeline,实现在 internal/storage、internal/recognizer)。
+// store/members/reports 为同一 *storage.Store 注入的三个窄端口(ISP:CLI 侧报告持久化、
+// 成员域、serve 报告域各持所需方法,既有 fake 零膨胀)。
 type deps struct {
 	store   pipeline.Store
 	members pipeline.MemberStore
+	reports pipeline.ReportStore
 	rec     pipeline.Recognizer
 	obj     pipeline.ObjectStore
 }

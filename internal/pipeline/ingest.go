@@ -22,14 +22,24 @@ func Ingest(ctx context.Context, st Store, rec Recognizer, obj ObjectStore, path
 	if err != nil {
 		return nil, fmt.Errorf("read image %s: %w", path, err)
 	}
+	return IngestImage(ctx, st, rec, obj, data, filepath.Base(path), date, force)
+}
+
+// ImageSha256Hex 图像内容身份(完整 64 位小写 hex sha256;全仓统一身份,见 types.go)。
+func ImageSha256Hex(data []byte) string {
 	sum := sha256.Sum256(data)
-	sha := hex.EncodeToString(sum[:])
+	return hex.EncodeToString(sum[:])
+}
+
+// IngestImage 以图像字节执行同一 ingest 编排(serve 上传原子接收后直接喂入);
+// 身份、幂等、--force 语义与 Ingest 完全一致。
+func IngestImage(ctx context.Context, st Store, rec Recognizer, obj ObjectStore, data []byte, filename, date string, force bool) (*IngestOutcome, error) {
+	sha := ImageSha256Hex(data)
 	img, err := st.ImageBySha256(ctx, sha)
 	if err != nil {
 		return nil, fmt.Errorf("query images: %w", err)
 	}
 
-	filename := filepath.Base(path)
 	if img != nil {
 		cached, ok, err := st.ReportByImage(ctx, sha)
 		if err != nil {
