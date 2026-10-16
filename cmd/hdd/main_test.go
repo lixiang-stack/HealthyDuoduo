@@ -57,9 +57,22 @@ func (fakeRecognizerCLI) Reparse(ctx context.Context, ocr *contract.OCRResult, d
 	return &contract.Report{ReportType: "血常规", Status: "success"}, nil
 }
 
-type fakeObjectsCLI struct{}
+type fakeObjectsCLI struct{ objects map[string][]byte }
 
-func (fakeObjectsCLI) Put(ctx context.Context, key string, data []byte) error { return nil }
+func (f fakeObjectsCLI) Put(ctx context.Context, key string, data []byte) error {
+	if f.objects != nil {
+		f.objects[key] = data
+	}
+	return nil
+}
+
+func (f fakeObjectsCLI) Get(ctx context.Context, key string) ([]byte, error) {
+	data, ok := f.objects[key]
+	if !ok {
+		return nil, nil
+	}
+	return data, nil
+}
 
 func str(s string) *string { return &s }
 

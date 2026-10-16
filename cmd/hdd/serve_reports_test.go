@@ -28,13 +28,15 @@ import (
 
 // fakeServeStore 内存版报告存储(见文件头注释;不追求并发语义,测试单请求串行)。
 type fakeServeStore struct {
-	mu      sync.Mutex
-	nextOCR int64
-	nextID  int64 // report_items.id 的 BIGSERIAL 镜像:重发新句柄、不重用
-	images  map[string]bool
-	ocr     map[string][][]byte
-	order   []string // 报告插入序(时间线迭代确定化)
-	reports map[string]*fakeServeReport
+	mu        sync.Mutex
+	nextOCR   int64 // ocr_results.id 的 BIGSERIAL 镜像
+	nextID    int64 // report_items.id 的 BIGSERIAL 镜像:重发新句柄、不重用
+	images    map[string]bool
+	ocr       map[string][][]byte
+	ocrByID   map[int64][]byte // AppendOCRResult 的 raw 落库;OCRResultJSONByReport 回读
+	reportOCR map[string]int64 // reports.ocr_result_id 镜像(WriteReport 记录)
+	order     []string         // 报告插入序(时间线迭代确定化)
+	reports   map[string]*fakeServeReport
 }
 
 type fakeServeReport struct {
@@ -48,7 +50,13 @@ var (
 )
 
 func newFakeServeStore() *fakeServeStore {
-	return &fakeServeStore{images: map[string]bool{}, ocr: map[string][][]byte{}, reports: map[string]*fakeServeReport{}}
+	return &fakeServeStore{
+		images:    map[string]bool{},
+		ocr:       map[string][][]byte{},
+		ocrByID:   map[int64][]byte{},
+		reportOCR: map[string]int64{},
+		reports:   map[string]*fakeServeReport{},
+	}
 }
 
 func (f *fakeServeStore) ImageBySha256(ctx context.Context, sha string) (*pipeline.Image, error) {
@@ -72,7 +80,20 @@ func (f *fakeServeStore) AppendOCRResult(ctx context.Context, imageSha string, r
 	defer f.mu.Unlock()
 	f.nextOCR++
 	f.ocr[imageSha] = append(f.ocr[imageSha], raw)
+	f.ocrByID[f.nextOCR] = raw
 	return f.nextOCR, nil
+}
+
+// OCRResultJSONByReport 镜像 storage:reports.ocr_result_id → ocr_results.engine_output;
+// 报告缺失 nil, nil。
+func (f *fakeServeStore) OCRResultJSONByReport(ctx context.Context, reportSha string) ([]byte, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	ocrID, ok := f.reportOCR[reportSha]
+	if !ok {
+		return nil, nil
+	}
+	return f.ocrByID[ocrID], nil
 }
 
 func (f *fakeServeStore) ReportByImage(ctx context.Context, imageSha string) (*pipeline.ReportRow, bool, error) {
@@ -129,6 +150,7 @@ func (f *fakeServeStore) WriteReport(ctx context.Context, reportSha string, ocrI
 	r.summary.ReportDate = report.ReportDate
 	r.summary.Status = report.Status
 	r.summary.FailReason = failReason
+	f.reportOCR[reportSha] = ocrID
 	r.items = nil
 	for _, it := range report.Items {
 		f.nextID++
@@ -208,7 +230,9 @@ func (f *fakeServeStore) SetReportMember(ctx context.Context, reportSha string, 
 	return nil
 }
 
-// seedReport 直接种一份报告(时间线用例的夹具;绕过 ingest 编排)。
+// seedReport 直接种一份报告(时间线用例的夹具;绕过 ingest 编排)。真实 schema 里
+// reports.ocr_result_id NOT NULL,故同时种一行空 OCR 结果(与库口径一致;具体行链接
+// 用例用 seedOCR 覆盖)。
 func (f *fakeServeStore) seedReport(sha string, memberID *int64, report contract.Report, failReason *string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -218,6 +242,9 @@ func (f *fakeServeStore) seedReport(sha string, memberID *int64, report contract
 	}}
 	f.reports[sha] = r
 	f.order = append(f.order, sha)
+	f.nextOCR++
+	f.ocrByID[f.nextOCR] = []byte("{}")
+	f.reportOCR[sha] = f.nextOCR
 	for _, it := range report.Items {
 		f.nextID++
 		r.items = append(r.items, pipeline.ReportItemRow{
@@ -233,6 +260,16 @@ func (f *fakeServeStore) setReviewStatus(sha string, i int, status string) {
 	f.reports[sha].items[i].ReviewStatus = status
 }
 
+// seedOCR 给已种报告挂 OCR 结果(详情行链接用例;镜像 reports.ocr_result_id 写入)。
+func (f *fakeServeStore) seedOCR(sha string, ocr *contract.OCRResult) {
+	raw, _ := json.Marshal(ocr)
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.nextOCR++
+	f.ocrByID[f.nextOCR] = raw
+	f.reportOCR[sha] = f.nextOCR
+}
+
 func (f *fakeServeStore) reportCount() int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -246,7 +283,7 @@ func (f *fakeServeStore) ocrCount(sha string) int {
 }
 
 // fakeUploadRecognizer 可配置识别结果;Report 返回深拷贝(不把 applyFailInvariant
-// 的就地归一化带进下一次调用)。
+// 的就地归一化带进下一次调用),OCR 结果取样本形状(行链接用例的数据底)。
 type fakeUploadRecognizer struct {
 	calls  int
 	report *contract.Report
@@ -258,7 +295,7 @@ func (f *fakeUploadRecognizer) Report(ctx context.Context, image []byte, filenam
 	if f.err != nil {
 		return nil, nil, f.err
 	}
-	return &contract.OCRResult{Txts: []string{"x"}, Engine: "onnxruntime"}, cloneReport(f.report), nil
+	return sampleUploadOCR(), cloneReport(f.report), nil
 }
 
 func (f *fakeUploadRecognizer) Reparse(ctx context.Context, ocr *contract.OCRResult, date string) (*contract.Report, error) {
@@ -290,13 +327,57 @@ func sampleUploadReport() *contract.Report {
 	}
 }
 
-// newReportsTestServer 报告端点集成测试的 handler 栈(空成员库 + 可配识别器 + 内存报告库)。
+// sampleUploadOCR 与 sampleUploadReport 的 raw_text 同源的行数据(共享栈真实血常规报告形状):
+// 两行表格数据 + 表头,含跨行重复碎片 "↑ %"(行链接重建需按 y 聚带消歧)。
+func sampleUploadOCR() *contract.OCRResult {
+	ocr := &contract.OCRResult{Engine: "onnxruntime"}
+	for _, l := range []struct {
+		text string
+		x, y float64
+	}{
+		{"序号", 0, 0},
+		{"单核细胞百分比", 51, 73},
+		{"10.8", 227, 76},
+		{"↑ %", 313, 74},
+		{"3-10", 403, 74},
+		{"中性粒细胞百分比", 52, 95},
+		{"81.3", 227, 99},
+		{"↑ %", 313, 98},
+		{"40-75", 404, 98},
+		{"血红蛋白", 591, 28},
+		{"128", 788, 30},
+		{"g/L", 878, 30},
+		{"115-150", 953, 32},
+	} {
+		ocr.Txts = append(ocr.Txts, l.text)
+		ocr.Boxes = append(ocr.Boxes, testBox(l.x, l.y))
+		ocr.Scores = append(ocr.Scores, 0.99)
+	}
+	return ocr
+}
+
+// testBox 左上角 + 固定尺寸(40×20)的行框。
+func testBox(x, y float64) contract.Box {
+	return contract.Box{{x, y}, {x + 40, y}, {x + 40, y + 20}, {x, y + 20}}
+}
+
+// apiBox testBox → 契约镜像(与 toAPILineBox 同形;测试侧独立以免漏转换)。
+func apiBox(x, y float64) httpapi.Box4x2 {
+	var out httpapi.Box4x2
+	for i, p := range testBox(x, y) {
+		out[i] = [2]float64{p[0], p[1]}
+	}
+	return out
+}
+
+// newReportsTestServer 报告端点集成测试的 handler 栈(空成员库 + 可配识别器 + 内存报告库;
+// 对象存储内存化,详情用例可经 /images 取回上传字节)。
 func newReportsTestServer(t *testing.T) (*httptest.Server, *fakeServeStore, *fakeUploadRecognizer, *fakeMemberStore) {
 	t.Helper()
 	st := newFakeServeStore()
 	rec := &fakeUploadRecognizer{report: sampleUploadReport()}
 	ms := &fakeMemberStore{}
-	d := &deps{store: st, members: ms, reports: st, rec: rec, obj: fakeObjectsCLI{}}
+	d := &deps{store: st, members: ms, reports: st, rec: rec, obj: fakeObjectsCLI{objects: map[string][]byte{}}}
 	srv := httptest.NewServer(newServeHandler(d, ""))
 	t.Cleanup(srv.Close)
 	return srv, st, rec, ms
@@ -404,11 +485,25 @@ func TestServeUploadNewReport(t *testing.T) {
 	if first.ItemID == 0 || first.ReviewStatus != pipeline.ReviewStatusUnreviewed {
 		t.Errorf("first item = %+v, want item_id>0 / review_status unreviewed", first)
 	}
-	if first.Prev != nil || len(first.OcrLines) != 0 {
-		t.Errorf("first item prev/ocr_lines = %+v/%v, want null/[] (票 07 与 M3 填充面)", first.Prev, first.OcrLines)
+	if first.Prev != nil {
+		t.Errorf("first item prev = %+v, want null (M3 填充面)", first.Prev)
 	}
-	if !strings.Contains(string(raw), `"ocr_lines":[]`) {
-		t.Errorf("ocr_lines must serialize as [] not null; body = %s", raw)
+	// 票 07:raw_text → OCR 行链接(行下标 + 框坐标,y 聚带消歧取本行重复碎片)。
+	wantFirst := []int{1, 2, 3, 4}
+	if len(first.OcrLines) != len(wantFirst) {
+		t.Fatalf("first item ocr_lines = %+v, want %d links", first.OcrLines, len(wantFirst))
+	}
+	for i, want := range wantFirst {
+		if first.OcrLines[i].Line != want {
+			t.Errorf("first item ocr_lines[%d].line = %d, want %d", i, first.OcrLines[i].Line, want)
+		}
+	}
+	if got, want := first.OcrLines[2].Box, apiBox(313, 74); got != want {
+		t.Errorf("↑ %% box = %v, want 本行框 %v(非他行重复碎片)", got, want)
+	}
+	second := got.Report.Items[1]
+	if len(second.OcrLines) != 4 || second.OcrLines[0].Line != 9 || second.OcrLines[3].Line != 12 {
+		t.Errorf("second item ocr_lines = %+v, want lines 9..12", second.OcrLines)
 	}
 	if rec.calls != 1 {
 		t.Errorf("recognizer calls = %d, want 1 (同步等待识别)", rec.calls)
@@ -443,6 +538,9 @@ func TestServeUploadDuplicate(t *testing.T) {
 	}
 	if got.Report.Items[0].ItemID != first.Report.Items[0].ItemID {
 		t.Errorf("item_id changed on duplicate: %d -> %d", first.Report.Items[0].ItemID, got.Report.Items[0].ItemID)
+	}
+	if len(got.Report.Items[0].OcrLines) == 0 {
+		t.Errorf("duplicate response ocr_lines empty, want 行链接(与详情同一投影)")
 	}
 	if rec.calls != 1 {
 		t.Errorf("recognizer calls = %d, want 1 (幂等命中不重跑)", rec.calls)
@@ -766,5 +864,95 @@ func TestServeListReportsFilterAndCounts(t *testing.T) {
 	status, raw = doJSON(t, srv, http.MethodGet, "/api/v1/reports?member_id=abc", "")
 	if status != http.StatusBadRequest {
 		t.Fatalf("non-integer member_id = %d %s, want 400", status, raw)
+	}
+}
+
+// TestServeGetReportDetail GET /api/v1/reports/{report_id}:详情完整形状(头部与聚合计数、
+// 指标项外部句柄与核对状态、OCR 行链接、prev null);report_id 即图像身份,/images 可直出原图;
+// 未知与非法形态 404(契约只声明 404)。
+func TestServeGetReportDetail(t *testing.T) {
+	srv, _, _, _ := newReportsTestServer(t)
+	createOne(t, srv, `{"name":"小虎","is_child":true}`)
+
+	image := sampleImageBytes(t) // 真实样本图:图像直出断言按字节逐位比较
+	status, raw := doUpload(t, srv, image, map[string]string{formMemberID: "1"})
+	created := decodeUpload(t, status, raw, http.StatusCreated)
+	sha := created.Report.ReportID
+
+	status, raw = doJSON(t, srv, http.MethodGet, "/api/v1/reports/"+sha, "")
+	if status != http.StatusOK {
+		t.Fatalf("GET /reports/%s = %d; body = %s", sha, status, raw)
+	}
+	var detail httpapi.ReportDetail
+	if err := json.Unmarshal(raw, &detail); err != nil {
+		t.Fatal(err)
+	}
+	if detail.ReportID != sha || detail.ReportType != "血常规" || detail.Status != contract.StatusPartial {
+		t.Errorf("detail header = %+v", detail.ReportHeader)
+	}
+	if detail.ReportDate == nil || *detail.ReportDate != "2026-10-01" {
+		t.Errorf("report_date = %v, want 2026-10-01", detail.ReportDate)
+	}
+	if detail.MemberID == nil || *detail.MemberID != 1 {
+		t.Errorf("member_id = %v, want 1", detail.MemberID)
+	}
+	if detail.FlagCounts != (httpapi.FlagCounts{High: 1}) || detail.UnreviewedLowConfidenceCount != 1 {
+		t.Errorf("counts = %+v/%d, want high=1 / 1 待核对", detail.FlagCounts, detail.UnreviewedLowConfidenceCount)
+	}
+	if len(detail.Items) != 2 {
+		t.Fatalf("items = %d, want 2", len(detail.Items))
+	}
+	first := detail.Items[0]
+	if first.ItemID == 0 || first.ReviewStatus != pipeline.ReviewStatusUnreviewed {
+		t.Errorf("first item handle/status = %+v, want 外部句柄 + unreviewed", first)
+	}
+	if len(first.OcrLines) != 4 || first.OcrLines[2].Line != 3 || first.OcrLines[2].Box != apiBox(313, 74) {
+		t.Errorf("first item ocr_lines = %+v, want 本行链接(↑ %% 不取他行重复碎片)", first.OcrLines)
+	}
+	if first.Prev != nil {
+		t.Errorf("prev = %+v, want null (M3 填充面)", first.Prev)
+	}
+
+	// 图像地址:详情 report_id 即图像内容身份,同源可直出(契约 GET /images/{sha256})。
+	imgStatus, imgRaw := doJSON(t, srv, http.MethodGet, "/api/v1/images/"+sha, "")
+	if imgStatus != http.StatusOK || !bytes.Equal(imgRaw, image) {
+		t.Errorf("GET /images/%s = %d (%d bytes), want 200 + 原图字节", sha, imgStatus, len(imgRaw))
+	}
+
+	// 未知报告与非法形态:404(非法形态无法是任何已有报告,与不存在同答)。
+	for _, id := range []string{strings.Repeat("f", 64), "not-a-sha", "abc"} {
+		if status, _ = doJSON(t, srv, http.MethodGet, "/api/v1/reports/"+id, ""); status != http.StatusNotFound {
+			t.Errorf("GET /reports/%s = %d, want 404", id, status)
+		}
+	}
+}
+
+// TestServeGetReportDetailFailed failed 报告详情:图像与失败原因可见(无可核对项),
+// items 序列化为空数组、计数全 0、fail_reason 透传。
+func TestServeGetReportDetailFailed(t *testing.T) {
+	srv, _, rec, _ := newReportsTestServer(t)
+	createOne(t, srv, `{"name":"小虎","is_child":true}`)
+	rec.report = &contract.Report{ReportType: "其他专项", Status: contract.StatusFailed}
+
+	status, raw := doUpload(t, srv, []byte("blank-photo"), map[string]string{formMemberID: "1"})
+	created := decodeUpload(t, status, raw, http.StatusCreated)
+	sha := created.Report.ReportID
+
+	status, raw = doJSON(t, srv, http.MethodGet, "/api/v1/reports/"+sha, "")
+	if status != http.StatusOK {
+		t.Fatalf("GET detail = %d; body = %s", status, raw)
+	}
+	var detail httpapi.ReportDetail
+	if err := json.Unmarshal(raw, &detail); err != nil {
+		t.Fatal(err)
+	}
+	if detail.Status != contract.StatusFailed || detail.FailReason == nil || *detail.FailReason != "no metric items recognized" {
+		t.Errorf("failed detail = %+v, want fail_reason 可见", detail)
+	}
+	if len(detail.Items) != 0 || detail.UnreviewedLowConfidenceCount != 0 {
+		t.Errorf("failed items/count = %d/%d, want 0/0(无可核对项、不计待核对)", len(detail.Items), detail.UnreviewedLowConfidenceCount)
+	}
+	if !strings.Contains(string(raw), `"items":[]`) {
+		t.Errorf("failed items must serialize as [] not null; body = %s", raw)
 	}
 }

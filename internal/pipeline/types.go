@@ -25,6 +25,8 @@ type Recognizer interface {
 // ObjectStore 对象存储边界(bucket raw,键=图像内容 sha256;即对象键=身份,单字段)。
 type ObjectStore interface {
 	Put(ctx context.Context, key string, data []byte) error
+	// Get 取对象字节(serve 图像直出,票 07);键不存在返回 nil, nil(与 ImageBySha256 同口径)。
+	Get(ctx context.Context, key string) ([]byte, error)
 }
 
 // Store 持久化边界(PG 四表);items 由实现随报告行事务式全量替换。
@@ -72,6 +74,9 @@ type ReportStore interface {
 	SummaryByImage(ctx context.Context, imageSha string) (*ReportSummary, error)
 	// ItemsWithReviewStatus 指标项含外部句柄与核对状态(上传响应回读;按 id 升序)。
 	ItemsWithReviewStatus(ctx context.Context, reportSha string) ([]ReportItemRow, error)
+	// OCRResultJSONByReport 报告所用 OCR 结果的原始 JSON(reports.ocr_result_id →
+	// ocr_results.engine_output;详情行链接回读,票 07)。缺失返回 nil, nil。
+	OCRResultJSONByReport(ctx context.Context, reportSha string) ([]byte, error)
 	// SetReportMember 只改报告归属(上传新建/无主归档时赋值;不碰其他字段)。
 	SetReportMember(ctx context.Context, reportSha string, memberID int64) error
 }

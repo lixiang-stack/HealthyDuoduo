@@ -1,8 +1,10 @@
 // 报告状态与徽标文案(纯逻辑,spec 固定映射):success→识别完成、partial→待核对、
-// failed→识别失败;徽标按 flag 聚合计数 + 「待核对 N 项」。文案中性事实侧,不做解读。
-import type { FlagCounts, ReportSummary, UploadResult } from '../api/reports';
+// failed→识别失败;徽标按 flag 聚合计数 + 「待核对 N 项」;详情指标项 flag 文案。
+// 文案中性事实侧,不做解读。
+import type { FlagCounts, ReportItem, ReportSummary, UploadResult } from '../api/reports';
 
 export type ReportStatus = ReportSummary['status'];
+export type Flag = ReportItem['flag'];
 
 const STATUS_LABELS: Record<ReportStatus, string> = {
   success: '识别完成',
@@ -12,6 +14,18 @@ const STATUS_LABELS: Record<ReportStatus, string> = {
 
 export function statusLabel(status: ReportStatus): string {
   return STATUS_LABELS[status];
+}
+
+const FLAG_LABELS: Record<Flag, string> = {
+  normal: '正常',
+  high: '偏高',
+  low: '偏低',
+  unknown: '未知',
+};
+
+/** 指标项 flag 文案(颜色之外的第二通道:只陈述与参考范围的比较结果)。 */
+export function flagLabel(flag: Flag): string {
+  return FLAG_LABELS[flag];
 }
 
 /** 异常徽标(偏高/偏低/未知;normal 不计,为 0 的档不出现)。 */
