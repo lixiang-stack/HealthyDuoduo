@@ -101,6 +101,11 @@ const (
 	sqlItemsWithReviewStatus = `SELECT id, name, value, unit, ref_range, method, flag, low_confidence, raw_text, review_status
 		 FROM report_items WHERE report_sha256 = $1 ORDER BY id`
 
+	// 报告所用 OCR 结果(详情行链接回读,票 07;reports.ocr_result_id 指向生成该报告的识别历史行)。
+	sqlOCRResultByReport = `SELECT o.engine_output FROM reports r
+		 JOIN ocr_results o ON o.id = r.ocr_result_id
+		 WHERE r.image_sha256 = $1`
+
 	// 归属只写 member_id(failed/success/识别历史不动;改归属端点同用)。
 	sqlReportSetMember = `UPDATE reports SET member_id = $2, updated_at = now()
 		 WHERE image_sha256 = $1`
@@ -355,6 +360,20 @@ func (s *Store) ItemsWithReviewStatus(ctx context.Context, reportSha string) ([]
 		out = append(out, it)
 	}
 	return out, rows.Err()
+}
+
+// OCRResultJSONByReport 报告所用 OCR 结果的原始 JSON(详情行链接回读,票 07):
+// reports.ocr_result_id → ocr_results.engine_output;报告缺失返回 nil, nil。
+func (s *Store) OCRResultJSONByReport(ctx context.Context, reportSha string) ([]byte, error) {
+	var raw []byte
+	err := s.pool.QueryRow(ctx, sqlOCRResultByReport, reportSha).Scan(&raw)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return raw, nil
 }
 
 // SetReportMember 只改报告归属(上传新建/无主归档时赋值,票 06;改归属端点同用)。

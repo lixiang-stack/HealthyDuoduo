@@ -6,6 +6,7 @@ export const colors = {
   onAccent: '#ffffff',
   ok: '#15803d',
   fail: '#b91c1c',
+  low: '#1d4ed8', // 偏低(flag 色板 low;与交互色 accent 区分,避免像链接)
   border: '#d1d5db',
   background: '#ffffff',
 };

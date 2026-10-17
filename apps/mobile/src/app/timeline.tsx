@@ -94,7 +94,20 @@ export default function TimelineScreen() {
                   这位成员还没有检查单。拍一张检查单,几秒后这里会出现归档卡片。
                 </Text>
               ) : (
-                reports.map((report) => <ReportCard key={report.report_id} report={report} />)
+                reports.map((report) => (
+                  <Link
+                    key={report.report_id}
+                    asChild
+                    href={{
+                      pathname: '/report/[report_id]',
+                      params: { report_id: report.report_id },
+                    }}
+                  >
+                    <Pressable>
+                      <ReportCard report={report} />
+                    </Pressable>
+                  </Link>
+                ))
               )}
             </>
           )}

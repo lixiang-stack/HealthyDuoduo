@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"strings"
 
 	minio "github.com/minio/minio-go/v7"
@@ -75,7 +76,27 @@ func (s *S3ObjectStore) Put(ctx context.Context, key string, data []byte) error 
 	return nil
 }
 
+// Get 取对象字节(serve 图像直出,票 07)。minio 的 GetObject 为惰性读取,
+// 键不存在的错误在 Read 时才出现(NoSuchKey),统一映射为 nil, nil(与
+// ImageBySha256 的缺失口径一致)。
+func (s *S3ObjectStore) Get(ctx context.Context, key string) ([]byte, error) {
+	obj, err := s.client.GetObject(ctx, s.bucket, key, minio.GetObjectOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("get object %s: %w", key, err)
+	}
+	defer obj.Close()
+	data, err := io.ReadAll(obj)
+	if err != nil {
+		if minio.ToErrorResponse(err).Code == "NoSuchKey" {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("read object %s: %w", key, err)
+	}
+	return data, nil
+}
+
 // 编译期接口校验(pipeline.ObjectStore 的实现)。
 var _ interface {
 	Put(context.Context, string, []byte) error
+	Get(context.Context, string) ([]byte, error)
 } = (*S3ObjectStore)(nil)

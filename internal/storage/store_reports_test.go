@@ -142,6 +142,15 @@ func TestReportStoreSmoke(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// 报告所用 OCR 结果回读(详情行链接输入,票 07):命中与缺失口径。
+	ocrRaw, err := st.OCRResultJSONByReport(ctx, "rep-a")
+	if err != nil || string(ocrRaw) != "{}" {
+		t.Fatalf("OCRResultJSONByReport(rep-a) = %q, %v, want 种子 OCR 行", ocrRaw, err)
+	}
+	if ocrRaw, err := st.OCRResultJSONByReport(ctx, "rep-missing"); err != nil || ocrRaw != nil {
+		t.Fatalf("OCRResultJSONByReport(missing) = %q, %v, want (nil, nil)", ocrRaw, err)
+	}
 	if len(items) != 5 {
 		t.Fatalf("rep-a items = %d, want 5", len(items))
 	}

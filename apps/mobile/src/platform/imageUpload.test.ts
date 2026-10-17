@@ -1,22 +1,33 @@
-import { imagePartValue } from './imageUpload';
+import { appendImagePart, imagePartValue } from './imageUpload';
+
+// 回归:Expo SDK 57 原生 fetch(WinterCG)的 FormData 只认 string | Blob | 带
+// bytes() 的对象;旧式 RN {uri,name,type} 会抛 "Unsupported FormDataPart implementation"。
+// 原生 part 必须提供 bytes()(expo-file-system File 即实现 Blob 接口)。
 
 describe('imagePartValue', () => {
-  it('Web 文件通道:直传 File 本体', () => {
+  it('Web 文件通道:直传 DOM File 本体', () => {
     const file = new File(['jpeg-bytes'], 'sheet.jpg', { type: 'image/jpeg' });
     expect(imagePartValue({ uri: 'blob:web', file })).toBe(file);
   });
 
-  it('原生通道:装入 {uri,name,type} 形态(RN fetch 识别的文件对象)', () => {
-    expect(
-      imagePartValue({ uri: 'file:///tmp/sheet.jpg', fileName: 'sheet.jpg', mimeType: 'image/jpeg' }),
-    ).toEqual({ uri: 'file:///tmp/sheet.jpg', name: 'sheet.jpg', type: 'image/jpeg' });
+  it('原生通道:expo-file-system File(uri 保留,带 bytes(),供 expo/fetch 读取)', () => {
+    const part = imagePartValue({ uri: 'file:///tmp/sheet.jpg' }) as unknown as {
+      uri: string;
+      bytes: unknown;
+    };
+    expect(part.uri).toBe('file:///tmp/sheet.jpg');
+    expect(typeof part.bytes).toBe('function');
   });
+});
 
-  it('缺失文件名/mime:回落 photo.jpg 与 image/jpeg', () => {
-    expect(imagePartValue({ uri: 'file:///tmp/x' })).toEqual({
-      uri: 'file:///tmp/x',
-      name: 'photo.jpg',
-      type: 'image/jpeg',
-    });
+describe('appendImagePart', () => {
+  it('装入 image 字段,取值为 imagePartValue(原生值为带 bytes() 的 File)', () => {
+    const appended: [string, unknown][] = [];
+    const form = {
+      append: (name: string, value: unknown) => appended.push([name, value]),
+    } as unknown as FormData;
+    appendImagePart(form, { uri: 'file:///tmp/sheet.jpg' });
+    expect(appended.map(([name]) => name)).toEqual(['image']);
+    expect(typeof (appended[0][1] as { bytes?: unknown }).bytes).toBe('function');
   });
 });

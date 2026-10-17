@@ -1,17 +1,20 @@
-// 报告端点(GET/POST /api/v1/reports;契约冻结于 schemas/openapi.yaml,viz-and-client 票 06)。
-// GET 时间线按成员过滤(缺省全部,含存量无主);POST multipart 上传(图像 + 成员),
-// 原子接收后同步等待识别,响应即完整报告。sha256 幂等分岔:已有报告不含核对决策 →
-// 200 duplicate:true;已含核对决策 → 409,显式 override=true 才重跑识别并重置归档。
+// 报告端点(GET /api/v1/reports 时间线、POST /api/v1/reports multipart 上传、
+// GET /api/v1/reports/{report_id} 详情;契约冻结于 schemas/openapi.yaml,viz-and-client 票 06/07)。
+// 时间线按成员过滤(缺省全部,含存量无主);上传原子接收后同步等待识别,响应即完整报告。
+// sha256 幂等分岔:已有报告不含核对决策 → 200 duplicate:true;已含核对决策 → 409,
+// 显式 override=true 才重跑识别并重置归档。详情含指标项 OCR 行链接(票 07)。
 package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"strconv"
 
+	"healthyduoduo/internal/contract"
 	"healthyduoduo/internal/httpapi"
 	"healthyduoduo/internal/pipeline"
 )
@@ -118,6 +121,39 @@ func handleListReports(rs pipeline.ReportStore) http.HandlerFunc {
 	}
 }
 
+// handleGetReport GET /api/v1/reports/{report_id}:报告详情(头部 + 指标项含 OCR 行链接)。
+// report_id 为对外身份 sha256;非该形态无法是任何已有报告,与不存在同样回 404(契约只声明 404)。
+func handleGetReport(d *deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		reportID := r.PathValue("report_id")
+		if pipeline.ValidateSha256(reportID) != nil {
+			writeErrorJSON(w, http.StatusNotFound, "report not found")
+			return
+		}
+		ctx := r.Context()
+		summary, err := d.reports.SummaryByImage(ctx, reportID)
+		if err != nil {
+			writeErrorJSON(w, http.StatusInternalServerError, "lookup report failed")
+			return
+		}
+		if summary == nil {
+			writeErrorJSON(w, http.StatusNotFound, "report not found")
+			return
+		}
+		items, err := d.reports.ItemsWithReviewStatus(ctx, reportID)
+		if err != nil {
+			writeErrorJSON(w, http.StatusInternalServerError, "read report items failed")
+			return
+		}
+		ocr, err := loadReportOCR(ctx, d.reports, reportID)
+		if err != nil {
+			writeErrorJSON(w, http.StatusInternalServerError, "read report ocr result failed")
+			return
+		}
+		writeJSON(w, http.StatusOK, toAPIDetail(*summary, items, ocr))
+	}
+}
+
 // handleUploadReport POST /api/v1/reports:multipart 同步上传。
 // 200/201 分岔与归属写入语义见包注释;所有错误走契约 Error 形状。
 func handleUploadReport(d *deps) http.HandlerFunc {
@@ -160,7 +196,12 @@ func handleUploadReport(d *deps) http.HandlerFunc {
 				writeErrorJSON(w, http.StatusInternalServerError, "assign member failed")
 				return
 			}
-			writeJSON(w, http.StatusOK, httpapi.UploadResult{Duplicate: true, Report: toAPIDetail(*existing, items)})
+			ocr, err := loadReportOCR(ctx, d.reports, existing.Sha256)
+			if err != nil {
+				writeErrorJSON(w, http.StatusInternalServerError, "read report ocr result failed")
+				return
+			}
+			writeJSON(w, http.StatusOK, httpapi.UploadResult{Duplicate: true, Report: toAPIDetail(*existing, items, ocr)})
 			return
 		}
 
@@ -189,7 +230,12 @@ func handleUploadReport(d *deps) http.HandlerFunc {
 			writeErrorJSON(w, http.StatusInternalServerError, "read report items failed")
 			return
 		}
-		writeJSON(w, http.StatusCreated, httpapi.UploadResult{Duplicate: false, Report: toAPIDetail(*summary, items)})
+		ocr, err := loadReportOCR(ctx, d.reports, sha)
+		if err != nil {
+			writeErrorJSON(w, http.StatusInternalServerError, "read report ocr result failed")
+			return
+		}
+		writeJSON(w, http.StatusCreated, httpapi.UploadResult{Duplicate: false, Report: toAPIDetail(*summary, items, ocr)})
 	}
 }
 
@@ -235,11 +281,43 @@ func toAPIReportHeader(sum pipeline.ReportSummary) httpapi.ReportHeader {
 	}
 }
 
-// toAPIDetail 上传响应的完整报告:头部 + 指标项。ocr_lines 与 prev 属票 07/M3
-// 填充面(契约形状先以空数组/null 满足,不冒充已有数据)。
-func toAPIDetail(sum pipeline.ReportSummary, items []pipeline.ReportItemRow) httpapi.ReportDetail {
+// loadReportOCR 读报告所用 OCR 结果并解析为契约形状(详情行链接重建的输入,票 07)。
+// 报告行在则 OCR 行必在(ingest 原子写入);缺失/损坏按错误暴露,不静默降级为空链接。
+func loadReportOCR(ctx context.Context, rs pipeline.ReportStore, reportSha string) (*contract.OCRResult, error) {
+	raw, err := rs.OCRResultJSONByReport(ctx, reportSha)
+	if err != nil {
+		return nil, err
+	}
+	if raw == nil {
+		return nil, fmt.Errorf("ocr result missing for report %s", reportSha)
+	}
+	var ocr contract.OCRResult
+	if err := json.Unmarshal(raw, &ocr); err != nil {
+		return nil, fmt.Errorf("parse stored ocr result: %w", err)
+	}
+	return &ocr, nil
+}
+
+// toAPILineBox 识别端 Box([4]Point) → 契约镜像 Box4x2([4][2]float64);
+// 元素为具名数组类型,直接类型转换不成立,逐点半拷贝。
+func toAPILineBox(b contract.Box) httpapi.Box4x2 {
+	var out httpapi.Box4x2
+	for i, p := range b {
+		out[i] = [2]float64{p[0], p[1]}
+	}
+	return out
+}
+
+// toAPIDetail 报告详情投影(GET 详情与上传响应共用):头部 + 指标项(含 OCR 行链接,
+// 由 raw_text 对 OCR 行重建);prev 属 M3(契约形状先以 null 满足,不冒充已有数据)。
+func toAPIDetail(sum pipeline.ReportSummary, items []pipeline.ReportItemRow, ocr *contract.OCRResult) httpapi.ReportDetail {
 	detail := httpapi.ReportDetail{ReportHeader: toAPIReportHeader(sum), Items: make([]httpapi.ReportItem, 0, len(items))}
 	for _, it := range items {
+		links := pipeline.LinkOCRLines(it.RawText, ocr)
+		ocrLines := make([]httpapi.OcrLineLink, 0, len(links))
+		for _, l := range links {
+			ocrLines = append(ocrLines, httpapi.OcrLineLink{Line: l.Line, Box: toAPILineBox(l.Box)})
+		}
 		detail.Items = append(detail.Items, httpapi.ReportItem{
 			ItemID:        it.ItemID,
 			Name:          it.Name,
@@ -251,7 +329,7 @@ func toAPIDetail(sum pipeline.ReportSummary, items []pipeline.ReportItemRow) htt
 			LowConfidence: it.LowConfidence,
 			RawText:       it.RawText,
 			ReviewStatus:  it.ReviewStatus,
-			OcrLines:      []httpapi.OcrLineLink{},
+			OcrLines:      ocrLines,
 			Prev:          nil,
 		})
 	}

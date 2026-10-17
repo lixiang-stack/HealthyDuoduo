@@ -196,6 +196,14 @@ func (f *fakeObjects) Put(ctx context.Context, key string, data []byte) error {
 	return nil
 }
 
+func (f *fakeObjects) Get(ctx context.Context, key string) ([]byte, error) {
+	data, ok := f.puts[key]
+	if !ok {
+		return nil, nil
+	}
+	return data, nil
+}
+
 var _ pipeline.Recognizer = (*fakeRecognizer)(nil)
 var _ pipeline.Store = (*fakeStore)(nil)
 var _ pipeline.ObjectStore = (*fakeObjects)(nil)
