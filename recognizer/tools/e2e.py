@@ -10,7 +10,8 @@
   uv run --project recognizer python tools/e2e.py seed [--with-local] # ingest samples/ 图(--with-local 追加 data/ 本地图)
   uv run --project recognizer python tools/e2e.py clean              # 移除 seed 写入的行(S3 对象保留:惰性字节,重 ingest 幂等)
   uv run --project recognizer python tools/e2e.py verify [--item 血小板] [--golden]
-      # 默认:真实数据不变量——单位 ∈ 注册规范形/族外原文、trend 质量门口径、delta 只在可信点间
+      # 默认:真实数据不变量——单位 ∈ 注册规范形/族外原文、ocr_lines 链接覆盖率与几何裕度
+      # (经 hdd serve /api/v1)、trend 质量门口径、delta 只在可信点间
       # --golden:seed 后逐张对比 DB 报告 vs samples/expected/report(全链路 HTTP+OCR+DB 写入一致)
 
 标准验证序列(refresh → verify → seed → verify --golden → clean)。
@@ -22,7 +23,8 @@
 - 快照/台账放 <主检出>/data/(gitignored,永不入库);S3 对象不快照(原图皆在本地)。
 
 依赖:docker(compose 项目 deploy)、容器内 pg_dump/pg_restore、宿主 go(refresh 构建用)。
-环境变量:E2E_PG_CONTAINER(默认 deploy-postgres-1);库名/账号沿 HDD_DATABASE_URL 默认值解析。
+环境变量:E2E_PG_CONTAINER(默认 deploy-postgres-1);库名/账号沿 HDD_DATABASE_URL 默认值解析;
+HDD_SERVE_PORT(默认 8080)决定 verify 访问 hdd serve 的端口。
 """
 
 import argparse
@@ -34,7 +36,9 @@ import re
 import subprocess
 import sys
 import time
+import urllib.error
 import urllib.parse
+import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -44,6 +48,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 MASKED_DATE = "2020-01-01"
 IMAGE_SUFFIXES = (".jpg", ".jpeg", ".png", ".webp", ".bmp")
 DEFAULT_CONTAINER = "deploy-postgres-1"
+# hdd serve 端口缺省(compose 映射 HDD_SERVE_PORT,默认 8080);verify 的 ocr_lines 度量经它取详情。
+DEFAULT_SERVE_PORT = "8080"
 
 
 def main_data() -> Path:
@@ -467,6 +473,94 @@ def _check(cond: bool, msg: str) -> None:
     print(f"ok: {msg}")
 
 
+# ---- ocr_lines 链接度量(票 02) ----
+
+
+def _serve_base() -> str:
+    """hdd serve 的 /api/v1 基座(verify 的 ocr_lines 度量经 HTTP 取详情)。"""
+    return f"http://127.0.0.1:{os.environ.get('HDD_SERVE_PORT', DEFAULT_SERVE_PORT)}/api/v1"
+
+
+def _serve_json(path: str) -> dict:
+    with urllib.request.urlopen(_serve_base() + path, timeout=15) as resp:
+        return json.loads(resp.read())
+
+
+def verify_ocr_lines() -> None:
+    """ocr_lines 行链接持续度量(GET /reports/{id} 契约;票 07 引入、票 02 收编为门禁)。
+
+    · 覆盖率与结构一致性(硬门禁):每份报告的每个指标项必须有行链接,且
+      「链接行文本按序 join == raw_text」、链接框逐点等于该行 OCR box——
+      结构错位或识别端 raw_text join 格式漂移在此 fail-fast。
+    · 歧义度(度量):有链接行文本在单内多次出现的项数——同文本行的绑定歧义面;
+      v2 前由服务端几何消歧消化,v2 后由识别端直吐下标,此处保留为持续观测(>0 属常态)。
+    · 歧义裕度(度量):链接行中心 y 的展开 / 最大行高——同一视觉行内应远小于 1,
+      跨行错配才会 >1(纵向回退项为合法跨行,故只度量告警、不硬判)。
+      真正的最优解-备选解差值只在识别/服务端内部可见,无法经契约暴露,故以
+      「所选解的几何聚拢度」为外部代理;>1 打印告警供人工抽查。
+    """
+    shas = [s for s in psql("select image_sha256 from reports order by image_sha256;").splitlines() if s]
+    total_items = linked_items = ambiguous = 0
+    worst_ratio, worst = 0.0, "-"
+    for sha in shas:
+        try:
+            detail = _serve_json(f"/reports/{sha}")
+        except urllib.error.URLError as exc:
+            raise SystemExit(
+                f"FAIL: ocr-lines: hdd serve 不可达({exc});"
+                "该度量依赖已构建的 serve 容器与 /api/v1/reports/{id}"
+            )
+        engine = psql(
+            "select engine_output from ocr_results where id="
+            f"(select ocr_result_id from reports where image_sha256='{sha}');"
+        )
+        ocr = json.loads(engine)
+        txts = [t.strip() for t in ocr["txts"]]
+        boxes = ocr["boxes"]
+        for item in detail["items"]:
+            total_items += 1
+            links = item["ocr_lines"]
+            if not links:
+                raise SystemExit(
+                    f"FAIL: {sha[:12]} item {item['name']!r} 无 ocr_lines(raw_text={item['raw_text']!r})"
+                )
+            linked_items += 1
+            # 格间分隔符按识别端 postprocess 的 raw_text 口径(两个空格);跨语言不变量,
+            # 若识别端改 join 格式,此处应同步(结构门禁会先在此炸出)。
+            joined = "  ".join(txts[l["line"]] for l in links)
+            if joined != item["raw_text"]:
+                raise SystemExit(
+                    f"FAIL: {sha[:12]} item {item['name']!r} 链接行 join 与 raw_text 不一致:"
+                    f" {joined!r} != {item['raw_text']!r}"
+                )
+            for l in links:
+                if l["box"] != boxes[l["line"]]:
+                    raise SystemExit(
+                        f"FAIL: {sha[:12]} item {item['name']!r} line {l['line']} box 与 OCR box 不一致"
+                    )
+            linked_texts = [txts[l["line"]] for l in links]
+            if any(txts.count(t) > 1 for t in linked_texts):
+                ambiguous += 1
+            cys = [sum(p[1] for p in boxes[l["line"]]) / 4 for l in links]
+            heights = [
+                max(p[1] for p in boxes[l["line"]]) - min(p[1] for p in boxes[l["line"]])
+                for l in links
+            ]
+            ratio = (max(cys) - min(cys)) / max(max(heights), 1.0)
+            if ratio > worst_ratio:
+                worst_ratio, worst = ratio, f"{sha[:12]}/{item['name']}"
+    # 覆盖率即"无链接项"已在上文逐项 raise;此处只作摘要输出(结构门禁的失败路径都是 raise)。
+    print(f"ok: ocr-lines: linked {linked_items}/{total_items} items; join/box 一致")
+    margin_msg = (
+        f"ocr-lines margin: ambiguous-resolution {ambiguous}/{total_items},"
+        f" max y-spread ratio {worst_ratio:.2f} (worst {worst})"
+    )
+    if worst_ratio > 1.0:
+        print(f"warn: {margin_msg} —— 跨行嫌疑,抽查上列项")
+    else:
+        print(f"ok: {margin_msg}")
+
+
 def _trend_rows(item: str, show_all: bool, from_root: Path) -> list[dict]:
     args = [build_hdd(from_root), "trend"] + (["--all"] if show_all else []) + [item]
     r = subprocess.run(args, capture_output=True, text=True, check=False)
@@ -527,6 +621,8 @@ def verify(item: str, from_root: Path) -> None:
         print(
             f"warn: printed-misprint units kept raw (source sheet garble): {misprint[:5]}"
         )
+
+    verify_ocr_lines()
 
     rows_def = _trend_rows(item, False, from_root)
     rows_all = _trend_rows(item, True, from_root)
