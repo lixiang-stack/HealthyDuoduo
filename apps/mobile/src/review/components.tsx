@@ -75,6 +75,7 @@ export function ReviewItemCard({
     <View style={styles.editorField} key={key}>
       <Text style={styles.editorLabel}>{label}</Text>
       <TextInput
+        testID={`review-field-${key}-${item.item_id}`}
         style={styles.editorInput}
         value={draft[key]}
         onChangeText={(text) => setDraft((prev) => ({ ...prev, [key]: text }))}
@@ -85,7 +86,10 @@ export function ReviewItemCard({
   );
 
   return (
-    <View style={[styles.itemCard, item.low_confidence && styles.itemCardLowConfidence]}>
+    <View
+      testID={`review-item-${item.item_id}`}
+      style={[styles.itemCard, item.low_confidence && styles.itemCardLowConfidence]}
+    >
       <View style={styles.itemHeader}>
         <Text style={styles.itemName}>{item.name}</Text>
         {item.low_confidence ? <Text style={styles.lowTag}>低置信</Text> : null}
@@ -111,6 +115,7 @@ export function ReviewItemCard({
           {field('ref_range', '参考范围')}
           <View style={styles.actions}>
             <Pressable
+              testID={`review-save-${item.item_id}`}
               style={[styles.actionPrimary, (!correction || busy) && styles.actionDisabled]}
               disabled={!correction || busy}
               onPress={() => correction && void submit(correction)}
@@ -118,6 +123,7 @@ export function ReviewItemCard({
               <Text style={styles.actionPrimaryText}>保存修正</Text>
             </Pressable>
             <Pressable
+              testID={`review-cancel-${item.item_id}`}
               style={styles.actionGhost}
               disabled={busy}
               onPress={() => {
@@ -134,6 +140,7 @@ export function ReviewItemCard({
           {/* 确认是对「未确信」项的动作:已确认后再点是无变化空操作,禁用;
               已修正项仍可再确认/再修正(决策可重复,ADR-0005)。 */}
           <Pressable
+            testID={`review-confirm-${item.item_id}`}
             style={[
               styles.actionPrimary,
               (busy || item.review_status === 'confirmed') && styles.actionDisabled,
@@ -143,7 +150,12 @@ export function ReviewItemCard({
           >
             <Text style={styles.actionPrimaryText}>确认</Text>
           </Pressable>
-          <Pressable style={styles.actionGhost} disabled={busy} onPress={() => setEditing(true)}>
+          <Pressable
+            testID={`review-correct-${item.item_id}`}
+            style={styles.actionGhost}
+            disabled={busy}
+            onPress={() => setEditing(true)}
+          >
             <Text style={styles.actionGhostText}>修正</Text>
           </Pressable>
         </View>

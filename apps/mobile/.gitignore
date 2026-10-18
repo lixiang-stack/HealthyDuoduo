@@ -39,3 +39,6 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# App E2E 产物(报告/trace/应用日志;见 docs/agents/app-e2e.md)
+.e2e/
