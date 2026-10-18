@@ -64,7 +64,9 @@ _DATE_LABELS = (
     "核收时间", "报告时间", "报告日期", "打印时间", "申请时间",
 )
 _DATE_RE = re.compile(r"(\d{4})[-/.年](\d{1,2})[-/.月]?(\d{1,2})")
-_DATE_LINE_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})\b")
+# 独立日期行(行首锚定):分隔符与 _DATE_RE 同口径(破折号/斜杠/点/年月日);
+# 月日合法性由 _date_match 复核。
+_DATE_LINE_RE = re.compile(r"^(\d{4})[-/.年](\d{1,2})[-/.月]?(\d{1,2})\b")
 
 _NUM = r"\d+(?:\.\d+)?"
 _NUMBER_RE = re.compile(rf"^{_NUM}$")  # 纯正数(含小数)
@@ -567,16 +569,20 @@ def _find_date(cells: list[_Cell], date_hint: str | None) -> str | None:
                 d = _date_match(c.text)
                 if d:
                     return d
-    # 标签与日期分格(webwxgetmsgimg_23):标签行(如「报告时间：」)右侧同带最近
-    # 的含日期格兜底。标签与值竖直错位 ≤10px,水平近距扫描 300px。
+    # 标签与日期分格(webwxgetmsgimg_23):标签行(如「报告时间：」)右侧同带最近的
+    # 含日期格兜底。门限按图内容宽度/格高缩放——旧值 300px/10px 按小截图校准,
+    # 大图字号同比放大(实测 3316px 照片盒间距 322px);max 单调放宽不引入更严判定。
+    width = max((c.x1 for c in cells), default=0.0)
     for label in _DATE_LABELS:
         for c in cells:
             if label not in c.text:
                 continue
+            gap_limit = max(300.0, 0.2 * width)
+            dy_limit = max(10.0, 0.25 * c.h)
             cands = [
                 d2
                 for d2 in cells
-                if d2 is not c and d2.cx > c.cx and abs(d2.cy - c.cy) <= 10.0 and (d2.cx - c.cx) <= 300.0
+                if d2 is not c and d2.cx > c.cx and abs(d2.cy - c.cy) <= dy_limit and (d2.cx - c.cx) <= gap_limit
             ]
             if not cands:
                 continue
@@ -586,9 +592,10 @@ def _find_date(cells: list[_Cell], date_hint: str | None) -> str | None:
     if date_hint:
         return date_hint
     for c in cells:  # 独立日期行(标签与日期被 OCR 拆开时的兜底,如 cbc_05)
-        m = _DATE_LINE_RE.match(c.text.strip())
-        if m:
-            return m.group(1)
+        if _DATE_LINE_RE.match(c.text.strip()):
+            d = _date_match(c.text)
+            if d:
+                return d
     return None
 
 

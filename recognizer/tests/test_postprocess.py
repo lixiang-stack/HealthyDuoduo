@@ -398,6 +398,30 @@ def test_no_date_and_no_hint_partial() -> None:
     assert r.status == "partial"
 
 
+def test_date_split_cells_large_photo_scale() -> None:
+    """真实照片形态(维护者实测 3316px 宽,2026-10-18):标签与日期分格且盒间距
+    322px——按小图校准的 300px 旧门限恰好越界,日期丢失。框值取自实测 OCR
+    (检验时间 Δcx=322.6/Δcy=-7.5/格高 73;页面内容宽 3278)。"""
+    cells = header_row(dated=False) + row(30, "血红蛋白", "128", unit="g/L", ref="115-150")
+    cells += [
+        {"x": 1217, "y": 1750, "w": 276, "h": 73, "text": "检验时间："},
+        {"x": 1521, "y": 1747, "w": 312, "h": 65, "text": "2026/05/16"},
+        {"x": 2519, "y": 1727, "w": 571, "h": 72, "text": "2026/05/16 12:38:27"},  # 页面右缘(撑内容宽度)
+    ]
+    assert run_postprocess(mk_ocr(cells)).report_date == "2026-05-16"
+
+
+def test_date_standalone_slash_line() -> None:
+    """独立日期行兜底与 _DATE_RE 同分隔符口径:斜杠形态收,非法月日不猜。"""
+    cells = header_row(dated=False) + row(30, "血红蛋白", "128", unit="g/L", ref="115-150")
+    cells += [{"x": 40, "y": 200, "text": "2026/05/16"}]
+    assert run_postprocess(mk_ocr(cells)).report_date == "2026-05-16"
+
+    cells_invalid = header_row(dated=False) + row(30, "血红蛋白", "128", unit="g/L", ref="115-150")
+    cells_invalid += [{"x": 40, "y": 200, "text": "2026/13/40"}]
+    assert run_postprocess(mk_ocr(cells_invalid)).report_date is None
+
+
 # ---------- 类别 / 状态 ----------
 
 
