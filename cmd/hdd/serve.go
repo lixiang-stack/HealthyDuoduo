@@ -45,6 +45,8 @@ func newServeHandler(d *deps, corsOrigin string) http.Handler {
 	mux.HandleFunc("GET /api/v1/reports", handleListReports(d.reports))
 	mux.HandleFunc("POST /api/v1/reports", handleUploadReport(d))
 	mux.HandleFunc("GET /api/v1/reports/{report_id}", handleGetReport(d))
+	// 核对端点(票 09):指标项确认/修正(flag 重算、修正对 append、状态派生单调)。
+	mux.HandleFunc("PATCH /api/v1/reports/{report_id}/items/{item_id}", handleReviewItem(d))
 	// 图像端点(票 07):后端代理对象存储、局域网直出。
 	mux.HandleFunc("GET /api/v1/images/{sha256}", handleGetImage(d.obj))
 	return withCORS(mux, corsOrigin)

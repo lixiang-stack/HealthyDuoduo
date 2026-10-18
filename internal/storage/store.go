@@ -112,6 +112,41 @@ const (
 	sqlReportSetMember = `UPDATE reports SET member_id = $2, updated_at = now()
 		 WHERE image_sha256 = $1`
 
+	// 核对落库(票 09;单报告核对事务):报告行锁串行化该报告的并发核对,
+	// 保证状态派生翻转看到的是最新已提交状态。
+	sqlReportLock = `SELECT image_sha256 FROM reports WHERE image_sha256 = $1 FOR UPDATE`
+
+	// 单指标项按报告内身份取行(核对动作前读;id 与报告不匹配即不存在)。
+	sqlItemForReview = `SELECT id, name, value, unit, ref_range, method, flag, low_confidence, raw_text, review_status,
+		   COALESCE(ocr_line_numbers, '{}')
+		 FROM report_items WHERE report_sha256 = $1 AND id = $2`
+
+	sqlItemReviewConfirm = `UPDATE report_items SET review_status = 'confirmed' WHERE id = $1`
+
+	sqlItemReviewCorrect = `UPDATE report_items SET name = $2, value = $3, unit = $4, ref_range = $5, flag = $6,
+		   review_status = 'corrected' WHERE id = $1`
+
+	// 修正对 append-only(ADR-0005;before→after 四项纸面事实全集 + 原始行文 + OCR 行号)。
+	sqlCorrectionPairInsert = `INSERT INTO correction_pairs
+		 (item_id, before_name, before_value, before_unit, before_ref_range,
+		  after_name, after_value, after_unit, after_ref_range, raw_text, ocr_line_numbers)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`
+
+	// 状态派生翻转(ADR-0005):partial → success 当且仅当未核对低置信计数 = 0;
+	// 单向(核对状态永不回 unreviewed,override 重跑会整写状态,不经此路径)。
+	sqlReportDeriveSuccess = `UPDATE reports SET status = 'success', updated_at = now()
+		 WHERE image_sha256 = $1 AND status = 'partial'
+		   AND NOT EXISTS (SELECT 1 FROM report_items i
+		                   WHERE i.report_sha256 = $1 AND i.review_status = 'unreviewed' AND i.low_confidence)`
+
+	// 动作后报告级派生读出(状态 + 未核对低置信计数,与 reportAggregateSQL 同口径:
+	// 计数以 partial 为门,success/failed 恒 0)。
+	sqlReportReviewState = `SELECT r.status,
+		   (SELECT COUNT(*) FROM report_items i
+		    WHERE i.report_sha256 = r.image_sha256 AND r.status = 'partial'
+		      AND i.review_status = 'unreviewed' AND i.low_confidence)
+		 FROM reports r WHERE r.image_sha256 = $1`
+
 	sqlOCRResultByID = `SELECT engine_output FROM ocr_results WHERE id = $1`
 
 	// 报告行 upsert:测定 identity = 图像 sha256(每图一行);冲突即原位更新(--force 重跑)。
@@ -389,6 +424,63 @@ func (s *Store) SetReportMember(ctx context.Context, reportSha string, memberID 
 		return fmt.Errorf("report %s not found", reportSha)
 	}
 	return nil
+}
+
+// ReviewItem 核对落地(票 09;确认/修正,单事务):锁报告行(串行化同一报告的并发
+// 核对,状态翻转不丢)→ 取指标项 → 应用动作(pipeline.ApplyReviewAction:生效值 +
+// flag 重算 + 修正对)→ 报告状态单调派生(partial → success 当且仅当未核对低置信
+// 计数归零)→ 读出动作后报告级状态与计数。报告或指标项缺失返回 nil, nil(404 口径)。
+func (s *Store) ReviewItem(ctx context.Context, reportSha string, itemID int64, action pipeline.ReviewAction) (*pipeline.ReviewOutcome, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	var locked string
+	if err := tx.QueryRow(ctx, sqlReportLock, reportSha).Scan(&locked); errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil // 报告不存在(与指标项缺失同口径:对客户端是同一件事)
+	} else if err != nil {
+		return nil, fmt.Errorf("lock report: %w", err)
+	}
+
+	var current pipeline.ReportItemRow
+	err = tx.QueryRow(ctx, sqlItemForReview, reportSha, itemID).Scan(
+		&current.ItemID, &current.Name, &current.Value, &current.Unit, &current.RefRange, &current.Method,
+		&current.Flag, &current.LowConfidence, &current.RawText, &current.ReviewStatus, &current.OCRLineNumbers)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil // 指标项不存在或不属于该报告
+	} else if err != nil {
+		return nil, fmt.Errorf("read report item: %w", err)
+	}
+
+	next, pair := pipeline.ApplyReviewAction(current, action)
+	if pair == nil {
+		if _, err := tx.Exec(ctx, sqlItemReviewConfirm, current.ItemID); err != nil {
+			return nil, fmt.Errorf("confirm item: %w", err)
+		}
+	} else {
+		if _, err := tx.Exec(ctx, sqlItemReviewCorrect, current.ItemID, next.Name, next.Value, next.Unit, next.RefRange, next.Flag); err != nil {
+			return nil, fmt.Errorf("correct item: %w", err)
+		}
+		if _, err := tx.Exec(ctx, sqlCorrectionPairInsert, current.ItemID,
+			pair.BeforeName, pair.BeforeValue, pair.BeforeUnit, pair.BeforeRefRange,
+			pair.AfterName, pair.AfterValue, pair.AfterUnit, pair.AfterRefRange,
+			pair.RawText, pair.OCRLineNumbers); err != nil {
+			return nil, fmt.Errorf("append correction pair: %w", err)
+		}
+	}
+	if _, err := tx.Exec(ctx, sqlReportDeriveSuccess, reportSha); err != nil {
+		return nil, fmt.Errorf("derive report status: %w", err)
+	}
+	outcome := pipeline.ReviewOutcome{Item: next}
+	if err := tx.QueryRow(ctx, sqlReportReviewState, reportSha).Scan(&outcome.Status, &outcome.UnreviewedLowConfidenceCount); err != nil {
+		return nil, fmt.Errorf("read report review state: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return &outcome, nil
 }
 
 // dateGranularity --date 输入的粒度;dateNone 表示未传日期。

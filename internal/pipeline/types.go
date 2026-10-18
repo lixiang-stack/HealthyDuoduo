@@ -79,6 +79,12 @@ type ReportStore interface {
 	OCRResultJSONByReport(ctx context.Context, reportSha string) ([]byte, error)
 	// SetReportMember 只改报告归属(上传新建/无主归档时赋值;不碰其他字段)。
 	SetReportMember(ctx context.Context, reportSha string, memberID int64) error
+	// ReviewItem 核对落地(确认/修正;viz-and-client 票 09):单事务内应用动作
+	// (生效值 + flag 按修正后 value × ref_range 重算 + 每次修正 append 一条修正对)
+	// 并派生报告状态(partial → success 当且仅当未核对低置信项归零,单向)。
+	// 返回动作后的报告级状态、未核对低置信计数与本次指标项;
+	// 报告或指标项不存在返回 nil, nil。
+	ReviewItem(ctx context.Context, reportSha string, itemID int64, action ReviewAction) (*ReviewOutcome, error)
 }
 
 // ReviewStatusUnreviewed 指标项核对状态机(ADR-0005)的初始态;任一指标项
