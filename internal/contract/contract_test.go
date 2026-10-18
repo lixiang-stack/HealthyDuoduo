@@ -73,6 +73,9 @@ func TestUnmarshalReportFixture(t *testing.T) {
 	if item.RawText != "血红蛋白 128 g/L 115-150" {
 		t.Errorf("Item.RawText = %q", item.RawText)
 	}
+	if len(item.OCRLineNumbers) != 3 || item.OCRLineNumbers[0] != 0 || item.OCRLineNumbers[2] != 2 {
+		t.Errorf("Item.OCRLineNumbers = %v, want [0 1 2]", item.OCRLineNumbers)
+	}
 }
 
 func TestUnmarshalReportNullDateFixture(t *testing.T) {

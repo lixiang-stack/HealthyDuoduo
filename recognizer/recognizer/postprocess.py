@@ -235,6 +235,7 @@ class _Cell:
     y0: float
     x1: float
     y1: float
+    line: int  # OCR 行下标(txts/boxes 同下标;_cells 填充,供 item→行链接)
 
     @property
     def cx(self) -> float:
@@ -250,12 +251,12 @@ class _Cell:
 
 
 def _cells(ocr: OCRResult) -> list[_Cell]:
-    """行文本 + box 多边形 → 以包络矩形表达的格。"""
+    """行文本 + box 多边形 → 以包络矩形表达的格(带行下标)。"""
     out = []
-    for text, box, score in zip(ocr.txts, ocr.boxes, ocr.scores):
+    for i, (text, box, score) in enumerate(zip(ocr.txts, ocr.boxes, ocr.scores)):
         xs = [p[0] for p in box]
         ys = [p[1] for p in box]
-        out.append(_Cell(text=text, score=score, x0=min(xs), y0=min(ys), x1=max(xs), y1=max(ys)))
+        out.append(_Cell(text=text, score=score, x0=min(xs), y0=min(ys), x1=max(xs), y1=max(ys), line=i))
     return out
 
 
@@ -964,6 +965,7 @@ def run_postprocess(ocr: OCRResult, date_hint: str | None = None) -> Report:
                 flag=flag,
                 low_confidence=low_conf,
                 raw_text=raw_text,
+                ocr_line_numbers=[c.line for c in raw_cells],
             )
         )
         if piece.value is None:

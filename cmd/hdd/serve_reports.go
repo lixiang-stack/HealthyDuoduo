@@ -281,7 +281,7 @@ func toAPIReportHeader(sum pipeline.ReportSummary) httpapi.ReportHeader {
 	}
 }
 
-// loadReportOCR 读报告所用 OCR 结果并解析为契约形状(详情行链接重建的输入,票 07)。
+// loadReportOCR 读报告所用 OCR 结果并解析为契约形状(详情行链接映射的行框来源,票 07)。
 // 报告行在则 OCR 行必在(ingest 原子写入);缺失/损坏按错误暴露,不静默降级为空链接。
 func loadReportOCR(ctx context.Context, rs pipeline.ReportStore, reportSha string) (*contract.OCRResult, error) {
 	raw, err := rs.OCRResultJSONByReport(ctx, reportSha)
@@ -308,15 +308,19 @@ func toAPILineBox(b contract.Box) httpapi.Box4x2 {
 	return out
 }
 
-// toAPIDetail 报告详情投影(GET 详情与上传响应共用):头部 + 指标项(含 OCR 行链接,
-// 由 raw_text 对 OCR 行重建);prev 属 M3(契约形状先以 null 满足,不冒充已有数据)。
+// toAPIDetail 报告详情投影(GET 详情与上传响应共用):头部 + 指标项。行链接由识别端
+// 直吐的 ocr_line_numbers 精确映射(下标 → 行框);prev 属 M3(契约形状先以 null 满足)。
 func toAPIDetail(sum pipeline.ReportSummary, items []pipeline.ReportItemRow, ocr *contract.OCRResult) httpapi.ReportDetail {
 	detail := httpapi.ReportDetail{ReportHeader: toAPIReportHeader(sum), Items: make([]httpapi.ReportItem, 0, len(items))}
 	for _, it := range items {
-		links := pipeline.LinkOCRLines(it.RawText, ocr)
-		ocrLines := make([]httpapi.OcrLineLink, 0, len(links))
-		for _, l := range links {
-			ocrLines = append(ocrLines, httpapi.OcrLineLink{Line: l.Line, Box: toAPILineBox(l.Box)})
+		ocrLines := make([]httpapi.OcrLineLink, 0, len(it.OCRLineNumbers))
+		for _, ln := range it.OCRLineNumbers {
+			// 下标契约内(识别端直吐);越界仅在数据损坏时出现——跳过不炸整页
+			// (raw_text 仍可见),结构完整性由 e2e verify 的 join/box 门禁兜底。
+			if ln < 0 || int(ln) >= len(ocr.Boxes) {
+				continue
+			}
+			ocrLines = append(ocrLines, httpapi.OcrLineLink{Line: int(ln), Box: toAPILineBox(ocr.Boxes[ln])})
 		}
 		detail.Items = append(detail.Items, httpapi.ReportItem{
 			ItemID:        it.ItemID,

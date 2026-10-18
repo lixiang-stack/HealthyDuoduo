@@ -70,6 +70,11 @@ func TestReportStoreSmoke(t *testing.T) {
 			('rep-d','葡萄糖','128',NULL,NULL,'normal',false,'葡萄糖  128','unreviewed')`); err != nil {
 		t.Fatalf("seed report_items: %v", err)
 	}
+	// 行链接下标(0005)按真实形态回填其中一行:读回校验用。
+	if _, err := pool.Exec(ctx, `UPDATE report_items SET ocr_line_numbers = ARRAY[7,8,9,10]
+		WHERE report_sha256='rep-a' AND name='单核细胞比率'`); err != nil {
+		t.Fatalf("seed ocr_line_numbers: %v", err)
+	}
 
 	// 全量:日期降序,dateless 沉底;逐卡核聚合口径。
 	all, err := st.ListTimeline(ctx, nil)
@@ -167,6 +172,12 @@ func TestReportStoreSmoke(t *testing.T) {
 	if items[2].ReviewStatus != "confirmed" || items[0].ReviewStatus != "unreviewed" {
 		t.Errorf("review_status not read back: %+v", items)
 	}
+	if len(items[0].OCRLineNumbers) != 4 || items[0].OCRLineNumbers[0] != 7 || items[0].OCRLineNumbers[3] != 10 {
+		t.Errorf("ocr_line_numbers not read back: %+v", items[0].OCRLineNumbers)
+	}
+	if len(items[1].OCRLineNumbers) != 0 {
+		t.Errorf("NULL ocr_line_numbers = %+v, want 空数组(存量行)", items[1].OCRLineNumbers)
+	}
 
 	// WriteReport(override 重跑镜像)不触碰 member_id:归属保持;items 全量替换。
 	var ocrID int64
@@ -176,7 +187,7 @@ func TestReportStoreSmoke(t *testing.T) {
 	v := "130"
 	if err := st.WriteReport(ctx, "rep-a", ocrID, contract.Report{
 		ReportType: "血常规", ReportDate: strPtr("2026-10-02"), Status: contract.StatusSuccess,
-		Items: []contract.ReportItem{{Name: "血红蛋白", Value: &v, Flag: "normal", RawText: "血红蛋白  130"}},
+		Items: []contract.ReportItem{{Name: "血红蛋白", Value: &v, Flag: "normal", RawText: "血红蛋白  130", OCRLineNumbers: []int32{3, 4}}},
 	}, nil); err != nil {
 		t.Fatalf("WriteReport override: %v", err)
 	}
@@ -193,6 +204,9 @@ func TestReportStoreSmoke(t *testing.T) {
 	}
 	if len(items) != 1 || items[0].ReviewStatus != pipeline.ReviewStatusUnreviewed {
 		t.Errorf("items after rerun = %+v, want 1 unreviewed (重置归档)", items)
+	}
+	if len(items[0].OCRLineNumbers) != 2 || items[0].OCRLineNumbers[0] != 3 || items[0].OCRLineNumbers[1] != 4 {
+		t.Errorf("ocr_line_numbers after rerun = %+v, want [3 4]", items[0].OCRLineNumbers)
 	}
 
 	// 归属写入:无主 → 成员 A;缺失报告报错。

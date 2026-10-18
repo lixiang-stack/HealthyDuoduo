@@ -86,6 +86,7 @@ def test_report_empty_items_must_be_failed() -> None:
 def test_report_with_items_accepts_every_status() -> None:
     """非空 items 与三种 status 的组合全部合法(不变量只约束空 items 一侧)。"""
     item = {"name": "血红蛋白", "value": "128", "unit": "g/L", "ref_range": "115-150",
-            "flag": "normal", "low_confidence": False, "raw_text": "血红蛋白 128 g/L 115-150"}
+            "flag": "normal", "low_confidence": False, "raw_text": "血红蛋白 128 g/L 115-150",
+            "ocr_line_numbers": [0, 1, 2]}
     for status in ("success", "partial", "failed"):
         assert Report.model_validate(_report(status, [item])) is not None

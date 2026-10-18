@@ -310,7 +310,8 @@ func cloneReport(r *contract.Report) *contract.Report {
 }
 
 // sampleUploadReport 真实样本形状(字段取自 schemas/testdata/http/report.detail.json 同源数据):
-// partial 报告、两个指标项(一项高置信 normal、一项低置信 high)。
+// partial 报告、两个指标项(一项高置信 normal、一项低置信 high);ocr_line_numbers 与
+// sampleUploadOCR 的行序对齐(识别端直吐,详情按它精确映射行框)。
 func sampleUploadReport() *contract.Report {
 	v1, u1, r1 := "10.8", "%", "3-10"
 	v2, u2, r2 := "128", "g/L", "115-150"
@@ -320,9 +321,9 @@ func sampleUploadReport() *contract.Report {
 		Status:     contract.StatusPartial,
 		Items: []contract.ReportItem{
 			{Name: "单核细胞比率", Value: &v1, Unit: &u1, RefRange: &r1, Flag: "high", LowConfidence: true,
-				RawText: "单核细胞百分比  10.8  ↑ %  3-10"},
+				RawText: "单核细胞百分比  10.8  ↑ %  3-10", OCRLineNumbers: []int32{1, 2, 3, 4}},
 			{Name: "血红蛋白", Value: &v2, Unit: &u2, RefRange: &r2, Flag: "normal",
-				RawText: "血红蛋白  128  g/L  115-150"},
+				RawText: "血红蛋白  128  g/L  115-150", OCRLineNumbers: []int32{9, 10, 11, 12}},
 		},
 	}
 }
@@ -488,7 +489,7 @@ func TestServeUploadNewReport(t *testing.T) {
 	if first.Prev != nil {
 		t.Errorf("first item prev = %+v, want null (M3 填充面)", first.Prev)
 	}
-	// 票 07:raw_text → OCR 行链接(行下标 + 框坐标,y 聚带消歧取本行重复碎片)。
+	// 票 07/03:行链接 = 识别端直吐 ocr_line_numbers → OCR 行框(下标映射,无文本反推)。
 	wantFirst := []int{1, 2, 3, 4}
 	if len(first.OcrLines) != len(wantFirst) {
 		t.Fatalf("first item ocr_lines = %+v, want %d links", first.OcrLines, len(wantFirst))
@@ -499,7 +500,7 @@ func TestServeUploadNewReport(t *testing.T) {
 		}
 	}
 	if got, want := first.OcrLines[2].Box, apiBox(313, 74); got != want {
-		t.Errorf("↑ %% box = %v, want 本行框 %v(非他行重复碎片)", got, want)
+		t.Errorf("↑ %% box = %v, want 直映行框 %v", got, want)
 	}
 	second := got.Report.Items[1]
 	if len(second.OcrLines) != 4 || second.OcrLines[0].Line != 9 || second.OcrLines[3].Line != 12 {
@@ -871,7 +872,7 @@ func TestServeListReportsFilterAndCounts(t *testing.T) {
 // 指标项外部句柄与核对状态、OCR 行链接、prev null);report_id 即图像身份,/images 可直出原图;
 // 未知与非法形态 404(契约只声明 404)。
 func TestServeGetReportDetail(t *testing.T) {
-	srv, _, _, _ := newReportsTestServer(t)
+	srv, st, _, _ := newReportsTestServer(t)
 	createOne(t, srv, `{"name":"小虎","is_child":true}`)
 
 	image := sampleImageBytes(t) // 真实样本图:图像直出断言按字节逐位比较
@@ -907,7 +908,7 @@ func TestServeGetReportDetail(t *testing.T) {
 		t.Errorf("first item handle/status = %+v, want 外部句柄 + unreviewed", first)
 	}
 	if len(first.OcrLines) != 4 || first.OcrLines[2].Line != 3 || first.OcrLines[2].Box != apiBox(313, 74) {
-		t.Errorf("first item ocr_lines = %+v, want 本行链接(↑ %% 不取他行重复碎片)", first.OcrLines)
+		t.Errorf("first item ocr_lines = %+v, want 识别端下标直映的行链接", first.OcrLines)
 	}
 	if first.Prev != nil {
 		t.Errorf("prev = %+v, want null (M3 填充面)", first.Prev)
@@ -924,6 +925,22 @@ func TestServeGetReportDetail(t *testing.T) {
 		if status, _ = doJSON(t, srv, http.MethodGet, "/api/v1/reports/"+id, ""); status != http.StatusNotFound {
 			t.Errorf("GET /reports/%s = %d, want 404", id, status)
 		}
+	}
+
+	// 损坏态防御:越界下标跳过不炸整页(链接空数组,raw_text 保留;结构完整性由 e2e 度量兜底)。
+	st.seedReport(strings.Repeat("d", 64), nil, contract.Report{ReportType: "血常规", Status: contract.StatusSuccess, Items: []contract.ReportItem{
+		{Name: "血红蛋白", Value: str("128"), Flag: "normal", RawText: "血红蛋白  128", OCRLineNumbers: []int32{0, 999}},
+	}}, nil)
+	status, raw = doJSON(t, srv, http.MethodGet, "/api/v1/reports/"+strings.Repeat("d", 64), "")
+	if status != http.StatusOK {
+		t.Fatalf("GET corrupted detail = %d; body = %s", status, raw)
+	}
+	var corrupted httpapi.ReportDetail
+	if err := json.Unmarshal(raw, &corrupted); err != nil {
+		t.Fatal(err)
+	}
+	if len(corrupted.Items) != 1 || len(corrupted.Items[0].OcrLines) != 0 || corrupted.Items[0].RawText != "血红蛋白  128" {
+		t.Errorf("corrupted indices = %+v, want 空链接 + raw_text 保留", corrupted.Items[0])
 	}
 }
 

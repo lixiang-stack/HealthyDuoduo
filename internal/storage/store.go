@@ -98,7 +98,9 @@ const (
 		 WHERE r.image_sha256 = $1`
 
 	// 指标项含外部句柄与核对状态(上传响应回读;行序 = id 升序与写入序一致)。
-	sqlItemsWithReviewStatus = `SELECT id, name, value, unit, ref_range, method, flag, low_confidence, raw_text, review_status
+	// ocr_line_numbers 存量行可为 NULL(0005 前入库),COALESCE 归空数组。
+	sqlItemsWithReviewStatus = `SELECT id, name, value, unit, ref_range, method, flag, low_confidence, raw_text, review_status,
+		   COALESCE(ocr_line_numbers, '{}')
 		 FROM report_items WHERE report_sha256 = $1 ORDER BY id`
 
 	// 报告所用 OCR 结果(详情行链接回读,票 07;reports.ocr_result_id 指向生成该报告的识别历史行)。
@@ -127,8 +129,8 @@ const (
 	sqlItemsDeleteByReport = `DELETE FROM report_items WHERE report_sha256 = $1`
 
 	sqlItemInsert = `INSERT INTO report_items
-		 (report_sha256, name, value, unit, ref_range, method, flag, low_confidence, raw_text)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`
+		 (report_sha256, name, value, unit, ref_range, method, flag, low_confidence, raw_text, ocr_line_numbers)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`
 
 	// 成员(迁移 0004;显示名 + 是否孩子两档,无删除):列表按 id 升序 = 创建序返回,
 	// 孩子优先由客户端做;改动用 COALESCE 只覆盖传入字段(nil = 保持不变)。
@@ -354,7 +356,7 @@ func (s *Store) ItemsWithReviewStatus(ctx context.Context, reportSha string) ([]
 	for rows.Next() {
 		var it pipeline.ReportItemRow
 		if err := rows.Scan(&it.ItemID, &it.Name, &it.Value, &it.Unit, &it.RefRange, &it.Method,
-			&it.Flag, &it.LowConfidence, &it.RawText, &it.ReviewStatus); err != nil {
+			&it.Flag, &it.LowConfidence, &it.RawText, &it.ReviewStatus, &it.OCRLineNumbers); err != nil {
 			return nil, err
 		}
 		out = append(out, it)
@@ -437,7 +439,8 @@ func (s *Store) WriteReport(ctx context.Context, reportSha string, ocrID int64, 
 	}
 	for _, it := range report.Items {
 		if _, err := tx.Exec(ctx, sqlItemInsert,
-			reportSha, it.Name, it.Value, it.Unit, it.RefRange, it.Method, it.Flag, it.LowConfidence, it.RawText); err != nil {
+			reportSha, it.Name, it.Value, it.Unit, it.RefRange, it.Method, it.Flag, it.LowConfidence, it.RawText,
+			it.OCRLineNumbers); err != nil {
 			return fmt.Errorf("write report item %q: %w", it.Name, err)
 		}
 	}

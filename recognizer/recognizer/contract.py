@@ -81,6 +81,10 @@ class ReportItem(BaseModel):
     flag: Flag
     low_confidence: bool
     raw_text: str = Field(min_length=1, description="matching raw OCR line text for manual review")
+    ocr_line_numbers: list[int] = Field(
+        description="indices of the OCR lines composing this item "
+        "(0-based, same as txts/boxes; ordered like raw_text)"
+    )
 
 
 class Report(BaseModel):

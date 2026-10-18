@@ -30,7 +30,7 @@
     "reportItem": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "value", "unit", "ref_range", "flag", "low_confidence", "raw_text"],
+      "required": ["name", "value", "unit", "ref_range", "flag", "low_confidence", "raw_text", "ocr_line_numbers"],
       "properties": {
         "name": {
           "type": "string",
@@ -65,6 +65,11 @@
           "type": "string",
           "minLength": 1,
           "description": "该指标项对应的原始 OCR 行文本,供人工核对"
+        },
+        "ocr_line_numbers": {
+          "type": "array",
+          "items": {"type": "integer", "minimum": 0},
+          "description": "该指标项组成 OCR 行的下标(0-based,与 ocr_result 的 txts/boxes 同下标;顺序与 raw_text 组成顺序一致)"
         }
       }
     }
