@@ -45,6 +45,9 @@ func newServeHandler(d *deps, corsOrigin string) http.Handler {
 	mux.HandleFunc("GET /api/v1/reports", handleListReports(d.reports))
 	mux.HandleFunc("POST /api/v1/reports", handleUploadReport(d))
 	mux.HandleFunc("GET /api/v1/reports/{report_id}", handleGetReport(d))
+	// 报告自愈(票 10):改归属(时间线移位)、删除(级联指标项与修正对;图像与 OCR 留痕)。
+	mux.HandleFunc("PATCH /api/v1/reports/{report_id}", handleReassignReport(d))
+	mux.HandleFunc("DELETE /api/v1/reports/{report_id}", handleDeleteReport(d))
 	// 核对端点(票 09):指标项确认/修正(flag 重算、修正对 append、状态派生单调)。
 	mux.HandleFunc("PATCH /api/v1/reports/{report_id}/items/{item_id}", handleReviewItem(d))
 	// 图像端点(票 07):后端代理对象存储、局域网直出。
@@ -63,6 +66,12 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 func writeErrorJSON(w http.ResponseWriter, status int, message string) {
 	writeJSON(w, status, httpapi.Error{Message: message})
 }
+
+// 404 说明的单点定义(契约 Error.message;成员/报告身份未命中的多个端点共用同一文案)。
+const (
+	reportNotFoundMessage = "report not found"
+	memberNotFoundMessage = "member not found"
+)
 
 // decodeJSONBody 严格解码单个 JSON 对象请求体:未知字段拒绝(契约 additionalProperties:false
 // 的端侧执行)、拒绝尾随数据。错误文案面向调试,中性事实侧。

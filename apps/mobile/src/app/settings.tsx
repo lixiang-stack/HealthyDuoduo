@@ -7,6 +7,7 @@ import type { HealthState } from '../api/connectivity';
 import { checkHealth } from '../api/health';
 import { resolveApiClient } from '../api/resolveClient';
 import { ConnectivityStatus } from '../components/ConnectivityStatus';
+import { sharedStyles } from '../components/styles';
 import { colors } from '../components/theme';
 import { normalizeBaseUrl } from '../settings/baseUrl';
 import { saveBaseUrl } from '../settings/baseUrlStore';
@@ -45,7 +46,7 @@ export default function SettingsScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>后端 Base URL</Text>
+      <Text style={sharedStyles.label}>后端 Base URL</Text>
       <TextInput
         value={input}
         onChangeText={setInput}
@@ -66,7 +67,6 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 24, gap: 12, backgroundColor: colors.background },
-  label: { fontSize: 13, color: colors.muted },
   input: { borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15 },
   fail: { fontSize: 13, color: colors.fail },
   button: { alignSelf: 'flex-start', paddingVertical: 10, paddingHorizontal: 16, backgroundColor: colors.accent, borderRadius: 8 },

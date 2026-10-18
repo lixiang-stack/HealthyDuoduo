@@ -6,6 +6,7 @@ import type { HealthState } from '../api/connectivity';
 import { checkHealth } from '../api/health';
 import { resolveApiClient } from '../api/resolveClient';
 import { ConnectivityStatus } from '../components/ConnectivityStatus';
+import { sharedStyles } from '../components/styles';
 import { colors } from '../components/theme';
 
 // 冷启动即探一次后端:显示连通状态与版本;未配置/不可达都呈现可理解的失败态,不崩溃。
@@ -32,7 +33,7 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>后端地址</Text>
+      <Text style={sharedStyles.label}>后端地址</Text>
       <Text style={styles.value}>{baseUrl ?? '未配置'}</Text>
       <ConnectivityStatus state={state} />
       <Pressable style={styles.button} onPress={() => void runCheck()}>
@@ -56,7 +57,6 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 24, gap: 12, backgroundColor: colors.background },
-  label: { fontSize: 13, color: colors.muted },
   value: { fontSize: 15, color: colors.text },
   button: { alignSelf: 'flex-start', paddingVertical: 10, paddingHorizontal: 16, backgroundColor: colors.accent, borderRadius: 8 },
   buttonText: { color: colors.onAccent, fontSize: 15 },

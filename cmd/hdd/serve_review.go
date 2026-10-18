@@ -74,9 +74,8 @@ func (b reviewBody) reviewAction() (*pipeline.ReviewAction, error) {
 // 响应:动作后报告级状态 + 未核对低置信计数 + 本次指标项(含行链接,同详情投影)。
 func handleReviewItem(d *deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		reportID := r.PathValue("report_id")
-		if pipeline.ValidateSha256(reportID) != nil {
-			writeErrorJSON(w, http.StatusNotFound, "report not found")
+		reportID, ok := reportIDFromPath(w, r)
+		if !ok {
 			return
 		}
 		itemID, err := strconv.ParseInt(r.PathValue("item_id"), 10, 64)

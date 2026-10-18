@@ -1,13 +1,20 @@
 // 报告屏数据挂载(票 09 起详情页与核对页共用):解析后端客户端 → 按路由报告 id
-// 取详情 → 聚焦重载 → 核对响应就地合并(单响应刷新整屏)。只共享数据流,
+// 取详情 → 聚焦重载 → 核对/改归属响应就地合并(单响应刷新整屏)。只共享数据流,
 // 四态(loading/unconfigured/error/ready)呈现各屏自行渲染。
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 
 import type { ApiClient } from '../api/client';
-import { getReport, reportImageUrl, type ReportDetail, type ReviewResult } from '../api/reports';
+import {
+  getReport,
+  reportImageUrl,
+  type ReportDetail,
+  type ReportSummary,
+  type ReviewResult,
+} from '../api/reports';
 import { resolveApiClient } from '../api/resolveClient';
 import { applyReviewResult } from '../review/items';
+import { applyReassignResult } from './manage';
 
 export type ReportDataState =
   | { status: 'loading' }
@@ -19,6 +26,7 @@ export function useReportData(reportId: string | undefined): {
   state: ReportDataState;
   reload: () => Promise<void>;
   applyReview: (result: ReviewResult) => void;
+  applyReassign: (summary: ReportSummary) => void;
 } {
   const [state, setState] = useState<ReportDataState>({ status: 'loading' });
 
@@ -57,5 +65,12 @@ export function useReportData(reportId: string | undefined): {
     );
   }, []);
 
-  return { state, reload, applyReview };
+  // 改归属响应(报告头部):只并入归属(改派不动报告内容,其余字段保持本地现值)。
+  const applyReassign = useCallback((summary: ReportSummary) => {
+    setState((prev) =>
+      prev.status === 'ready' ? { ...prev, report: applyReassignResult(prev.report, summary) } : prev,
+    );
+  }, []);
+
+  return { state, reload, applyReview, applyReassign };
 }

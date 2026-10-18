@@ -209,16 +209,16 @@ func TestReportStoreSmoke(t *testing.T) {
 		t.Errorf("ocr_line_numbers after rerun = %+v, want [3 4]", items[0].OCRLineNumbers)
 	}
 
-	// 归属写入:无主 → 成员 A;缺失报告报错。
-	if err := st.SetReportMember(ctx, "rep-d", memberA); err != nil {
-		t.Fatalf("SetReportMember(rep-d): %v", err)
+	// 归属写入:无主 → 成员 A;缺失报告返回 false, nil(404 口径)。
+	if ok, err := st.SetReportMember(ctx, "rep-d", memberA); err != nil || !ok {
+		t.Fatalf("SetReportMember(rep-d) = (%v, %v), want (true, nil)", ok, err)
 	}
 	owned, err = st.ListTimeline(ctx, &memberA)
 	if err != nil || len(owned) != 3 {
 		t.Fatalf("member A timeline after assign = %v (%v), want 3", shaList(owned), err)
 	}
-	if err := st.SetReportMember(ctx, "rep-missing", memberA); err == nil {
-		t.Error("SetReportMember(missing) = nil error, want error")
+	if ok, err := st.SetReportMember(ctx, "rep-missing", memberA); err != nil || ok {
+		t.Errorf("SetReportMember(missing) = (%v, %v), want (false, nil)", ok, err)
 	}
 
 	// MemberByID:命中与缺失(上传归属校验口径)。
@@ -230,6 +230,84 @@ func TestReportStoreSmoke(t *testing.T) {
 	if err != nil || none != nil {
 		t.Fatalf("MemberByID(999) = (%v, %v), want (nil, nil)", none, err)
 	}
+
+	// 硬删与重归档(票 10):先修正 rep-c 一项造修正对;删除报告 → 报告/指标项/修正对
+	// 级联清除,images 与 ocr_results 留痕保留;同图重新归档(WriteReport)可行。
+	itemsC, err := st.ItemsWithReviewStatus(ctx, "rep-c")
+	if err != nil || len(itemsC) != 1 {
+		t.Fatalf("rep-c items = %+v, %v", itemsC, err)
+	}
+	newValue := "11.0"
+	if _, err := st.ReviewItem(ctx, "rep-c", itemsC[0].ItemID, pipeline.ReviewAction{Value: &newValue}); err != nil {
+		t.Fatalf("review rep-c: %v", err)
+	}
+	if n := countReportItems(t, ctx, pool, "rep-c"); n != 1 {
+		t.Fatalf("rep-c items before delete = %d, want 1", n)
+	}
+	if n := countCorrectionPairs(t, ctx, pool, "rep-c"); n != 1 {
+		t.Fatalf("rep-c pairs before delete = %d, want 1", n)
+	}
+	deleted, err := st.DeleteReport(ctx, "rep-c")
+	if err != nil || !deleted {
+		t.Fatalf("DeleteReport(rep-c) = %v, %v, want (true, nil)", deleted, err)
+	}
+	if one, err := st.SummaryByImage(ctx, "rep-c"); err != nil || one != nil {
+		t.Errorf("SummaryByImage(rep-c) after delete = (%v, %v), want (nil, nil)", one, err)
+	}
+	if n := countReportItems(t, ctx, pool, "rep-c"); n != 0 {
+		t.Errorf("rep-c items after delete = %d, want 0(级联)", n)
+	}
+	if n := countCorrectionPairs(t, ctx, pool, "rep-c"); n != 0 {
+		t.Errorf("rep-c pairs after delete = %d, want 0(随指标项级联)", n)
+	}
+	var imgRows, ocrRows int
+	if err := pool.QueryRow(ctx, `SELECT (SELECT COUNT(*) FROM images WHERE sha256='rep-c'),
+			(SELECT COUNT(*) FROM ocr_results WHERE image_sha256='rep-c')`).Scan(&imgRows, &ocrRows); err != nil {
+		t.Fatal(err)
+	}
+	if imgRows != 1 || ocrRows != 1 {
+		t.Errorf("images/ocr rows after delete = %d/%d, want 1/1(原始图像与识别历史留痕)", imgRows, ocrRows)
+	}
+	// 已删报告再删:false, nil(404 口径,不虚报错误)。
+	if deleted, err := st.DeleteReport(ctx, "rep-c"); err != nil || deleted {
+		t.Errorf("second DeleteReport(rep-c) = (%v, %v), want (false, nil)", deleted, err)
+	}
+	// 同图重新归档:报告行可重写,归属从零开始(重传由上传归属重新赋值)。
+	var reOcrID int64
+	if err := pool.QueryRow(ctx, `SELECT id FROM ocr_results WHERE image_sha256='rep-c'`).Scan(&reOcrID); err != nil {
+		t.Fatalf("fetch rep-c ocr id: %v", err)
+	}
+	v2 := "10.5"
+	if err := st.WriteReport(ctx, "rep-c", reOcrID, contract.Report{
+		ReportType: "尿常规", ReportDate: strPtr("2026-10-01"), Status: contract.StatusSuccess,
+		Items: []contract.ReportItem{{Name: "尿蛋白", Value: &v2, Flag: "high", RawText: "尿蛋白  10.5"}},
+	}, nil); err != nil {
+		t.Fatalf("re-archive rep-c: %v", err)
+	}
+	back, err := st.SummaryByImage(ctx, "rep-c")
+	if err != nil || back == nil {
+		t.Fatalf("re-archived rep-c summary = (%v, %v), want 非 nil", back, err)
+	}
+	if back.MemberID != nil {
+		t.Errorf("re-archived member_id = %v, want null", back.MemberID)
+	}
+	if n := countReportItems(t, ctx, pool, "rep-c"); n != 1 {
+		t.Errorf("rep-c items after re-archive = %d, want 1", n)
+	}
+	// 缺失报告:false, nil(404 口径)。
+	if deleted, err := st.DeleteReport(ctx, "rep-missing"); err != nil || deleted {
+		t.Errorf("DeleteReport(rep-missing) = (%v, %v), want (false, nil)", deleted, err)
+	}
+}
+
+// countReportItems 报告下指标项计数(删除级联断言用)。
+func countReportItems(t *testing.T, ctx context.Context, pool *pgxpool.Pool, reportSha string) int {
+	t.Helper()
+	var n int
+	if err := pool.QueryRow(ctx, `SELECT COUNT(*) FROM report_items WHERE report_sha256 = $1`, reportSha).Scan(&n); err != nil {
+		t.Fatalf("count report items: %v", err)
+	}
+	return n
 }
 
 func shaList(summaries []pipeline.ReportSummary) []string {

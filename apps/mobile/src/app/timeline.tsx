@@ -5,6 +5,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { listMembers, type Member } from '../api/members';
 import { listReports, type ReportSummary } from '../api/reports';
 import { resolveApiClient } from '../api/resolveClient';
+import { sharedStyles } from '../components/styles';
 import { colors } from '../components/theme';
 import { MemberChips } from '../members/components';
 import { useCurrentMember } from '../members/CurrentMemberContext';
@@ -53,14 +54,14 @@ export default function TimelineScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {state.status === 'loading' ? (
-        <View style={styles.horizontal}>
+        <View style={sharedStyles.horizontal}>
           <ActivityIndicator />
-          <Text style={styles.muted}>正在加载时间线…</Text>
+          <Text style={sharedStyles.muted}>正在加载时间线…</Text>
         </View>
       ) : null}
 
       {state.status === 'unconfigured' ? (
-        <Text style={styles.muted}>
+        <Text style={sharedStyles.muted}>
           尚未配置后端地址,请先到<Link href="/settings" style={styles.link}>设置</Link>填写。
         </Text>
       ) : null}
@@ -77,20 +78,20 @@ export default function TimelineScreen() {
       {state.status === 'ready' ? (
         <View style={styles.stack}>
           {members.length === 0 ? (
-            <Text style={styles.muted}>
+            <Text style={sharedStyles.muted}>
               还没有家庭成员。先到<Link href="/members" style={styles.link}>家庭成员</Link>建一个。
             </Text>
           ) : (
             <>
-              <Text style={styles.label}>查看谁的档案</Text>
+              <Text style={sharedStyles.label}>查看谁的档案</Text>
               <MemberChips members={members} selectedId={currentMemberId} onSelect={selectMember} />
               <Link href="/upload" style={styles.link}>
                 上传检查单
               </Link>
               {!selected ? (
-                <Text style={styles.muted}>选择一个成员查看其报告时间线。</Text>
+                <Text style={sharedStyles.muted}>选择一个成员查看其报告时间线。</Text>
               ) : reports.length === 0 ? (
-                <Text style={styles.muted}>
+                <Text style={sharedStyles.muted}>
                   这位成员还没有检查单。拍一张检查单,几秒后这里会出现归档卡片。
                 </Text>
               ) : (
@@ -121,9 +122,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: 24, gap: 12 },
   stack: { gap: 12 },
-  horizontal: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  label: { fontSize: 13, color: colors.muted },
-  muted: { fontSize: 13, color: colors.muted, lineHeight: 20 },
   fail: { fontSize: 13, color: colors.fail },
   link: { color: colors.accent, fontSize: 15 },
   button: {

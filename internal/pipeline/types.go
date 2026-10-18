@@ -77,8 +77,13 @@ type ReportStore interface {
 	// OCRResultJSONByReport 报告所用 OCR 结果的原始 JSON(reports.ocr_result_id →
 	// ocr_results.engine_output;详情行链接回读,票 07)。缺失返回 nil, nil。
 	OCRResultJSONByReport(ctx context.Context, reportSha string) ([]byte, error)
-	// SetReportMember 只改报告归属(上传新建/无主归档时赋值;不碰其他字段)。
-	SetReportMember(ctx context.Context, reportSha string, memberID int64) error
+	// SetReportMember 只改报告归属(上传新建/无主归档时赋值;改归属端点同用;不碰其他字段)。
+	// 报告不存在返回 false, nil(与 DeleteReport 同一缺失口径,写入路径自带存在性判定)。
+	SetReportMember(ctx context.Context, reportSha string, memberID int64) (bool, error)
+	// DeleteReport 硬删报告行(级联指标项与修正对;viz-and-client 票 10):
+	// 原始图像与 OCR 识别历史留痕保留,同图日后可重新上传入档。
+	// 报告不存在返回 false, nil(与 SummaryByImage 的缺失口径同惯例)。
+	DeleteReport(ctx context.Context, reportSha string) (bool, error)
 	// ReviewItem 核对落地(确认/修正;viz-and-client 票 09):单事务内应用动作
 	// (生效值 + flag 按修正后 value × ref_range 重算 + 每次修正 append 一条修正对)
 	// 并派生报告状态(partial → success 当且仅当未核对低置信项归零,单向)。
