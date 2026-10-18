@@ -152,9 +152,6 @@ _PIECE_CAP_FACTOR = 0.6
 _PIECE_CAP_MIN_PX = 6.0
 _PIECE_CAP_DEFAULT_PX = 25.0
 
-# cell 归列时允许的最大偏离(像素);页面级垃圾行(标题/落款)不应占用表列
-_ASSIGN_TOLERANCE_PX = 180
-
 # 表头行判定:一行命中的 (格, 列角色关键词) 对 ≥ 此值才判为表头带;
 # 3 = 名称+结果+单位/参考值等列角色同时在行内的最少组合。
 _HEADER_MIN_ROLES = 3
@@ -688,10 +685,15 @@ def _extract_items(
         bcols = band_columns(band)
 
         # 1. 逐格归 (角色, 块)
+        # 列归属 = 最近表头列中心(中点分区,不设固定偏离上限)。名称列左对齐,长文本格的
+        # 中心随文本长度向右漂移(实测免疫单「抗Ribosomal P抗体」中心偏离名称列头 398px),
+        # 固定容差会把这类格整格丢弃、整行漏抽(故选整行/整单缩水)。页面级垃圾格(标题/
+        # 落款)照常归到最近列:与词典不命中且与数据行 dy 超限,不产出伪指标项(样本语料
+        # golden 与全量真实数据回归锁定)。
         assigned: dict[tuple[str, int], list[_Cell]] = {}
         cell_ref_kw: set[int] = set()  # 复合 value 表头列(文本含参考范围)的格 id → 其 r 可进 ref 位
         for c in seg:
-            best_role, best_idx, best_blk, best_d = None, 0, 0, _ASSIGN_TOLERANCE_PX + 1
+            best_role, best_idx, best_blk, best_d = None, 0, 0, float("inf")
             best_ref_kw = False
             for cx, role, idx, ref_kw, blk in bcols:
                 dx = abs(c.cx - cx)

@@ -25,10 +25,14 @@
     超声叙述体走 postprocess 的 narrative 模式)。**ua_02/ua_03 为异常图像,已移出样本集**
     (其别名证据一并从 `ua_dict.yaml` 清理)。
   - 另有 cbc 无前缀 1.jpeg~5.jpg 维护者留底(未入 golden,勿提交)。
-  - **掩码 OCR 语料**(`mask` 产物,无原图):ana_01~03 / bloodtype_01 / cbc_06~09 / coag_01 /
+  - **掩码 OCR 语料**(`mask` 产物,无原图):ana_01~05 / bloodtype_01 / cbc_06~09 / coag_01 /
     fibrosis_01 / glu_04 / infectious_01~02 / lft_06~09 / proghcg_01 / tft_04~05 / ua_06 /
-    unknown_01 / vitanemia_01~02(共 24 条,细类编号接在该类别图像样本之后;id 只作样本编号,
+    unknown_01 / vitanemia_01~02(共 26 条,细类编号接在该类别图像样本之后;id 只作样本编号,
     与 report_type 解耦)。
+    ana_04/05(2026-10-18 从共享栈真实报告冻结后脱敏):**左对齐长名称列**版式载体——
+    名称格中心随文本长度漂移,整行不再被列归属固定容差丢弃(ana_04 抗核抗体谱 16 项,
+    含 OCR 漏值行;ana_05 自免肝谱 10 项,兼作 `抗Sc1-70抗体`/`ANA(IIF) (ANA(IIF))`
+    别名证据)。
     unknown_01(产前筛查)已由 其他专项 词典收录,narrative 模式逐格收录项目名、
     value=None 留痕 raw_text(status=partial 属诚实落痕,漏值待行内配对规则扩展)。
 - **真实数据基准 `expected/vl/<id>.json`**:由视觉模型 + LLM 结构化得到的**逐项真值**

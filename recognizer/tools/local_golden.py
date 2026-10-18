@@ -130,6 +130,12 @@ def _redacted(txts: list[str]) -> list[str]:
     return [t for t in txts if t != _PLACEHOLDER]
 
 
+# 掩码期「落在表列 x 区间」判据:与 postprocess 的列归属语义解耦——解析侧已改为中点分区
+# (无固定偏离上限),而掩码只需保守判断「格是否算表列内解析依据」;沿用历次语料冻结口径,
+# 避免脱敏产物整体漂移(词典别名与列角色关键词命中的格另有独立保留路径,长名称不受此限)。
+_MASK_COLUMN_TOLERANCE_PX = 180
+
+
 def _keep_cell(
     c: pp._Cell,
     header_top: float,
@@ -151,7 +157,7 @@ def _keep_cell(
         return True
     if c.y0 < header_top or (footer_top is not None and c.y0 >= footer_top):
         return False
-    return any(abs(c.cx - cx) <= pp._ASSIGN_TOLERANCE_PX for cx in centers)
+    return any(abs(c.cx - cx) <= _MASK_COLUMN_TOLERANCE_PX for cx in centers)
 
 
 def mask() -> int:
