@@ -37,6 +37,7 @@ type fakeServeStore struct {
 	reportOCR map[string]int64 // reports.ocr_result_id 镜像(WriteReport 记录)
 	order     []string         // 报告插入序(时间线迭代确定化)
 	reports   map[string]*fakeServeReport
+	pairs     []pipeline.CorrectionPairRecord // correction_pairs 追加记录(仅修正产生)
 }
 
 type fakeServeReport struct {
@@ -251,13 +252,6 @@ func (f *fakeServeStore) seedReport(sha string, memberID *int64, report contract
 			ItemID: f.nextID, ReviewStatus: pipeline.ReviewStatusUnreviewed, ReportItem: it,
 		})
 	}
-}
-
-// setReviewStatus 把报告第 i 项标记为已确认/已修正(核对决策入口,票 09 前的测试桩)。
-func (f *fakeServeStore) setReviewStatus(sha string, i int, status string) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.reports[sha].items[i].ReviewStatus = status
 }
 
 // seedOCR 给已种报告挂 OCR 结果(详情行链接用例;镜像 reports.ocr_result_id 写入)。
@@ -597,7 +591,7 @@ func TestServeUploadFailedReport(t *testing.T) {
 // fixture report.conflict.json);override=true → 201 重跑:item_id 全换、
 // review_status 回 unreviewed、归属保持;无核对决策时 override 同样重跑(显式覆盖)。
 func TestServeUploadOverride(t *testing.T) {
-	srv, st, rec, _ := newReportsTestServer(t)
+	srv, _, rec, _ := newReportsTestServer(t)
 	createOne(t, srv, `{"name":"小虎","is_child":true}`)
 
 	image := []byte("fake-jpeg-bytes-03")
@@ -605,7 +599,10 @@ func TestServeUploadOverride(t *testing.T) {
 	first := decodeUpload(t, status, raw, http.StatusCreated)
 	sha := first.Report.ReportID
 
-	st.setReviewStatus(sha, 0, "confirmed")
+	// 经真实核对端点建立决策(替代早期测试桩):确认首项。
+	if status, raw := doReview(t, srv, sha, first.Report.Items[0].ItemID, `{"action":"confirm"}`); status != http.StatusOK {
+		t.Fatalf("confirm for 409 setup = %d; body = %s", status, raw)
+	}
 
 	status, raw = doUpload(t, srv, image, map[string]string{formMemberID: "1"})
 	if status != http.StatusConflict {
@@ -739,12 +736,15 @@ func TestServeUploadIgnoresURLQuery(t *testing.T) {
 	})
 
 	t.Run("query override 不放行 409", func(t *testing.T) {
-		srv, st, rec, _ := newReportsTestServer(t)
+		srv, _, rec, _ := newReportsTestServer(t)
 		createOne(t, srv, `{"name":"小虎","is_child":true}`)
 		image := []byte("img")
 		status, raw := doUpload(t, srv, image, map[string]string{formMemberID: "1"})
 		first := decodeUpload(t, status, raw, http.StatusCreated)
-		st.setReviewStatus(first.Report.ReportID, 0, "confirmed")
+		// 经真实核对端点建立决策(替代早期测试桩):确认首项。
+		if status, raw := doReview(t, srv, first.Report.ReportID, first.Report.Items[0].ItemID, `{"action":"confirm"}`); status != http.StatusOK {
+			t.Fatalf("confirm for 409 setup = %d; body = %s", status, raw)
+		}
 
 		status, raw = doUploadQuery(t, srv, image, map[string]string{formMemberID: "1"}, "override=true")
 		if status != http.StatusConflict {

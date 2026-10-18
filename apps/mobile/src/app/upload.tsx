@@ -10,10 +10,12 @@ import { MemberChips } from '../members/components';
 import { useCurrentMember } from '../members/CurrentMemberContext';
 import { sortMembers } from '../members/order';
 import { pickImage, type ImageSource, type PickedImage } from '../platform/imagePicker';
+import { needsReview } from '../review/items';
 import { uploadResultText, uploadWaitText } from '../reports/status';
 
-// 上传页(票 06):选图 → 确认归属成员(默认当前成员)→ multipart 直传、同步等待识别;
-// 等待可感知(计时 + 超时提示),结果轻提示(成功/待核对/失败原因/重复归档)。
+// 上传页(票 06;票 09 核对分岔):选图 → 确认归属成员(默认当前成员)→ multipart 直传、
+// 同步等待识别;等待可感知(计时 + 超时提示),上传返回即分岔——需核对报告(partial/
+// 含低置信项)给「立即核对」直达核对页(纸还在手边),干净 success 轻提示已归档。
 type ScreenState =
   | { status: 'loading' }
   | { status: 'unconfigured' }
@@ -203,6 +205,19 @@ export default function UploadScreen() {
                   >
                     {uploadResultText(upload.result)}
                   </Text>
+                  {needsReview(upload.result.report) ? (
+                    <Link
+                      asChild
+                      href={{
+                        pathname: '/review/[report_id]',
+                        params: { report_id: upload.result.report.report_id },
+                      }}
+                    >
+                      <Pressable style={styles.button}>
+                        <Text style={styles.buttonText}>立即核对</Text>
+                      </Pressable>
+                    </Link>
+                  ) : null}
                   <View style={styles.horizontal}>
                     <Link href="/timeline" style={styles.link}>
                       去时间线查看

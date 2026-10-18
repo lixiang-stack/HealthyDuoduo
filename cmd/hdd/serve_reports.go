@@ -308,34 +308,39 @@ func toAPILineBox(b contract.Box) httpapi.Box4x2 {
 	return out
 }
 
-// toAPIDetail 报告详情投影(GET 详情与上传响应共用):头部 + 指标项。行链接由识别端
-// 直吐的 ocr_line_numbers 精确映射(下标 → 行框);prev 属 M3(契约形状先以 null 满足)。
+// toAPIItem 单个指标项投影(详情与核对响应共用):行链接由识别端直吐的
+// ocr_line_numbers 精确映射(下标 → 行框);越界仅在数据损坏时出现——跳过不炸
+// 整页(raw_text 仍可见),结构完整性由 e2e verify 的 join/box 门禁兜底;
+// prev 属 M3(契约形状先以 null 满足)。
+func toAPIItem(it pipeline.ReportItemRow, ocr *contract.OCRResult) httpapi.ReportItem {
+	ocrLines := make([]httpapi.OcrLineLink, 0, len(it.OCRLineNumbers))
+	for _, ln := range it.OCRLineNumbers {
+		if ln < 0 || int(ln) >= len(ocr.Boxes) {
+			continue
+		}
+		ocrLines = append(ocrLines, httpapi.OcrLineLink{Line: int(ln), Box: toAPILineBox(ocr.Boxes[ln])})
+	}
+	return httpapi.ReportItem{
+		ItemID:        it.ItemID,
+		Name:          it.Name,
+		Value:         it.Value,
+		Unit:          it.Unit,
+		RefRange:      it.RefRange,
+		Method:        it.Method,
+		Flag:          it.Flag,
+		LowConfidence: it.LowConfidence,
+		RawText:       it.RawText,
+		ReviewStatus:  it.ReviewStatus,
+		OcrLines:      ocrLines,
+		Prev:          nil,
+	}
+}
+
+// toAPIDetail 报告详情投影(GET 详情与上传响应共用):头部 + 指标项。
 func toAPIDetail(sum pipeline.ReportSummary, items []pipeline.ReportItemRow, ocr *contract.OCRResult) httpapi.ReportDetail {
 	detail := httpapi.ReportDetail{ReportHeader: toAPIReportHeader(sum), Items: make([]httpapi.ReportItem, 0, len(items))}
 	for _, it := range items {
-		ocrLines := make([]httpapi.OcrLineLink, 0, len(it.OCRLineNumbers))
-		for _, ln := range it.OCRLineNumbers {
-			// 下标契约内(识别端直吐);越界仅在数据损坏时出现——跳过不炸整页
-			// (raw_text 仍可见),结构完整性由 e2e verify 的 join/box 门禁兜底。
-			if ln < 0 || int(ln) >= len(ocr.Boxes) {
-				continue
-			}
-			ocrLines = append(ocrLines, httpapi.OcrLineLink{Line: int(ln), Box: toAPILineBox(ocr.Boxes[ln])})
-		}
-		detail.Items = append(detail.Items, httpapi.ReportItem{
-			ItemID:        it.ItemID,
-			Name:          it.Name,
-			Value:         it.Value,
-			Unit:          it.Unit,
-			RefRange:      it.RefRange,
-			Method:        it.Method,
-			Flag:          it.Flag,
-			LowConfidence: it.LowConfidence,
-			RawText:       it.RawText,
-			ReviewStatus:  it.ReviewStatus,
-			OcrLines:      ocrLines,
-			Prev:          nil,
-		})
+		detail.Items = append(detail.Items, toAPIItem(it, ocr))
 	}
 	return detail
 }
