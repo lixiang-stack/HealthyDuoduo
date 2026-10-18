@@ -599,6 +599,43 @@ def test_unknown_unit_kept_as_printed() -> None:
     assert item_of(run_postprocess(ocr), "血红蛋白").unit == "xw/L"
 
 
+def test_vertical_fallback_rejects_prose_cells() -> None:
+    """竖排回退只认数值格:页脚散文格不得被抽成 value。
+
+    实测(共享栈 尿常规报告):零碎片行落在页脚的「实验室地址：…航天东路155号」上,
+    按其数字抽值把地址门牌号 155 写成了 尿潜血 的 value——整格并非数值语义。
+    """
+    cells = [
+        {"x": 100, "y": -60, "text": "市人民医院血常规报告单"},
+        {"x": 20, "y": 0, "text": "序号"},
+        {"x": 160, "y": 0, "text": "项目名称"},
+        {"x": 360, "y": 0, "text": "结果"},
+        {"x": 470, "y": 0, "text": "单位"},
+        {"x": 580, "y": 0, "text": "参考值"},
+        {"x": 150, "y": 40, "w": 90, "text": "白细胞计数"},
+        {"x": 140, "y": 600, "w": 180, "text": "实验室地址：某某路155号 电话:029-000"},
+    ]
+    it = item_of(run_postprocess(mk_ocr(cells)), "白细胞计数")
+    assert it.value is None
+    assert "实验室地址" not in it.raw_text
+
+
+def test_vertical_fallback_accepts_leading_value() -> None:
+    """竖排回退的正例:列内短数值格(可带 ↑ 等短缀)照常吸收。"""
+    cells = [
+        {"x": 100, "y": -60, "text": "市人民医院血常规报告单"},
+        {"x": 20, "y": 0, "text": "序号"},
+        {"x": 160, "y": 0, "text": "项目名称"},
+        {"x": 360, "y": 0, "text": "结果"},
+        {"x": 470, "y": 0, "text": "单位"},
+        {"x": 580, "y": 0, "text": "参考值"},
+        {"x": 150, "y": 40, "w": 90, "text": "白细胞计数"},
+        {"x": 150, "y": 160, "w": 70, "text": "5.3 ↑"},
+    ]
+    it = item_of(run_postprocess(mk_ocr(cells)), "白细胞计数")
+    assert it.value == "5.3"
+
+
 def test_family_map_chosen_by_item_membership() -> None:
     """同族损耗形跨类别生效:μ 家族(lft_03/05 证据)按生化词典项归一。"""
     chem = next(d for d in _postprocess.load_dicts() if d.report_type == "生化")

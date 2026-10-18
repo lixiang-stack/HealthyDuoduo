@@ -152,6 +152,10 @@ _PIECE_CAP_FACTOR = 0.6
 _PIECE_CAP_MIN_PX = 6.0
 _PIECE_CAP_DEFAULT_PX = 25.0
 
+# 竖排回退候选「数值 token 居格首」的前缀容差:容许空白/箭头等 ≤2 个前缀字符
+# (页脚散文格的数字在格中段,超此即拒)。
+_VERTICAL_VALUE_PREFIX_MAX = 2
+
 # 表头行判定:一行命中的 (格, 列角色关键词) 对 ≥ 此值才判为表头带;
 # 3 = 名称+结果+单位/参考值等列角色同时在行内的最少组合。
 _HEADER_MIN_ROLES = 3
@@ -905,8 +909,9 @@ def _vertical_value(
 
     产筛竖排表与糖耐量转置表(列头=项目名/缩写,值在列内向下,webwxgetmsgimg_17/_18):
     候选门:①cx 落在名格 x 区间内(列归属);②未其他词典命中(下一行「序号+名」格不算);
-    ③非日期形;④非纯范围串;含数值 token(比较前缀可带) → 数值字符串;按 (dy,|dcx|) 取最近。
-    找不到 → (None, None),保持 value=None 的诚实留痕。
+    ③非日期形;④非纯范围串;⑤数值 token 居格首(容许 ≤2 前缀字符;含数值的散文格如
+    页脚「实验室地址:…155号」不得按数字抽值——实测会把门牌号写成 value)。
+    按 (dy,|dcx|) 取最近;找不到 → (None, None),保持 value=None 的诚实留痕。
     """
     best: tuple[float, float, _Cell, str] | None = None
     for c in cells:
@@ -919,7 +924,7 @@ def _vertical_value(
         if _RANGE_RE.fullmatch(c.text.strip()):
             continue
         m = re.search(r"(<|≤|>|≥)?\s*(\d+(?:\.\d+)?(?::\d+)?)", c.text)
-        if m is None:
+        if m is None or m.start() > _VERTICAL_VALUE_PREFIX_MAX:
             continue
         val = (m.group(1) or "") + m.group(2)
         key = (c.y0 - name_cell.y1, abs(c.cx - name_cell.cx))
