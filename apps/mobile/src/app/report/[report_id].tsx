@@ -56,7 +56,7 @@ export default function ReportDetailScreen() {
       {state.status === 'ready' && report ? (
         <View style={styles.stack}>
           <ReportCard report={report} />
-          <Text style={styles.shortId}>
+          <Text testID="report-short-id" style={styles.shortId}>
             报告 {report.report_id.slice(0, SHORT_ID_LENGTH)}
           </Text>
 

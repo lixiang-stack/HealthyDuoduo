@@ -173,6 +173,7 @@ export default function UploadScreen() {
                   <Text style={styles.link}>拍照</Text>
                 </Pressable>
                 <Pressable
+                  testID="upload-pick-library"
                   style={styles.buttonGhost}
                   onPress={() => void onPick('library')}
                   disabled={upload.status === 'uploading'}
@@ -183,6 +184,7 @@ export default function UploadScreen() {
               {pickMessage ? <Text style={sharedStyles.muted}>{pickMessage}</Text> : null}
 
               <Pressable
+                testID="upload-submit"
                 style={[styles.button, !canUpload && styles.buttonDisabled]}
                 onPress={onUpload}
                 disabled={!canUpload}
@@ -200,6 +202,7 @@ export default function UploadScreen() {
               {upload.status === 'done' ? (
                 <View style={styles.card}>
                   <Text
+                    testID="upload-result"
                     style={
                       upload.result.report.status === 'failed' ? styles.fail : styles.success
                     }
@@ -214,7 +217,7 @@ export default function UploadScreen() {
                         params: { report_id: upload.result.report.report_id },
                       }}
                     >
-                      <Pressable style={styles.button}>
+                      <Pressable testID="upload-review" style={styles.button}>
                         <Text style={styles.buttonText}>立即核对</Text>
                       </Pressable>
                     </Link>

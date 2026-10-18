@@ -48,6 +48,7 @@ export default function SettingsScreen() {
     <View style={styles.container}>
       <Text style={sharedStyles.label}>后端 Base URL</Text>
       <TextInput
+        testID="settings-base-url"
         value={input}
         onChangeText={setInput}
         autoCapitalize="none"
@@ -57,7 +58,7 @@ export default function SettingsScreen() {
         style={styles.input}
       />
       {error ? <Text style={styles.fail}>{error}</Text> : null}
-      <Pressable style={styles.button} onPress={() => void onSave()}>
+      <Pressable testID="settings-save" style={styles.button} onPress={() => void onSave()}>
         <Text style={styles.buttonText}>保存并校验</Text>
       </Pressable>
       <ConnectivityStatus state={state} />

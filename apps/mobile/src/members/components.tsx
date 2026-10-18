@@ -24,8 +24,13 @@ export function MemberRow({
   onEdit: () => void;
 }) {
   return (
-    <View style={[styles.card, selected && styles.cardSelected]}>
-      <Pressable style={styles.cardMain} onPress={onSelect} disabled={disabled}>
+    <View testID={`member-row-${member.member_id}`} style={[styles.card, selected && styles.cardSelected]}>
+      <Pressable
+        testID={`member-select-${member.member_id}`}
+        style={styles.cardMain}
+        onPress={onSelect}
+        disabled={disabled}
+      >
         <Text style={styles.memberName}>{member.name}</Text>
         <Text style={styles.memberMeta}>
           {member.is_child ? '孩子' : '成人'}
@@ -99,6 +104,7 @@ export function MemberCreateForm({
     <View style={styles.cardForm}>
       <Text style={styles.sectionTitle}>添加成员</Text>
       <TextInput
+        testID="members-name-input"
         value={name}
         onChangeText={onNameChange}
         placeholder="显示名(如:小虎、妈妈)"
@@ -107,6 +113,7 @@ export function MemberCreateForm({
       />
       <ChildPicker isChild={isChild} onChange={onIsChildChange} />
       <Pressable
+        testID="members-create"
         style={[styles.button, (busy || !name.trim()) && styles.buttonDisabled]}
         onPress={onSubmit}
         disabled={busy || !name.trim()}
@@ -151,6 +158,7 @@ export function MemberChips({
         return (
           <Pressable
             key={m.member_id}
+            testID={`member-chip-${m.member_id}`}
             style={[styles.chip, active && styles.chipActive]}
             onPress={() => onSelect(m.member_id)}
             disabled={disabled}

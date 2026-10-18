@@ -1,4 +1,6 @@
-# E2E testing
+# Pipeline E2E(数据链路端到端)
+
+App 层 UI 端到端见 `docs/agents/app-e2e.md`（Expo Web + 专用栈，不复用这里的共享栈）。
 
 共享 deploy 栈(本机 compose,项目名 `deploy`:postgres 5432 / recognizer 8000 / seaweedfs 8333,默认账号见 `cmd/hdd/config.go`)上的端到端自证回路。宿主机无 psql:SQL 一律走
 `docker exec deploy-postgres-1 psql -U healthyduoduo -d healthyduoduo ...`。

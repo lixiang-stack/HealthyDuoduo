@@ -45,7 +45,7 @@ export function ReportBadges({ report }: { report: ReportSummary }) {
 export function ReportCard({ report }: { report: ReportSummary }) {
   const failed = report.status === 'failed';
   return (
-    <View style={styles.card}>
+    <View testID={`report-card-${report.report_id}`} style={styles.card}>
       <View style={styles.headerRow}>
         <Text style={styles.type}>{report.report_type}</Text>
         <Text style={[styles.status, { color: STATUS_COLORS[report.status] }]}>
@@ -163,10 +163,11 @@ export function ReportManageCard({
     <View style={[styles.card, styles.manageCard]}>
       {mode === undefined ? (
         <View style={styles.manageActions}>
-          <Pressable onPress={openReassign} disabled={busy}>
+          <Pressable testID="report-manage-reassign" onPress={openReassign} disabled={busy}>
             <Text style={styles.manageLink}>改归属</Text>
           </Pressable>
           <Pressable
+            testID="report-manage-delete"
             onPress={() => {
               setMode('delete');
               setNotice(undefined);
@@ -208,6 +209,7 @@ export function ReportManageCard({
               </Text>
               <View style={styles.manageActions}>
                 <Pressable
+                  testID="report-manage-confirm-reassign"
                   style={[
                     styles.manageButton,
                     styles.managePrimaryFill,
@@ -238,6 +240,7 @@ export function ReportManageCard({
           </Text>
           <View style={styles.manageActions}>
             <Pressable
+              testID="report-manage-confirm-delete"
               style={[styles.manageButton, styles.manageDangerFill, busy && styles.manageButtonDisabled]}
               disabled={busy}
               onPress={confirmDelete}
@@ -251,8 +254,8 @@ export function ReportManageCard({
         </View>
       ) : null}
 
-      {notice ? <Text style={styles.success}>{notice}</Text> : null}
-      {error ? <Text style={styles.fail}>操作失败:{error}</Text> : null}
+      {notice ? <Text testID="report-manage-notice" style={styles.success}>{notice}</Text> : null}
+      {error ? <Text testID="report-manage-error" style={styles.fail}>操作失败:{error}</Text> : null}
     </View>
   );
 }

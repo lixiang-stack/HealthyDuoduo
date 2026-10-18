@@ -145,4 +145,4 @@
 
 ### E2E testing
 
-改 recognizer 词典/规则或 hdd CLI 后要自证端到端行为，或需动共享库（快照/回滚/种子）。详见 `docs/agents/e2e.md`。
+两条回路：**Pipeline E2E**（recognizer 词典/规则、hdd CLI 的数据链路，共享栈 + 快照）见 `docs/agents/e2e.md`；**App E2E**（家长侧 App UI，Expo Web + 专用栈，`npm run e2e`）见 `docs/agents/app-e2e.md`。
