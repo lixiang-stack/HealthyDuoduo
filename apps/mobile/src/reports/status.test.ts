@@ -1,12 +1,28 @@
 import type { ReportDetail, UploadResult } from '../api/reports';
 
-import { flagBadges, statusLabel, unreviewedBadge, uploadResultText, uploadWaitText } from './status';
+import {
+  flagBadges,
+  flagLabel,
+  statusLabel,
+  unreviewedBadge,
+  uploadResultText,
+  uploadWaitText,
+} from './status';
 
 describe('statusLabel', () => {
   it('状态文案映射固定:success→识别完成、partial→待核对、failed→识别失败', () => {
     expect(statusLabel('success')).toBe('识别完成');
     expect(statusLabel('partial')).toBe('待核对');
     expect(statusLabel('failed')).toBe('识别失败');
+  });
+});
+
+describe('flagLabel', () => {
+  it('指标项 flag 文案:正常/偏高/偏低/未知(中性事实侧)', () => {
+    expect(flagLabel('normal')).toBe('正常');
+    expect(flagLabel('high')).toBe('偏高');
+    expect(flagLabel('low')).toBe('偏低');
+    expect(flagLabel('unknown')).toBe('未知');
   });
 });
 
