@@ -10,7 +10,8 @@
       "ref_range": "115-150",
       "flag": "normal",
       "low_confidence": true,
-      "raw_text": "血红蛋白 128 g/L 115-150"
+      "raw_text": "血红蛋白 128 g/L 115-150",
+      "ocr_line_numbers": [0, 1, 2]
     }
   ]
 }

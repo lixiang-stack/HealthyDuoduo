@@ -29,14 +29,27 @@ func TestMigrationSmokeM0Contract(t *testing.T) {
 		t.Fatalf("migrate: %v", err)
 	}
 
-	// goose 已升到 0004 且幂等(Open 内重复 Migrate 不报错)。
+	// goose 已升到 0005 且幂等(Open 内重复 Migrate 不报错)。
 	var latest int
 	if err := pool.QueryRow(ctx, `SELECT max(version_id) FROM goose_db_version`).Scan(&latest); err != nil {
 		t.Fatalf("read goose version: %v", err)
 	}
-	if latest != 4 {
-		t.Fatalf("goose version = %d, want 4", latest)
+	if latest != 5 {
+		t.Fatalf("goose version = %d, want 5", latest)
 	}
+
+	// report_items.ocr_line_numbers(0005):识别端直吐的组成行下标,可空(存量未回填)。
+	t.Run("report item ocr line numbers column", func(t *testing.T) {
+		var dataType string
+		var nullable string
+		if err := pool.QueryRow(ctx, `SELECT data_type, is_nullable FROM information_schema.columns
+			WHERE table_name='report_items' AND column_name='ocr_line_numbers'`).Scan(&dataType, &nullable); err != nil {
+			t.Fatal(err)
+		}
+		if dataType != "ARRAY" || nullable != "YES" {
+			t.Fatalf("ocr_line_numbers = %s/%s, want ARRAY/YES(存量行 NULL)", dataType, nullable)
+		}
+	})
 
 	// 子测试共享种子:两份报告(一份有主、一份存量 CLI 时代无主)与图像/OCR 留痕。
 	if _, err := pool.Exec(ctx, `INSERT INTO members (id, name, is_child) VALUES (1, 'user_test', true)`); err != nil {

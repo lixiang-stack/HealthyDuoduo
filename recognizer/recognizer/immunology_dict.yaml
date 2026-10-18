@@ -26,7 +26,7 @@ items:
     aliases: [抗SS—B抗体, 抗SS—B抗体(SS-B)]
     units: [AU]
   - name: 抗Scl-70抗体
-    aliases: [抗Scl-70抗体(Sc1-70)]
+    aliases: [抗Scl-70抗体(Sc1-70), 抗Sc1-70抗体(Sc1-70)]
     units: [AU]
   - name: 抗PM-Scl抗体
     aliases: [抗PM—Scl抗体, 抗PM—Scl抗体(PM-Scl)]
@@ -59,7 +59,7 @@ items:
     aliases: [抗dsDNA抗体(dsDNA)]
     units: [IU/mL]
   - name: ANA(IIF)
-    aliases: [ANA(IIF)(ANA(IIF)), "ANA(I IF)(ANA(IIF))"]
+    aliases: [ANA(IIF)(ANA(IIF)), "ANA(I IF)(ANA(IIF))", "ANA(IIF) (ANA(IIF))"]
     units: []
   - name: 抗核抗体主荧光核型
     aliases: [抗核抗体主荧光核型(ZHX2)]

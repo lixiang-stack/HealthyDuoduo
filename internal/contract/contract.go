@@ -46,6 +46,9 @@ type ReportItem struct {
 	Flag          string  `json:"flag"`
 	LowConfidence bool    `json:"low_confidence"`
 	RawText       string  `json:"raw_text"`
+	// OCRLineNumbers 该指标项组成 OCR 行的下标(0-based,与 ocr_result 的 txts/boxes 同下标;
+	// 顺序与 raw_text 组成顺序一致)。识别端直接给出,详情/核对的行链接不再做文本反推。
+	OCRLineNumbers []int32 `json:"ocr_line_numbers"`
 }
 
 // Report 对应 schemas/report.schema.json(实施计划 4.2)。

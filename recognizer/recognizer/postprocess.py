@@ -152,8 +152,9 @@ _PIECE_CAP_FACTOR = 0.6
 _PIECE_CAP_MIN_PX = 6.0
 _PIECE_CAP_DEFAULT_PX = 25.0
 
-# cell 归列时允许的最大偏离(像素);页面级垃圾行(标题/落款)不应占用表列
-_ASSIGN_TOLERANCE_PX = 180
+# 竖排回退候选「数值 token 居格首」的前缀容差:容许空白/箭头等 ≤2 个前缀字符
+# (页脚散文格的数字在格中段,超此即拒)。
+_VERTICAL_VALUE_PREFIX_MAX = 2
 
 # 表头行判定:一行命中的 (格, 列角色关键词) 对 ≥ 此值才判为表头带;
 # 3 = 名称+结果+单位/参考值等列角色同时在行内的最少组合。
@@ -234,6 +235,7 @@ class _Cell:
     y0: float
     x1: float
     y1: float
+    line: int  # OCR 行下标(txts/boxes 同下标;_cells 填充,供 item→行链接)
 
     @property
     def cx(self) -> float:
@@ -249,12 +251,12 @@ class _Cell:
 
 
 def _cells(ocr: OCRResult) -> list[_Cell]:
-    """行文本 + box 多边形 → 以包络矩形表达的格。"""
+    """行文本 + box 多边形 → 以包络矩形表达的格(带行下标)。"""
     out = []
-    for text, box, score in zip(ocr.txts, ocr.boxes, ocr.scores):
+    for i, (text, box, score) in enumerate(zip(ocr.txts, ocr.boxes, ocr.scores)):
         xs = [p[0] for p in box]
         ys = [p[1] for p in box]
-        out.append(_Cell(text=text, score=score, x0=min(xs), y0=min(ys), x1=max(xs), y1=max(ys)))
+        out.append(_Cell(text=text, score=score, x0=min(xs), y0=min(ys), x1=max(xs), y1=max(ys), line=i))
     return out
 
 
@@ -688,10 +690,15 @@ def _extract_items(
         bcols = band_columns(band)
 
         # 1. 逐格归 (角色, 块)
+        # 列归属 = 最近表头列中心(中点分区,不设固定偏离上限)。名称列左对齐,长文本格的
+        # 中心随文本长度向右漂移(实测免疫单「抗Ribosomal P抗体」中心偏离名称列头 398px),
+        # 固定容差会把这类格整格丢弃、整行漏抽(故选整行/整单缩水)。页面级垃圾格(标题/
+        # 落款)照常归到最近列:与词典不命中且与数据行 dy 超限,不产出伪指标项(样本语料
+        # golden 与全量真实数据回归锁定)。
         assigned: dict[tuple[str, int], list[_Cell]] = {}
         cell_ref_kw: set[int] = set()  # 复合 value 表头列(文本含参考范围)的格 id → 其 r 可进 ref 位
         for c in seg:
-            best_role, best_idx, best_blk, best_d = None, 0, 0, _ASSIGN_TOLERANCE_PX + 1
+            best_role, best_idx, best_blk, best_d = None, 0, 0, float("inf")
             best_ref_kw = False
             for cx, role, idx, ref_kw, blk in bcols:
                 dx = abs(c.cx - cx)
@@ -903,8 +910,9 @@ def _vertical_value(
 
     产筛竖排表与糖耐量转置表(列头=项目名/缩写,值在列内向下,webwxgetmsgimg_17/_18):
     候选门:①cx 落在名格 x 区间内(列归属);②未其他词典命中(下一行「序号+名」格不算);
-    ③非日期形;④非纯范围串;含数值 token(比较前缀可带) → 数值字符串;按 (dy,|dcx|) 取最近。
-    找不到 → (None, None),保持 value=None 的诚实留痕。
+    ③非日期形;④非纯范围串;⑤数值 token 居格首(容许 ≤2 前缀字符;含数值的散文格如
+    页脚「实验室地址:…155号」不得按数字抽值——实测会把门牌号写成 value)。
+    按 (dy,|dcx|) 取最近;找不到 → (None, None),保持 value=None 的诚实留痕。
     """
     best: tuple[float, float, _Cell, str] | None = None
     for c in cells:
@@ -917,7 +925,7 @@ def _vertical_value(
         if _RANGE_RE.fullmatch(c.text.strip()):
             continue
         m = re.search(r"(<|≤|>|≥)?\s*(\d+(?:\.\d+)?(?::\d+)?)", c.text)
-        if m is None:
+        if m is None or m.start() > _VERTICAL_VALUE_PREFIX_MAX:
             continue
         val = (m.group(1) or "") + m.group(2)
         key = (c.y0 - name_cell.y1, abs(c.cx - name_cell.cx))
@@ -957,6 +965,7 @@ def run_postprocess(ocr: OCRResult, date_hint: str | None = None) -> Report:
                 flag=flag,
                 low_confidence=low_conf,
                 raw_text=raw_text,
+                ocr_line_numbers=[c.line for c in raw_cells],
             )
         )
         if piece.value is None:
