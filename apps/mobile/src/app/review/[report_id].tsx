@@ -1,6 +1,7 @@
 import { Link, useLocalSearchParams } from 'expo-router';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { sharedStyles } from '../../components/styles';
 import { colors } from '../../components/theme';
 import { ReportCard } from '../../reports/components';
 import { useReportData } from '../../reports/useReportData';
@@ -23,14 +24,14 @@ export default function ReviewScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {state.status === 'loading' ? (
-        <View style={styles.horizontal}>
+        <View style={sharedStyles.horizontal}>
           <ActivityIndicator />
-          <Text style={styles.muted}>正在加载报告…</Text>
+          <Text style={sharedStyles.muted}>正在加载报告…</Text>
         </View>
       ) : null}
 
       {state.status === 'unconfigured' ? (
-        <Text style={styles.muted}>
+        <Text style={sharedStyles.muted}>
           尚未配置后端地址,请先到<Link href="/settings" style={styles.link}>设置</Link>填写。
         </Text>
       ) : null}
@@ -50,7 +51,7 @@ export default function ReviewScreen() {
 
           {report.status === 'failed' ? (
             <View style={styles.card}>
-              <Text style={styles.muted}>这张检查单没有识别出可核对的指标项。</Text>
+              <Text style={sharedStyles.muted}>这张检查单没有识别出可核对的指标项。</Text>
               <Image source={{ uri: state.imageUrl }} style={styles.image} resizeMode="contain" />
               <Link href="/upload" style={styles.link}>
                 重新拍照上传(生成新报告,原报告与识别记录保留)
@@ -69,7 +70,7 @@ export default function ReviewScreen() {
                   onUpdated={applyReview}
                 />
               ))}
-              <Text style={styles.muted}>
+              <Text style={sharedStyles.muted}>
                 高置信项与全部指标项可在
                 <Link
                   href={{ pathname: '/report/[report_id]', params: { report_id: report.report_id } }}
@@ -82,8 +83,8 @@ export default function ReviewScreen() {
             </>
           ) : (
             <View style={styles.card}>
-              <Text style={styles.muted}>没有需要核对的低置信项。</Text>
-              <View style={styles.horizontal}>
+              <Text style={sharedStyles.muted}>没有需要核对的低置信项。</Text>
+              <View style={sharedStyles.horizontal}>
                 <Link href="/timeline" style={styles.link}>
                   去时间线查看
                 </Link>
@@ -106,10 +107,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: 24, gap: 12 },
   stack: { gap: 12 },
-  horizontal: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   card: { borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, gap: 8 },
   sectionTitle: { fontSize: 13, color: colors.muted },
-  muted: { fontSize: 13, color: colors.muted, lineHeight: 20 },
   fail: { fontSize: 13, color: colors.fail, lineHeight: 20 },
   link: { color: colors.accent, fontSize: 15 },
   image: {

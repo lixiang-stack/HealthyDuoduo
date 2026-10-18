@@ -3,6 +3,7 @@
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import type { Member } from '../api/members';
+import { sharedStyles } from '../components/styles';
 import { colors } from '../components/theme';
 
 /** 行内编辑草稿;memberId 定位被编辑行。 */
@@ -62,7 +63,7 @@ export function MemberEditRow({
         style={styles.input}
       />
       <ChildPicker isChild={draft.isChild} onChange={(value) => onChange({ isChild: value })} />
-      <View style={styles.horizontal}>
+      <View style={sharedStyles.horizontal}>
         <Pressable
           style={[styles.button, (busy || !draft.name.trim()) && styles.buttonDisabled]}
           onPress={onSave}
@@ -119,7 +120,7 @@ export function MemberCreateForm({
 // 「孩子 / 成人」两档选择(成员最小模型只有这两档)。
 function ChildPicker({ isChild, onChange }: { isChild: boolean; onChange: (isChild: boolean) => void }) {
   return (
-    <View style={styles.horizontal}>
+    <View style={sharedStyles.horizontal}>
       <Pressable style={[styles.chip, isChild && styles.chipActive]} onPress={() => onChange(true)}>
         <Text style={isChild ? styles.chipTextActive : styles.chipText}>孩子</Text>
       </Pressable>
@@ -163,7 +164,6 @@ export function MemberChips({
 }
 
 const styles = StyleSheet.create({
-  horizontal: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   sectionTitle: { fontSize: 13, color: colors.muted },
   input: {

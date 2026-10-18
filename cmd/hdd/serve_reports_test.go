@@ -12,7 +12,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -37,7 +36,14 @@ type fakeServeStore struct {
 	reportOCR map[string]int64 // reports.ocr_result_id 镜像(WriteReport 记录)
 	order     []string         // 报告插入序(时间线迭代确定化)
 	reports   map[string]*fakeServeReport
-	pairs     []pipeline.CorrectionPairRecord // correction_pairs 追加记录(仅修正产生)
+	pairs     []fakeCorrectionPair // correction_pairs 追加记录(仅修正产生)
+}
+
+// fakeCorrectionPair 修正对 + 所属指标项 id(correction_pairs.item_id 的镜像:
+// 删除级联用例按项断言;storage 侧由 FK ON DELETE CASCADE 承担)。
+type fakeCorrectionPair struct {
+	itemID int64
+	pair   pipeline.CorrectionPairRecord
 }
 
 type fakeServeReport struct {
@@ -219,16 +225,48 @@ func (f *fakeServeStore) ItemsWithReviewStatus(ctx context.Context, reportSha st
 	return append([]pipeline.ReportItemRow(nil), r.items...), nil
 }
 
-func (f *fakeServeStore) SetReportMember(ctx context.Context, reportSha string, memberID int64) error {
+// SetReportMember 镜像 storage:只改归属;报告缺失返回 false, nil。
+func (f *fakeServeStore) SetReportMember(ctx context.Context, reportSha string, memberID int64) (bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	r, ok := f.reports[reportSha]
 	if !ok {
-		return fmt.Errorf("report %s missing", reportSha)
+		return false, nil
 	}
 	id := memberID
 	r.summary.MemberID = &id
-	return nil
+	return true, nil
+}
+
+// DeleteReport 镜像 storage 硬删:报告行与指标项消失、修正对随指标项级联;
+// images/ocr_results 留痕保留(重传走同图未归档路径,识别历史继续追加)。
+func (f *fakeServeStore) DeleteReport(ctx context.Context, reportSha string) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	r, ok := f.reports[reportSha]
+	if !ok {
+		return false, nil
+	}
+	itemIDs := make(map[int64]bool, len(r.items))
+	for _, it := range r.items {
+		itemIDs[it.ItemID] = true
+	}
+	kept := f.pairs[:0]
+	for _, p := range f.pairs {
+		if !itemIDs[p.itemID] {
+			kept = append(kept, p)
+		}
+	}
+	f.pairs = kept
+	delete(f.reports, reportSha)
+	delete(f.reportOCR, reportSha)
+	for i, sha := range f.order {
+		if sha == reportSha {
+			f.order = append(f.order[:i], f.order[i+1:]...)
+			break
+		}
+	}
+	return true, nil
 }
 
 // seedReport 直接种一份报告(时间线用例的夹具;绕过 ingest 编排)。真实 schema 里
@@ -274,6 +312,12 @@ func (f *fakeServeStore) ocrCount(sha string) int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return len(f.ocr[sha])
+}
+
+func (f *fakeServeStore) hasImage(sha string) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.images[sha]
 }
 
 // fakeUploadRecognizer 可配置识别结果;Report 返回深拷贝(不把 applyFailInvariant
@@ -972,4 +1016,337 @@ func TestServeGetReportDetailFailed(t *testing.T) {
 	if !strings.Contains(string(raw), `"items":[]`) {
 		t.Errorf("failed items must serialize as [] not null; body = %s", raw)
 	}
+}
+
+// doReassign 发一次改归属请求(PATCH /reports/{id};body 原始 JSON 以覆盖畸形形态)。
+func doReassign(t *testing.T, srv *httptest.Server, reportID, body string) (int, []byte) {
+	t.Helper()
+	return doJSON(t, srv, http.MethodPatch, "/api/v1/reports/"+reportID, body)
+}
+
+// decodeReassign 断言状态码并解码 ReportSummary(改归属响应 = 刷新后的报告头部)。
+func decodeReassign(t *testing.T, status int, raw []byte, wantStatus int) httpapi.ReportSummary {
+	t.Helper()
+	if status != wantStatus {
+		t.Fatalf("reassign status = %d, want %d; body = %s", status, wantStatus, raw)
+	}
+	var got httpapi.ReportSummary
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatalf("decode ReportSummary: %v; body = %s", err, raw)
+	}
+	return got
+}
+
+// timelineShas 时间线(?member_id=)的 report_id 序列;memberID 空串 = 全量。
+func timelineShas(t *testing.T, srv *httptest.Server, memberID string) []string {
+	t.Helper()
+	path := "/api/v1/reports"
+	if memberID != "" {
+		path += "?member_id=" + memberID
+	}
+	status, raw := doJSON(t, srv, http.MethodGet, path, "")
+	if status != http.StatusOK {
+		t.Fatalf("GET %s = %d; body = %s", path, status, raw)
+	}
+	var list httpapi.ReportsList
+	if err := json.Unmarshal(raw, &list); err != nil {
+		t.Fatalf("decode timeline %s: %v", raw, err)
+	}
+	out := make([]string, 0, len(list.Reports))
+	for _, r := range list.Reports {
+		out = append(out, r.ReportID)
+	}
+	return out
+}
+
+// TestServeReassignReport 改归属(票 10):归属即刻生效、时间线随成员过滤移位;
+// 报告内容零变化(状态/计数/指标项与核对状态原样);重复改派幂等;未知成员 404 零写入。
+func TestServeReassignReport(t *testing.T) {
+	srv, _, _, _ := newReportsTestServer(t)
+	createOne(t, srv, `{"name":"小虎","is_child":true}`)  // id 1
+	createOne(t, srv, `{"name":"妈妈","is_child":false}`) // id 2
+
+	status, raw := doUpload(t, srv, []byte("fake-jpeg-reassign-bytes-01"), map[string]string{formMemberID: "1"})
+	created := decodeUpload(t, status, raw, http.StatusCreated)
+	sha := created.Report.ReportID
+	if got := timelineShas(t, srv, "1"); len(got) != 1 || got[0] != sha {
+		t.Fatalf("timeline(1) before = %v, want [%s]", got, sha)
+	}
+	if got := timelineShas(t, srv, "2"); len(got) != 0 {
+		t.Fatalf("timeline(2) before = %v, want 空", got)
+	}
+
+	// 传错成员改归属:归属即刻生效、时间线移位(原成员无、目标成员有)。
+	status, raw = doReassign(t, srv, sha, `{"member_id":2}`)
+	got := decodeReassign(t, status, raw, http.StatusOK)
+	if got.MemberID == nil || *got.MemberID != 2 {
+		t.Fatalf("reassigned member_id = %v, want 2", got.MemberID)
+	}
+	if got.Status != created.Report.Status || got.ReportType != created.Report.ReportType ||
+		got.FlagCounts != created.Report.FlagCounts ||
+		got.UnreviewedLowConfidenceCount != created.Report.UnreviewedLowConfidenceCount ||
+		!sameOptionalString(got.ReportDate, created.Report.ReportDate) || !sameOptionalString(got.FailReason, created.Report.FailReason) {
+		t.Errorf("reassign response = %+v, want 除归属外零变化(上传响应 %+v)", got.ReportHeader, created.Report.ReportHeader)
+	}
+	if got := timelineShas(t, srv, "1"); len(got) != 0 {
+		t.Errorf("timeline(1) after = %v, want 空(报告已移走)", got)
+	}
+	if got := timelineShas(t, srv, "2"); len(got) != 1 || got[0] != sha {
+		t.Errorf("timeline(2) after = %v, want [%s]", got, sha)
+	}
+
+	// 详情同步:归属更新、报告内容零变化(指标项句柄与核对状态原样)。
+	status, raw = doJSON(t, srv, http.MethodGet, "/api/v1/reports/"+sha, "")
+	if status != http.StatusOK {
+		t.Fatalf("GET detail = %d; body = %s", status, raw)
+	}
+	var detail httpapi.ReportDetail
+	if err := json.Unmarshal(raw, &detail); err != nil {
+		t.Fatal(err)
+	}
+	if detail.MemberID == nil || *detail.MemberID != 2 {
+		t.Errorf("detail member_id = %v, want 2", detail.MemberID)
+	}
+	if len(detail.Items) != len(created.Report.Items) || detail.Items[0].ItemID != created.Report.Items[0].ItemID ||
+		detail.Items[0].ReviewStatus != pipeline.ReviewStatusUnreviewed {
+		t.Errorf("detail items after reassign = %+v, want 与上传时逐项一致", detail.Items)
+	}
+
+	// 重复改派(同成员)幂等:200 且归属不变。
+	status, raw = doReassign(t, srv, sha, `{"member_id":2}`)
+	if again := decodeReassign(t, status, raw, http.StatusOK); again.MemberID == nil || *again.MemberID != 2 {
+		t.Errorf("replayed reassign member_id = %v, want 2", again.MemberID)
+	}
+
+	// 未知成员 404 零写入(归属保持 2)。
+	status, raw = doReassign(t, srv, sha, `{"member_id":999}`)
+	if status != http.StatusNotFound {
+		t.Fatalf("reassign to unknown member = %d; body = %s, want 404", status, raw)
+	}
+	assertAPIError(t, raw)
+	status, raw = doJSON(t, srv, http.MethodGet, "/api/v1/reports/"+sha, "")
+	if status != http.StatusOK {
+		t.Fatalf("GET detail = %d", status)
+	}
+	if err := json.Unmarshal(raw, &detail); err != nil {
+		t.Fatal(err)
+	}
+	if detail.MemberID == nil || *detail.MemberID != 2 {
+		t.Errorf("member_id after rejected reassign = %v, want 2(零写入)", detail.MemberID)
+	}
+
+	// 改回原成员:时间线随之移回(改归属不是单向操作)。
+	status, raw = doReassign(t, srv, sha, `{"member_id":1}`)
+	if back := decodeReassign(t, status, raw, http.StatusOK); back.MemberID == nil || *back.MemberID != 1 {
+		t.Fatalf("reassign back member_id = %v, want 1", back.MemberID)
+	}
+	if got := timelineShas(t, srv, "1"); len(got) != 1 || got[0] != sha {
+		t.Errorf("timeline(1) after reassign back = %v, want [%s]", got, sha)
+	}
+	if got := timelineShas(t, srv, "2"); len(got) != 0 {
+		t.Errorf("timeline(2) after reassign back = %v, want 空", got)
+	}
+}
+
+// reassignRaceStore 模拟改归属的竞态窗口:摘要读出后报告被并发删除——
+// SetReportMember 恒回「未命中」;只覆写写入路径,读路径仍走内存 fake。
+type reassignRaceStore struct{ *fakeServeStore }
+
+func (reassignRaceStore) SetReportMember(context.Context, string, int64) (bool, error) {
+	return false, nil
+}
+
+// TestServeReassignConcurrentDelete 竞态收口:报告在摘要读出后被并发删除时,
+// 改归属以路径身份口径回 404(而非 500「assign member failed」)。
+func TestServeReassignConcurrentDelete(t *testing.T) {
+	st := newFakeServeStore()
+	sha := strings.Repeat("a", 64)
+	st.seedReport(sha, nil, contract.Report{ReportType: "血常规", Status: contract.StatusSuccess, Items: []contract.ReportItem{
+		{Name: "血红蛋白", Value: str("128"), Flag: "normal", RawText: "血红蛋白  128"},
+	}}, nil)
+	d := &deps{store: st, members: &fakeMemberStore{}, reports: reassignRaceStore{st},
+		rec: &fakeUploadRecognizer{}, obj: fakeObjectsCLI{objects: map[string][]byte{}}}
+	srv := httptest.NewServer(newServeHandler(d, ""))
+	t.Cleanup(srv.Close)
+	createOne(t, srv, `{"name":"小虎","is_child":true}`)
+
+	status, raw := doReassign(t, srv, sha, `{"member_id":1}`)
+	if status != http.StatusNotFound {
+		t.Fatalf("reassign during concurrent delete = %d %s, want 404", status, raw)
+	}
+	assertAPIError(t, raw)
+}
+
+// TestServeReassignValidation 改归属校验与 404 矩阵:非法请求 4xx 且零写入;
+// report_id 非 hex → 404(内容身份口径)、未知报告/成员 → 404。
+func TestServeReassignValidation(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+		want int
+		sha  func(sample httpapi.ReportDetail) string // 缺省 = 样例报告
+	}{
+		{name: "empty body", body: "", want: http.StatusBadRequest},
+		{name: "missing member", body: `{}`, want: http.StatusBadRequest},
+		{name: "null member", body: `{"member_id":null}`, want: http.StatusBadRequest},
+		{name: "string member", body: `{"member_id":"abc"}`, want: http.StatusBadRequest},
+		{name: "float member", body: `{"member_id":1.5}`, want: http.StatusBadRequest},
+		{name: "unknown field rejected", body: `{"member_id":1,"note":"x"}`, want: http.StatusBadRequest},
+		{name: "non-hex report", body: `{"member_id":1}`, want: http.StatusNotFound,
+			sha: func(_ httpapi.ReportDetail) string { return "not-a-sha" }},
+		{name: "unknown report", body: `{"member_id":1}`, want: http.StatusNotFound,
+			sha: func(_ httpapi.ReportDetail) string { return strings.Repeat("f", 64) }},
+		{name: "unknown member", body: `{"member_id":999}`, want: http.StatusNotFound},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			srv, _, _, _ := newReportsTestServer(t)
+			createOne(t, srv, `{"name":"小虎","is_child":true}`)
+			status, raw := doUpload(t, srv, []byte("fake-jpeg-reassign-validation"), map[string]string{formMemberID: "1"})
+			sample := decodeUpload(t, status, raw, http.StatusCreated).Report
+			sha := sample.ReportID
+			if c.sha != nil {
+				sha = c.sha(sample)
+			}
+			status, raw = doReassign(t, srv, sha, c.body)
+			if status != c.want {
+				t.Fatalf("status = %d, want %d; body = %s", status, c.want, raw)
+			}
+			assertAPIError(t, raw)
+			// 零写入:样例报告归属未动。
+			status, raw = doJSON(t, srv, http.MethodGet, "/api/v1/reports/"+sample.ReportID, "")
+			if status != http.StatusOK {
+				t.Fatalf("GET sample detail = %d", status)
+			}
+			var detail httpapi.ReportDetail
+			if err := json.Unmarshal(raw, &detail); err != nil {
+				t.Fatal(err)
+			}
+			if detail.MemberID == nil || *detail.MemberID != 1 {
+				t.Errorf("member_id after rejected request = %v, want 1", detail.MemberID)
+			}
+		})
+	}
+}
+
+// TestServeDeleteReport 删除(票 10):204 无响应体;报告、指标项、修正对随之清除;
+// 原始图像与 OCR 历史留痕保留;删除后同图重传走新归档(201、非 duplicate、
+// 指标项句柄全换、识别重跑且 OCR 历史追加);重复删除与非法形态 404。
+func TestServeDeleteReport(t *testing.T) {
+	srv, st, rec, _ := newReportsTestServer(t)
+	createOne(t, srv, `{"name":"小虎","is_child":true}`)
+
+	image := []byte("fake-jpeg-delete-bytes-01")
+	status, raw := doUpload(t, srv, image, map[string]string{formMemberID: "1"})
+	created := decodeUpload(t, status, raw, http.StatusCreated)
+	sha := created.Report.ReportID
+	oldItems := created.Report.Items
+
+	// 先修正低置信项:产生一条修正对(删除级联的断言底;同时翻 partial → success)。
+	status, raw = doReview(t, srv, sha, oldItems[0].ItemID, `{"action":"correct","value":"5.6"}`)
+	if got := decodeReview(t, status, raw, http.StatusOK); got.Status != contract.StatusSuccess {
+		t.Fatalf("review → %+v, want success", got)
+	}
+	if len(st.pairsSnapshot()) != 1 {
+		t.Fatalf("pairs before delete = %d, want 1", len(st.pairsSnapshot()))
+	}
+
+	// DELETE → 204 无响应体。
+	status, raw = doJSON(t, srv, http.MethodDelete, "/api/v1/reports/"+sha, "")
+	if status != http.StatusNoContent || len(bytes.TrimSpace(raw)) != 0 {
+		t.Fatalf("DELETE report = %d %q, want 204 无响应体", status, raw)
+	}
+
+	// 报告、指标项、修正对随之清除:详情 404、时间线消失、级联计数归零。
+	if status, _ = doJSON(t, srv, http.MethodGet, "/api/v1/reports/"+sha, ""); status != http.StatusNotFound {
+		t.Errorf("GET deleted detail = %d, want 404", status)
+	}
+	if got := timelineShas(t, srv, "1"); len(got) != 0 {
+		t.Errorf("timeline after delete = %v, want 空", got)
+	}
+	if got := timelineShas(t, srv, ""); len(got) != 0 {
+		t.Errorf("all timeline after delete = %v, want 空", got)
+	}
+	if st.reportCount() != 0 {
+		t.Errorf("reports after delete = %d, want 0", st.reportCount())
+	}
+	if items, err := st.ItemsWithReviewStatus(context.Background(), sha); err != nil || len(items) != 0 {
+		t.Errorf("items after delete = %+v (%v), want 级联清除", items, err)
+	}
+	if pairs := st.pairsSnapshot(); len(pairs) != 0 {
+		t.Errorf("pairs after delete = %d, want 0(随指标项级联)", len(pairs))
+	}
+
+	// 原始图像与 OCR 历史留痕保留(append-only 文化不破)。
+	if !st.hasImage(sha) {
+		t.Error("image row removed, want 原始图像留痕")
+	}
+	if n := st.ocrCount(sha); n != 1 {
+		t.Errorf("ocr history after delete = %d, want 1(识别历史保留)", n)
+	}
+
+	// 删除后同图重传:201 新报告(内容哈希不再命中、非 duplicate),指标项句柄全换、
+	// 核对状态回 unreviewed;识别重跑,OCR 历史追加(NF-05)。
+	status, raw = doUpload(t, srv, image, map[string]string{formMemberID: "1"})
+	again := decodeUpload(t, status, raw, http.StatusCreated)
+	if again.Duplicate {
+		t.Error("duplicate = true after delete, want false(内容哈希不再命中)")
+	}
+	if again.Report.ReportID != sha {
+		t.Errorf("re-upload report_id = %q, want 同图身份 %q", again.Report.ReportID, sha)
+	}
+	if again.Report.Status != contract.StatusPartial || again.Report.UnreviewedLowConfidenceCount != 1 {
+		t.Errorf("re-upload header = %+v, want 重新识别归档(partial/1)", again.Report.ReportHeader)
+	}
+	oldIDs := map[int64]bool{}
+	for _, it := range oldItems {
+		oldIDs[it.ItemID] = true
+	}
+	for _, it := range again.Report.Items {
+		if oldIDs[it.ItemID] {
+			t.Errorf("re-upload reused item_id %d, want 全换", it.ItemID)
+		}
+		if it.ReviewStatus != pipeline.ReviewStatusUnreviewed {
+			t.Errorf("re-upload item review_status = %q, want unreviewed", it.ReviewStatus)
+		}
+	}
+	if rec.calls != 2 {
+		t.Errorf("recognizer calls = %d, want 2(删除后重传重跑识别)", rec.calls)
+	}
+	if n := st.ocrCount(sha); n != 2 {
+		t.Errorf("ocr history after re-upload = %d, want 2(历史追加不覆盖)", n)
+	}
+	if pairs := st.pairsSnapshot(); len(pairs) != 0 {
+		t.Errorf("pairs after re-upload = %d, want 0(新报告不携带旧修正对)", len(pairs))
+	}
+	if got := timelineShas(t, srv, "1"); len(got) != 1 || got[0] != sha {
+		t.Errorf("timeline after re-upload = %v, want [%s]", got, sha)
+	}
+
+	// 重复删除(先删掉重传的新报告)与非法形态:404(契约只声明 404)。
+	if status, raw = doJSON(t, srv, http.MethodDelete, "/api/v1/reports/"+sha, ""); status != http.StatusNoContent {
+		t.Fatalf("DELETE re-uploaded report = %d %s, want 204", status, raw)
+	}
+	for _, id := range []string{sha, strings.Repeat("f", 64), "not-a-sha"} {
+		if status, raw = doJSON(t, srv, http.MethodDelete, "/api/v1/reports/"+id, ""); status != http.StatusNotFound {
+			t.Errorf("DELETE %s = %d %s, want 404", id, status, raw)
+		}
+	}
+}
+
+// assertAPIError 非 2xx 响应体必须是契约 Error 形状(message 非空)。
+func assertAPIError(t *testing.T, raw []byte) {
+	t.Helper()
+	var apiErr httpapi.Error
+	if err := json.Unmarshal(raw, &apiErr); err != nil || apiErr.Message == "" {
+		t.Errorf("error body = %s, want 契约 Error 形状", raw)
+	}
+}
+
+// sameOptionalString 两个可空字符串相等(nil 与 nil、指针与同值;日期/失败原因等可空字段比较用)。
+func sameOptionalString(a, b *string) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
 }

@@ -1,8 +1,11 @@
 // 报告端点(GET /api/v1/reports 时间线、POST /api/v1/reports multipart 上传、
-// GET /api/v1/reports/{report_id} 详情;契约冻结于 schemas/openapi.yaml,viz-and-client 票 06/07)。
+// GET /api/v1/reports/{report_id} 详情、PATCH 改归属、DELETE 硬删;契约冻结于
+// schemas/openapi.yaml,viz-and-client 票 06/07/10)。
 // 时间线按成员过滤(缺省全部,含存量无主);上传原子接收后同步等待识别,响应即完整报告。
 // sha256 幂等分岔:已有报告不含核对决策 → 200 duplicate:true;已含核对决策 → 409,
 // 显式 override=true 才重跑识别并重置归档。详情含指标项 OCR 行链接(票 07)。
+// 自愈(票 10):改归属即刻生效、时间线随之移位;删除硬删报告与指标项与修正对,
+// 原始图像与 OCR 识别历史留痕保留(同图可重新上传入档)。
 package main
 
 import (
@@ -95,6 +98,32 @@ func parseUploadRequest(w http.ResponseWriter, r *http.Request) (*uploadRequest,
 	return &uploadRequest{data: data, filename: filename, memberID: memberID, override: override}, nil
 }
 
+// reportIDFromPath 取并校验路径报告身份(64 hex):非法形态无法是任何已有报告,
+// 与不存在同答 404(已写响应,返回 false;详情/核对/改归属/删除共用该口径)。
+func reportIDFromPath(w http.ResponseWriter, r *http.Request) (string, bool) {
+	reportID := r.PathValue("report_id")
+	if pipeline.ValidateSha256(reportID) != nil {
+		writeErrorJSON(w, http.StatusNotFound, reportNotFoundMessage)
+		return "", false
+	}
+	return reportID, true
+}
+
+// requireMember 校验归属成员存在(上传/改归属共用):未知成员 404、查询失败 500,
+// 已写响应并返回 false。
+func requireMember(w http.ResponseWriter, r *http.Request, ms pipeline.MemberStore, memberID int64) bool {
+	member, err := ms.MemberByID(r.Context(), memberID)
+	if err != nil {
+		writeErrorJSON(w, http.StatusInternalServerError, "lookup member failed")
+		return false
+	}
+	if member == nil {
+		writeErrorJSON(w, http.StatusNotFound, memberNotFoundMessage)
+		return false
+	}
+	return true
+}
+
 // handleListReports GET /api/v1/reports?member_id=:时间线卡片(成员过滤;缺省全部)。
 // 排序口径服务端先给(日期降序、dateless 沉底),客户端展示会再排序一次。
 func handleListReports(rs pipeline.ReportStore) http.HandlerFunc {
@@ -125,9 +154,8 @@ func handleListReports(rs pipeline.ReportStore) http.HandlerFunc {
 // report_id 为对外身份 sha256;非该形态无法是任何已有报告,与不存在同样回 404(契约只声明 404)。
 func handleGetReport(d *deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		reportID := r.PathValue("report_id")
-		if pipeline.ValidateSha256(reportID) != nil {
-			writeErrorJSON(w, http.StatusNotFound, "report not found")
+		reportID, ok := reportIDFromPath(w, r)
+		if !ok {
 			return
 		}
 		ctx := r.Context()
@@ -137,7 +165,7 @@ func handleGetReport(d *deps) http.HandlerFunc {
 			return
 		}
 		if summary == nil {
-			writeErrorJSON(w, http.StatusNotFound, "report not found")
+			writeErrorJSON(w, http.StatusNotFound, reportNotFoundMessage)
 			return
 		}
 		items, err := d.reports.ItemsWithReviewStatus(ctx, reportID)
@@ -154,6 +182,81 @@ func handleGetReport(d *deps) http.HandlerFunc {
 	}
 }
 
+// reassignBody PATCH /reports/{report_id} 请求体解码形状:member_id 必带且为整数
+// (显式 null 一律拒绝,与成员端点同一执行立场)。
+type reassignBody struct {
+	MemberID optField[int64] `json:"member_id"`
+}
+
+// handleReassignReport PATCH /api/v1/reports/{report_id}:改归属(传错成员不必删档重传)。
+// report_id 非 64 hex → 404(内容身份口径,同详情端点);未知成员/未知报告 → 404;
+// 成功 200 返回刷新后的报告头部(归属即刻生效,时间线随成员过滤移位)。
+func handleReassignReport(d *deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		reportID, ok := reportIDFromPath(w, r)
+		if !ok {
+			return
+		}
+		var body reassignBody
+		if err := decodeJSONBody(r, &body); err != nil {
+			writeErrorJSON(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		if !body.MemberID.set {
+			writeErrorJSON(w, http.StatusBadRequest, "member_id is required")
+			return
+		}
+		ctx := r.Context()
+		if !requireMember(w, r, d.members, body.MemberID.value) {
+			return
+		}
+		summary, err := d.reports.SummaryByImage(ctx, reportID)
+		if err != nil {
+			writeErrorJSON(w, http.StatusInternalServerError, "lookup report failed")
+			return
+		}
+		if summary == nil {
+			writeErrorJSON(w, http.StatusNotFound, reportNotFoundMessage)
+			return
+		}
+		updated, err := d.reports.SetReportMember(ctx, reportID, body.MemberID.value)
+		if err != nil {
+			writeErrorJSON(w, http.StatusInternalServerError, "assign member failed")
+			return
+		}
+		if !updated {
+			// 竞态窗口:摘要读出后报告被并发删除——按路径身份口径回 404。
+			writeErrorJSON(w, http.StatusNotFound, reportNotFoundMessage)
+			return
+		}
+		memberID := body.MemberID.value
+		summary.MemberID = &memberID
+		writeJSON(w, http.StatusOK, httpapi.ReportSummary{ReportHeader: toAPIReportHeader(*summary)})
+	}
+}
+
+// handleDeleteReport DELETE /api/v1/reports/{report_id}:硬删报告(级联指标项与修正对;
+// 无回收站)。原始图像与 OCR 识别历史留痕保留,同图日后可重新上传入档(内容哈希不再命中)。
+// report_id 非 64 hex → 404;报告不存在 → 404;成功 204 无响应体。
+func handleDeleteReport(d *deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		reportID, ok := reportIDFromPath(w, r)
+		if !ok {
+			return
+		}
+		deleted, err := d.reports.DeleteReport(r.Context(), reportID)
+		if err != nil {
+			writeErrorJSON(w, http.StatusInternalServerError, "delete report failed")
+			return
+		}
+		if !deleted {
+			writeErrorJSON(w, http.StatusNotFound, reportNotFoundMessage)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
 // handleUploadReport POST /api/v1/reports:multipart 同步上传。
 // 200/201 分岔与归属写入语义见包注释;所有错误走契约 Error 形状。
 func handleUploadReport(d *deps) http.HandlerFunc {
@@ -164,13 +267,7 @@ func handleUploadReport(d *deps) http.HandlerFunc {
 			return
 		}
 		ctx := r.Context()
-		member, err := d.members.MemberByID(ctx, req.memberID)
-		if err != nil {
-			writeErrorJSON(w, http.StatusInternalServerError, "lookup member failed")
-			return
-		}
-		if member == nil {
-			writeErrorJSON(w, http.StatusNotFound, "member not found")
+		if !requireMember(w, r, d.members, req.memberID) {
 			return
 		}
 
@@ -241,12 +338,17 @@ func handleUploadReport(d *deps) http.HandlerFunc {
 
 // assignIfUnowned 归属到本次上传的成员:仅当报告无主时写入(set 后回填视图);
 // 已有归属(from 同图重传/override 重跑的其他成员)不静默夺走,改归属走 PATCH 端点。
+// 写入路径回报告缺失(并发删除竞态)时报错——上传路径刚写入的行缺失属异常,不静默。
 func assignIfUnowned(ctx context.Context, rs pipeline.ReportStore, sum *pipeline.ReportSummary, memberID int64) error {
 	if sum.MemberID != nil {
 		return nil
 	}
-	if err := rs.SetReportMember(ctx, sum.Sha256, memberID); err != nil {
+	updated, err := rs.SetReportMember(ctx, sum.Sha256, memberID)
+	if err != nil {
 		return err
+	}
+	if !updated {
+		return fmt.Errorf("report %s not found", sum.Sha256)
 	}
 	sum.MemberID = &memberID
 	return nil

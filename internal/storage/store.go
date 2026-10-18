@@ -112,6 +112,9 @@ const (
 	sqlReportSetMember = `UPDATE reports SET member_id = $2, updated_at = now()
 		 WHERE image_sha256 = $1`
 
+	// 硬删报告行(票 10;级联 report_items 与 correction_pairs,images/ocr_results 留痕)。
+	sqlReportDelete = `DELETE FROM reports WHERE image_sha256 = $1`
+
 	// 核对落库(票 09;单报告核对事务):报告行锁串行化该报告的并发核对,
 	// 保证状态派生翻转看到的是最新已提交状态。
 	sqlReportLock = `SELECT image_sha256 FROM reports WHERE image_sha256 = $1 FOR UPDATE`
@@ -414,16 +417,24 @@ func (s *Store) OCRResultJSONByReport(ctx context.Context, reportSha string) ([]
 }
 
 // SetReportMember 只改报告归属(上传新建/无主归档时赋值,票 06;改归属端点同用)。
-// 报告不存在返回错误(不静默虚报成功)。
-func (s *Store) SetReportMember(ctx context.Context, reportSha string, memberID int64) error {
+// 报告不存在返回 false, nil(404 口径;0 行更新即报告已不在,不静默虚报成功)。
+func (s *Store) SetReportMember(ctx context.Context, reportSha string, memberID int64) (bool, error) {
 	tag, err := s.pool.Exec(ctx, sqlReportSetMember, reportSha, memberID)
 	if err != nil {
-		return err
+		return false, err
 	}
-	if tag.RowsAffected() == 0 {
-		return fmt.Errorf("report %s not found", reportSha)
+	return tag.RowsAffected() > 0, nil
+}
+
+// DeleteReport 硬删报告行(票 10):级联 report_items → correction_pairs(FK ON DELETE
+// CASCADE);images 与 ocr_results 不动(原图与识别历史留痕,append-only 文化不破)。
+// 报告不存在返回 false, nil(404 口径,不虚报错误)。
+func (s *Store) DeleteReport(ctx context.Context, reportSha string) (bool, error) {
+	tag, err := s.pool.Exec(ctx, sqlReportDelete, reportSha)
+	if err != nil {
+		return false, err
 	}
-	return nil
+	return tag.RowsAffected() > 0, nil
 }
 
 // ReviewItem 核对落地(票 09;确认/修正,单事务):锁报告行(串行化同一报告的并发

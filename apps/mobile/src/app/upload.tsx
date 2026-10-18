@@ -5,6 +5,7 @@ import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View
 import { listMembers, type Member } from '../api/members';
 import { uploadReport, type UploadResult } from '../api/reports';
 import { resolveApiClient } from '../api/resolveClient';
+import { sharedStyles } from '../components/styles';
 import { colors } from '../components/theme';
 import { MemberChips } from '../members/components';
 import { useCurrentMember } from '../members/CurrentMemberContext';
@@ -116,14 +117,14 @@ export default function UploadScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {state.status === 'loading' ? (
-        <View style={styles.horizontal}>
+        <View style={sharedStyles.horizontal}>
           <ActivityIndicator />
-          <Text style={styles.muted}>正在加载…</Text>
+          <Text style={sharedStyles.muted}>正在加载…</Text>
         </View>
       ) : null}
 
       {state.status === 'unconfigured' ? (
-        <Text style={styles.muted}>
+        <Text style={sharedStyles.muted}>
           尚未配置后端地址,请先到<Link href="/settings" style={styles.link}>设置</Link>填写。
         </Text>
       ) : null}
@@ -140,12 +141,12 @@ export default function UploadScreen() {
       {state.status === 'ready' ? (
         <View style={styles.stack}>
           {members.length === 0 ? (
-            <Text style={styles.muted}>
+            <Text style={sharedStyles.muted}>
               还没有家庭成员。先到<Link href="/members" style={styles.link}>家庭成员</Link>建一个,再上传检查单。
             </Text>
           ) : (
             <>
-              <Text style={styles.label}>归属成员</Text>
+              <Text style={sharedStyles.label}>归属成员</Text>
               <MemberChips
                 members={members}
                 selectedId={currentMemberId}
@@ -153,17 +154,17 @@ export default function UploadScreen() {
                 onSelect={selectMember}
               />
               {currentMemberId === undefined ? (
-                <Text style={styles.muted}>先选择这张检查单归属哪位成员。</Text>
+                <Text style={sharedStyles.muted}>先选择这张检查单归属哪位成员。</Text>
               ) : null}
 
-              <Text style={styles.label}>检查单照片</Text>
+              <Text style={sharedStyles.label}>检查单照片</Text>
               {image ? (
                 <View style={styles.previewRow}>
                   <Image source={{ uri: image.uri }} style={styles.preview} />
-                  <Text style={styles.muted}>{image.fileName ?? '已选择照片'}</Text>
+                  <Text style={sharedStyles.muted}>{image.fileName ?? '已选择照片'}</Text>
                 </View>
               ) : null}
-              <View style={styles.horizontal}>
+              <View style={sharedStyles.horizontal}>
                 <Pressable
                   style={styles.buttonGhost}
                   onPress={() => void onPick('camera')}
@@ -179,7 +180,7 @@ export default function UploadScreen() {
                   <Text style={styles.link}>从相册选择</Text>
                 </Pressable>
               </View>
-              {pickMessage ? <Text style={styles.muted}>{pickMessage}</Text> : null}
+              {pickMessage ? <Text style={sharedStyles.muted}>{pickMessage}</Text> : null}
 
               <Pressable
                 style={[styles.button, !canUpload && styles.buttonDisabled]}
@@ -190,9 +191,9 @@ export default function UploadScreen() {
               </Pressable>
 
               {upload.status === 'uploading' ? (
-                <View style={styles.horizontal}>
+                <View style={sharedStyles.horizontal}>
                   <ActivityIndicator />
-                  <Text style={styles.muted}>{uploadWaitText(elapsedMs)}</Text>
+                  <Text style={sharedStyles.muted}>{uploadWaitText(elapsedMs)}</Text>
                 </View>
               ) : null}
 
@@ -218,7 +219,7 @@ export default function UploadScreen() {
                       </Pressable>
                     </Link>
                   ) : null}
-                  <View style={styles.horizontal}>
+                  <View style={sharedStyles.horizontal}>
                     <Link href="/timeline" style={styles.link}>
                       去时间线查看
                     </Link>
@@ -249,9 +250,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: 24, gap: 12 },
   stack: { gap: 12 },
-  horizontal: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  label: { fontSize: 13, color: colors.muted },
-  muted: { fontSize: 13, color: colors.muted, lineHeight: 20 },
   fail: { fontSize: 13, color: colors.fail, lineHeight: 20 },
   success: { fontSize: 13, color: colors.ok, lineHeight: 20 },
   link: { color: colors.accent, fontSize: 15 },

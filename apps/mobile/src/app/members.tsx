@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 
 import { createMember, listMembers, updateMember, type Member } from '../api/members';
 import { resolveApiClient } from '../api/resolveClient';
+import { sharedStyles } from '../components/styles';
 import { colors } from '../components/theme';
 import { MemberCreateForm, MemberEditRow, MemberRow, type EditDraft } from '../members/components';
 import { useCurrentMember } from '../members/CurrentMemberContext';
@@ -106,14 +107,14 @@ export default function MembersScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {state.status === 'loading' ? (
-        <View style={styles.horizontal}>
+        <View style={sharedStyles.horizontal}>
           <ActivityIndicator />
-          <Text style={styles.muted}>正在加载成员…</Text>
+          <Text style={sharedStyles.muted}>正在加载成员…</Text>
         </View>
       ) : null}
 
       {state.status === 'unconfigured' ? (
-        <Text style={styles.muted}>尚未配置后端地址,请先到「设置」填写。</Text>
+        <Text style={sharedStyles.muted}>尚未配置后端地址,请先到「设置」填写。</Text>
       ) : null}
 
       {state.status === 'error' ? (
@@ -128,7 +129,7 @@ export default function MembersScreen() {
       {state.status === 'ready' ? (
         <View style={styles.stack}>
           {members.length === 0 ? (
-            <Text style={styles.muted}>还没有家庭成员。先给家人建一个:填显示名,选择是否孩子。</Text>
+            <Text style={sharedStyles.muted}>还没有家庭成员。先给家人建一个:填显示名,选择是否孩子。</Text>
           ) : (
             members.map((m) => {
               if (editing?.memberId === m.member_id) {
@@ -176,8 +177,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: 24, gap: 12 },
   stack: { gap: 12 },
-  horizontal: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  muted: { fontSize: 13, color: colors.muted },
   fail: { fontSize: 13, color: colors.fail },
   button: {
     alignSelf: 'flex-start',

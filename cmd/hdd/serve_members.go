@@ -131,7 +131,7 @@ func handleUpdateMember(ms pipeline.MemberStore) http.HandlerFunc {
 			return
 		}
 		if m == nil {
-			writeErrorJSON(w, http.StatusNotFound, "member not found")
+			writeErrorJSON(w, http.StatusNotFound, memberNotFoundMessage)
 			return
 		}
 		writeJSON(w, http.StatusOK, toAPIMember(*m))

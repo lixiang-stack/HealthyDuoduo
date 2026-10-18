@@ -40,7 +40,7 @@ func (f *fakeServeStore) ReviewItem(ctx context.Context, reportSha string, itemI
 		next, pair := pipeline.ApplyReviewAction(it, action)
 		r.items[i] = next
 		if pair != nil {
-			f.pairs = append(f.pairs, *pair)
+			f.pairs = append(f.pairs, fakeCorrectionPair{itemID: it.ItemID, pair: *pair})
 		}
 		if r.summary.Status == contract.StatusPartial {
 			remaining := false
@@ -64,7 +64,11 @@ func (f *fakeServeStore) ReviewItem(ctx context.Context, reportSha string, itemI
 func (f *fakeServeStore) pairsSnapshot() []pipeline.CorrectionPairRecord {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return append([]pipeline.CorrectionPairRecord(nil), f.pairs...)
+	out := make([]pipeline.CorrectionPairRecord, 0, len(f.pairs))
+	for _, p := range f.pairs {
+		out = append(out, p.pair)
+	}
+	return out
 }
 
 // doReview 发一次核对请求(PATCH /reports/{id}/items/{item};itemID 用 any 以覆盖
