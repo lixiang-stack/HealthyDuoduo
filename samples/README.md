@@ -2,7 +2,8 @@
 
 - **报告大类分组**(2026-10 词典重组):`report_type` 输出为大类 **临检/生化/免疫/激素/影像/其他专项**
   (临检=cbc/ua/coag/bloodtype 走 logical merge 未并文件;生化=chemistry(lft/glu/vitanemia)、
-  免疫=immunology(ana/infectious/fibrosis)、激素=endocrine(tft/proghcg)、影像=imaging(us,叙述体)、
+  免疫=immunology(ana/infectious/fibrosis)、激素=endocrine(tft/proghcg)、
+  影像=us(logical merge;当前仅产检超声测量词表,叙述体)、
   其他专项=special(产筛,narrative mode;无创DNA/基因检测/微生物按需续录)。
   样本 id 前缀仍按细类语义命名,与 report_type 解耦;掩码语料无原图、编号接续该细类图像样本。)
 

@@ -14,5 +14,11 @@
       "raw_text": "血红蛋白 128 g/L 115-150",
       "ocr_line_numbers": [0, 1, 2]
     }
-  ]
+  ],
+  "exam_name": null,
+  "exam_name_ocr_line_numbers": null,
+  "findings": null,
+  "findings_ocr_line_numbers": null,
+  "impression": null,
+  "impression_ocr_line_numbers": null
 }

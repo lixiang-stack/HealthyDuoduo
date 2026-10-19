@@ -1,0 +1,59 @@
+# 超声词典(2026-10 分组方案:logical merge——本文件是 影像 大类的超声子词典;
+# 其他影像模态(CT/MRI 等)按真实样本新增文件,共用 report_type: 影像)。
+# 叙述体(category.mode=narrative):无表头/行列,关键指标以「别名 + 桥接符 + 数值」
+# 形态散布于检查所见文字行(_extract_narrative 行内配对;值不完整/未提及 → value=None,
+# raw_text 留整行供人工核对)。OCR 损耗行不命中即漏抓,报告保 partial 诚实留痕;
+# canonical 是维护者选择的规范名。当前 items 仅覆盖产检超声测量项,非产科超声按样本续录。
+
+report_type: 影像
+category:
+  title_keywords: [超声, 彩超]
+  min_matched_items: 3
+  mode: narrative
+  section_anchors:
+    exam_name: [检查项目, 检查部位, 检查内容]
+    findings: [超声描述, 检查所见, 超声所见]
+    impression: [超声提示, 检查提示]
+items:
+  - name: 颈项透明层厚度
+    aliases: [NT]
+    units: [mm]
+  - name: 头臀长
+    aliases: []
+    units: [mm]
+  - name: 双顶径
+    aliases: [BPD]
+    units: [mm]
+  - name: 股骨长
+    aliases: [FL]
+    units: [mm]
+  - name: 腹围
+    aliases: [AC]
+    units: [mm]
+  - name: 胎心率
+    aliases: [胎儿心率]
+    units: [次/分]
+  - name: 脐动脉S/D
+    aliases: [脐动脉S/D值, S/D]
+    units: []
+  - name: 羊水最大深度
+    aliases: [羊水最大前后径]
+    units: [mm]
+  - name: 宫颈管长度
+    aliases: [子宫颈管长约]
+    units: [mm]
+  - name: 肱骨长
+    aliases: [HL]
+    units: [mm]
+  - name: 鼻骨长
+    aliases: []
+    units: [mm]
+  - name: 颈项皮肤褶皱厚度
+    aliases: [NF]
+    units: [mm]
+  - name: 侧脑室宽度
+    aliases: [侧脑室]
+    units: [mm]
+  - name: 后颅窝池宽度
+    aliases: [后颅窝池]
+    units: [mm]

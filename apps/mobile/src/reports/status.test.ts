@@ -59,6 +59,12 @@ describe('uploadResultText', () => {
     fail_reason: null,
     flag_counts: { high: 0, low: 0, unknown: 0 },
     unreviewed_low_confidence_count: 0,
+    exam_name: null,
+    exam_name_ocr_lines: null,
+    findings: null,
+    findings_ocr_lines: null,
+    impression: null,
+    impression_ocr_lines: null,
     items: [],
   };
 

@@ -77,6 +77,9 @@ type ReportStore interface {
 	// OCRResultJSONByReport 报告所用 OCR 结果的原始 JSON(reports.ocr_result_id →
 	// ocr_results.engine_output;详情行链接回读,票 07)。缺失返回 nil, nil。
 	OCRResultJSONByReport(ctx context.Context, reportSha string) ([]byte, error)
+	// ReportSectionsByImage 报告级叙述段落(影像单详情投影;非影像报告六字段零值;
+	// 报告缺失返回 nil, nil,与 SummaryByImage 同口径)。
+	ReportSectionsByImage(ctx context.Context, reportSha string) (*ReportSections, error)
 	// SetReportMember 只改报告归属(上传新建/无主归档时赋值;改归属端点同用;不碰其他字段)。
 	// 报告不存在返回 false, nil(与 DeleteReport 同一缺失口径,写入路径自带存在性判定)。
 	SetReportMember(ctx context.Context, reportSha string, memberID int64) (bool, error)
@@ -116,6 +119,17 @@ type ReportSummary struct {
 	FailReason                   *string
 	FlagCounts                   FlagCounts
 	UnreviewedLowConfidenceCount int
+}
+
+// ReportSections 报告级叙述段落(影像单;非影像报告六字段零值)。
+// 文本与行号成对:文本 nil ⇒ 行号 nil;文本非 nil ⇒ 行号非空(识别端契约已锁)。
+type ReportSections struct {
+	ExamName                 *string
+	ExamNameOCRLineNumbers   []int32
+	Findings                 *string
+	FindingsOCRLineNumbers   []int32
+	Impression               *string
+	ImpressionOCRLineNumbers []int32
 }
 
 // ReportItemRow 指标项含 HTTP 外部句柄与核对状态(嵌入识别端形状的八个字段)。

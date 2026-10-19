@@ -72,7 +72,12 @@ def test_invalid_report_rejected() -> None:
 
 
 def _report(status: str, items: list[dict]) -> dict:
-    return {"report_type": "血常规", "report_date": "2026-10-01", "status": status, "items": items}
+    return {
+        "report_type": "血常规", "report_date": "2026-10-01", "status": status, "items": items,
+        "exam_name": None, "exam_name_ocr_line_numbers": None,
+        "findings": None, "findings_ocr_line_numbers": None,
+        "impression": None, "impression_ocr_line_numbers": None,
+    }
 
 
 def test_report_empty_items_must_be_failed() -> None:
@@ -90,3 +95,35 @@ def test_report_with_items_accepts_every_status() -> None:
             "ocr_line_numbers": [0, 1, 2]}
     for status in ("success", "partial", "failed"):
         assert Report.model_validate(_report(status, [item])) is not None
+
+
+def test_report_sections_pairing() -> None:
+    """段落文本与行号成对:文本有 ⇒ 行号非空;文本 null ⇒ 行号 null。"""
+    valid = _report("failed", [])
+    valid.update({"findings": "宫内单活胎。", "findings_ocr_line_numbers": [3, 4]})
+    assert Report.model_validate(valid) is not None
+    schema = Draft202012Validator(_load(SCHEMA_DIR / "report.schema.json"))
+    assert schema.is_valid(valid)
+
+    missing_lines = {**valid, "findings": "宫内单活胎。", "findings_ocr_line_numbers": None}
+    with pytest.raises(ValidationError, match="findings"):
+        Report.model_validate(missing_lines)
+    assert not schema.is_valid(missing_lines)
+
+    empty_lines = {**valid, "findings": "宫内单活胎。", "findings_ocr_line_numbers": []}
+    with pytest.raises(ValidationError, match="findings"):
+        Report.model_validate(empty_lines)
+    assert not schema.is_valid(empty_lines)
+
+    orphan_lines = {**valid, "findings": None, "findings_ocr_line_numbers": [3]}
+    with pytest.raises(ValidationError, match="findings"):
+        Report.model_validate(orphan_lines)
+    assert not schema.is_valid(orphan_lines)
+
+
+def test_report_failed_with_sections_is_valid() -> None:
+    """零指标项 failed 影像单与段落并存:空 items 不变量与段落成对约束互不冲突。"""
+    failed = _report("failed", [])
+    failed.update({"findings": "宫内单活胎。", "findings_ocr_line_numbers": [3]})
+    assert Report.model_validate(failed) is not None
+    assert Draft202012Validator(_load(SCHEMA_DIR / "report.schema.json")).is_valid(failed)

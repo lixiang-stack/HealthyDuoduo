@@ -96,6 +96,24 @@ class Report(BaseModel):
     report_date: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
     status: Status
     items: list[ReportItem]
+    exam_name: str | None = Field(
+        None, min_length=1, description="exam name/location line as printed; null for non-narrative reports"
+    )
+    exam_name_ocr_line_numbers: list[int] | None = Field(
+        None, description="indices of the OCR lines composing exam_name; null when exam_name is null"
+    )
+    findings: str | None = Field(
+        None, min_length=1, description="findings paragraph as printed (lines joined); null when absent"
+    )
+    findings_ocr_line_numbers: list[int] | None = Field(
+        None, description="indices of the OCR lines composing findings; null when findings is null"
+    )
+    impression: str | None = Field(
+        None, min_length=1, description="impression paragraph as printed (lines joined); null when absent"
+    )
+    impression_ocr_line_numbers: list[int] | None = Field(
+        None, description="indices of the OCR lines composing impression; null when impression is null"
+    )
 
     @model_validator(mode="after")
     def _empty_items_must_be_failed(self) -> "Report":
@@ -103,6 +121,21 @@ class Report(BaseModel):
         # 连构造都不可能,与识别端后处理规则(空产出 → failed)互为表里,契约层锁死。
         if not self.items and self.status is not Status.FAILED:
             raise ValueError("report with no items must have status=failed (empty-items invariant)")
+        return self
+
+    @model_validator(mode="after")
+    def _sections_paired(self) -> "Report":
+        # 段落文本与行号成对(影像单报告级留痕):文本非 null ⇒ 行号非 null 且非空;
+        # 文本 null ⇒ 行号 null。非影像报告由识别端恒置 null。
+        for name, text, lines in (
+            ("exam_name", self.exam_name, self.exam_name_ocr_line_numbers),
+            ("findings", self.findings, self.findings_ocr_line_numbers),
+            ("impression", self.impression, self.impression_ocr_line_numbers),
+        ):
+            if text is None and lines is not None:
+                raise ValueError(f"{name}: ocr line numbers must be null when text is null")
+            if text is not None and not lines:
+                raise ValueError(f"{name}: ocr line numbers must be non-empty when text is present")
         return self
 
 

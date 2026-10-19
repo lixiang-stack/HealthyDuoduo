@@ -104,6 +104,56 @@ func TestOpenAPIMirrorsRecognitionItem(t *testing.T) {
 	}
 }
 
+// TestOpenAPIMirrorsRecognitionReportSections 报告级段落:三段文本与识别端
+// report.schema.json 逐字段相同;三段行链接在 HTTP 侧映射为 OcrLineLink[]。
+func TestOpenAPIMirrorsRecognitionReportSections(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "schemas", "report.schema.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var schema map[string]any
+	if err := json.Unmarshal(raw, &schema); err != nil {
+		t.Fatal(err)
+	}
+	props := schema["properties"].(map[string]any)
+
+	doc := getOpenAPI(t)
+	httpProps := componentSchema(t, doc, "ReportDetail")["properties"].(map[string]any)
+
+	for _, field := range []string{"exam_name", "findings", "impression"} {
+		rec, ok := props[field]
+		if !ok {
+			t.Fatalf("report.schema.json lost property %q — recognition contract changed?", field)
+		}
+		if recJSON, httpJSON := jsonCompact(rec), jsonCompact(httpProps[field]); recJSON != httpJSON {
+			t.Errorf("shared section field %q drifted:\n  recognition: %s\n  openapi:     %s", field, recJSON, httpJSON)
+		}
+	}
+
+	for numberField, linkField := range map[string]string{
+		"exam_name_ocr_line_numbers":  "exam_name_ocr_lines",
+		"findings_ocr_line_numbers":   "findings_ocr_lines",
+		"impression_ocr_line_numbers": "impression_ocr_lines",
+	} {
+		rec, ok := props[numberField].(map[string]any)
+		if !ok {
+			t.Fatalf("report.schema.json lost property %q", numberField)
+		}
+		items, ok := rec["items"].(map[string]any)
+		if !ok || items["type"] != "integer" {
+			t.Errorf("%s items = %v, want integer line indices", numberField, rec["items"])
+		}
+		link, ok := httpProps[linkField].(map[string]any)
+		if !ok {
+			t.Fatalf("OpenAPI ReportDetail lost property %q", linkField)
+		}
+		linkItems, ok := link["items"].(map[string]any)
+		if !ok || linkItems["$ref"] != "#/components/schemas/OcrLineLink" {
+			t.Errorf("%s items = %v, want OcrLineLink ref", linkField, link["items"])
+		}
+	}
+}
+
 // fixtureCase 一张表同时供「对 schema 校验」与「对 Go 镜像回转」两个方向使用,
 // 免去两处清单各自漂移。
 type fixtureCase struct {
@@ -117,6 +167,7 @@ var reconcileCases = []fixtureCase{
 	{"report.summary.json", "ReportSummary", unmarshal[ReportSummary]},
 	{"report.summary.failed.json", "ReportSummary", unmarshal[ReportSummary]},
 	{"report.detail.json", "ReportDetail", unmarshal[ReportDetail]},
+	{"report.detail.imaging.json", "ReportDetail", unmarshal[ReportDetail]},
 	{"upload.duplicate.json", "UploadResult", unmarshal[UploadResult]},
 	{"report.conflict.json", "Error", unmarshal[Error]},
 	{"review.request.confirm.json", "ReviewRequest", unmarshal[ReviewRequest]},

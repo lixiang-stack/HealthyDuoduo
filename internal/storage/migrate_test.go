@@ -7,11 +7,14 @@ package storage
 
 import (
 	"context"
+	"database/sql"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/pressly/goose/v3"
 )
 
 func TestMigrationSmokeM0Contract(t *testing.T) {
@@ -29,14 +32,55 @@ func TestMigrationSmokeM0Contract(t *testing.T) {
 		t.Fatalf("migrate: %v", err)
 	}
 
-	// goose 已升到 0005 且幂等(Open 内重复 Migrate 不报错)。
+	// goose 已升到 0006 且幂等(Open 内重复 Migrate 不报错)。
 	var latest int
 	if err := pool.QueryRow(ctx, `SELECT max(version_id) FROM goose_db_version`).Scan(&latest); err != nil {
 		t.Fatalf("read goose version: %v", err)
 	}
-	if latest != 5 {
-		t.Fatalf("goose version = %d, want 5", latest)
+	if latest != 6 {
+		t.Fatalf("goose version = %d, want 6", latest)
 	}
+
+	// 0006 报告级段落六列(影像单):三个 TEXT + 三个 INTEGER[],存量可空。
+	t.Run("report sections columns", func(t *testing.T) {
+		rows, err := pool.Query(ctx, `SELECT column_name, data_type FROM information_schema.columns
+			WHERE table_name='reports' AND column_name IN (
+				'exam_name','exam_name_ocr_line_numbers','findings','findings_ocr_line_numbers',
+				'impression','impression_ocr_line_numbers')`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer rows.Close()
+		got := map[string]string{}
+		for rows.Next() {
+			var name, typ string
+			if err := rows.Scan(&name, &typ); err != nil {
+				t.Fatal(err)
+			}
+			got[name] = typ
+		}
+		if err := rows.Err(); err != nil {
+			t.Fatal(err)
+		}
+		want := map[string]string{
+			"exam_name": "text", "exam_name_ocr_line_numbers": "ARRAY",
+			"findings": "text", "findings_ocr_line_numbers": "ARRAY",
+			"impression": "text", "impression_ocr_line_numbers": "ARRAY",
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("section columns = %v, want %v", got, want)
+		}
+		var nullable int
+		if err := pool.QueryRow(ctx, `SELECT COUNT(*) FROM information_schema.columns
+			WHERE table_name='reports' AND is_nullable='YES' AND column_name IN (
+				'exam_name','exam_name_ocr_line_numbers','findings','findings_ocr_line_numbers',
+				'impression','impression_ocr_line_numbers')`).Scan(&nullable); err != nil {
+			t.Fatal(err)
+		}
+		if nullable != 6 {
+			t.Fatalf("nullable section columns = %d, want 6(存量行 NULL)", nullable)
+		}
+	})
 
 	// report_items.ocr_line_numbers(0005):识别端直吐的组成行下标,可空(存量未回填)。
 	t.Run("report item ocr line numbers column", func(t *testing.T) {
@@ -173,4 +217,46 @@ func TestMigrationSmokeM0Contract(t *testing.T) {
 			t.Fatalf("after report delete: items=%d pairs=%d images=%d, want 0/0/2 (image retained)", items, pairs, images)
 		}
 	})
+}
+
+// TestMigration0006DownUp 0006 升降版:down 删除六个段落列,up 重新加回。
+func TestMigration0006DownUp(t *testing.T) {
+	dsn := os.Getenv("HDD_TEST_DSN")
+	if dsn == "" {
+		t.Skip("HDD_TEST_DSN not set: migration smoke runs against a disposable PG container")
+	}
+	ctx := context.Background()
+	db, err := sql.Open("pgx", dsn)
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	defer db.Close()
+	goose.SetBaseFS(migrationsFS)
+	if err := goose.SetDialect("postgres"); err != nil {
+		t.Fatalf("goose dialect: %v", err)
+	}
+	if err := goose.UpContext(ctx, db, migrationsDir); err != nil {
+		t.Fatalf("up to latest: %v", err)
+	}
+	if err := goose.DownToContext(ctx, db, migrationsDir, 5); err != nil {
+		t.Fatalf("down to 0005: %v", err)
+	}
+	var n int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM information_schema.columns
+		WHERE table_name='reports' AND column_name='exam_name'`).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 0 {
+		t.Fatalf("exam_name column survived down migration")
+	}
+	if err := goose.UpContext(ctx, db, migrationsDir); err != nil {
+		t.Fatalf("up after down: %v", err)
+	}
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM information_schema.columns
+		WHERE table_name='reports' AND column_name='exam_name'`).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Fatalf("exam_name column missing after re-up")
+	}
 }

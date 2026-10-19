@@ -10,6 +10,7 @@ package storage
 import (
 	"context"
 	"os"
+	"reflect"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -207,6 +208,52 @@ func TestReportStoreSmoke(t *testing.T) {
 	}
 	if len(items[0].OCRLineNumbers) != 2 || items[0].OCRLineNumbers[0] != 3 || items[0].OCRLineNumbers[1] != 4 {
 		t.Errorf("ocr_line_numbers after rerun = %+v, want [3 4]", items[0].OCRLineNumbers)
+	}
+
+	// 报告级段落(0006):写入/读回;非影像报告六列 NULL → 零值;缺失报告 nil, nil。
+	sec := pipeline.ReportSections{
+		ExamName:                 strPtr("产科胎儿彩超检查（中孕）"),
+		ExamNameOCRLineNumbers:   []int32{5},
+		Findings:                 strPtr("宫内单活胎。"),
+		FindingsOCRLineNumbers:   []int32{10, 11},
+		Impression:               strPtr("正常。"),
+		ImpressionOCRLineNumbers: []int32{20},
+	}
+	var ocrB int64
+	if err := pool.QueryRow(ctx, `SELECT id FROM ocr_results WHERE image_sha256='rep-b'`).Scan(&ocrB); err != nil {
+		t.Fatalf("fetch rep-b ocr id: %v", err)
+	}
+	if err := st.WriteReport(ctx, "rep-b", ocrB, contract.Report{
+		ReportType: "影像", ReportDate: strPtr("2024-09-15"), Status: contract.StatusFailed,
+		ExamName: sec.ExamName, ExamNameOCRLineNumbers: sec.ExamNameOCRLineNumbers,
+		Findings: sec.Findings, FindingsOCRLineNumbers: sec.FindingsOCRLineNumbers,
+		Impression: sec.Impression, ImpressionOCRLineNumbers: sec.ImpressionOCRLineNumbers,
+	}, nil); err != nil {
+		t.Fatalf("WriteReport sections: %v", err)
+	}
+	gotSec, err := st.ReportSectionsByImage(ctx, "rep-b")
+	if err != nil || gotSec == nil {
+		t.Fatalf("ReportSectionsByImage(rep-b) = %v, %v", gotSec, err)
+	}
+	if gotSec.ExamName == nil || *gotSec.ExamName != *sec.ExamName ||
+		!reflect.DeepEqual(gotSec.ExamNameOCRLineNumbers, sec.ExamNameOCRLineNumbers) ||
+		gotSec.Findings == nil || *gotSec.Findings != *sec.Findings ||
+		!reflect.DeepEqual(gotSec.FindingsOCRLineNumbers, sec.FindingsOCRLineNumbers) ||
+		gotSec.Impression == nil || *gotSec.Impression != *sec.Impression ||
+		!reflect.DeepEqual(gotSec.ImpressionOCRLineNumbers, sec.ImpressionOCRLineNumbers) {
+		t.Errorf("sections read back = %+v, want %+v", gotSec, sec)
+	}
+	legacySec, err := st.ReportSectionsByImage(ctx, "rep-d")
+	if err != nil || legacySec == nil {
+		t.Fatalf("ReportSectionsByImage(rep-d) = %v, %v", legacySec, err)
+	}
+	if legacySec.ExamName != nil || legacySec.ExamNameOCRLineNumbers != nil ||
+		legacySec.Findings != nil || legacySec.FindingsOCRLineNumbers != nil ||
+		legacySec.Impression != nil || legacySec.ImpressionOCRLineNumbers != nil {
+		t.Errorf("non-imaging sections = %+v, want all nil", legacySec)
+	}
+	if missingSec, err := st.ReportSectionsByImage(ctx, "rep-missing"); err != nil || missingSec != nil {
+		t.Errorf("ReportSectionsByImage(missing) = (%v, %v), want (nil, nil)", missingSec, err)
 	}
 
 	// 归属写入:无主 → 成员 A;缺失报告返回 false, nil(404 口径)。

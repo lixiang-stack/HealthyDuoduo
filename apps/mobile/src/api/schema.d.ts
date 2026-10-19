@@ -288,6 +288,18 @@ export interface components {
             fail_reason: string | null;
             flag_counts: components["schemas"]["FlagCounts"];
             unreviewed_low_confidence_count: number;
+            /** @description 检查项目/部位行原文;非影像报告为 null */
+            exam_name: string | null;
+            /** @description 检查项目原文对应的 OCR 行链接(行号→框,与 items 的 ocr_lines 同源同构);无段落为 null */
+            exam_name_ocr_lines: components["schemas"]["OcrLineLink"][] | null;
+            /** @description 检查所见段落原文(行文本按序拼接);非影像报告为 null */
+            findings: string | null;
+            /** @description 检查所见段落对应的 OCR 行链接(行号→框,与 items 的 ocr_lines 同源同构);无段落为 null */
+            findings_ocr_lines: components["schemas"]["OcrLineLink"][] | null;
+            /** @description 超声/检查提示段落原文(行文本按序拼接);非影像报告为 null */
+            impression: string | null;
+            /** @description 超声/检查提示段落对应的 OCR 行链接(行号→框,与 items 的 ocr_lines 同源同构);无段落为 null */
+            impression_ocr_lines: components["schemas"]["OcrLineLink"][] | null;
             items: components["schemas"]["ReportItem"][];
         };
         /** @description 图像区域 ↔ 原始 OCR 行文 ↔ 解析值三方对照的行链接。 */

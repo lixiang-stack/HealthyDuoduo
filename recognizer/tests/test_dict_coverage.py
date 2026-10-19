@@ -57,14 +57,26 @@ def _narrative(dict_path) -> bool:
     return str(d.get("category", {}).get("mode", "table")) == "narrative"
 
 
+def _sub_witnessed(term: str, text: str) -> bool:
+    """叙述体子串见证;ASCII 别名前后不得紧邻字母,避免短缩写被更长英文串误命中(如 HC 命中 HCT/MCHC/HCG)。
+
+    数字紧邻仍算证据(HL36mm / AC174m 是叙述体量值印法);中文/标点/空格不设限。
+    """
+    if not term.isascii():
+        return term in text
+    return re.search(rf"(?<![A-Za-z]){re.escape(term)}(?![A-Za-z])", text) is not None
+
+
 def _witnessed_sub(term: str) -> set[str]:
     """门禁路径与 _witnessed 相同(序号/熔断容忍的整行变体),叙述体改为子串匹配。"""
     seen: set[str] = set()
     for raw, sids in _corpus().items():
-        if term in raw or any(term in v for v in {
+        variants = {
+            raw,
             re.sub(r"^[*＊※✱]+", "", raw),
             re.sub(r"^\d+[.、．]?[\s]*", "", raw),
-        }):
+        }
+        if any(_sub_witnessed(term, v) for v in variants):
             seen |= sids
     return seen
 

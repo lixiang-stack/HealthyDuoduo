@@ -11,6 +11,8 @@
   或「代号/缩写」列(名称列失败时用代号兜底,如 cbc_04 的 MCH/名称误写);
 - 熔断行按内容拆解:名熔值(平均血红蛋白浓度324)、单位熔范围(*10~9/L 3.5-9.5)、
   范围熔单位(130--175 g/L)、值熔范围熔单位(11.61|1.1--3.2|10^9/L→OCR 乱珠)。
+报告级段落(影像叙述单,词典 category.section_anchors):按行首锚词切检查项目/
+检查所见/超声提示,整段原文 + OCR 行号留痕,不解析内容(见 _extract_sections)。
 
 低置信:任一组成行 score < LOW_SCORE_THRESHOLD → 该项 low_confidence 标记保留;
 partial 触发(review 2026-10-12 收敛 + 低置信占比补丁):指标 value 缺失、日期缺失,
@@ -58,9 +60,13 @@ LOW_CONF_PARTIAL_RATIO = 0.5
 # 类别不识别时的报告类别(review 决定用英文占位,区别于「临检」等正名)
 UNKNOWN_REPORT_TYPE = "unknown"
 
+# 报告级段落字段(识别端契约 Report 与超声词典 category.section_anchors 的键)。
+SECTION_FIELDS = ("exam_name", "findings", "impression")
+
 # 日期标签,按优先级降序取首个命中行里的日期(打印/申请最低;检验最高)
 _DATE_LABELS = (
-    "检验时间", "检验日期", "检测时间", "检测日期", "采样时间", "采集时间", "标本采集时间",
+    "检验时间", "检验日期", "检测时间", "检测日期", "检查时间", "检查日期",
+    "采样时间", "采集时间", "标本采集时间",
     "核收时间", "报告时间", "报告日期", "打印时间", "申请时间",
 )
 _DATE_RE = re.compile(r"(\d{4})[-/.年](\d{1,2})[-/.月]?(\d{1,2})")
@@ -158,6 +164,10 @@ _PIECE_CAP_DEFAULT_PX = 25.0
 # (页脚散文格的数字在格中段,超此即拒)。
 _VERTICAL_VALUE_PREFIX_MAX = 2
 
+# 相邻 OCR 行框常有小幅上下重叠(us_02 侧脑室名称行与 9.1mm 值行重叠 4px/17px);
+# 竖排回退允许最多 1/4 格高的重叠,既能取到正下方值行,又不把同一行邻格当下一行。
+_VERTICAL_ROW_OVERLAP_RATIO = 0.25
+
 # 表头行判定:一行命中的 (格, 列角色关键词) 对 ≥ 此值才判为表头带;
 # 3 = 名称+结果+单位/参考值等列角色同时在行内的最少组合。
 _HEADER_MIN_ROLES = 3
@@ -187,6 +197,8 @@ class LabDict:
     alias_map: dict[str, DictItem] = field(default_factory=dict)
     unit_literals: tuple[str, ...] = ()
     mode: str = "table"
+    # 报告级段落锚(字段 → 行首锚词);非叙述体类别为空。
+    section_anchors: dict[str, tuple[str, ...]] = field(default_factory=dict)
 
 
 @lru_cache(maxsize=1)
@@ -218,6 +230,12 @@ def _build_dict(path: Path) -> LabDict:
         literals.append(u)
         if not u.startswith("*"):
             literals.append("*" + u)
+    raw_anchors = raw["category"].get("section_anchors") or {}
+    section_anchors = {
+        field: tuple(words)
+        for field, words in raw_anchors.items()
+        if field in SECTION_FIELDS and words
+    }
     return LabDict(
         report_type=raw["report_type"],
         title_keywords=tuple(raw["category"]["title_keywords"]),
@@ -226,6 +244,7 @@ def _build_dict(path: Path) -> LabDict:
         alias_map=alias_map,
         unit_literals=tuple(sorted(set(literals), key=len, reverse=True)),
         mode=str(raw["category"].get("mode", "table")),
+        section_anchors=section_anchors,
     )
 
 
@@ -918,12 +937,14 @@ def _vertical_value(
     产筛竖排表与糖耐量转置表(列头=项目名/缩写,值在列内向下,webwxgetmsgimg_17/_18):
     候选门:①cx 落在名格 x 区间内(列归属);②未其他词典命中(下一行「序号+名」格不算);
     ③非日期形;④非纯范围串;⑤数值 token 居格首(容许 ≤2 前缀字符;含数值的散文格如
-    页脚「实验室地址:…155号」不得按数字抽值——实测会把门牌号写成 value)。
+    页脚「实验室地址:…155号」不得按数字抽值——实测会把门牌号写成 value);
+    ⑥行框允许 ≤1/4 格高的上下重叠,相邻 OCR 行不因几像素重叠被跳过。
     按 (dy,|dcx|) 取最近;找不到 → (None, None),保持 value=None 的诚实留痕。
     """
+    overlap = (name_cell.y1 - name_cell.y0) * _VERTICAL_ROW_OVERLAP_RATIO
     best: tuple[float, float, _Cell, str] | None = None
     for c in cells:
-        if c is name_cell or c.y0 < name_cell.y1:
+        if c is name_cell or c.y0 < name_cell.y1 - overlap:
             continue
         if not (name_cell.x0 <= c.cx <= name_cell.x1):
             continue
@@ -943,6 +964,57 @@ def _vertical_value(
     return best[2], best[3]
 
 
+def _extract_sections(txts: list[str], anchors: dict[str, tuple[str, ...]]) -> dict[str, str | list[int] | None]:
+    """按行首锚词切报告级段落,整段原文 + OCR 行号留痕(不解析内容)。
+
+    规则(影像单三段式):
+    - 锚 = 去空白后行首命中锚词;段落 = 锚词后的同行尾缀 + 后续行,至下一锚行或页尾;
+    - 「注：」不设终止锚,自然并入其前段;
+    - exam_name 例外:只取锚行尾缀;尾缀为空时取紧随其后的一行(不吞患者信息/日期/图像);
+    - 文本与行号成对:空段 → (None, None);行文本以换行拼接,行号按 txts 下标升序。
+    """
+    present = [section for section in SECTION_FIELDS if anchors.get(section)]
+    if not present:
+        return {}
+    words = sorted(
+        ((word, section) for section in present for word in anchors[section]),
+        key=lambda pair: len(pair[0]),
+        reverse=True,
+    )
+    hits: list[tuple[int, str, str]] = []
+    for idx, text in enumerate(txts):
+        stripped = text.strip()
+        for word, section in words:
+            if stripped.startswith(word):
+                tail = re.sub(r"^[\s:：]+", "", stripped[len(word):]).strip()
+                hits.append((idx, section, tail))
+                break
+
+    result: dict[str, str | list[int] | None] = {
+        section: None for section in SECTION_FIELDS
+    } | {
+        f"{section}_ocr_line_numbers": None for section in SECTION_FIELDS
+    }
+    for pos, (start, section, tail) in enumerate(hits):
+        end = hits[pos + 1][0] if pos + 1 < len(hits) else len(txts)
+        if section == "exam_name":
+            if tail:
+                lines = [(start, tail)]
+            elif start + 1 < end:
+                lines = [(start + 1, txts[start + 1].strip())]
+            else:
+                lines = []
+        else:
+            lines = ([(start, tail)] if tail else []) + [
+                (idx, txts[idx].strip()) for idx in range(start + 1, end)
+            ]
+        text = "\n".join(line for _, line in lines if line)
+        if text:
+            result[section] = text
+            result[f"{section}_ocr_line_numbers"] = [idx for idx, line in lines if line]
+    return result
+
+
 def run_postprocess(ocr: OCRResult, date_hint: str | None = None) -> Report:
     """OCR 结果 → 报告。date_hint:ingest --date 兜底;检查单已解析出日期时兜底不生效。"""
     cells = _cells(ocr)
@@ -954,6 +1026,7 @@ def run_postprocess(ocr: OCRResult, date_hint: str | None = None) -> Report:
     if selected is None:
         return Report(report_type=UNKNOWN_REPORT_TYPE, report_date=date, status=Status.FAILED, items=[])
     d, pairs = selected
+    sections = _extract_sections(ocr.txts, d.section_anchors)
 
     items: list[ReportItem] = []
     partial = False
@@ -993,6 +1066,7 @@ def run_postprocess(ocr: OCRResult, date_hint: str | None = None) -> Report:
         report_date=date,
         status=status,
         items=items,
+        **sections,
     )
 
 

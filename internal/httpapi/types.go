@@ -100,10 +100,17 @@ type ReportItem struct {
 	Prev          *PrevValue    `json:"prev"`
 }
 
-// ReportDetail GET /reports/{report_id} 详情响应(含全量指标项)。
+// ReportDetail GET /reports/{report_id} 详情响应(含全量指标项与报告级段落)。
+// 段落六字段:三段文本 + 三段 OCR 行链接;非影像报告六字段均为 null(契约 required)。
 type ReportDetail struct {
 	ReportHeader
-	Items []ReportItem `json:"items"`
+	ExamName           *string       `json:"exam_name"`
+	ExamNameOcrLines   []OcrLineLink `json:"exam_name_ocr_lines"`
+	Findings           *string       `json:"findings"`
+	FindingsOcrLines   []OcrLineLink `json:"findings_ocr_lines"`
+	Impression         *string       `json:"impression"`
+	ImpressionOcrLines []OcrLineLink `json:"impression_ocr_lines"`
+	Items              []ReportItem  `json:"items"`
 }
 
 // UploadResult POST /reports 响应(200 幂等命中 / 201 新建或显式覆盖重跑):

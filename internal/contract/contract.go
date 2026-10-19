@@ -59,4 +59,12 @@ type Report struct {
 	ReportDate *string      `json:"report_date"`
 	Status     string       `json:"status"`
 	Items      []ReportItem `json:"items"`
+	// 报告级叙述段落(影像单;非影像类别六字段恒 null)。文本与行号成对:
+	// 文本非 null ⇒ 行号非 null 且非空;文本 null ⇒ 行号 null。nil slice 序列化为 null。
+	ExamName                 *string `json:"exam_name"`
+	ExamNameOCRLineNumbers   []int32 `json:"exam_name_ocr_line_numbers"`
+	Findings                 *string `json:"findings"`
+	FindingsOCRLineNumbers   []int32 `json:"findings_ocr_line_numbers"`
+	Impression               *string `json:"impression"`
+	ImpressionOCRLineNumbers []int32 `json:"impression_ocr_line_numbers"`
 }

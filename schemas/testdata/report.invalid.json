@@ -4,5 +4,11 @@
   "status": "ok",
   "items": [
     {"name": "", "value": "128", "unit": null, "ref_range": null, "flag": "none", "low_confidence": false, "raw_text": ""}
-  ]
+  ],
+  "exam_name": null,
+  "exam_name_ocr_line_numbers": null,
+  "findings": null,
+  "findings_ocr_line_numbers": null,
+  "impression": null,
+  "impression_ocr_line_numbers": null
 }

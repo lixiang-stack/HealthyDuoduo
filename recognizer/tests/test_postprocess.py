@@ -379,6 +379,23 @@ def test_date_priority_and_formats() -> None:
     assert run_postprocess(mk_ocr(cells2)).report_date == "2009-03-21"  # 打印时间最低优先级
 
 
+def test_date_imaging_labels() -> None:
+    """影像单标准印法「检查日期 / 检查时间」:检验单词表之外的新标签(us_03/bd39 形态)。"""
+    cells = [
+        {"x": 100, "y": -40, "text": "超声检查报告单"},
+        {"x": 100, "y": 0, "text": "检查日期：2024-09-1514:37:47"},
+        {"x": 100, "y": 30, "text": "股骨长 22mm"},
+    ]
+    assert run_postprocess(mk_ocr(cells)).report_date == "2024-09-15"
+
+    cells_time = [
+        {"x": 100, "y": -40, "text": "超声检查报告单"},
+        {"x": 100, "y": 0, "text": "检查时间：2024-09-15 14:37:47"},
+        {"x": 100, "y": 30, "text": "股骨长 22mm"},
+    ]
+    assert run_postprocess(mk_ocr(cells_time)).report_date == "2024-09-15"
+
+
 def test_date_hint_fallback_only_when_unparsed() -> None:
     cells = header_row(dated=False) + row(30, "血红蛋白", "128", unit="g/L", ref="115-150")
     cells += [{"x": 40, "y": 200, "text": "报告时间：2009-03-21 09:15:32"}]
@@ -443,6 +460,13 @@ def test_title_keyword_detects_category() -> None:
     cells += [{"x": 100, "y": -40, "text": "市人民医院血常规报告单"}]
     r = run_postprocess(mk_ocr(cells))
     assert r.report_type == "临检"
+
+
+def test_title_keyword_detects_imaging_without_ultrasound_word() -> None:
+    """「彩超」标题兜底(us_03 印法):标题不含「超声」二字也能归入影像。"""
+    cells = [{"x": 100, "y": -40, "text": "彩超检查报告单"}]
+    r = run_postprocess(mk_ocr(cells))
+    assert r.report_type == "影像"
 
 
 # ---------- 多词典注册表分发(P3:词典数据文件每个类别一份,分发语义见 _select_category) ----------
@@ -554,7 +578,7 @@ def test_registry_tie_follows_registry_order(monkeypatch, tmp_path) -> None:
     assert r.report_type == "尿常规"
 
 
-# ---------- 叙述体抽取(P3,category.mode=narrative,现 影像词典) ----------
+# ---------- 叙述体抽取(P3,category.mode=narrative,现 超声词典) ----------
 
 
 def test_narrative_alias_bridge_value() -> None:
@@ -565,6 +589,33 @@ def test_narrative_alias_bridge_value() -> None:
     assert item_of(r, "颈项透明层厚度").value == "2.6"
     assert item_of(r, "颈项透明层厚度").unit == "mm"
     assert item_of(r, "头臀长").value == "59"
+
+
+def test_narrative_new_measurements() -> None:
+    """首批影像测量项:HL/鼻骨长/NF/侧脑室/后颅窝池 在同一叙述行内配对(us_02 形态)。"""
+    cells = [
+        {"x": 100, "y": -40, "text": "本院超声检查报告单"},
+        {"x": 100, "y": 0, "text": "BPD 57mm，HL36mm，鼻骨长：5.8mm，NF:4.7mm，侧脑室 9.1mm，后颅窝池4.0mm。"},
+    ]
+    r = run_postprocess(mk_ocr(cells))
+    assert r.report_type == "影像"
+    for name, value in (
+        ("肱骨长", "36"),
+        ("鼻骨长", "5.8"),
+        ("颈项皮肤褶皱厚度", "4.7"),
+        ("侧脑室宽度", "9.1"),
+        ("后颅窝池宽度", "4.0"),
+    ):
+        assert item_of(r, name).value == value
+    assert item_of(r, "肱骨长").unit == "mm"
+
+
+def test_narrative_aliases_are_specific() -> None:
+    """narrative 别名专指性硬约束:不得用裸后缀词与单字方向词,防 NT/胎盘厚度误配。"""
+    imaging = next(d for d in _postprocess.load_dicts() if d.report_type == "影像")
+    forbidden = {"厚度", "宽度", "长度", "左", "右"}
+    offenders = sorted({a for it in imaging.items for a in it.aliases if a in forbidden})
+    assert not offenders, f"narrative 泛别名必须专指: {offenders}"
 
 
 def test_narrative_remote_number_not_fused() -> None:
@@ -586,6 +637,97 @@ def test_narrative_first_value_wins_over_title_mention() -> None:
     it = item_of(r, "颈项透明层厚度")
     assert it.value == "2.6"
     assert "2.6mm" in it.raw_text
+
+
+# ---------- 报告级段落(影像单;锚表在词典 category.section_anchors) ----------
+
+
+def test_sections_anchor_tail_and_following_lines() -> None:
+    """三段切分:锚行尾缀 + 后续行至下一锚;exam_name 只取尾缀/下一行。"""
+    cells = [
+        {"x": 100, "y": -40, "text": "超声检查报告单"},
+        {"x": 100, "y": 0, "text": "检查部位："},
+        {"x": 100, "y": 15, "text": "产科超声"},
+        {"x": 100, "y": 30, "text": "检查所见：宫内单活胎。"},
+        {"x": 100, "y": 45, "text": "胎心率159次/分。"},
+        {"x": 100, "y": 60, "text": "检查提示：正常。"},
+        {"x": 100, "y": 75, "text": "注：仅供临床参考。"},
+    ]
+    r = run_postprocess(mk_ocr(cells))
+    assert r.exam_name == "产科超声"
+    assert r.exam_name_ocr_line_numbers == [2]
+    assert r.findings == "宫内单活胎。\n胎心率159次/分。"
+    assert r.findings_ocr_line_numbers == [3, 4]
+    assert r.impression == "正常。\n注：仅供临床参考。"
+    assert r.impression_ocr_line_numbers == [5, 6]
+
+
+def test_sections_exam_name_minimal_termination_and_failed_no_items() -> None:
+    """us_03 形态:exam_name 不吞后续行;零指标项 failed 影像单仍保留段落。"""
+    cells = [
+        {"x": 100, "y": -40, "text": "超声检查报告单"},
+        {"x": 100, "y": 0, "text": "检查项目：产科胎儿彩超检查（中孕）"},
+        {"x": 100, "y": 15, "text": "姓名：张三"},
+        {"x": 100, "y": 30, "text": "检查日期：2024-09-15"},
+        {"x": 100, "y": 45, "text": "超声提示：宫内单活胎。"},
+    ]
+    r = run_postprocess(mk_ocr(cells))
+    assert r.status == "failed" and r.items == []
+    assert r.report_date == "2024-09-15"
+    assert r.exam_name == "产科胎儿彩超检查（中孕）"
+    assert r.exam_name_ocr_line_numbers == [1]
+    assert r.findings is None and r.findings_ocr_line_numbers is None
+    assert r.impression == "宫内单活胎。"
+
+
+def test_sections_check_content_anchor_uses_next_line_only() -> None:
+    """us_02 形态:检查内容 → exam_name;只取下一行,不吞姓名等患者信息。"""
+    cells = [
+        {"x": 100, "y": -40, "text": "超声检查报告单"},
+        {"x": 100, "y": 0, "text": "检查内容"},
+        {"x": 100, "y": 15, "text": "胎儿畸形系统筛查 彩超"},
+        {"x": 100, "y": 30, "text": "姓名：张三"},
+        {"x": 100, "y": 45, "text": "超声描述：宫内妊娠。"},
+        {"x": 100, "y": 60, "text": "超声提示：正常。"},
+    ]
+    r = run_postprocess(mk_ocr(cells))
+    assert r.exam_name == "胎儿畸形系统筛查 彩超"
+    assert r.exam_name_ocr_line_numbers == [2]
+    assert r.findings == "宫内妊娠。"
+    assert r.impression == "正常。"
+
+
+def test_sections_empty_between_anchors_are_null() -> None:
+    """锚到锚之间无内容:段落与行号都必须为 null(成对约束)。"""
+    cells = [
+        {"x": 100, "y": -40, "text": "超声检查报告单"},
+        {"x": 100, "y": 0, "text": "检查所见："},
+        {"x": 100, "y": 15, "text": "超声提示：正常。"},
+    ]
+    r = run_postprocess(mk_ocr(cells))
+    assert r.findings is None and r.findings_ocr_line_numbers is None
+    assert r.impression == "正常。"
+
+
+def test_sections_absent_for_table_reports() -> None:
+    """非影像类别零影响:六个段落字段恒 null。"""
+    r = run_postprocess(mk_ocr(header_row() + row(30, "血红蛋白", "128", unit="g/L", ref="115-150")))
+    assert r.exam_name is None and r.exam_name_ocr_line_numbers is None
+    assert r.findings is None and r.findings_ocr_line_numbers is None
+    assert r.impression is None and r.impression_ocr_line_numbers is None
+
+
+def test_sections_do_not_affect_status() -> None:
+    """段落只留痕:status 仍只看指标项与日期(日期+值齐 → success)。"""
+    cells = [
+        {"x": 100, "y": -40, "text": "超声检查报告单"},
+        {"x": 100, "y": 0, "text": "检查日期：2024-09-15"},
+        {"x": 100, "y": 15, "text": "超声提示：正常。"},
+        {"x": 100, "y": 30, "text": "股骨长 22mm"},
+    ]
+    r = run_postprocess(mk_ocr(cells))
+    assert r.status == "success"
+    assert r.impression == "正常。\n股骨长 22mm"
 
 
 # ---------- 单位规一化(印刷损耗形 → 词典注册的规范印形,unit_families.yaml) ----------
@@ -642,6 +784,18 @@ def test_vertical_fallback_rejects_prose_cells() -> None:
     it = item_of(run_postprocess(mk_ocr(cells)), "白细胞计数")
     assert it.value is None
     assert "实验室地址" not in it.raw_text
+
+
+def test_vertical_fallback_allows_small_row_overlap() -> None:
+    """相邻 OCR 行框小幅重叠(us_02 侧脑室 9.1mm):仍取正下方,不被远行门牌号抢走。"""
+    cells = [
+        {"x": 100, "y": -40, "text": "本院超声检查报告单"},
+        {"x": 40, "y": 0, "w": 340, "text": "双侧侧脑室室，左："},
+        {"x": 35, "y": 15, "w": 240, "text": "9.1mm，右：8.2mm"},
+        {"x": 35, "y": 120, "w": 140, "text": "L.13.脐带"},
+    ]
+    r = run_postprocess(mk_ocr(cells))
+    assert item_of(r, "侧脑室宽度").value == "9.1"
 
 
 def test_vertical_fallback_accepts_leading_value() -> None:

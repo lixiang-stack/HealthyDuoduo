@@ -97,6 +97,11 @@ const (
 		 LEFT JOIN LATERAL (` + reportAggregateSQL + `) agg ON TRUE
 		 WHERE r.image_sha256 = $1`
 
+	// 报告级叙述段落(影像单详情投影,0006):非影像报告六列为 NULL。
+	sqlReportSectionsByImage = `SELECT exam_name, exam_name_ocr_line_numbers,
+		   findings, findings_ocr_line_numbers, impression, impression_ocr_line_numbers
+		 FROM reports WHERE image_sha256 = $1`
+
 	// 指标项含外部句柄与核对状态(上传响应回读;行序 = id 升序与写入序一致)。
 	// ocr_line_numbers 存量行可为 NULL(0005 前入库),COALESCE 归空数组。
 	sqlItemsWithReviewStatus = `SELECT id, name, value, unit, ref_range, method, flag, low_confidence, raw_text, review_status,
@@ -153,15 +158,25 @@ const (
 	sqlOCRResultByID = `SELECT engine_output FROM ocr_results WHERE id = $1`
 
 	// 报告行 upsert:测定 identity = 图像 sha256(每图一行);冲突即原位更新(--force 重跑)。
-	// fail_reason 全量更新(pipeline 产出,非 failed 一律 NULL:重算复原时旧原因清除)。
-	sqlReportUpsert = `INSERT INTO reports (image_sha256, ocr_result_id, report_type, report_date, status, fail_reason)
-		 VALUES ($1,$2,$3,$4::date,$5,$6)
+	// fail_reason 全量更新(pipeline 产出,非 failed 一律 NULL:重算复原时旧原因清除);
+	// 六个段落字段随重跑全量覆盖(非影像报告写 NULL)。
+	sqlReportUpsert = `INSERT INTO reports (
+		     image_sha256, ocr_result_id, report_type, report_date, status, fail_reason,
+		     exam_name, exam_name_ocr_line_numbers, findings, findings_ocr_line_numbers,
+		     impression, impression_ocr_line_numbers)
+		 VALUES ($1,$2,$3,$4::date,$5,$6,$7,$8,$9,$10,$11,$12)
 		 ON CONFLICT (image_sha256) DO UPDATE SET
 		     ocr_result_id = excluded.ocr_result_id,
 		     report_type   = excluded.report_type,
 		     report_date   = excluded.report_date,
 		     status        = excluded.status,
 		     fail_reason   = excluded.fail_reason,
+		     exam_name = excluded.exam_name,
+		     exam_name_ocr_line_numbers = excluded.exam_name_ocr_line_numbers,
+		     findings = excluded.findings,
+		     findings_ocr_line_numbers = excluded.findings_ocr_line_numbers,
+		     impression = excluded.impression,
+		     impression_ocr_line_numbers = excluded.impression_ocr_line_numbers,
 		     updated_at    = now()`
 
 	sqlItemsDeleteByReport = `DELETE FROM report_items WHERE report_sha256 = $1`
@@ -402,6 +417,23 @@ func (s *Store) ItemsWithReviewStatus(ctx context.Context, reportSha string) ([]
 	return out, rows.Err()
 }
 
+// ReportSectionsByImage 报告级叙述段落(详情投影,0006):非影像报告六列 NULL,
+// 读回零值;报告缺失返回 nil, nil(与 SummaryByImage 同口径)。
+func (s *Store) ReportSectionsByImage(ctx context.Context, reportSha string) (*pipeline.ReportSections, error) {
+	var sections pipeline.ReportSections
+	err := s.pool.QueryRow(ctx, sqlReportSectionsByImage, reportSha).Scan(
+		&sections.ExamName, &sections.ExamNameOCRLineNumbers,
+		&sections.Findings, &sections.FindingsOCRLineNumbers,
+		&sections.Impression, &sections.ImpressionOCRLineNumbers)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &sections, nil
+}
+
 // OCRResultJSONByReport 报告所用 OCR 结果的原始 JSON(详情行链接回读,票 07):
 // reports.ocr_result_id → ocr_results.engine_output;报告缺失返回 nil, nil。
 func (s *Store) OCRResultJSONByReport(ctx context.Context, reportSha string) ([]byte, error) {
@@ -534,7 +566,9 @@ func (s *Store) WriteReport(ctx context.Context, reportSha string, ocrID int64, 
 	defer tx.Rollback(ctx)
 
 	if _, err := tx.Exec(ctx, sqlReportUpsert,
-		reportSha, ocrID, report.ReportType, report.ReportDate, report.Status, failReason); err != nil {
+		reportSha, ocrID, report.ReportType, report.ReportDate, report.Status, failReason,
+		report.ExamName, report.ExamNameOCRLineNumbers, report.Findings, report.FindingsOCRLineNumbers,
+		report.Impression, report.ImpressionOCRLineNumbers); err != nil {
 		return fmt.Errorf("upsert report: %w", err)
 	}
 	if _, err := tx.Exec(ctx, sqlItemsDeleteByReport, reportSha); err != nil {

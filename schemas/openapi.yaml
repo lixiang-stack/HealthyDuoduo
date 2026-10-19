@@ -452,7 +452,9 @@ components:
       type: object
       additionalProperties: false
       required: [report_id, member_id, report_type, report_date, status, fail_reason,
-        flag_counts, unreviewed_low_confidence_count, items]
+        flag_counts, unreviewed_low_confidence_count,
+        exam_name, exam_name_ocr_lines, findings, findings_ocr_lines,
+        impression, impression_ocr_lines, items]
       properties:
         report_id:
           type: string
@@ -475,6 +477,30 @@ components:
         unreviewed_low_confidence_count:
           type: integer
           minimum: 0
+        exam_name:
+          type: [string, "null"]
+          minLength: 1
+          description: 检查项目/部位行原文;非影像报告为 null
+        exam_name_ocr_lines:
+          type: [array, "null"]
+          items: { $ref: "#/components/schemas/OcrLineLink" }
+          description: 检查项目原文对应的 OCR 行链接(行号→框,与 items 的 ocr_lines 同源同构);无段落为 null
+        findings:
+          type: [string, "null"]
+          minLength: 1
+          description: 检查所见段落原文(行文本按序拼接);非影像报告为 null
+        findings_ocr_lines:
+          type: [array, "null"]
+          items: { $ref: "#/components/schemas/OcrLineLink" }
+          description: 检查所见段落对应的 OCR 行链接(行号→框,与 items 的 ocr_lines 同源同构);无段落为 null
+        impression:
+          type: [string, "null"]
+          minLength: 1
+          description: 超声/检查提示段落原文(行文本按序拼接);非影像报告为 null
+        impression_ocr_lines:
+          type: [array, "null"]
+          items: { $ref: "#/components/schemas/OcrLineLink" }
+          description: 超声/检查提示段落对应的 OCR 行链接(行号→框,与 items 的 ocr_lines 同源同构);无段落为 null
         items:
           type: array
           items: { $ref: "#/components/schemas/ReportItem" }

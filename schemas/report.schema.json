@@ -5,7 +5,9 @@
   "description": "系统对一张图像处理后产出的结构化报告(实施计划 4.2;report_id / image_id 等由 Go 落库时赋予,不在契约内)",
   "type": "object",
   "additionalProperties": false,
-  "required": ["report_type", "report_date", "status", "items"],
+  "required": ["report_type", "report_date", "status", "items",
+    "exam_name", "exam_name_ocr_line_numbers", "findings", "findings_ocr_line_numbers",
+    "impression", "impression_ocr_line_numbers"],
   "properties": {
     "report_type": {
       "type": "string",
@@ -24,8 +26,58 @@
     "items": {
       "type": "array",
       "items": {"$ref": "#/$defs/reportItem"}
+    },
+    "exam_name": {
+      "type": ["string", "null"],
+      "minLength": 1,
+      "description": "检查项目/部位行原文;非影像报告为 null"
+    },
+    "exam_name_ocr_line_numbers": {
+      "type": ["array", "null"],
+      "items": {"type": "integer", "minimum": 0},
+      "minItems": 1,
+      "description": "检查项目原文对应的 OCR 行下标(0-based,与 txts/boxes 同下标);文本为 null 时为 null"
+    },
+    "findings": {
+      "type": ["string", "null"],
+      "minLength": 1,
+      "description": "检查所见段落原文(行文本按序拼接);非影像报告为 null"
+    },
+    "findings_ocr_line_numbers": {
+      "type": ["array", "null"],
+      "items": {"type": "integer", "minimum": 0},
+      "minItems": 1,
+      "description": "检查所见段落对应的 OCR 行下标(0-based,与 txts/boxes 同下标);文本为 null 时为 null"
+    },
+    "impression": {
+      "type": ["string", "null"],
+      "minLength": 1,
+      "description": "超声/检查提示段落原文(行文本按序拼接);非影像报告为 null"
+    },
+    "impression_ocr_line_numbers": {
+      "type": ["array", "null"],
+      "items": {"type": "integer", "minimum": 0},
+      "minItems": 1,
+      "description": "超声/检查提示段落对应的 OCR 行下标(0-based,与 txts/boxes 同下标);文本为 null 时为 null"
     }
   },
+  "allOf": [
+    {
+      "if": {"properties": {"exam_name": {"type": "string"}}, "required": ["exam_name"]},
+      "then": {"properties": {"exam_name_ocr_line_numbers": {"type": "array"}}},
+      "else": {"properties": {"exam_name_ocr_line_numbers": {"type": "null"}}}
+    },
+    {
+      "if": {"properties": {"findings": {"type": "string"}}, "required": ["findings"]},
+      "then": {"properties": {"findings_ocr_line_numbers": {"type": "array"}}},
+      "else": {"properties": {"findings_ocr_line_numbers": {"type": "null"}}}
+    },
+    {
+      "if": {"properties": {"impression": {"type": "string"}}, "required": ["impression"]},
+      "then": {"properties": {"impression_ocr_line_numbers": {"type": "array"}}},
+      "else": {"properties": {"impression_ocr_line_numbers": {"type": "null"}}}
+    }
+  ],
   "$defs": {
     "reportItem": {
       "type": "object",

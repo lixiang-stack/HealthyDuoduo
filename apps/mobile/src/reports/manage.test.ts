@@ -18,7 +18,17 @@ function summary(overrides: Partial<ReportSummary> = {}): ReportSummary {
 }
 
 function detail(overrides: Partial<ReportDetail> = {}): ReportDetail {
-  return { ...summary({ member_id: 1 }), items: [], ...overrides };
+  return {
+    ...summary({ member_id: 1 }),
+    items: [],
+    exam_name: null,
+    exam_name_ocr_lines: null,
+    findings: null,
+    findings_ocr_lines: null,
+    impression: null,
+    impression_ocr_lines: null,
+    ...overrides,
+  };
 }
 
 describe('applyReassignResult', () => {
