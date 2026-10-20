@@ -74,6 +74,70 @@ describe('App E2E', { serial: true, timeout: 300_000 }, () => {
     await expect(screen.getByTestId(testID.reportCard(payload.report.report_id))).toBeVisible();
   });
 
+  test('影像单 us_03:检查项目 / 超声提示 / 日期 / 指标项,无检查所见', async ({
+    app,
+    browser,
+    screen,
+  }) => {
+    const report = seed.imaging03;
+    const sections = report.sections ?? [];
+    const impression = sections.find((section) => section.kind === 'impression')!;
+    const impressionIndex = sections.indexOf(impression);
+    const femur = report.items.find((item) => item.name === '股骨长');
+    expect(report.report_date).toBe('2024-09-15');
+    expect(sections.some((section) => section.kind === 'findings')).toBe(false);
+    expect(femur).toBeDefined();
+
+    await openConfigured(app, browser, `/report/${report.report_id}`, {
+      memberId: seed.xiaoming.member_id,
+    });
+    await expect(screen.getByTestId(testID.reportExamName)).toContainText('检查项目');
+    await expect(screen.getByTestId(testID.reportExamName)).toContainText(
+      '产科胎儿彩超检查（中孕）',
+    );
+    await expect(screen.getByText('2024-09-15')).toBeVisible();
+    await expect(screen.getByText('检查所见')).toHaveCount(0);
+    await expect(screen.getByTestId(testID.reportSection(impressionIndex))).toContainText(
+      '超声提示',
+    );
+    await expect(screen.getByTestId(testID.reportSection(impressionIndex))).toContainText(
+      impression.text,
+    );
+    await expect(screen.getByTestId(testID.reviewItem(femur!.item_id))).toContainText('股骨长');
+  });
+
+  test('影像单 us_01:检查项目 / 检查所见 / 超声提示三段完整,段落卡可缩放原图', async ({
+    app,
+    browser,
+    screen,
+  }) => {
+    const report = seed.imaging01;
+    const sections = report.sections ?? [];
+    const examName = sections.find((section) => section.kind === 'exam_name');
+    const findings = sections.find((section) => section.kind === 'findings')!;
+    const findingsIndex = sections.indexOf(findings);
+    const impression = sections.find((section) => section.kind === 'impression')!;
+    const impressionIndex = sections.indexOf(impression);
+    expect(examName).toBeDefined();
+
+    await openConfigured(app, browser, `/report/${report.report_id}`, {
+      memberId: seed.xiaoming.member_id,
+    });
+    await expect(screen.getByTestId(testID.reportExamName)).toContainText('检查项目');
+    await expect(screen.getByTestId(testID.reportExamName)).toContainText(examName!.text);
+    await expect(screen.getByTestId(testID.reportSection(findingsIndex))).toContainText('检查所见');
+    await expect(screen.getByTestId(testID.reportSection(findingsIndex))).toContainText(findings.text);
+    await expect(screen.getByTestId(testID.reportSection(impressionIndex))).toContainText('超声提示');
+    await expect(screen.getByTestId(testID.reportSection(impressionIndex))).toContainText(
+      impression.text,
+    );
+
+    await screen.getByTestId(testID.reportSection(findingsIndex)).tap();
+    await expect(screen.getByTestId(testID.reportSectionZoom(findingsIndex))).toBeVisible();
+    await screen.getByTestId(testID.reportSection(findingsIndex)).tap();
+    await expect(screen.getByTestId(testID.reportSectionZoom(findingsIndex))).toHaveCount(0);
+  });
+
   test('核对低置信项并修正指标项', async ({ app, browser, screen }) => {
     const pending = seed.reviewReport.items.find(
       (item) => item.low_confidence && item.review_status === 'unreviewed',

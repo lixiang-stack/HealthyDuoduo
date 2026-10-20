@@ -62,6 +62,9 @@ export async function stubFileChooser(browser: Browser): Promise<void> {
   memberRow: (memberId: number) => `member-row-${memberId}`,
   memberSelect: (memberId: number) => `member-select-${memberId}`,
   reportCard: (reportId: string) => `report-card-${reportId}`,
+  reportExamName: 'report-exam-name',
+  reportSection: (index: number) => `report-section-${index}`,
+  reportSectionZoom: (index: number) => `report-section-zoom-${index}`,
   reviewItem: (itemId: number) => `review-item-${itemId}`,
   reviewConfirm: (itemId: number) => `review-confirm-${itemId}`,
   reviewCorrect: (itemId: number) => `review-correct-${itemId}`,
@@ -126,9 +129,12 @@ export type Seed = {
   mama: Member;
   reviewReport: ReportDetail;
   healReport: ReportDetail;
+  imaging01: ReportDetail;
+  imaging03: ReportDetail;
 };
 
-/** 种子:两成员 + 一份含低置信项的报告(核对) + 一份改归属用报告(自愈)。 */
+/** 种子:两成员 + 一份含低置信项的报告(核对) + 一份改归属用报告(自愈)
+ *  + 两张真实影像单(us_01 三段完整 / us_03 无检查所见锚)。 */
 export async function seedData(): Promise<Seed> {
   const xiaoming = await createMember('E2E 小明', true);
   const mama = await createMember('E2E 妈妈', false);
@@ -137,5 +143,15 @@ export async function seedData(): Promise<Seed> {
     throw new Error('cbc_03 未识别出低置信项,核对闭环无法用例化');
   }
   const healReport = await uploadSample('cbc_04.png', mama.member_id);
-  return { xiaoming, mama, reviewReport, healReport };
+  const imaging01 = await uploadSample('us_01.webp', xiaoming.member_id);
+  const imaging03 = await uploadSample('us_03.jpeg', xiaoming.member_id);
+  for (const [name, report] of [
+    ['us_01', imaging01],
+    ['us_03', imaging03],
+  ] as const) {
+    if (!report.sections?.some((section) => section.kind === 'impression')) {
+      throw new Error(`${name} 未识别出报告段落,影像单呈现用例无法成立`);
+    }
+  }
+  return { xiaoming, mama, reviewReport, healReport, imaging01, imaging03 };
 }

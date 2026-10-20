@@ -16,7 +16,7 @@ npm run e2e -- --headed        # 参数透传给 e2e run(如 --headed/--grep)
 E2E_KEEP_STACK=1 npm run e2e   # 跑完保留栈,便于手工看 Web/API(下次运行前仍会重建)
 ```
 
-完成判据：7/7 通过；失败时看 `.e2e/results/<test>/trace.md` 与应用日志 `.e2e/logs/expo.log`。
+完成判据：9/9 通过；失败时看 `.e2e/results/<test>/trace.md` 与应用日志 `.e2e/logs/expo.log`。
 
 ## 专用栈
 
@@ -27,15 +27,17 @@ E2E_KEEP_STACK=1 npm run e2e   # 跑完保留栈,便于手工看 Web/API(下次�
 | 55432 | postgres | 临时卷 `hdd-e2e_pgdata` |
 | 58333 | seaweedfs S3 | 临时卷 `hdd-e2e_seaweeddata` |
 
-每轮 `run.sh` 先 `down -v` 再 `up`，seed 经真实上传端点入档 `samples/cbc_03.png`（核对）与
-`samples/cbc_04.png`（自愈）；`duplicate:true` 即视为栈未重置并失败。共享 `deploy` 栈（8080 等）不受影响。
+每轮 `run.sh` 先 `down -v` 再 `up`，seed 经真实上传端点入档 `samples/cbc_03.png`（核对）、
+`samples/cbc_04.png`（自愈）与影像单 `samples/us_01.webp` / `samples/us_03.jpeg`（报告段落
+三段 / 无检查所见锚）；`duplicate:true` 即视为栈未重置并失败。共享 `deploy` 栈（8080 等）不受影响。
 
 ## 用例与选择器
 
 - 用例在 `apps/mobile/e2e/tests/app.e2e.ts`：一条 serial 核心链路 + 一条错误态；无 agent/模型调用。
 - 契约类型复用 `src/api/schema.d.ts`；API/样张/testID 约定集中在 `e2e/support.ts`。
 - 关键控件带 `testID`（RNW 渲染为 `data-testid`）：成员 chip/行、上传选择/提交/结果、报告卡、
-  核对项/确认/修正、详情管理卡（改归属/删除/确认）。改控件时同步改 `support.ts` 的 `testID`。
+  报告检查项目/段落卡/段落缩放、核对项/确认/修正、详情管理卡（改归属/删除/确认）。改控件时
+  同步改 `support.ts` 的 `testID`。
 - Web 相册通道在 headless 下会打开原生 chooser 并被取消（expo-image-picker 随即移除 input）；
   `stubFileChooser` 屏蔽该次 click，测试再用 `setInputFiles` 注入文件。
 

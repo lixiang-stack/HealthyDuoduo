@@ -26,12 +26,13 @@ App 层 UI 端到端见 `docs/agents/app-e2e.md`（Expo Web + 专用栈，不复
 2. `refresh --from <被测检出根>` — 该检出的代码成为 served recognizer(go build →
    compose 重建 → 全量 reparse,内置 healthz 等待与点名重试)。完成标准:`refresh ok (N reparses)`。
 3. `verify --item 血小板 --from <被测检出根>` — 不变量:单位止于注册规范形/族外原文、
-   ocr_lines 行链接覆盖率与 join/box 一致性(经 hdd serve `/api/v1/reports/{id}`;歧义度与
-   几何裕度作度量告警)、trend 质量门只滤有据点、delta 只在同单位间。完成标准:全 `ok`
-   (warn=源单印刷串列,合法保留原文,如 RDW-CV 的 109/L;ocr-lines 裕度 >1 的孤立项为斜拍/
-   竖排版式的良性常客,点名供抽查)。
-4. `verify --golden --from <被测检出根>` — DB 指标项 vs `<检出>/samples/expected/report`
-   逐字段一致(items 为红、日期/整单状态偏离为 warn——ingest `--date` 补录属合法偏离)。
+   items / sections 的 ocr_lines 行链接覆盖率与 join/box 一致性(经 hdd serve
+   `/api/v1/reports/{id}`;歧义度与几何裕度作度量告警)、trend 质量门只滤有据点、delta
+   只在同单位间。完成标准:全 `ok`(warn=源单印刷串列,合法保留原文,如 RDW-CV 的
+   109/L;ocr-lines 裕度 >1 的孤立项为斜拍/竖排版式的良性常客,点名供抽查)。
+4. `verify --golden --from <被测检出根>` — DB 指标项与可选报告段落 vs
+   `<检出>/samples/expected/report` 逐字段一致(items/sections 为红、日期/整单状态偏离为
+   warn——ingest `--date` 补录属合法偏离;非影像报告 sections 缺省)。
 5. `seed` / `clean` — 种子 ingest 幂等;clean 只删台账登记行且需人工 `yes`。
 6. `restore --latest` — 回滚快照(pg_restore --clean,人工 `yes`);机制自证:`restore-check`(临时库)。
 

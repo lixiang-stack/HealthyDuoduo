@@ -4,9 +4,10 @@ import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View
 
 import { sharedStyles } from '../../components/styles';
 import { colors } from '../../components/theme';
-import { ReportCard, ReportManageCard } from '../../reports/components';
+import { ReportCard, ReportManageCard, ReportSectionCard } from '../../reports/components';
 import { pendingItems } from '../../review/items';
 import { ReviewItemCard } from '../../review/components';
+import { examNameText, reportSectionCards } from '../../reports/sections';
 import { useReportData } from '../../reports/useReportData';
 
 // 报告详情页(票 07;票 09 起为核对闭环的「详情顺手」入口;票 10 起含自愈操作):
@@ -26,6 +27,8 @@ export default function ReportDetailScreen() {
 
   const report = state.status === 'ready' ? state.report : undefined;
   const pending = report ? pendingItems(report.items) : [];
+  const examName = examNameText(report?.sections);
+  const sectionCards = reportSectionCards(report?.sections);
   const imageVisible =
     report !== undefined ? (imageOverride ?? report.status === 'failed') : false;
 
@@ -55,10 +58,22 @@ export default function ReportDetailScreen() {
 
       {state.status === 'ready' && report ? (
         <View style={styles.stack}>
-          <ReportCard report={report} />
+          <ReportCard report={report} examName={examName} />
           <Text testID="report-short-id" style={styles.shortId}>
             报告 {report.report_id.slice(0, SHORT_ID_LENGTH)}
           </Text>
+
+          {/* 影像单叙述段落(票 02):检查所见 / 超声提示在指标项上方;failed 影像单
+              与失败原因、原图并存,不被下方空态遮挡。 */}
+          {sectionCards.map(({ index, label, section }) => (
+            <ReportSectionCard
+              key={index}
+              index={index}
+              label={label}
+              section={section}
+              imageUrl={state.imageUrl}
+            />
+          ))}
 
           {report.status === 'failed' ? (
             <View style={styles.card}>

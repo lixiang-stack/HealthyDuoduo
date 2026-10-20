@@ -2,15 +2,15 @@
 // OCR 行区域缩放对照 LineZoom。flag 只展示服务端返回值(修正后由服务端按值×范围
 // 重算),无手改入口;修正字段限 name/value/unit/ref_range 四项纸面事实。
 import { useEffect, useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import type { ApiClient } from '../api/client';
-import { reviewItem, type OcrLineLink, type ReportItem, type ReviewResult } from '../api/reports';
+import { reviewItem, type ReportItem, type ReviewResult } from '../api/reports';
+import { LineZoom } from '../components/LineZoom';
 import { colors } from '../components/theme';
 import { parseNumericForm, parseRefRange, stripLayout, type StripLayout } from '../reports/refRange';
 import { flagLabel } from '../reports/status';
 import { buildCorrection, draftFromItem, reviewStatusLabel, type CorrectionDraft } from './items';
-import { zoomCrop, type Size } from './zoom';
 
 // flag 色板(票 07 实施期定,详情/核对共用):normal 绿 / high 红 / low 蓝 /
 // unknown 中性灰。只表示与参考范围的比较结果,不暗示诊断。
@@ -20,9 +20,6 @@ const FLAG_COLORS: Record<ReportItem['flag'], string> = {
   low: colors.low,
   unknown: colors.muted,
 };
-
-/** OCR 行缩放视口高(px):约三分之一屏宽,行文读到字级。 */
-const ZOOM_VIEWPORT_HEIGHT = 96;
 
 // ReviewItemCard 指标项核对卡:与详情指标项同一展示(名称/值/单位/参考范围/条带/
 // 原文/低置信高亮)+ 核对状态标签、确认/修正动作与四项纸面事实编辑器。
@@ -165,60 +162,6 @@ export function ReviewItemCard({
   );
 }
 
-// LineZoom 图像缩放至 OCR 行对应区域(三方对照的图像一侧):行框并集经
-// zoomCrop 定位(整段行文尽可能大地装进视口);原始尺寸经 Image.getSize 取得。
-function LineZoom({ imageUrl, lines }: { imageUrl: string; lines: OcrLineLink[] }) {
-  const [viewport, setViewport] = useState<Size>();
-  const [natural, setNatural] = useState<Size>();
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    setNatural(undefined);
-    setFailed(false);
-    Image.getSize(
-      imageUrl,
-      (width, height) => {
-        if (!cancelled) {
-          setNatural({ width, height });
-        }
-      },
-      () => {
-        if (!cancelled) {
-          setFailed(true);
-        }
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [imageUrl]);
-
-  const crop = viewport && natural ? zoomCrop(natural, lines, viewport) : undefined;
-  return (
-    <View
-      style={styles.zoomViewport}
-      onLayout={(event) =>
-        setViewport({ width: event.nativeEvent.layout.width, height: ZOOM_VIEWPORT_HEIGHT })
-      }
-    >
-      {crop ? (
-        <Image
-          source={{ uri: imageUrl }}
-          style={{
-            position: 'absolute',
-            left: crop.left,
-            top: crop.top,
-            width: crop.width,
-            height: crop.height,
-          }}
-        />
-      ) : null}
-      {failed ? <Text style={styles.zoomHint}>图像区域载入失败,以上文原文与解析值为准</Text> : null}
-    </View>
-  );
-}
-
 // MetricStrip 参考范围条带(票 07 画法):条 = 正常区(中性灰;标量参考退化为细
 // 基准线),点 = 当前值(flag 色;空心 = 带不等号的非精确值,置于条端外),
 // 跨度条 = 区间值(spec:区间无点)。几何全部来自 stripLayout(纯逻辑)。
@@ -327,16 +270,6 @@ const styles = StyleSheet.create({
     marginLeft: -5,
   },
   stripDotOpen: { backgroundColor: colors.background },
-  zoomViewport: {
-    height: ZOOM_VIEWPORT_HEIGHT,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    marginTop: 4,
-    overflow: 'hidden',
-    justifyContent: 'center',
-  },
-  zoomHint: { fontSize: 12, color: colors.muted, textAlign: 'center', paddingHorizontal: 8 },
   editor: { gap: 8, marginTop: 4 },
   editorField: { gap: 4 },
   editorLabel: { fontSize: 12, color: colors.muted },

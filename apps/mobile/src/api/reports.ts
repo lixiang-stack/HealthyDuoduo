@@ -16,6 +16,7 @@ export type ReportItem = components['schemas']['ReportItem'];
 export type FlagCounts = components['schemas']['FlagCounts'];
 export type UploadResult = components['schemas']['UploadResult'];
 export type OcrLineLink = components['schemas']['OcrLineLink'];
+export type ReportSection = components['schemas']['ReportSection'];
 export type ReviewResult = components['schemas']['ReviewResult'];
 
 // 契约 ReviewRequest 的 oneOf 经 codegen 退化为 unknown(correct 分支的 anyOf
