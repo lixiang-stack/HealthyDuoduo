@@ -15,6 +15,16 @@ const (
 	StatusFailed  = "failed"
 )
 
+// ReportTypeImaging 影像(超声)叙述型报告的 report_type 域值。
+const ReportTypeImaging = "影像"
+
+// 报告段落类别(schemas/report.schema.json reportSection.kind)。
+const (
+	SectionKindExamName   = "exam_name"
+	SectionKindFindings   = "findings"
+	SectionKindImpression = "impression"
+)
+
 // ModelInfo 描述 OCR 使用的模型。
 type ModelInfo struct {
 	Det string `json:"det"`

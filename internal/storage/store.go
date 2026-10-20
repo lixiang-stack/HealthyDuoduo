@@ -551,11 +551,12 @@ func dateGranularity(date string) dateGrain {
 
 // WriteReport 落/更一份报告(items 取自 report.Items,事务式全量替换;
 // 身份 = 图像 sha256,每图一行:首次插入/冲突原位更新,updated_at 恒刷新)。
-// 镜像校验(viz-and-client 票 03 双保险):空指标项⇒failed——绕过识别端直灌
-// 的违规形状(status=success/partial 且零 items)在此拒绝,不写库。
+// 镜像校验(viz-and-client 票 03 双保险;票 04 叙事后开口):零 items + 空 sections
+// 只允许 failed;零 items + 非空 sections(影像单等叙述型报告)合法。绕过识别端直灌的
+// 违规形状(status=success/partial 且零 items 且无 sections)在此拒绝,不写库。
 func (s *Store) WriteReport(ctx context.Context, reportSha string, ocrID int64, report contract.Report, failReason *string) error {
-	if len(report.Items) == 0 && report.Status != contract.StatusFailed {
-		return fmt.Errorf("report invariant violated: %d items with status %q — report with no items must be failed", len(report.Items), report.Status)
+	if len(report.Items) == 0 && len(report.Sections) == 0 && report.Status != contract.StatusFailed {
+		return fmt.Errorf("report invariant violated: %d items and %d sections with status %q — report with no items and no sections must be failed", len(report.Items), len(report.Sections), report.Status)
 	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {

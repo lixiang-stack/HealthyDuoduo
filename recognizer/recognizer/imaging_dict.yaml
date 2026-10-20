@@ -1,59 +1,15 @@
 # 影像词典(2026-10 分组方案:物理合并 us_dict.yaml。
 # 临检组为 logical merge、不适用本文件。report_type 输出为 影像
-# (原 超声);min_matched_items 取各源最小值。
-# 条目体逐字来自源文件,条目注释与决策 #8 头注释随之搬运,分节 banner 留来源元信息。
+# (原 超声)。票 04 起影像单以正文段落为主体:分类只看 findings /
+# impression 锚,exam_name 锚只用于段落抽取;不抽取任何指标项。
 
 report_type: 影像
 category:
   title_keywords: [超声, 彩超]
-  min_matched_items: 3
+  min_section_hits: 1
   mode: narrative
   section_anchors:
     exam_name: [检查项目, 检查部位, 检查内容]
     findings: [超声描述, 检查所见, 超声所见]
     impression: [超声提示, 检查提示]
-items:
-
-# ==== us_dict.yaml(原 超声;min=3;titles=['超声'];mode=narrative) ====
-  - name: 颈项透明层厚度
-    aliases: [NT]
-    units: [mm]
-  - name: 头臀长
-    aliases: []
-    units: [mm]
-  - name: 双顶径
-    aliases: [BPD]
-    units: [mm]
-  - name: 股骨长
-    aliases: [FL]
-    units: [mm]
-  - name: 腹围
-    aliases: [AC]
-    units: [mm]
-  - name: 胎心率
-    aliases: [胎儿心率]
-    units: [次/分]
-  - name: 脐动脉S/D
-    aliases: [脐动脉S/D值, S/D]
-    units: []
-  - name: 羊水最大深度
-    aliases: [羊水最大前后径]
-    units: [mm]
-  - name: 宫颈管长度
-    aliases: [子宫颈管长约]
-    units: [mm]
-  - name: 肱骨长
-    aliases: [HL]
-    units: [mm]
-  - name: 鼻骨长
-    aliases: []
-    units: [mm]
-  - name: 颈项皮肤褶皱厚度
-    aliases: [NF]
-    units: [mm]
-  - name: 侧脑室宽度
-    aliases: [侧脑室]
-    units: [mm]
-  - name: 后颅窝池宽度
-    aliases: [后颅窝池]
-    units: [mm]
+items: []

@@ -1012,12 +1012,8 @@ func TestServeGetReportDetail(t *testing.T) {
 func TestServeGetReportDetailSections(t *testing.T) {
 	srv, _, rec, _ := newReportsTestServer(t)
 	createOne(t, srv, `{"name":"小虎","is_child":true}`)
-	femur := "22"
 	rec.report = &contract.Report{
-		ReportType: "影像", ReportDate: str("2024-09-15"), Status: contract.StatusPartial,
-		Items: []contract.ReportItem{
-			{Name: "股骨长", Value: &femur, Flag: "unknown", RawText: "股骨长 22mm", OCRLineNumbers: []int32{5}},
-		},
+		ReportType: contract.ReportTypeImaging, ReportDate: str("2024-09-15"), Status: contract.StatusSuccess,
 		Sections: []contract.ReportSection{
 			{Kind: "exam_name", Text: "产科胎儿彩超检查（中孕）", OCRLineNumbers: []int32{1}},
 			{Kind: "impression", Text: "宫内单活胎。", OCRLineNumbers: []int32{4}},
@@ -1040,8 +1036,8 @@ func TestServeGetReportDetailSections(t *testing.T) {
 			len(detail.Sections[1].OcrLines) != 1 || detail.Sections[1].OcrLines[0].Line != 4 {
 			t.Errorf("%s impression section = %+v", label, detail.Sections[1])
 		}
-		if len(detail.Items) != 1 || detail.Items[0].Name != "股骨长" {
-			t.Errorf("%s items = %+v, want 股骨长", label, detail.Items)
+		if len(detail.Items) != 0 {
+			t.Errorf("%s items = %+v, want 0 (影像单零指标项)", label, detail.Items)
 		}
 	}
 	checkSections("upload", created.Report)

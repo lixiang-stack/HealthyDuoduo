@@ -3,12 +3,12 @@
   "member_id": 1,
   "report_type": "影像",
   "report_date": "2024-09-15",
-  "status": "partial",
+  "status": "success",
   "fail_reason": null,
   "flag_counts": {
     "high": 0,
     "low": 0,
-    "unknown": 1
+    "unknown": 0
   },
   "unreviewed_low_confidence_count": 0,
   "sections": [
@@ -37,25 +37,5 @@
       ]
     }
   ],
-  "items": [
-    {
-      "item_id": 11,
-      "name": "股骨长",
-      "value": "22",
-      "unit": "mm",
-      "ref_range": null,
-      "method": null,
-      "flag": "unknown",
-      "low_confidence": false,
-      "raw_text": "股骨长 22mm",
-      "review_status": "unreviewed",
-      "ocr_lines": [
-        {
-          "line": 19,
-          "box": [[100, 500], [240, 500], [240, 530], [100, 530]]
-        }
-      ],
-      "prev": null
-    }
-  ]
+  "items": []
 }

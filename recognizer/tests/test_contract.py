@@ -79,12 +79,17 @@ def _report(status: str, items: list[dict]) -> dict:
     return {"report_type": "血常规", "report_date": "2026-10-01", "status": status, "items": items}
 
 
-def test_report_empty_items_must_be_failed() -> None:
-    """不变量(viz-and-client 票 03):空 items ⇒ failed——「成功且零指标项」连构造都不可能。"""
+def test_report_empty_items_must_be_failed_or_narrative() -> None:
+    """不变量:空 items 只允许 failed,或叙述型报告携带 sections(票 04)。"""
     assert Report.model_validate(_report("failed", [])) is not None
     for status in ("success", "partial"):
         with pytest.raises(ValidationError, match="no items"):
             Report.model_validate(_report(status, []))
+    narrative = {
+        **_report("success", []),
+        "sections": [{"kind": "findings", "text": "宫内单活胎。", "ocr_line_numbers": [3]}],
+    }
+    assert Report.model_validate(narrative) is not None
 
 
 def test_report_with_items_accepts_every_status() -> None:

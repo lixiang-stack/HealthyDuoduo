@@ -661,6 +661,35 @@ def verify_ocr_lines() -> None:
         print(f"ok: {margin_msg}")
 
 
+def verify_narrative_reports(body_kinds: tuple[str, ...]) -> None:
+    """叙述型报告(有 sections)硬门禁(票 04):零指标项,status 与正文段落一致。"""
+    kinds_sql = ", ".join("'" + kind.replace("'", "''") + "'" for kind in body_kinds)
+    rows = json.loads(
+        psql(
+            "select coalesce(json_agg(row_to_json(t)),'[]') from ("
+            " select r.image_sha256 sha, r.status,"
+            "   (select count(*) from report_items i"
+            "    where i.report_sha256 = r.image_sha256) item_count,"
+            "   exists(select 1 from jsonb_array_elements(r.sections) e"
+            f"          where e->>'kind' in ({kinds_sql})) has_body"
+            " from reports r where r.sections is not null) t;"
+        ).strip()
+    )
+    for row in rows:
+        sha = row["sha"]
+        if row["item_count"] != 0:
+            raise SystemExit(
+                f"FAIL: {sha[:12]} narrative report has {row['item_count']} items, want 0"
+            )
+        want = "success" if row["has_body"] else "failed"
+        if row["status"] != want:
+            raise SystemExit(
+                f"FAIL: {sha[:12]} narrative status={row['status']}, want {want}"
+                f" (body={row['has_body']})"
+            )
+    print(f"ok: narrative reports: {len(rows)} zero-item, status matches body")
+
+
 def _trend_rows(item: str, show_all: bool, from_root: Path) -> list[dict]:
     args = [build_hdd(from_root), "trend"] + (["--all"] if show_all else []) + [item]
     r = subprocess.run(args, capture_output=True, text=True, check=False)
@@ -686,7 +715,11 @@ def verify(item: str, from_root: Path) -> None:
     import importlib
 
     importlib.invalidate_caches()
-    from recognizer.postprocess import load_dicts, load_unit_families
+    from recognizer.postprocess import (
+        BODY_SECTION_KINDS,
+        load_dicts,
+        load_unit_families,
+    )
 
     families = (
         load_unit_families()
@@ -724,6 +757,7 @@ def verify(item: str, from_root: Path) -> None:
         )
 
     verify_ocr_lines()
+    verify_narrative_reports(BODY_SECTION_KINDS)
 
     rows_def = _trend_rows(item, False, from_root)
     rows_all = _trend_rows(item, True, from_root)

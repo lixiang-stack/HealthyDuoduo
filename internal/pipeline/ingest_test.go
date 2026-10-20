@@ -244,6 +244,75 @@ func TestIngestFailedEmpty_KeepsFailedAndSetsReason(t *testing.T) {
 	}
 }
 
+func TestIngestEmptyItemsWithSections_Success(t *testing.T) {
+	// 叙述型报告(票 04):零指标项 + 非空 sections 是合法形状,不降级 failed。
+	rec := newFakeRecognizer()
+	rec.report = contract.Report{
+		ReportType: contract.ReportTypeImaging,
+		Status:     contract.StatusSuccess,
+		Sections: []contract.ReportSection{
+			{Kind: contract.SectionKindFindings, Text: "宫内单活胎。", OCRLineNumbers: []int32{0}},
+		},
+	}
+	st, obj := newFakeStore(), newObjects()
+	path := writeImage(t, []byte("fake-imaging-1"))
+
+	oc := ingest(t, st, rec, obj, path, "", false)
+
+	if oc.Report.Status != contract.StatusSuccess {
+		t.Errorf("status = %q, want success untouched", oc.Report.Status)
+	}
+	if got := st.reports[oc.Sha256].failReason; got != nil {
+		t.Errorf("fail_reason = %v, want nil for narrative report with body", got)
+	}
+}
+
+func TestIngestEmptyItemsImaging_CoercedFailedWithNoBodyReason(t *testing.T) {
+	// 影像单据成功且零指标项 + 空 sections(绕过识别端的违规形状)→ failed + 无正文原因。
+	rec := newFakeRecognizer()
+	rec.report = contract.Report{ReportType: contract.ReportTypeImaging, Status: contract.StatusSuccess}
+	st, obj := newFakeStore(), newObjects()
+	path := writeImage(t, []byte("fake-imaging-3"))
+
+	oc := ingest(t, st, rec, obj, path, "", false)
+
+	if oc.Report.Status != contract.StatusFailed {
+		t.Errorf("status = %q, want failed coerced", oc.Report.Status)
+	}
+	want := "no report body recognized"
+	if got := st.reports[oc.Sha256].failReason; got == nil || *got != want {
+		t.Errorf("fail_reason = %v, want %q", got, want)
+	}
+}
+
+func TestIngestFailedImagingEmpty_SetsNoBodyReason(t *testing.T) {
+	// 影像单据无正文段落失败:固定原因 no report body recognized(票 04)。
+	for name, sections := range map[string][]contract.ReportSection{
+		"no sections": nil,
+		"exam_name only": {
+			{Kind: contract.SectionKindExamName, Text: "产科胎儿彩超检查（中孕）", OCRLineNumbers: []int32{0}},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			rec := newFakeRecognizer()
+			rec.report = contract.Report{
+				ReportType: contract.ReportTypeImaging,
+				Status:     contract.StatusFailed,
+				Sections:   sections,
+			}
+			st, obj := newFakeStore(), newObjects()
+			path := writeImage(t, []byte("fake-imaging-2"))
+
+			oc := ingest(t, st, rec, obj, path, "", false)
+
+			want := "no report body recognized"
+			if got := st.reports[oc.Sha256].failReason; got == nil || *got != want {
+				t.Errorf("fail_reason = %v, want %q", got, want)
+			}
+		})
+	}
+}
+
 func TestIngestWithItems_NoFailReason(t *testing.T) {
 	// 正常有产出报告:fail_reason 必须为 nil(仅 failed 报告有值)。
 	st, rec, obj := newFakeStore(), newFakeRecognizer(), newObjects()

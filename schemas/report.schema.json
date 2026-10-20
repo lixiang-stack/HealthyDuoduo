@@ -19,10 +19,11 @@
     },
     "status": {
       "enum": ["success", "partial", "failed"],
-      "description": "success=类别与主要指标解析成功;partial=有产出但有指标缺失/低置信/日期未解析;failed=无法产出结构化结果(仍留痕落库)"
+      "description": "success=类别与报告主体(指标项或段落)解析成功;partial=有指标项产出但有缺失/低置信/日期未解析;failed=无法产出结构化结果(仍留痕落库)"
     },
     "items": {
       "type": "array",
+      "description": "指标项;叙述型报告(影像)为空数组,主体见 sections",
       "items": {"$ref": "#/$defs/reportItem"}
     },
     "sections": {

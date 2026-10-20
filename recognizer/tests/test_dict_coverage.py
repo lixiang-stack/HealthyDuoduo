@@ -85,7 +85,7 @@ def _witnessed_sub(term: str) -> set[str]:
 def test_every_alias_has_corpus_evidence(dict_path) -> None:
     d = yaml.safe_load(dict_path.read_text(encoding="utf-8"))
     problems = []
-    for it in d["items"]:
+    for it in d.get("items") or []:
         for a in set(it.get("aliases", [])):
             ids = _witnessed_sub(a) if _narrative(dict_path) else _witnessed(a)
             if not ids:
@@ -99,7 +99,7 @@ def test_every_item_has_witnessed_reference(dict_path) -> None:
     """每一词典组(规范名 + 别名)至少有一条真实样本证据,防孤儿词条。"""
     d = yaml.safe_load(dict_path.read_text(encoding="utf-8"))
     problems = []
-    for it in d["items"]:
+    for it in d.get("items") or []:
         terms = {it["name"], *it.get("aliases", [])}
         if not any(_witnessed_sub(t) if _narrative(dict_path) else _witnessed(t) for t in terms):
             problems.append(f"{it['name']}: 规范名与全部别名均无样本证据")

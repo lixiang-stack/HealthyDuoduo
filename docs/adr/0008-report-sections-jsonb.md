@@ -29,3 +29,4 @@
 - 新增迁移 0007（一列 JSONB），而不是六列。
 - 段落形状由 JSON Schema/Pydantic/Go 互证与 store roundtrip 测试约束；数据库只保证 JSONB 可空，不承担逐元素约束。
 - 若后续出现段落级核对/修正、全文检索或独立状态，再迁移到 `report_sections` 表；对外 `sections` 数组形状可保持不变。
+- 后续票 04 收紧叙述型报告语义：影像单零指标项、status 由正文段落派生，见 ADR-0009。
