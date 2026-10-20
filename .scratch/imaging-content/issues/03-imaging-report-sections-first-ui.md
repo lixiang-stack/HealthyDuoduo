@@ -35,7 +35,7 @@
 
 ## Out of scope（后续票）
 
-- 后端停止影像 items 抽取、改分类 / status 派生 / golden / verify。
-- 删除或迁移既有影像 items 数据。
+- 后端停止影像 items 抽取、改分类 / status 派生 / golden / verify（→ 票 04）。
+- 删除或迁移既有影像 items 数据（→ 票 04）。
 - OCR 模型升级、低置信 `exam_name` 处理、段落人工修正。
 - 生长趋势 / 孕周评估 / 测量值曲线。
