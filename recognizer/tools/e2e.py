@@ -141,6 +141,11 @@ def existing_shas() -> set[str]:
     return {s for s in psql("select sha256 from images;").split() if s}
 
 
+def report_shas() -> set[str]:
+    """可 reparse 的报告身份(reports 每图一行);images 可能因半截 ingest 无报告。"""
+    return {s for s in psql("select image_sha256 from reports;").split() if s}
+
+
 def stats() -> dict[str, int]:
     q = (
         "select (select count(*) from images),(select count(*) from ocr_results),"
@@ -411,7 +416,7 @@ def refresh(from_root: Path) -> None:
     ):
         subprocess.run(cmd, cwd=from_root, check=True)
     wait_healthz()
-    done_in_round = reparse_batch(from_root, sorted(existing_shas()))
+    done_in_round = reparse_batch(from_root, sorted(report_shas()))
     print(f"refresh ok ({done_in_round} reparses)")
 
 
@@ -675,8 +680,9 @@ def verify_golden(from_base: Path) -> None:
                 f" where image_sha256 = '{sha}') t;"
             ).strip()
         )
-        if hdr == "null":
-            raise SystemExit(f"FAIL: {sid} not in db")
+        if not hdr:
+            # json_agg 无行时返回 []（不是字符串 "null"）；旧判定会让 hdr[0] 直接 TypeError。
+            raise SystemExit(f"FAIL: {sid} not in db (sha={sha[:12]}); run `e2e.py seed` first")
         items = json.loads(
             psql(
                 "select coalesce(json_agg(row_to_json(t)), '[]') from ("

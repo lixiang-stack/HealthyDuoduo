@@ -10,6 +10,7 @@ package storage
 import (
 	"context"
 	"os"
+	"reflect"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -207,6 +208,32 @@ func TestReportStoreSmoke(t *testing.T) {
 	}
 	if len(items[0].OCRLineNumbers) != 2 || items[0].OCRLineNumbers[0] != 3 || items[0].OCRLineNumbers[1] != 4 {
 		t.Errorf("ocr_line_numbers after rerun = %+v, want [3 4]", items[0].OCRLineNumbers)
+	}
+
+	// 报告段落(0006/ADR-0008):JSONB 写入/读回;非叙述型 NULL → nil;缺失报告 nil。
+	sections := []contract.ReportSection{
+		{Kind: "exam_name", Text: "产科胎儿彩超检查（中孕）", OCRLineNumbers: []int32{5}},
+		{Kind: "impression", Text: "宫内单活胎。", OCRLineNumbers: []int32{10, 11}},
+	}
+	var ocrB int64
+	if err := pool.QueryRow(ctx, `SELECT id FROM ocr_results WHERE image_sha256='rep-b'`).Scan(&ocrB); err != nil {
+		t.Fatalf("fetch rep-b ocr id: %v", err)
+	}
+	if err := st.WriteReport(ctx, "rep-b", ocrB, contract.Report{
+		ReportType: "影像", ReportDate: strPtr("2024-09-15"), Status: contract.StatusFailed,
+		Sections: sections,
+	}, nil); err != nil {
+		t.Fatalf("WriteReport sections: %v", err)
+	}
+	gotSections, err := st.SectionsByImage(ctx, "rep-b")
+	if err != nil || !reflect.DeepEqual(gotSections, sections) {
+		t.Errorf("SectionsByImage(rep-b) = %+v, %v; want %+v", gotSections, err, sections)
+	}
+	if got, err := st.SectionsByImage(ctx, "rep-a"); err != nil || got != nil {
+		t.Errorf("SectionsByImage(non-narrative) = (%+v, %v), want (nil, nil)", got, err)
+	}
+	if got, err := st.SectionsByImage(ctx, "rep-missing"); err != nil || got != nil {
+		t.Errorf("SectionsByImage(missing) = (%+v, %v), want (nil, nil)", got, err)
 	}
 
 	// 归属写入:无主 → 成员 A;缺失报告返回 false, nil(404 口径)。

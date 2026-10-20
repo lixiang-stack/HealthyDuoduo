@@ -1,17 +1,19 @@
 package storage
 
-// 迁移冒烟:goose 链(0001..0004)应用后 schema 形状符合 M0 契约(票 02)。
+// 迁移冒烟:goose 链(0001..0007)应用后 schema 形状符合 M0 契约(票 02)。
 // 需要真库:设 HDD_TEST_DSN(如 postgres://postgres:smoke@127.0.0.1:55432/postgres)后运行;
 // 未设则整体 Skip——CI 门禁跑 go test ./... 时默认跳过,共享栈验证走 e2e 外环
 // (docs/agents/e2e.md「schemas/迁移」行)。冒烟姿势:一次性 PG 容器 + 本测试。
 
 import (
 	"context"
+	"database/sql"
 	"os"
 	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/pressly/goose/v3"
 )
 
 func TestMigrationSmokeM0Contract(t *testing.T) {
@@ -29,14 +31,27 @@ func TestMigrationSmokeM0Contract(t *testing.T) {
 		t.Fatalf("migrate: %v", err)
 	}
 
-	// goose 已升到 0005 且幂等(Open 内重复 Migrate 不报错)。
+	// goose 已升到 0007 且幂等(Open 内重复 Migrate 不报错)。
 	var latest int
 	if err := pool.QueryRow(ctx, `SELECT max(version_id) FROM goose_db_version`).Scan(&latest); err != nil {
 		t.Fatalf("read goose version: %v", err)
 	}
-	if latest != 5 {
-		t.Fatalf("goose version = %d, want 5", latest)
+	if latest != 7 {
+		t.Fatalf("goose version = %d, want 7", latest)
 	}
+
+	// reports.sections(0007,ADR-0008):可选报告段落 JSONB,可空(存量/非叙述型 NULL)。
+	t.Run("report sections column", func(t *testing.T) {
+		var dataType string
+		var nullable string
+		if err := pool.QueryRow(ctx, `SELECT data_type, is_nullable FROM information_schema.columns
+			WHERE table_name='reports' AND column_name='sections'`).Scan(&dataType, &nullable); err != nil {
+			t.Fatal(err)
+		}
+		if dataType != "jsonb" || nullable != "YES" {
+			t.Fatalf("sections = %s/%s, want jsonb/YES(非叙述型/存量 NULL)", dataType, nullable)
+		}
+	})
 
 	// report_items.ocr_line_numbers(0005):识别端直吐的组成行下标,可空(存量未回填)。
 	t.Run("report item ocr line numbers column", func(t *testing.T) {
@@ -173,4 +188,46 @@ func TestMigrationSmokeM0Contract(t *testing.T) {
 			t.Fatalf("after report delete: items=%d pairs=%d images=%d, want 0/0/2 (image retained)", items, pairs, images)
 		}
 	})
+}
+
+// TestMigration0007DownUp 0007 升降版:down 删除 sections 列,up 重新加回(0006 为空占位)。
+func TestMigration0007DownUp(t *testing.T) {
+	dsn := os.Getenv("HDD_TEST_DSN")
+	if dsn == "" {
+		t.Skip("HDD_TEST_DSN not set: migration smoke runs against a disposable PG container")
+	}
+	ctx := context.Background()
+	db, err := sql.Open("pgx", dsn)
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	defer db.Close()
+	goose.SetBaseFS(migrationsFS)
+	if err := goose.SetDialect("postgres"); err != nil {
+		t.Fatalf("goose dialect: %v", err)
+	}
+	if err := goose.UpContext(ctx, db, migrationsDir); err != nil {
+		t.Fatalf("up to latest: %v", err)
+	}
+	if err := goose.DownToContext(ctx, db, migrationsDir, 6); err != nil {
+		t.Fatalf("down to 0005: %v", err)
+	}
+	var n int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM information_schema.columns
+		WHERE table_name='reports' AND column_name='sections'`).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 0 {
+		t.Fatalf("sections column survived down migration")
+	}
+	if err := goose.UpContext(ctx, db, migrationsDir); err != nil {
+		t.Fatalf("up after down: %v", err)
+	}
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM information_schema.columns
+		WHERE table_name='reports' AND column_name='sections'`).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Fatalf("sections column missing after re-up")
+	}
 }

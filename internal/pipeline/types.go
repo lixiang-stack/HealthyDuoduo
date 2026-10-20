@@ -77,6 +77,8 @@ type ReportStore interface {
 	// OCRResultJSONByReport 报告所用 OCR 结果的原始 JSON(reports.ocr_result_id →
 	// ocr_results.engine_output;详情行链接回读,票 07)。缺失返回 nil, nil。
 	OCRResultJSONByReport(ctx context.Context, reportSha string) ([]byte, error)
+	// SectionsByImage 报告级叙述段落(0006/ADR-0008;非叙述型报告/缺失返回 nil, nil)。
+	SectionsByImage(ctx context.Context, reportSha string) ([]contract.ReportSection, error)
 	// SetReportMember 只改报告归属(上传新建/无主归档时赋值;改归属端点同用;不碰其他字段)。
 	// 报告不存在返回 false, nil(与 DeleteReport 同一缺失口径,写入路径自带存在性判定)。
 	SetReportMember(ctx context.Context, reportSha string, memberID int64) (bool, error)

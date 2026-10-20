@@ -100,10 +100,19 @@ type ReportItem struct {
 	Prev          *PrevValue    `json:"prev"`
 }
 
-// ReportDetail GET /reports/{report_id} 详情响应(含全量指标项)。
+// ReportSection 报告级叙述段落(叙述型报告;与识别端 reportSection 同源,
+// 行号在 HTTP 侧映射为 OcrLineLink)。数组顺序即展示顺序;非叙述型报告不输出 sections。
+type ReportSection struct {
+	Kind     string        `json:"kind"`
+	Text     string        `json:"text"`
+	OcrLines []OcrLineLink `json:"ocr_lines"`
+}
+
+// ReportDetail GET /reports/{report_id} 详情响应(含全量指标项与可选报告段落)。
 type ReportDetail struct {
 	ReportHeader
-	Items []ReportItem `json:"items"`
+	Sections []ReportSection `json:"sections,omitempty"`
+	Items    []ReportItem    `json:"items"`
 }
 
 // UploadResult POST /reports 响应(200 幂等命中 / 201 新建或显式覆盖重跑):

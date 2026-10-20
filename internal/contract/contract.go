@@ -51,12 +51,22 @@ type ReportItem struct {
 	OCRLineNumbers []int32 `json:"ocr_line_numbers"`
 }
 
+// ReportSection 是报告级叙述段落(仅叙述型报告,如影像单;只读展示,不参与指标项核对)。
+// Kind 当前已知值 exam_name / findings / impression;数组顺序即展示顺序。
+type ReportSection struct {
+	Kind           string  `json:"kind"`
+	Text           string  `json:"text"`
+	OCRLineNumbers []int32 `json:"ocr_line_numbers"`
+}
+
 // Report 对应 schemas/report.schema.json(实施计划 4.2)。
 // report_date 为 YYYY-MM-DD 字符串或 null;用 string 而非 time.Time 是因为
 // encoding/json 对纯日期字符串无法直接反序列化为 time.Time(契约值为原样日期,不承担时区语义)。
+// Sections 可选:非叙述型报告不输出该键,既有 JSON 消费方保持兼容(ADR-0008)。
 type Report struct {
-	ReportType string       `json:"report_type"`
-	ReportDate *string      `json:"report_date"`
-	Status     string       `json:"status"`
-	Items      []ReportItem `json:"items"`
+	ReportType string          `json:"report_type"`
+	ReportDate *string         `json:"report_date"`
+	Status     string          `json:"status"`
+	Items      []ReportItem    `json:"items"`
+	Sections   []ReportSection `json:"sections,omitempty"`
 }

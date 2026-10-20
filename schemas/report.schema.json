@@ -24,9 +24,38 @@
     "items": {
       "type": "array",
       "items": {"$ref": "#/$defs/reportItem"}
+    },
+    "sections": {
+      "type": ["array", "null"],
+      "items": {"$ref": "#/$defs/reportSection"},
+      "minItems": 1,
+      "description": "报告级叙述段落(影像等叙述型报告);缺省或 null 表示无段落,数组顺序即展示顺序"
     }
   },
   "$defs": {
+    "reportSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "text", "ocr_line_numbers"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "minLength": 1,
+          "description": "段落类别;当前已知值 exam_name / findings / impression,数组顺序即展示顺序"
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "description": "段落原文(OCR 行按序以换行拼接)"
+        },
+        "ocr_line_numbers": {
+          "type": "array",
+          "items": {"type": "integer", "minimum": 0},
+          "minItems": 1,
+          "description": "段落组成 OCR 行的下标(0-based,与 ocr_result 的 txts/boxes 同下标;顺序与 text 组成顺序一致)"
+        }
+      }
+    },
     "reportItem": {
       "type": "object",
       "additionalProperties": false,

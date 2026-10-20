@@ -78,6 +78,26 @@ func TestUnmarshalReportFixture(t *testing.T) {
 	}
 }
 
+func TestUnmarshalReportSectionsFixture(t *testing.T) {
+	var got Report
+	if err := json.Unmarshal(fixture(t, "report.sections.example.json"), &got); err != nil {
+		t.Fatalf("unmarshal report (sections): %v", err)
+	}
+	if got.ReportType != "影像" || got.ReportDate == nil || *got.ReportDate != "2024-09-15" {
+		t.Errorf("Report header = %+v", got)
+	}
+	if len(got.Sections) != 3 {
+		t.Fatalf("Sections = %d, want 3", len(got.Sections))
+	}
+	if got.Sections[0].Kind != "exam_name" || got.Sections[0].Text != "产科胎儿彩超检查（中孕）" ||
+		len(got.Sections[0].OCRLineNumbers) != 1 || got.Sections[0].OCRLineNumbers[0] != 1 {
+		t.Errorf("Sections[0] = %+v", got.Sections[0])
+	}
+	if got.Sections[1].Kind != "findings" || len(got.Sections[1].OCRLineNumbers) != 2 {
+		t.Errorf("Sections[1] = %+v", got.Sections[1])
+	}
+}
+
 func TestUnmarshalReportNullDateFixture(t *testing.T) {
 	var got Report
 	if err := json.Unmarshal(fixture(t, "report.null-date.example.json"), &got); err != nil {

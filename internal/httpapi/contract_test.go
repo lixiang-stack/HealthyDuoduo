@@ -104,6 +104,46 @@ func TestOpenAPIMirrorsRecognitionItem(t *testing.T) {
 	}
 }
 
+// TestOpenAPIMirrorsRecognitionSection 报告段落:kind/text 与识别端 reportSection
+// 逐字段相同;识别端 ocr_line_numbers 在 HTTP 侧映射为 ocr_lines: OcrLineLink[]。
+func TestOpenAPIMirrorsRecognitionSection(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "schemas", "report.schema.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var schema map[string]any
+	if err := json.Unmarshal(raw, &schema); err != nil {
+		t.Fatal(err)
+	}
+	rec := schema["$defs"].(map[string]any)["reportSection"].(map[string]any)
+	recProps := rec["properties"].(map[string]any)
+
+	doc := getOpenAPI(t)
+	httpProps := componentSchema(t, doc, "ReportSection")["properties"].(map[string]any)
+
+	for _, field := range []string{"kind", "text"} {
+		if recJSON, httpJSON := jsonCompact(recProps[field]), jsonCompact(httpProps[field]); recJSON != httpJSON {
+			t.Errorf("shared section field %q drifted:\n  recognition: %s\n  openapi:     %s", field, recJSON, httpJSON)
+		}
+	}
+	lineNumbers, ok := recProps["ocr_line_numbers"].(map[string]any)
+	if !ok {
+		t.Fatalf("report.schema.json lost ocr_line_numbers")
+	}
+	items, ok := lineNumbers["items"].(map[string]any)
+	if !ok || items["type"] != "integer" {
+		t.Errorf("ocr_line_numbers items = %v, want integer line indices", lineNumbers["items"])
+	}
+	lines, ok := httpProps["ocr_lines"].(map[string]any)
+	if !ok {
+		t.Fatalf("OpenAPI ReportSection lost ocr_lines")
+	}
+	lineItems, ok := lines["items"].(map[string]any)
+	if !ok || lineItems["$ref"] != "#/components/schemas/OcrLineLink" {
+		t.Errorf("ocr_lines items = %v, want OcrLineLink ref", lines["items"])
+	}
+}
+
 // fixtureCase 一张表同时供「对 schema 校验」与「对 Go 镜像回转」两个方向使用,
 // 免去两处清单各自漂移。
 type fixtureCase struct {
@@ -117,6 +157,7 @@ var reconcileCases = []fixtureCase{
 	{"report.summary.json", "ReportSummary", unmarshal[ReportSummary]},
 	{"report.summary.failed.json", "ReportSummary", unmarshal[ReportSummary]},
 	{"report.detail.json", "ReportDetail", unmarshal[ReportDetail]},
+	{"report.detail.imaging.json", "ReportDetail", unmarshal[ReportDetail]},
 	{"upload.duplicate.json", "UploadResult", unmarshal[UploadResult]},
 	{"report.conflict.json", "Error", unmarshal[Error]},
 	{"review.request.confirm.json", "ReviewRequest", unmarshal[ReviewRequest]},
