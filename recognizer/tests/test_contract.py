@@ -22,7 +22,9 @@ def _load(path: Path) -> dict:
     ("schema_name", "examples"),
     [
         ("ocr_result.schema.json", ["ocr_result.example.json"]),
-        ("report.schema.json", ["report.example.json", "report.null-date.example.json"]),
+        ("report.schema.json", [
+            "report.example.json", "report.null-date.example.json", "report.sections.example.json",
+        ]),
     ],
 )
 def test_schemas_valid_and_examples_match(schema_name: str, examples: list[str]) -> None:
@@ -44,7 +46,9 @@ OCR_RESULT_MODEL_BY_SCHEMA = {
     ("schema_name", "examples"),
     [
         ("ocr_result.schema.json", ["ocr_result.example.json"]),
-        ("report.schema.json", ["report.example.json", "report.null-date.example.json"]),
+        ("report.schema.json", [
+            "report.example.json", "report.null-date.example.json", "report.sections.example.json",
+        ]),
     ],
 )
 def test_pydantic_mirror_matches_examples(schema_name: str, examples: list[str]) -> None:
@@ -90,3 +94,44 @@ def test_report_with_items_accepts_every_status() -> None:
             "ocr_line_numbers": [0, 1, 2]}
     for status in ("success", "partial", "failed"):
         assert Report.model_validate(_report(status, [item])) is not None
+
+
+def test_report_sections_optional_and_validated() -> None:
+    """sections 可选;出现时 kind/text/行号均非空,且允许 failed 空 items 携带段落。"""
+    schema = Draft202012Validator(_load(SCHEMA_DIR / "report.schema.json"))
+    base = _report("failed", [])
+    assert Report.model_validate(base) is not None
+    assert schema.is_valid(base)
+    assert Report.model_validate({**base, "sections": None}) is not None
+    assert schema.is_valid({**base, "sections": None})
+
+    valid = {**base, "sections": [
+        {"kind": "findings", "text": "宫内单活胎。", "ocr_line_numbers": [3, 4]},
+    ]}
+    assert Report.model_validate(valid) is not None
+    assert schema.is_valid(valid)
+
+    for broken in (
+        {**valid, "sections": [{"kind": "findings", "text": "宫内单活胎。", "ocr_line_numbers": []}]},
+        {**valid, "sections": [{"kind": "", "text": "宫内单活胎。", "ocr_line_numbers": [3]}]},
+        {**valid, "sections": [{"kind": "findings", "text": "", "ocr_line_numbers": [3]}]},
+        {**valid, "sections": []},
+    ):
+        with pytest.raises(ValidationError):
+            Report.model_validate(broken)
+        assert not schema.is_valid(broken)
+
+
+def test_report_serialization_omits_absent_sections() -> None:
+    """非叙述型报告不输出 sections 键(而非 sections:null),既有 golden/消费方保持兼容。"""
+    plain = Report.model_validate(_report("failed", []))
+    assert "sections" not in json.loads(plain.model_dump_json())
+
+    with_sections = Report.model_validate({
+        **_report("failed", []),
+        "sections": [{"kind": "impression", "text": "正常。", "ocr_line_numbers": [1]}],
+    })
+    dumped = json.loads(with_sections.model_dump_json())
+    assert dumped["sections"] == [
+        {"kind": "impression", "text": "正常。", "ocr_line_numbers": [1]}
+    ]

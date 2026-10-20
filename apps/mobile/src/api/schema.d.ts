@@ -288,7 +288,18 @@ export interface components {
             fail_reason: string | null;
             flag_counts: components["schemas"]["FlagCounts"];
             unreviewed_low_confidence_count: number;
+            /** @description 报告级叙述段落(影像等叙述型报告);缺省或 null 表示无段落,数组顺序即展示顺序 */
+            sections?: components["schemas"]["ReportSection"][] | null;
             items: components["schemas"]["ReportItem"][];
+        };
+        /** @description 报告级叙述段落(只读展示;与识别端 reportSection 同源,行号在 HTTP 侧映射为行链接)。 */
+        ReportSection: {
+            /** @description 段落类别;当前已知值 exam_name / findings / impression,数组顺序即展示顺序 */
+            kind: string;
+            /** @description 段落原文(OCR 行按序以换行拼接) */
+            text: string;
+            /** @description 段落组成 OCR 行的行链接(行号→框,与 items 的 ocr_lines 同源同构) */
+            ocr_lines: components["schemas"]["OcrLineLink"][];
         };
         /** @description 图像区域 ↔ 原始 OCR 行文 ↔ 解析值三方对照的行链接。 */
         OcrLineLink: {

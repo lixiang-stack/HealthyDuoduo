@@ -47,8 +47,9 @@ type fakeCorrectionPair struct {
 }
 
 type fakeServeReport struct {
-	summary pipeline.ReportSummary
-	items   []pipeline.ReportItemRow
+	summary  pipeline.ReportSummary
+	sections []contract.ReportSection
+	items    []pipeline.ReportItemRow
 }
 
 var (
@@ -101,6 +102,17 @@ func (f *fakeServeStore) OCRResultJSONByReport(ctx context.Context, reportSha st
 		return nil, nil
 	}
 	return f.ocrByID[ocrID], nil
+}
+
+// SectionsByImage 镜像 storage:报告存在则返回段落副本(无段落 = nil)。
+func (f *fakeServeStore) SectionsByImage(ctx context.Context, reportSha string) ([]contract.ReportSection, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	r, ok := f.reports[reportSha]
+	if !ok {
+		return nil, nil
+	}
+	return append([]contract.ReportSection(nil), r.sections...), nil
 }
 
 func (f *fakeServeStore) ReportByImage(ctx context.Context, imageSha string) (*pipeline.ReportRow, bool, error) {
@@ -157,6 +169,7 @@ func (f *fakeServeStore) WriteReport(ctx context.Context, reportSha string, ocrI
 	r.summary.ReportDate = report.ReportDate
 	r.summary.Status = report.Status
 	r.summary.FailReason = failReason
+	r.sections = append([]contract.ReportSection(nil), report.Sections...)
 	f.reportOCR[reportSha] = ocrID
 	r.items = nil
 	for _, it := range report.Items {
@@ -275,10 +288,13 @@ func (f *fakeServeStore) DeleteReport(ctx context.Context, reportSha string) (bo
 func (f *fakeServeStore) seedReport(sha string, memberID *int64, report contract.Report, failReason *string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	r := &fakeServeReport{summary: pipeline.ReportSummary{
-		Sha256: sha, MemberID: memberID, ReportType: report.ReportType,
-		ReportDate: report.ReportDate, Status: report.Status, FailReason: failReason,
-	}}
+	r := &fakeServeReport{
+		summary: pipeline.ReportSummary{
+			Sha256: sha, MemberID: memberID, ReportType: report.ReportType,
+			ReportDate: report.ReportDate, Status: report.Status, FailReason: failReason,
+		},
+		sections: append([]contract.ReportSection(nil), report.Sections...),
+	}
 	f.reports[sha] = r
 	f.order = append(f.order, sha)
 	f.nextOCR++
@@ -944,6 +960,9 @@ func TestServeGetReportDetail(t *testing.T) {
 	if detail.FlagCounts != (httpapi.FlagCounts{High: 1}) || detail.UnreviewedLowConfidenceCount != 1 {
 		t.Errorf("counts = %+v/%d, want high=1 / 1 待核对", detail.FlagCounts, detail.UnreviewedLowConfidenceCount)
 	}
+	if detail.Sections != nil || strings.Contains(string(raw), `"sections"`) {
+		t.Errorf("non-narrative detail must omit sections; sections=%+v body=%s", detail.Sections, raw)
+	}
 	if len(detail.Items) != 2 {
 		t.Fatalf("items = %d, want 2", len(detail.Items))
 	}
@@ -986,6 +1005,56 @@ func TestServeGetReportDetail(t *testing.T) {
 	if len(corrupted.Items) != 1 || len(corrupted.Items[0].OcrLines) != 0 || corrupted.Items[0].RawText != "血红蛋白  128" {
 		t.Errorf("corrupted indices = %+v, want 空链接 + raw_text 保留", corrupted.Items[0])
 	}
+}
+
+// TestServeGetReportDetailSections 影像单详情:可选 sections 经上传响应与 GET 详情
+// 同一投影返回,行号映射为行链接;非影像报告不输出 sections(上一用例)。
+func TestServeGetReportDetailSections(t *testing.T) {
+	srv, _, rec, _ := newReportsTestServer(t)
+	createOne(t, srv, `{"name":"小虎","is_child":true}`)
+	femur := "22"
+	rec.report = &contract.Report{
+		ReportType: "影像", ReportDate: str("2024-09-15"), Status: contract.StatusPartial,
+		Items: []contract.ReportItem{
+			{Name: "股骨长", Value: &femur, Flag: "unknown", RawText: "股骨长 22mm", OCRLineNumbers: []int32{5}},
+		},
+		Sections: []contract.ReportSection{
+			{Kind: "exam_name", Text: "产科胎儿彩超检查（中孕）", OCRLineNumbers: []int32{1}},
+			{Kind: "impression", Text: "宫内单活胎。", OCRLineNumbers: []int32{4}},
+		},
+	}
+
+	status, raw := doUpload(t, srv, []byte("fake-imaging-bytes"), map[string]string{formMemberID: "1"})
+	created := decodeUpload(t, status, raw, http.StatusCreated)
+	sha := created.Report.ReportID
+	checkSections := func(label string, detail httpapi.ReportDetail) {
+		t.Helper()
+		if len(detail.Sections) != 2 {
+			t.Fatalf("%s sections = %+v, want 2", label, detail.Sections)
+		}
+		if detail.Sections[0].Kind != "exam_name" || detail.Sections[0].Text != "产科胎儿彩超检查（中孕）" ||
+			len(detail.Sections[0].OcrLines) != 1 || detail.Sections[0].OcrLines[0].Line != 1 {
+			t.Errorf("%s exam_name section = %+v", label, detail.Sections[0])
+		}
+		if detail.Sections[1].Kind != "impression" || detail.Sections[1].Text != "宫内单活胎。" ||
+			len(detail.Sections[1].OcrLines) != 1 || detail.Sections[1].OcrLines[0].Line != 4 {
+			t.Errorf("%s impression section = %+v", label, detail.Sections[1])
+		}
+		if len(detail.Items) != 1 || detail.Items[0].Name != "股骨长" {
+			t.Errorf("%s items = %+v, want 股骨长", label, detail.Items)
+		}
+	}
+	checkSections("upload", created.Report)
+
+	status, raw = doJSON(t, srv, http.MethodGet, "/api/v1/reports/"+sha, "")
+	if status != http.StatusOK {
+		t.Fatalf("GET detail = %d; body = %s", status, raw)
+	}
+	var detail httpapi.ReportDetail
+	if err := json.Unmarshal(raw, &detail); err != nil {
+		t.Fatal(err)
+	}
+	checkSections("detail", detail)
 }
 
 // TestServeGetReportDetailFailed failed 报告详情:图像与失败原因可见(无可核对项),

@@ -1,0 +1,61 @@
+{
+  "report_id": "d2f7000000000000000000000000000000000000000000000000000000000000",
+  "member_id": 1,
+  "report_type": "影像",
+  "report_date": "2024-09-15",
+  "status": "partial",
+  "fail_reason": null,
+  "flag_counts": {
+    "high": 0,
+    "low": 0,
+    "unknown": 1
+  },
+  "unreviewed_low_confidence_count": 0,
+  "sections": [
+    {
+      "kind": "exam_name",
+      "text": "产科胎儿彩超检查（中孕）",
+      "ocr_lines": [
+        {
+          "line": 5,
+          "box": [[400, 200], [460, 200], [460, 230], [400, 230]]
+        }
+      ]
+    },
+    {
+      "kind": "impression",
+      "text": "宫内单活胎。\n胎儿脐带绕颈一周。",
+      "ocr_lines": [
+        {
+          "line": 24,
+          "box": [[100, 600], [500, 600], [500, 630], [100, 630]]
+        },
+        {
+          "line": 25,
+          "box": [[100, 640], [500, 640], [500, 670], [100, 670]]
+        }
+      ]
+    }
+  ],
+  "items": [
+    {
+      "item_id": 11,
+      "name": "股骨长",
+      "value": "22",
+      "unit": "mm",
+      "ref_range": null,
+      "method": null,
+      "flag": "unknown",
+      "low_confidence": false,
+      "raw_text": "股骨长 22mm",
+      "review_status": "unreviewed",
+      "ocr_lines": [
+        {
+          "line": 19,
+          "box": [[100, 500], [240, 500], [240, 530], [100, 530]]
+        }
+      ],
+      "prev": null
+    }
+  ]
+}

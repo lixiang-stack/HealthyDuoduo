@@ -5,9 +5,13 @@
 
 report_type: 影像
 category:
-  title_keywords: [超声]
+  title_keywords: [超声, 彩超]
   min_matched_items: 3
   mode: narrative
+  section_anchors:
+    exam_name: [检查项目, 检查部位, 检查内容]
+    findings: [超声描述, 检查所见, 超声所见]
+    impression: [超声提示, 检查提示]
 items:
 
 # ==== us_dict.yaml(原 超声;min=3;titles=['超声'];mode=narrative) ====
@@ -37,4 +41,19 @@ items:
     units: [mm]
   - name: 宫颈管长度
     aliases: [子宫颈管长约]
+    units: [mm]
+  - name: 肱骨长
+    aliases: [HL]
+    units: [mm]
+  - name: 鼻骨长
+    aliases: []
+    units: [mm]
+  - name: 颈项皮肤褶皱厚度
+    aliases: [NF]
+    units: [mm]
+  - name: 侧脑室宽度
+    aliases: [侧脑室]
+    units: [mm]
+  - name: 后颅窝池宽度
+    aliases: [后颅窝池]
     units: [mm]

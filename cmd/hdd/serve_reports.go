@@ -173,12 +173,17 @@ func handleGetReport(d *deps) http.HandlerFunc {
 			writeErrorJSON(w, http.StatusInternalServerError, "read report items failed")
 			return
 		}
+		sections, err := d.reports.SectionsByImage(ctx, reportID)
+		if err != nil {
+			writeErrorJSON(w, http.StatusInternalServerError, "read report sections failed")
+			return
+		}
 		ocr, err := loadReportOCR(ctx, d.reports, reportID)
 		if err != nil {
 			writeErrorJSON(w, http.StatusInternalServerError, "read report ocr result failed")
 			return
 		}
-		writeJSON(w, http.StatusOK, toAPIDetail(*summary, items, ocr))
+		writeJSON(w, http.StatusOK, toAPIDetail(*summary, sections, items, ocr))
 	}
 }
 
@@ -293,12 +298,17 @@ func handleUploadReport(d *deps) http.HandlerFunc {
 				writeErrorJSON(w, http.StatusInternalServerError, "assign member failed")
 				return
 			}
+			sections, err := d.reports.SectionsByImage(ctx, existing.Sha256)
+			if err != nil {
+				writeErrorJSON(w, http.StatusInternalServerError, "read report sections failed")
+				return
+			}
 			ocr, err := loadReportOCR(ctx, d.reports, existing.Sha256)
 			if err != nil {
 				writeErrorJSON(w, http.StatusInternalServerError, "read report ocr result failed")
 				return
 			}
-			writeJSON(w, http.StatusOK, httpapi.UploadResult{Duplicate: true, Report: toAPIDetail(*existing, items, ocr)})
+			writeJSON(w, http.StatusOK, httpapi.UploadResult{Duplicate: true, Report: toAPIDetail(*existing, sections, items, ocr)})
 			return
 		}
 
@@ -327,12 +337,17 @@ func handleUploadReport(d *deps) http.HandlerFunc {
 			writeErrorJSON(w, http.StatusInternalServerError, "read report items failed")
 			return
 		}
+		sections, err := d.reports.SectionsByImage(ctx, sha)
+		if err != nil {
+			writeErrorJSON(w, http.StatusInternalServerError, "read report sections failed")
+			return
+		}
 		ocr, err := loadReportOCR(ctx, d.reports, sha)
 		if err != nil {
 			writeErrorJSON(w, http.StatusInternalServerError, "read report ocr result failed")
 			return
 		}
-		writeJSON(w, http.StatusCreated, httpapi.UploadResult{Duplicate: false, Report: toAPIDetail(*summary, items, ocr)})
+		writeJSON(w, http.StatusCreated, httpapi.UploadResult{Duplicate: false, Report: toAPIDetail(*summary, sections, items, ocr)})
 	}
 }
 
@@ -410,18 +425,24 @@ func toAPILineBox(b contract.Box) httpapi.Box4x2 {
 	return out
 }
 
+// toAPILineLinks 行号 → 行链接(items 与报告段落共用同一映射口径;越界仅在
+// 数据损坏时出现,跳过不炸整页)。非 nil 空数组:items.ocr_lines 契约要求数组。
+func toAPILineLinks(lineNumbers []int32, ocr *contract.OCRResult) []httpapi.OcrLineLink {
+	links := make([]httpapi.OcrLineLink, 0, len(lineNumbers))
+	for _, ln := range lineNumbers {
+		if ln < 0 || int(ln) >= len(ocr.Boxes) {
+			continue
+		}
+		links = append(links, httpapi.OcrLineLink{Line: int(ln), Box: toAPILineBox(ocr.Boxes[ln])})
+	}
+	return links
+}
+
 // toAPIItem 单个指标项投影(详情与核对响应共用):行链接由识别端直吐的
 // ocr_line_numbers 精确映射(下标 → 行框);越界仅在数据损坏时出现——跳过不炸
 // 整页(raw_text 仍可见),结构完整性由 e2e verify 的 join/box 门禁兜底;
 // prev 属 M3(契约形状先以 null 满足)。
 func toAPIItem(it pipeline.ReportItemRow, ocr *contract.OCRResult) httpapi.ReportItem {
-	ocrLines := make([]httpapi.OcrLineLink, 0, len(it.OCRLineNumbers))
-	for _, ln := range it.OCRLineNumbers {
-		if ln < 0 || int(ln) >= len(ocr.Boxes) {
-			continue
-		}
-		ocrLines = append(ocrLines, httpapi.OcrLineLink{Line: int(ln), Box: toAPILineBox(ocr.Boxes[ln])})
-	}
 	return httpapi.ReportItem{
 		ItemID:        it.ItemID,
 		Name:          it.Name,
@@ -433,14 +454,27 @@ func toAPIItem(it pipeline.ReportItemRow, ocr *contract.OCRResult) httpapi.Repor
 		LowConfidence: it.LowConfidence,
 		RawText:       it.RawText,
 		ReviewStatus:  it.ReviewStatus,
-		OcrLines:      ocrLines,
+		OcrLines:      toAPILineLinks(it.OCRLineNumbers, ocr),
 		Prev:          nil,
 	}
 }
 
-// toAPIDetail 报告详情投影(GET 详情与上传响应共用):头部 + 指标项。
-func toAPIDetail(sum pipeline.ReportSummary, items []pipeline.ReportItemRow, ocr *contract.OCRResult) httpapi.ReportDetail {
+// toAPISection 报告级段落投影:文本原样 + 行号 → 行链接(与 items 同源同构)。
+func toAPISection(s contract.ReportSection, ocr *contract.OCRResult) httpapi.ReportSection {
+	return httpapi.ReportSection{
+		Kind:     s.Kind,
+		Text:     s.Text,
+		OcrLines: toAPILineLinks(s.OCRLineNumbers, ocr),
+	}
+}
+
+// toAPIDetail 报告详情投影(GET 详情与上传响应共用):头部 + 可选报告段落 + 指标项。
+// sections 为空时省略该键(非叙述型报告响应与既有契约逐字节一致)。
+func toAPIDetail(sum pipeline.ReportSummary, sections []contract.ReportSection, items []pipeline.ReportItemRow, ocr *contract.OCRResult) httpapi.ReportDetail {
 	detail := httpapi.ReportDetail{ReportHeader: toAPIReportHeader(sum), Items: make([]httpapi.ReportItem, 0, len(items))}
+	for _, s := range sections {
+		detail.Sections = append(detail.Sections, toAPISection(s, ocr))
+	}
 	for _, it := range items {
 		detail.Items = append(detail.Items, toAPIItem(it, ocr))
 	}

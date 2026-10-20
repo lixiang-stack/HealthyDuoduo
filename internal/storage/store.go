@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -108,6 +109,9 @@ const (
 		 JOIN ocr_results o ON o.id = r.ocr_result_id
 		 WHERE r.image_sha256 = $1`
 
+	// 报告级叙述段落(0006,ADR-0008):非叙述型报告/存量行为 NULL。
+	sqlReportSectionsByImage = `SELECT sections FROM reports WHERE image_sha256 = $1`
+
 	// 归属只写 member_id(failed/success/识别历史不动;改归属端点同用)。
 	sqlReportSetMember = `UPDATE reports SET member_id = $2, updated_at = now()
 		 WHERE image_sha256 = $1`
@@ -153,15 +157,17 @@ const (
 	sqlOCRResultByID = `SELECT engine_output FROM ocr_results WHERE id = $1`
 
 	// 报告行 upsert:测定 identity = 图像 sha256(每图一行);冲突即原位更新(--force 重跑)。
-	// fail_reason 全量更新(pipeline 产出,非 failed 一律 NULL:重算复原时旧原因清除)。
-	sqlReportUpsert = `INSERT INTO reports (image_sha256, ocr_result_id, report_type, report_date, status, fail_reason)
-		 VALUES ($1,$2,$3,$4::date,$5,$6)
+	// fail_reason 全量更新(pipeline 产出,非 failed 一律 NULL:重算复原时旧原因清除);
+	// sections 全量覆盖(非叙述型报告写 NULL,重算复原时旧段落一并清除)。
+	sqlReportUpsert = `INSERT INTO reports (image_sha256, ocr_result_id, report_type, report_date, status, fail_reason, sections)
+		 VALUES ($1,$2,$3,$4::date,$5,$6,$7::jsonb)
 		 ON CONFLICT (image_sha256) DO UPDATE SET
 		     ocr_result_id = excluded.ocr_result_id,
 		     report_type   = excluded.report_type,
 		     report_date   = excluded.report_date,
 		     status        = excluded.status,
 		     fail_reason   = excluded.fail_reason,
+		     sections      = excluded.sections,
 		     updated_at    = now()`
 
 	sqlItemsDeleteByReport = `DELETE FROM report_items WHERE report_sha256 = $1`
@@ -416,6 +422,30 @@ func (s *Store) OCRResultJSONByReport(ctx context.Context, reportSha string) ([]
 	return raw, nil
 }
 
+// SectionsByImage 报告级叙述段落(详情投影,0006/ADR-0008):非叙述型报告/存量 NULL
+// 返回 nil,nil;报告缺失返回 nil,nil(与 SummaryByImage 同口径)。
+func (s *Store) SectionsByImage(ctx context.Context, reportSha string) ([]contract.ReportSection, error) {
+	var raw []byte
+	err := s.pool.QueryRow(ctx, sqlReportSectionsByImage, reportSha).Scan(&raw)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if raw == nil {
+		return nil, nil
+	}
+	var sections []contract.ReportSection
+	if err := json.Unmarshal(raw, &sections); err != nil {
+		return nil, fmt.Errorf("parse report sections: %w", err)
+	}
+	if len(sections) == 0 {
+		return nil, nil
+	}
+	return sections, nil
+}
+
 // SetReportMember 只改报告归属(上传新建/无主归档时赋值,票 06;改归属端点同用)。
 // 报告不存在返回 false, nil(404 口径;0 行更新即报告已不在,不静默虚报成功)。
 func (s *Store) SetReportMember(ctx context.Context, reportSha string, memberID int64) (bool, error) {
@@ -533,8 +563,16 @@ func (s *Store) WriteReport(ctx context.Context, reportSha string, ocrID int64, 
 	}
 	defer tx.Rollback(ctx)
 
+	var sectionsArg any
+	if len(report.Sections) > 0 {
+		raw, err := json.Marshal(report.Sections)
+		if err != nil {
+			return fmt.Errorf("marshal report sections: %w", err)
+		}
+		sectionsArg = string(raw)
+	}
 	if _, err := tx.Exec(ctx, sqlReportUpsert,
-		reportSha, ocrID, report.ReportType, report.ReportDate, report.Status, failReason); err != nil {
+		reportSha, ocrID, report.ReportType, report.ReportDate, report.Status, failReason, sectionsArg); err != nil {
 		return fmt.Errorf("upsert report: %w", err)
 	}
 	if _, err := tx.Exec(ctx, sqlItemsDeleteByReport, reportSha); err != nil {

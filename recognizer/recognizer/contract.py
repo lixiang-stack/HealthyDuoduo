@@ -7,7 +7,7 @@ schema/ 下 JSON 文件是双语共用的源头,本文件与其保持字段一�
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_serializer, model_validator
 
 
 # status / flag 枚举(实施计划 4.2)。str 子类:与 JSON 字面值直接相等(s == "success" 成立),
@@ -87,6 +87,23 @@ class ReportItem(BaseModel):
     )
 
 
+class ReportSection(BaseModel):
+    """报告级叙述段落(仅叙述型报告,如影像单;只读展示,不参与指标项核对)。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: str = Field(
+        min_length=1,
+        description="section kind; known values: exam_name / findings / impression",
+    )
+    text: str = Field(min_length=1, description="section text as printed (OCR lines joined by newline)")
+    ocr_line_numbers: list[int] = Field(
+        min_length=1,
+        description="indices of the OCR lines composing this section "
+        "(0-based, same as txts/boxes; ordered like text)",
+    )
+
+
 class Report(BaseModel):
     """系统对一张图像处理后产出的结构化报告(report_id 等由 Go 落库时赋予)。"""
 
@@ -96,6 +113,11 @@ class Report(BaseModel):
     report_date: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
     status: Status
     items: list[ReportItem]
+    sections: list[ReportSection] | None = Field(
+        default=None,
+        min_length=1,
+        description="optional report-level sections for narrative reports; omitted for non-narrative reports",
+    )
 
     @model_validator(mode="after")
     def _empty_items_must_be_failed(self) -> "Report":
@@ -104,6 +126,15 @@ class Report(BaseModel):
         if not self.items and self.status is not Status.FAILED:
             raise ValueError("report with no items must have status=failed (empty-items invariant)")
         return self
+
+    @model_serializer(mode="wrap")
+    def _omit_empty_sections(self, handler):
+        # sections 是可选集合:非叙述型报告不输出该键(而非 "sections": null),
+        # 这样既有 report golden / JSON 消费方保持逐字节兼容(ADR-0008)。
+        data = handler(self)
+        if data.get("sections") is None:
+            data.pop("sections", None)
+        return data
 
 
 class ReportResponse(BaseModel):
