@@ -21,7 +21,7 @@ import { MemberChips } from '../members/components';
 import { sortMembers } from '../members/order';
 import { needsReassign, reassignConfirmText } from './manage';
 import { EXAM_NAME_KIND, SECTION_LABELS } from './sections';
-import { flagBadges, statusLabel, unreviewedBadge } from './status';
+import { reportBadgeLabels, reportDateLabel, reportStatusLabel } from './status';
 
 // 报告状态色:时间线卡片与详情头部共用。
 export const STATUS_COLORS: Record<ReportSummary['status'], string> = {
@@ -31,15 +31,15 @@ export const STATUS_COLORS: Record<ReportSummary['status'], string> = {
 };
 
 // ReportBadges 异常徽标(偏高/偏低/未知)+「待核对 N 项」;时间线与详情头部共用。
+// 徽标口径由报告类别派生(影像单无指标项、无核对入口:未知与待核对都不显示)。
 export function ReportBadges({ report }: { report: ReportSummary }) {
-  const badges = flagBadges(report.flag_counts);
-  const unreviewed = unreviewedBadge(report.unreviewed_low_confidence_count);
-  if (badges.length === 0 && !unreviewed) {
+  const { flags, unreviewed } = reportBadgeLabels(report);
+  if (flags.length === 0 && !unreviewed) {
     return null;
   }
   return (
     <View style={styles.badges}>
-      {badges.map((badge) => (
+      {flags.map((badge) => (
         <Text key={badge} style={styles.badge}>
           {badge}
         </Text>
@@ -58,20 +58,21 @@ export function ReportCard({
   examName?: string;
 }) {
   const failed = report.status === 'failed';
+  const status = reportStatusLabel(report);
   return (
     <View testID={`report-card-${report.report_id}`} style={styles.card}>
       <View style={styles.headerRow}>
         <Text style={styles.type}>{report.report_type}</Text>
-        <Text style={[styles.status, { color: STATUS_COLORS[report.status] }]}>
-          {statusLabel(report.status)}
-        </Text>
+        {status ? (
+          <Text style={[styles.status, { color: STATUS_COLORS[report.status] }]}>{status}</Text>
+        ) : null}
       </View>
       {examName ? (
         <Text testID="report-exam-name" style={styles.examName}>
           {SECTION_LABELS[EXAM_NAME_KIND]}:{examName}
         </Text>
       ) : null}
-      <Text style={styles.date}>{report.report_date ?? '日期未知'}</Text>
+      <Text style={styles.date}>{reportDateLabel(report)}</Text>
       {failed && report.fail_reason ? <Text style={styles.fail}>{report.fail_reason}</Text> : null}
       <ReportBadges report={report} />
     </View>

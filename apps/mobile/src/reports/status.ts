@@ -1,7 +1,10 @@
 // 报告状态与徽标文案(纯逻辑,spec 固定映射):success→识别完成、partial→待核对、
-// failed→识别失败;徽标按 flag 聚合计数 + 「待核对 N 项」;详情指标项 flag 文案。
+// failed→识别失败;影像单的 partial 没有对应核对动作,不显示状态文案。
+// 徽标按 flag 聚合计数 + 「待核对 N 项」;影像单不呈现指标项,未知与待核对徽标都关闭。
 // 文案中性事实侧,不做解读。
-import type { FlagCounts, ReportItem, ReportSummary, UploadResult } from '../api/reports';
+import type { ReportItem, ReportSummary, UploadResult } from '../api/reports';
+
+import { isImagingReport } from './category';
 
 export type ReportStatus = ReportSummary['status'];
 export type Flag = ReportItem['flag'];
@@ -12,8 +15,27 @@ const STATUS_LABELS: Record<ReportStatus, string> = {
   failed: '识别失败',
 };
 
-export function statusLabel(status: ReportStatus): string {
-  return STATUS_LABELS[status];
+/** 状态文案按报告类别取:检验单 partial 为「待核对」;影像单 partial 无核对动作,不显示。 */
+export function reportStatusLabel(
+  report: Pick<ReportSummary, 'status' | 'report_type'>,
+): string | undefined {
+  if (isImagingReport(report) && report.status === 'partial') {
+    return undefined;
+  }
+  return STATUS_LABELS[report.status];
+}
+
+const DATE_UNKNOWN_LABEL = '日期未知';
+const IMAGING_DATE_UNPRINTED_LABEL = '检查单未印日期';
+
+/** 日期文案按报告类别取:影像单未印日期时明确说「未印」,不暗示识别失败。 */
+export function reportDateLabel(
+  report: Pick<ReportSummary, 'report_date' | 'report_type'>,
+): string {
+  if (report.report_date) {
+    return report.report_date;
+  }
+  return isImagingReport(report) ? IMAGING_DATE_UNPRINTED_LABEL : DATE_UNKNOWN_LABEL;
 }
 
 const FLAG_LABELS: Record<Flag, string> = {
@@ -28,17 +50,21 @@ export function flagLabel(flag: Flag): string {
   return FLAG_LABELS[flag];
 }
 
-/** 异常徽标(偏高/偏低/未知;normal 不计,为 0 的档不出现)。 */
-export function flagBadges(counts: FlagCounts): string[] {
+/** 异常徽标(偏高/偏低/未知;normal 不计,为 0 的档不出现)。
+ * 影像单不呈现指标项,未知档按报告类别关闭。 */
+export function flagBadges(
+  report: Pick<ReportSummary, 'report_type' | 'flag_counts'>,
+): string[] {
+  const { high, low, unknown } = report.flag_counts;
   const badges: string[] = [];
-  if (counts.high > 0) {
-    badges.push(`偏高 ${counts.high}`);
+  if (high > 0) {
+    badges.push(`偏高 ${high}`);
   }
-  if (counts.low > 0) {
-    badges.push(`偏低 ${counts.low}`);
+  if (low > 0) {
+    badges.push(`偏低 ${low}`);
   }
-  if (counts.unknown > 0) {
-    badges.push(`未知 ${counts.unknown}`);
+  if (!isImagingReport(report) && unknown > 0) {
+    badges.push(`未知 ${unknown}`);
   }
   return badges;
 }
@@ -46,6 +72,24 @@ export function flagBadges(counts: FlagCounts): string[] {
 /** 「待核对 N 项」徽标;N=0(failed 恒 0、success 免核对)不出徽标。 */
 export function unreviewedBadge(count: number): string | undefined {
   return count > 0 ? `待核对 ${count} 项` : undefined;
+}
+
+export type ReportBadgeLabels = { flags: string[]; unreviewed?: string };
+
+/** 报告级徽标(时间线/详情共用):影像单不呈现指标项、没有核对入口,
+ * 未知与待核对徽标都不显示;其余类别保持原口径。 */
+export function reportBadgeLabels(
+  report: Pick<
+    ReportSummary,
+    'report_type' | 'flag_counts' | 'unreviewed_low_confidence_count'
+  >,
+): ReportBadgeLabels {
+  return {
+    flags: flagBadges(report),
+    unreviewed: isImagingReport(report)
+      ? undefined
+      : unreviewedBadge(report.unreviewed_low_confidence_count),
+  };
 }
 
 /** 上传等待达到此毫秒数后提示核对后端可达性(NF-04 预期 <3s,此为超时提示阈值)。 */

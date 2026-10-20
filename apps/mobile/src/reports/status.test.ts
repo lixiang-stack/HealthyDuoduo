@@ -1,19 +1,54 @@
 import type { ReportDetail, UploadResult } from '../api/reports';
 
+import { IMAGING_REPORT_TYPE } from './category';
 import {
   flagBadges,
   flagLabel,
-  statusLabel,
+  reportBadgeLabels,
+  reportDateLabel,
+  reportStatusLabel,
   unreviewedBadge,
   uploadResultText,
   uploadWaitText,
 } from './status';
 
-describe('statusLabel', () => {
-  it('状态文案映射固定:success→识别完成、partial→待核对、failed→识别失败', () => {
-    expect(statusLabel('success')).toBe('识别完成');
-    expect(statusLabel('partial')).toBe('待核对');
-    expect(statusLabel('failed')).toBe('识别失败');
+const report: ReportDetail = {
+  report_id: 'a'.repeat(64),
+  member_id: 1,
+  report_type: '血常规',
+  report_date: '2026-10-01',
+  status: 'success',
+  fail_reason: null,
+  flag_counts: { high: 0, low: 0, unknown: 0 },
+  unreviewed_low_confidence_count: 0,
+  items: [],
+};
+
+const imaging = { ...report, report_type: IMAGING_REPORT_TYPE };
+
+describe('reportStatusLabel', () => {
+  it('检验单状态文案固定:success→识别完成、partial→待核对、failed→识别失败', () => {
+    expect(reportStatusLabel({ ...report, status: 'success' })).toBe('识别完成');
+    expect(reportStatusLabel({ ...report, status: 'partial' })).toBe('待核对');
+    expect(reportStatusLabel({ ...report, status: 'failed' })).toBe('识别失败');
+  });
+
+  it('影像单不显示没有对应动作的「待核对」;success/failed 仍给出状态', () => {
+    expect(reportStatusLabel({ ...imaging, status: 'partial' })).toBeUndefined();
+    expect(reportStatusLabel({ ...imaging, status: 'success' })).toBe('识别完成');
+    expect(reportStatusLabel({ ...imaging, status: 'failed' })).toBe('识别失败');
+  });
+});
+
+describe('reportDateLabel', () => {
+  it('检验单缺日期显示「日期未知」,有日期照常显示', () => {
+    expect(reportDateLabel({ ...report, report_date: null })).toBe('日期未知');
+    expect(reportDateLabel(report)).toBe('2026-10-01');
+  });
+
+  it('影像单缺日期显示「检查单未印日期」,有日期照常显示', () => {
+    expect(reportDateLabel({ ...imaging, report_date: null })).toBe('检查单未印日期');
+    expect(reportDateLabel({ ...imaging, report_date: '2024-09-15' })).toBe('2024-09-15');
   });
 });
 
@@ -28,9 +63,42 @@ describe('flagLabel', () => {
 
 describe('flagBadges', () => {
   it('按偏高/偏低/未知聚合;normal 不计、为 0 的档不出现', () => {
-    expect(flagBadges({ high: 5, low: 2, unknown: 1 })).toEqual(['偏高 5', '偏低 2', '未知 1']);
-    expect(flagBadges({ high: 0, low: 0, unknown: 0 })).toEqual([]);
-    expect(flagBadges({ high: 3, low: 0, unknown: 2 })).toEqual(['偏高 3', '未知 2']);
+    expect(flagBadges({ ...report, flag_counts: { high: 5, low: 2, unknown: 1 } })).toEqual([
+      '偏高 5',
+      '偏低 2',
+      '未知 1',
+    ]);
+    expect(flagBadges({ ...report, flag_counts: { high: 0, low: 0, unknown: 0 } })).toEqual([]);
+    expect(flagBadges({ ...report, flag_counts: { high: 3, low: 0, unknown: 2 } })).toEqual([
+      '偏高 3',
+      '未知 2',
+    ]);
+  });
+
+  it('影像单按类别关闭未知档(指标项不呈现),偏高/偏低仍保留', () => {
+    expect(
+      flagBadges({ ...imaging, flag_counts: { high: 3, low: 1, unknown: 2 } }),
+    ).toEqual(['偏高 3', '偏低 1']);
+    expect(flagBadges({ ...imaging, flag_counts: { high: 0, low: 0, unknown: 2 } })).toEqual([]);
+  });
+});
+
+describe('reportBadgeLabels', () => {
+  it('影像单不出未知 / 待核对徽标;检验单保持原口径', () => {
+    expect(
+      reportBadgeLabels({
+        ...imaging,
+        flag_counts: { high: 1, low: 0, unknown: 6 },
+        unreviewed_low_confidence_count: 1,
+      }),
+    ).toEqual({ flags: ['偏高 1'], unreviewed: undefined });
+    expect(
+      reportBadgeLabels({
+        ...report,
+        flag_counts: { high: 3, low: 0, unknown: 2 },
+        unreviewed_low_confidence_count: 1,
+      }),
+    ).toEqual({ flags: ['偏高 3', '未知 2'], unreviewed: '待核对 1 项' });
   });
 });
 
@@ -50,18 +118,6 @@ describe('uploadWaitText', () => {
 });
 
 describe('uploadResultText', () => {
-  const report: ReportDetail = {
-    report_id: 'a'.repeat(64),
-    member_id: 1,
-    report_type: '血常规',
-    report_date: '2026-10-01',
-    status: 'success',
-    fail_reason: null,
-    flag_counts: { high: 0, low: 0, unknown: 0 },
-    unreviewed_low_confidence_count: 0,
-    items: [],
-  };
-
   it('重复上传:明确已归档、未重复上传', () => {
     const result: UploadResult = { duplicate: true, report };
     expect(uploadResultText(result)).toBe('这张图已经归档过,未重复上传');

@@ -65,6 +65,8 @@ export async function stubFileChooser(browser: Browser): Promise<void> {
   reportExamName: 'report-exam-name',
   reportSection: (index: number) => `report-section-${index}`,
   reportSectionZoom: (index: number) => `report-section-zoom-${index}`,
+  reportImageToggle: 'report-image-toggle',
+  reportImage: 'report-image',
   reviewItem: (itemId: number) => `review-item-${itemId}`,
   reviewConfirm: (itemId: number) => `review-confirm-${itemId}`,
   reviewCorrect: (itemId: number) => `review-correct-${itemId}`,
