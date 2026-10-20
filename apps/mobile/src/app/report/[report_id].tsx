@@ -4,6 +4,7 @@ import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View
 
 import { sharedStyles } from '../../components/styles';
 import { colors } from '../../components/theme';
+import { isImagingReport } from '../../reports/category';
 import { ReportCard, ReportManageCard, ReportSectionCard } from '../../reports/components';
 import { pendingItems } from '../../review/items';
 import { ReviewItemCard } from '../../review/components';
@@ -26,7 +27,9 @@ export default function ReportDetailScreen() {
   const [imageOverride, setImageOverride] = useState<boolean>();
 
   const report = state.status === 'ready' ? state.report : undefined;
-  const pending = report ? pendingItems(report.items) : [];
+  // 影像单是叙述文档:主体为段落 + 原图,不呈现检验单式指标项与核对入口(票 03)。
+  const imaging = report !== undefined && isImagingReport(report);
+  const pending = report && !imaging ? pendingItems(report.items) : [];
   const examName = examNameText(report?.sections);
   const sectionCards = reportSectionCards(report?.sections);
   const imageVisible =
@@ -77,7 +80,9 @@ export default function ReportDetailScreen() {
 
           {report.status === 'failed' ? (
             <View style={styles.card}>
-              <Text style={sharedStyles.muted}>这张检查单没有识别出可核对的指标项。</Text>
+              {!imaging ? (
+                <Text style={sharedStyles.muted}>这张检查单没有识别出可核对的指标项。</Text>
+              ) : null}
               <Link href="/upload" style={styles.link}>
                 重新拍照上传(生成新报告,原报告与识别记录保留)
               </Link>
@@ -93,25 +98,32 @@ export default function ReportDetailScreen() {
             </Link>
           ) : null}
 
-          {report.items.length > 0 ? (
+          {!imaging && report.items.length > 0 ? (
             <Text style={styles.sectionTitle}>指标项({report.items.length})</Text>
           ) : null}
-          {report.items.map((item) => (
-            <ReviewItemCard
-              key={item.item_id}
-              item={item}
-              reportId={report.report_id}
-              client={state.client}
-              imageUrl={state.imageUrl}
-              onUpdated={applyReview}
-            />
-          ))}
+          {!imaging
+            ? report.items.map((item) => (
+                <ReviewItemCard
+                  key={item.item_id}
+                  item={item}
+                  reportId={report.report_id}
+                  client={state.client}
+                  imageUrl={state.imageUrl}
+                  onUpdated={applyReview}
+                />
+              ))
+            : null}
 
-          <Pressable onPress={() => setImageOverride(!imageVisible)}>
+          <Pressable testID="report-image-toggle" onPress={() => setImageOverride(!imageVisible)}>
             <Text style={styles.link}>{imageVisible ? '收起检查单原图' : '查看检查单原图'}</Text>
           </Pressable>
           {imageVisible ? (
-            <Image source={{ uri: state.imageUrl }} style={styles.image} resizeMode="contain" />
+            <Image
+              testID="report-image"
+              source={{ uri: state.imageUrl }}
+              style={styles.image}
+              resizeMode="contain"
+            />
           ) : null}
 
           {/* 自愈操作(票 10):改归属(时间线移位)与删除(确认后回时间线,报告已不在)。 */}

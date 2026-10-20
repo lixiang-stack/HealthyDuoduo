@@ -3,6 +3,7 @@
 // 运行入口:apps/mobile `npm run e2e`(专用栈启停见 e2e/run.sh)。
 import { beforeAll, describe, test } from '@e2e-dev/web';
 import { expect } from 'e2e';
+import type { Screen } from 'e2e';
 
 import {
   API_BASE_URL,
@@ -12,11 +13,27 @@ import {
   seedData,
   stubFileChooser,
   testID,
+  type ReportDetail,
   type Seed,
   type UploadResult,
 } from '../support';
 
 let seed!: Seed;
+
+// 影像单详情主体(票 03):指标项 / 未知 / 待核对 / 逐项核对不出现;原图入口可展开。
+async function expectImagingDetail(screen: Screen, report: ReportDetail): Promise<void> {
+  await expect(screen.getByText(/指标项/)).toHaveCount(0);
+  await expect(screen.getByText(/未知/)).toHaveCount(0);
+  await expect(screen.getByText(/待核对/)).toHaveCount(0);
+  await expect(screen.getByText(/逐项核对/)).toHaveCount(0);
+  for (const item of report.items) {
+    await expect(screen.getByTestId(testID.reviewItem(item.item_id))).toHaveCount(0);
+  }
+  await expect(screen.getByTestId(testID.reportImageToggle)).toBeVisible();
+  await expect(screen.getByTestId(testID.reportImage)).toHaveCount(0);
+  await screen.getByTestId(testID.reportImageToggle).tap();
+  await expect(screen.getByTestId(testID.reportImage)).toBeVisible();
+}
 
 describe('App E2E', { serial: true, timeout: 300_000 }, () => {
   beforeAll(async () => {
@@ -51,10 +68,23 @@ describe('App E2E', { serial: true, timeout: 300_000 }, () => {
     await openConfigured(app, browser, '/timeline', { memberId: seed.xiaoming.member_id });
     await expect(screen.getByTestId(testID.reportCard(seed.reviewReport.report_id))).toBeVisible();
     await expect(screen.getByTestId(testID.reportCard(seed.healReport.report_id))).toHaveCount(0);
+    // 影像单不呈现指标项:卡片无未知 / 待核对徽标,未印日期文案按类别区分(票 03)。
+    const imaging01Card = screen.getByTestId(testID.reportCard(seed.imaging01.report_id));
+    const imaging03Card = screen.getByTestId(testID.reportCard(seed.imaging03.report_id));
+    await expect(imaging01Card).toContainText('检查单未印日期');
+    await expect(imaging01Card).not.toContainText(/未知|待核对/);
+    await expect(imaging03Card).not.toContainText(/未知|待核对/);
 
     await screen.getByTestId(testID.memberChip(seed.mama.member_id)).tap();
     await expect(screen.getByTestId(testID.reportCard(seed.healReport.report_id))).toBeVisible();
     await expect(screen.getByTestId(testID.reportCard(seed.reviewReport.report_id))).toHaveCount(0);
+    // 检验单卡片保持原样:未知徽标与非零待核对徽标仍显示。
+    await expect(screen.getByTestId(testID.reportCard(seed.healReport.report_id))).toContainText(
+      /未知 \d+/,
+    );
+    await expect(screen.getByTestId(testID.reportCard(seed.healReport.report_id))).toContainText(
+      /待核对 \d+ 项/,
+    );
   });
 
   test('上传样张后时间线出现新报告', async ({ app, browser, screen }) => {
@@ -74,7 +104,7 @@ describe('App E2E', { serial: true, timeout: 300_000 }, () => {
     await expect(screen.getByTestId(testID.reportCard(payload.report.report_id))).toBeVisible();
   });
 
-  test('影像单 us_03:检查项目 / 超声提示 / 日期 / 指标项,无检查所见', async ({
+  test('影像单 us_03:检查项目 / 超声提示 / 日期 / 原图,不呈现指标项与未知', async ({
     app,
     browser,
     screen,
@@ -83,10 +113,10 @@ describe('App E2E', { serial: true, timeout: 300_000 }, () => {
     const sections = report.sections ?? [];
     const impression = sections.find((section) => section.kind === 'impression')!;
     const impressionIndex = sections.indexOf(impression);
-    const femur = report.items.find((item) => item.name === '股骨长');
     expect(report.report_date).toBe('2024-09-15');
     expect(sections.some((section) => section.kind === 'findings')).toBe(false);
-    expect(femur).toBeDefined();
+    // 后端数据仍有指标项(本期不改抽取);App 仅对影像单不呈现。
+    expect(report.items.length).toBeGreaterThan(0);
 
     await openConfigured(app, browser, `/report/${report.report_id}`, {
       memberId: seed.xiaoming.member_id,
@@ -103,7 +133,8 @@ describe('App E2E', { serial: true, timeout: 300_000 }, () => {
     await expect(screen.getByTestId(testID.reportSection(impressionIndex))).toContainText(
       impression.text,
     );
-    await expect(screen.getByTestId(testID.reviewItem(femur!.item_id))).toContainText('股骨长');
+
+    await expectImagingDetail(screen, report);
   });
 
   test('影像单 us_01:检查项目 / 检查所见 / 超声提示三段完整,段落卡可缩放原图', async ({
@@ -119,18 +150,25 @@ describe('App E2E', { serial: true, timeout: 300_000 }, () => {
     const impression = sections.find((section) => section.kind === 'impression')!;
     const impressionIndex = sections.indexOf(impression);
     expect(examName).toBeDefined();
+    expect(report.report_date).toBeNull();
+    expect(report.items.length).toBeGreaterThan(0);
 
     await openConfigured(app, browser, `/report/${report.report_id}`, {
       memberId: seed.xiaoming.member_id,
     });
     await expect(screen.getByTestId(testID.reportExamName)).toContainText('检查项目');
     await expect(screen.getByTestId(testID.reportExamName)).toContainText(examName!.text);
+    // 影像单未印日期:明确「未印」,不显示检验单口径的「日期未知」(票 03)。
+    await expect(screen.getByText('检查单未印日期')).toBeVisible();
+    await expect(screen.getByText('日期未知')).toHaveCount(0);
     await expect(screen.getByTestId(testID.reportSection(findingsIndex))).toContainText('检查所见');
     await expect(screen.getByTestId(testID.reportSection(findingsIndex))).toContainText(findings.text);
     await expect(screen.getByTestId(testID.reportSection(impressionIndex))).toContainText('超声提示');
     await expect(screen.getByTestId(testID.reportSection(impressionIndex))).toContainText(
       impression.text,
     );
+
+    await expectImagingDetail(screen, report);
 
     await screen.getByTestId(testID.reportSection(findingsIndex)).tap();
     await expect(screen.getByTestId(testID.reportSectionZoom(findingsIndex))).toBeVisible();
@@ -155,6 +193,8 @@ describe('App E2E', { serial: true, timeout: 300_000 }, () => {
       memberId: seed.xiaoming.member_id,
     });
     await expect(screen.getByTestId(testID.reviewItem(pending!.item_id))).toContainText('已确认');
+    // 检验单详情保持原路径:指标项标题仍在(票 03 只改影像单)。
+    await expect(screen.getByText(/指标项/)).toBeVisible();
 
     const target = seed.reviewReport.items.find(
       (item) => item.item_id !== pending!.item_id && item.value !== null,
@@ -170,6 +210,15 @@ describe('App E2E', { serial: true, timeout: 300_000 }, () => {
     await openConfigured(app, browser, `/report/${seed.healReport.report_id}`, {
       memberId: seed.mama.member_id,
     });
+    // 检验单详情保持原路径:待核对 / 未知徽标、指标项与逐项核对入口仍在(票 03 只改影像单)。
+    await expect(screen.getByText('待核对')).toBeVisible();
+    await expect(screen.getByText(/未知 \d+/)).toBeVisible();
+    const unknownItem = seed.healReport.items.find((item) => item.flag === 'unknown');
+    expect(unknownItem).toBeDefined();
+    await expect(screen.getByTestId(testID.reviewItem(unknownItem!.item_id))).toContainText('未知');
+    await expect(screen.getByText(/指标项/)).toBeVisible();
+    await expect(screen.getByText(/逐项核对/)).toBeVisible();
+
     await screen.getByTestId('report-manage-reassign').tap();
     await screen.getByTestId(testID.memberChip(seed.xiaoming.member_id)).tap();
     await expect(screen.getByText('把报告从「E2E 妈妈」改派给「E2E 小明」?')).toBeVisible();
