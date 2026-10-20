@@ -146,6 +146,42 @@ def report_shas() -> set[str]:
     return {s for s in psql("select image_sha256 from reports;").split() if s}
 
 
+def orphan_images() -> list[dict[str, str]]:
+    """有 images 行、无 reports 行的半截 ingest;带图片/OCR 入库时间用于定位引入时间。"""
+    q = (
+        "select i.sha256 || chr(31) || replace(i.original_filename, chr(31), ' ') || chr(31) || "
+        "to_char(i.created_at, 'YYYY-MM-DD HH24:MI:SSOF') || chr(31) || "
+        "coalesce((select min(to_char(o.created_at, 'YYYY-MM-DD HH24:MI:SSOF'))"
+        " from ocr_results o where o.image_sha256 = i.sha256), '') "
+        "from images i where not exists ("
+        "select 1 from reports r where r.image_sha256 = i.sha256) "
+        "order by i.created_at;"
+    )
+    out: list[dict[str, str]] = []
+    for line in psql(q).splitlines():
+        parts = (line.split(chr(31)) + ["", "", "", ""])[:4]
+        out.append(
+            dict(zip(("sha", "filename", "image_created", "ocr_created"), parts))
+        )
+    return out
+
+
+def verify_no_orphans() -> None:
+    """孤儿图像门禁:images 有、reports 无 → 半截 ingest;报出文件名与入库时间。"""
+    orphans = orphan_images()
+    if orphans:
+        lines = [
+            f"  {o['sha'][:12]} {o['filename']} image_created={o['image_created']}"
+            f" ocr_created={o['ocr_created'] or '-'}"
+            for o in orphans
+        ]
+        raise SystemExit(
+            "FAIL: orphan images (images without reports; half-ingested):\n"
+            + "\n".join(lines)
+        )
+    print("ok: no orphan images")
+
+
 def stats() -> dict[str, int]:
     q = (
         "select (select count(*) from images),(select count(*) from ocr_results),"
@@ -416,6 +452,14 @@ def refresh(from_root: Path) -> None:
     ):
         subprocess.run(cmd, cwd=from_root, check=True)
     wait_healthz()
+    orphans = orphan_images()
+    if orphans:
+        print(f"warn: {len(orphans)} orphan image(s) without report (reparse skipped):")
+        for o in orphans:
+            print(
+                f"  {o['sha'][:12]} {o['filename']} image_created={o['image_created']}"
+                f" ocr_created={o['ocr_created'] or '-'}"
+            )
     done_in_round = reparse_batch(from_root, sorted(report_shas()))
     print(f"refresh ok ({done_in_round} reparses)")
 
@@ -585,6 +629,7 @@ def _trend_rows(item: str, show_all: bool, from_root: Path) -> list[dict]:
 
 def verify(item: str, from_root: Path) -> None:
     """真实数据不变量(无需 seed;refresh 之后的收口检查)。"""
+    verify_no_orphans()
     # 词典/单位家族语义跟随被测检出(--from)加载,避免吞并进 harness 自身的旧规则
     sys.path.insert(0, str(Path(from_root) / "recognizer"))
     import importlib

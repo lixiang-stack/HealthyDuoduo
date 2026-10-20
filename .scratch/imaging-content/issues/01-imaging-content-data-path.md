@@ -29,5 +29,6 @@
 - 内环：pytest 213 passed / 28 skipped；go test ./... 全绿；golden 只有 us_01/02/03 变化，其余 report golden 逐字节不变。
 - 共享栈：`refresh` 19 reparses ok（0007 自动升版）；`verify` 全 ok；三张影像单 DB sections 与 golden 逐字段一致；非影像报告 `sections` 为 NULL。
 - API 冒烟：新 `hdd serve` 详情对 us_01 返回 3 个 sections（行链接齐全）；cbc_01 详情不输出 `sections`。
-- 已知边界：`22f705…` 是共享库里一张半截真实图（有 OCR、无 reports 行，文件名 `11005edc-….jpeg`），不是 samples/golden；`refresh` 已按 reports 取身份并跳过它。`verify --golden` 按标准序列需先 `seed`；无报告样本现在会清晰报 `FAIL: <sid> not in db`（不再 `hdr[0]` TypeError）。App 详情页/段落卡归票 02。
+- 数据完整性：`refresh` 按 reports 取身份，无 reports 行的半截图不参与 reparse；`verify` 新增孤儿图像门禁（输出 sha / 文件名 / 图片与 OCR 入库时间，便于定位引入时间）。本次已清理共享库 1 张孤儿图像（S3 对象按 e2e clean 惯例保留）。
+- `verify --golden` 按标准序列需先 `seed`；无报告样本现在会清晰报 `FAIL: <sid> not in db`（不再 `hdr[0]` TypeError）。App 详情页/段落卡归票 02。
 
