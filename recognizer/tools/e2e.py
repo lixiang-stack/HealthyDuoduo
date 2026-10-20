@@ -10,9 +10,11 @@
   uv run --project recognizer python tools/e2e.py seed [--with-local] # ingest samples/ 图(--with-local 追加 data/ 本地图)
   uv run --project recognizer python tools/e2e.py clean              # 移除 seed 写入的行(S3 对象保留:惰性字节,重 ingest 幂等)
   uv run --project recognizer python tools/e2e.py verify [--item 血小板] [--golden]
-      # 默认:真实数据不变量——单位 ∈ 注册规范形/族外原文、ocr_lines 链接覆盖率与几何裕度
-      # (经 hdd serve /api/v1)、trend 质量门口径、delta 只在可信点间
-      # --golden:seed 后逐张对比 DB 报告 vs samples/expected/report(全链路 HTTP+OCR+DB 写入一致)
+      # 默认:真实数据不变量——单位 ∈ 注册规范形/族外原文、items/sections 的
+      # ocr_lines 链接覆盖率与几何裕度(经 hdd serve /api/v1)、trend 质量门口径、
+      # delta 只在可信点间
+      # --golden:seed 后逐张对比 DB 报告 vs samples/expected/report(全链路
+      # HTTP+OCR+DB 写入一致;items 逐字段 + 可选 sections 逐段)
 
 标准验证序列(refresh → verify → seed → verify --golden → clean)。
 
@@ -535,12 +537,21 @@ def _serve_json(path: str) -> dict:
         return json.loads(resp.read())
 
 
+def _check_ocr_box(sha: str, label: str, link: dict, boxes: list) -> None:
+    """行链接框必须逐点等于该行 OCR box(结构与坐标同源)。"""
+    if link["box"] != boxes[link["line"]]:
+        raise SystemExit(f"FAIL: {sha[:12]} {label} line {link['line']} box 与 OCR box 不一致")
+
+
 def verify_ocr_lines() -> None:
     """ocr_lines 行链接持续度量(GET /reports/{id} 契约;票 07 引入、票 02 收编为门禁)。
 
     · 覆盖率与结构一致性(硬门禁):每份报告的每个指标项必须有行链接,且
       「链接行文本按序 join == raw_text」、链接框逐点等于该行 OCR box——
       结构错位或识别端 raw_text join 格式漂移在此 fail-fast。
+    · 报告段落(硬门禁):HTTP 段落数必须等于 DB reports.sections 基数(防旧 serve
+      静默省略),每段必须有行链接,且链接行文本逐行与 text 一致(首行允许锚词/
+      标签前缀)、链接框逐点等于该行 OCR box(票 02 收编)。
     · 歧义度(度量):有链接行文本在单内多次出现的项数——同文本行的绑定歧义面;
       v2 前由服务端几何消歧消化,v2 后由识别端直吐下标,此处保留为持续观测(>0 属常态)。
     · 歧义裕度(度量):链接行中心 y 的展开 / 最大行高——同一视觉行内应远小于 1,
@@ -548,8 +559,17 @@ def verify_ocr_lines() -> None:
       真正的最优解-备选解差值只在识别/服务端内部可见,无法经契约暴露,故以
       「所选解的几何聚拢度」为外部代理;>1 打印告警供人工抽查。
     """
-    shas = [s for s in psql("select image_sha256 from reports order by image_sha256;").splitlines() if s]
+    section_counts: dict[str, int] = {}
+    for line in psql(
+        "select image_sha256, coalesce(jsonb_array_length(sections),0)"
+        " from reports order by image_sha256;"
+    ).splitlines():
+        if line:
+            sha, count = line.split("|")
+            section_counts[sha] = int(count)
+    shas = list(section_counts)
     total_items = linked_items = ambiguous = 0
+    total_sections = linked_sections = 0
     worst_ratio, worst = 0.0, "-"
     for sha in shas:
         try:
@@ -583,10 +603,7 @@ def verify_ocr_lines() -> None:
                     f" {joined!r} != {item['raw_text']!r}"
                 )
             for l in links:
-                if l["box"] != boxes[l["line"]]:
-                    raise SystemExit(
-                        f"FAIL: {sha[:12]} item {item['name']!r} line {l['line']} box 与 OCR box 不一致"
-                    )
+                _check_ocr_box(sha, f"item {item['name']!r}", l, boxes)
             linked_texts = [txts[l["line"]] for l in links]
             if any(txts.count(t) > 1 for t in linked_texts):
                 ambiguous += 1
@@ -598,8 +615,42 @@ def verify_ocr_lines() -> None:
             ratio = (max(cys) - min(cys)) / max(max(heights), 1.0)
             if ratio > worst_ratio:
                 worst_ratio, worst = ratio, f"{sha[:12]}/{item['name']}"
+        # 报告段落(票 02):HTTP 段落数必须与 DB 一致(旧 serve 省略 sections 时
+        # 不能静默通过);段落文本 = OCR 行以换行拼接,首行可含锚词/标签前缀。
+        served_sections = detail.get("sections") or []
+        if len(served_sections) != section_counts[sha]:
+            raise SystemExit(
+                f"FAIL: {sha[:12]} HTTP sections {len(served_sections)}"
+                f" != db {section_counts[sha]} (hdd serve 是否已重建?)"
+            )
+        for section in served_sections:
+            total_sections += 1
+            links = section["ocr_lines"]
+            if not links:
+                raise SystemExit(
+                    f"FAIL: {sha[:12]} section {section['kind']!r} 无 ocr_lines(text={section['text']!r})"
+                )
+            text_lines = section["text"].split("\n")
+            if len(text_lines) != len(links):
+                raise SystemExit(
+                    f"FAIL: {sha[:12]} section {section['kind']!r} 行数不一致:"
+                    f" text={len(text_lines)} links={len(links)}"
+                )
+            for pos, (text_line, l) in enumerate(zip(text_lines, links)):
+                ocr_line = txts[l["line"]]
+                matched = ocr_line.endswith(text_line) if pos == 0 else ocr_line == text_line
+                if not matched:
+                    raise SystemExit(
+                        f"FAIL: {sha[:12]} section {section['kind']!r} line {l['line']} 与 text 不一致:"
+                        f" {ocr_line!r} != {text_line!r}"
+                    )
+                _check_ocr_box(sha, f"section {section['kind']!r}", l, boxes)
+            linked_sections += 1
     # 覆盖率即"无链接项"已在上文逐项 raise;此处只作摘要输出(结构门禁的失败路径都是 raise)。
-    print(f"ok: ocr-lines: linked {linked_items}/{total_items} items; join/box 一致")
+    print(
+        f"ok: ocr-lines: linked {linked_items}/{total_items} items,"
+        f" {linked_sections}/{total_sections} sections; join/box 一致"
+    )
     margin_msg = (
         f"ocr-lines margin: ambiguous-resolution {ambiguous}/{total_items},"
         f" max y-spread ratio {worst_ratio:.2f} (worst {worst})"
@@ -708,10 +759,10 @@ def verify(item: str, from_root: Path) -> None:
 
 
 def verify_golden(from_base: Path) -> None:
-    """--golden:逐张比对 DB 指标项 vs <from_base>/samples/expected/report(全链路一致)。
+    """--golden:逐张比对 DB 指标项 / 报告段落 vs <from_base>/samples/expected/report(全链路一致)。
 
     report_date/status 会因 ingest --date 补录而与 golden(纯解析)合法偏离 → 警告不判红;
-    items(解析产物)要求逐字段一致。
+    items(解析产物)要求逐字段一致;sections 可选,存在时逐段逐字段一致。
     """
     for sid, f in sample_images().items():
         golden = json.loads(
@@ -721,7 +772,8 @@ def verify_golden(from_base: Path) -> None:
         hdr = json.loads(
             psql(
                 "select coalesce(json_agg(row_to_json(t)),'null') from ("
-                " select report_type, status, to_char(report_date,'YYYY-MM-DD') report_date from reports"
+                " select report_type, status, to_char(report_date,'YYYY-MM-DD') report_date,"
+                " sections from reports"
                 f" where image_sha256 = '{sha}') t;"
             ).strip()
         )
@@ -766,6 +818,26 @@ def verify_golden(from_base: Path) -> None:
                     f"  db    ={json.dumps(db[bad_at], ensure_ascii=False)}"
                 )
         _check(True, f"{sid}: {len(gitems)} items identical to golden")
+        # 报告段落(票 02):非影像报告 golden 无该键,DB 必须为 NULL;影像报告逐段
+        # 逐字段比对 kind/text/ocr_line_numbers(行号顺序即文本组成顺序)。
+        gsections, dbsections = golden.get("sections"), got.get("sections")
+        if gsections is None:
+            _check(dbsections is None, f"{sid}: non-narrative sections absent")
+        else:
+            dbsections = dbsections or []
+            _check(
+                len(dbsections) == len(gsections),
+                f"{sid}: {len(dbsections)} sections == golden {len(gsections)}",
+            )
+            for pos, (g, db) in enumerate(zip(gsections, dbsections)):
+                for field in ("kind", "text", "ocr_line_numbers"):
+                    if g.get(field) != db.get(field):
+                        raise SystemExit(
+                            f"FAIL: {sid} section #{pos} field '{field}':\n"
+                            f"  golden={json.dumps(g.get(field), ensure_ascii=False)}\n"
+                            f"  db    ={json.dumps(db.get(field), ensure_ascii=False)}"
+                        )
+            _check(True, f"{sid}: {len(gsections)} sections identical to golden")
         if got["report_date"] != golden["report_date"]:
             print(
                 f"warn: {sid} date/status diverge from golden (ingest --date 补录或 reparse 滞后):"

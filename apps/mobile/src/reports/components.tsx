@@ -8,12 +8,19 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 
 import type { ApiClient } from '../api/client';
 import { listMembers, type Member } from '../api/members';
-import { deleteReport, reassignReport, type ReportSummary } from '../api/reports';
+import {
+  deleteReport,
+  reassignReport,
+  type ReportSection,
+  type ReportSummary,
+} from '../api/reports';
+import { LineZoom } from '../components/LineZoom';
 import { sharedStyles } from '../components/styles';
 import { colors } from '../components/theme';
 import { MemberChips } from '../members/components';
 import { sortMembers } from '../members/order';
 import { needsReassign, reassignConfirmText } from './manage';
+import { EXAM_NAME_KIND, SECTION_LABELS } from './sections';
 import { flagBadges, statusLabel, unreviewedBadge } from './status';
 
 // 报告状态色:时间线卡片与详情头部共用。
@@ -42,7 +49,14 @@ export function ReportBadges({ report }: { report: ReportSummary }) {
   );
 }
 
-export function ReportCard({ report }: { report: ReportSummary }) {
+export function ReportCard({
+  report,
+  examName,
+}: {
+  report: ReportSummary;
+  /** 影像单检查项目(票 02):仅详情页传入,时间线/核对页头部保持原样。 */
+  examName?: string;
+}) {
   const failed = report.status === 'failed';
   return (
     <View testID={`report-card-${report.report_id}`} style={styles.card}>
@@ -52,10 +66,50 @@ export function ReportCard({ report }: { report: ReportSummary }) {
           {statusLabel(report.status)}
         </Text>
       </View>
+      {examName ? (
+        <Text testID="report-exam-name" style={styles.examName}>
+          {SECTION_LABELS[EXAM_NAME_KIND]}:{examName}
+        </Text>
+      ) : null}
       <Text style={styles.date}>{report.report_date ?? '日期未知'}</Text>
       {failed && report.fail_reason ? <Text style={styles.fail}>{report.fail_reason}</Text> : null}
       <ReportBadges report={report} />
     </View>
+  );
+}
+
+// ReportSectionCard 报告段落卡(票 02;影像单检查所见 / 超声提示):整段原文按
+// sections 数组序展示;点卡片在同位置展开 LineZoom,按该段 ocr_lines 缩放到原图
+// 对应区域(与核对项三方对照共用实现)。
+export function ReportSectionCard({
+  index,
+  label,
+  section,
+  imageUrl,
+}: {
+  index: number;
+  label: string;
+  section: ReportSection;
+  imageUrl: string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <Pressable
+      testID={`report-section-${index}`}
+      style={styles.sectionCard}
+      onPress={() => setExpanded((prev) => !prev)}
+    >
+      <Text style={styles.sectionLabel}>{label}</Text>
+      <Text style={styles.sectionText}>{section.text}</Text>
+      {expanded ? (
+        <LineZoom
+          testID={`report-section-zoom-${index}`}
+          imageUrl={imageUrl}
+          lines={section.ocr_lines}
+        />
+      ) : null}
+      <Text style={styles.sectionHint}>{expanded ? '收起原图对照' : '点击对照原图'}</Text>
+    </Pressable>
   );
 }
 
@@ -272,6 +326,17 @@ const styles = StyleSheet.create({
   type: { fontSize: 16, color: colors.text },
   status: { fontSize: 13 },
   date: { fontSize: 13, color: colors.muted },
+  examName: { fontSize: 14, color: colors.text, lineHeight: 20 },
+  sectionCard: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    padding: 12,
+    gap: 6,
+  },
+  sectionLabel: { fontSize: 13, color: colors.muted },
+  sectionText: { fontSize: 14, color: colors.text, lineHeight: 21 },
+  sectionHint: { fontSize: 12, color: colors.accent },
   fail: { fontSize: 13, color: colors.fail },
   badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 },
   badge: {
