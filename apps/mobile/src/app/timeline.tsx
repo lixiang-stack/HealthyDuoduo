@@ -1,10 +1,6 @@
-import { Link, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { Link, useLocalSearchParams } from 'expo-router';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { listMembers, type Member } from '../api/members';
-import { listReports, type ReportSummary } from '../api/reports';
-import { resolveApiClient } from '../api/resolveClient';
 import { sharedStyles } from '../components/styles';
 import { colors } from '../components/theme';
 import { MemberChips } from '../members/components';
@@ -12,51 +8,28 @@ import { useCurrentMember } from '../members/CurrentMemberContext';
 import { sortMembers } from '../members/order';
 import { ReportCard } from '../reports/components';
 import { sortReports } from '../reports/order';
+import { filterReports, parseReportFilter } from '../reports/overview';
+import { useMemberReports } from '../reports/useMemberReports';
 
-// 时间线页(票 06):按当前成员过滤报告;卡片含类别、日期、状态文案、flag 徽标与
-// 「待核对 N 项」;failed 展示失败原因。空态引导上传,加载与错误可重试。
-type ScreenState =
-  | { status: 'loading' }
-  | { status: 'unconfigured' }
-  | { status: 'error'; detail: string }
-  | { status: 'ready'; members: Member[]; reports: ReportSummary[] };
-
+// 全部档案页(票 06;本期筛选):按当前成员展示完整档案,可按待核对 / 识别失败
+// 只看子集;卡片含类别、日期、状态文案、flag 徽标与「待核对 N 项」;failed 展示失败原因。
 export default function TimelineScreen() {
   const { currentMemberId, selectMember } = useCurrentMember();
-  const [state, setState] = useState<ScreenState>({ status: 'loading' });
-
-  const reload = useCallback(async () => {
-    const resolved = await resolveApiClient();
-    if (!resolved) {
-      setState({ status: 'unconfigured' });
-      return;
-    }
-    try {
-      const members = await listMembers(resolved.client);
-      const selected = members.find((m) => m.member_id === currentMemberId);
-      const reports = selected ? await listReports(resolved.client, selected.member_id) : [];
-      setState({ status: 'ready', members, reports });
-    } catch (error) {
-      setState({ status: 'error', detail: error instanceof Error ? error.message : String(error) });
-    }
-  }, [currentMemberId]);
-
-  useFocusEffect(
-    useCallback(() => {
-      void reload();
-    }, [reload]),
-  );
+  const { state, reload } = useMemberReports(currentMemberId);
+  const params = useLocalSearchParams();
+  const filter = parseReportFilter(params.filter);
 
   const members = state.status === 'ready' ? sortMembers(state.members) : [];
-  const selected = state.status === 'ready' && members.some((m) => m.member_id === currentMemberId);
+  const selected = state.status === 'ready' && state.hasCurrentMember;
   const reports = state.status === 'ready' ? sortReports(state.reports) : [];
+  const visibleReports = filterReports(reports, filter);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {state.status === 'loading' ? (
         <View style={sharedStyles.horizontal}>
           <ActivityIndicator />
-          <Text style={sharedStyles.muted}>正在加载时间线…</Text>
+          <Text style={sharedStyles.muted}>正在加载档案…</Text>
         </View>
       ) : null}
 
@@ -89,26 +62,52 @@ export default function TimelineScreen() {
                 上传检查单
               </Link>
               {!selected ? (
-                <Text style={sharedStyles.muted}>选择一个成员查看其报告时间线。</Text>
-              ) : reports.length === 0 ? (
-                <Text style={sharedStyles.muted}>
-                  这位成员还没有检查单。拍一张检查单,几秒后这里会出现归档卡片。
-                </Text>
+                <Text style={sharedStyles.muted}>选择一个成员查看其档案。</Text>
               ) : (
-                reports.map((report) => (
-                  <Link
-                    key={report.report_id}
-                    asChild
-                    href={{
-                      pathname: '/report/[report_id]',
-                      params: { report_id: report.report_id },
-                    }}
-                  >
-                    <Pressable>
-                      <ReportCard report={report} />
-                    </Pressable>
-                  </Link>
-                ))
+                <View style={styles.stack}>
+                  {filter ? (
+                    <View testID="archive-filter-banner" style={styles.filterBanner}>
+                      <Text style={sharedStyles.muted}>
+                        {filter === 'partial' ? '只看待核对' : '只看识别失败'} ·{' '}
+                        {visibleReports.length} 份
+                      </Text>
+                      <Link asChild href="/timeline">
+                        <Pressable testID="archive-filter-clear">
+                          <Text style={styles.link}>清除筛选</Text>
+                        </Pressable>
+                      </Link>
+                    </View>
+                  ) : null}
+                  {visibleReports.length === 0 ? (
+                    filter ? (
+                      <View testID="archive-empty" style={styles.stack}>
+                        <Text style={sharedStyles.muted}>没有符合筛选条件的报告。</Text>
+                        <Link href="/timeline" style={styles.link}>
+                          查看全部档案
+                        </Link>
+                      </View>
+                    ) : (
+                      <Text style={sharedStyles.muted}>
+                        这位成员还没有检查单。拍一张检查单,几秒后这里会出现归档卡片。
+                      </Text>
+                    )
+                  ) : (
+                    visibleReports.map((report) => (
+                      <Link
+                        key={report.report_id}
+                        asChild
+                        href={{
+                          pathname: '/report/[report_id]',
+                          params: { report_id: report.report_id },
+                        }}
+                      >
+                        <Pressable>
+                          <ReportCard report={report} />
+                        </Pressable>
+                      </Link>
+                    ))
+                  )}
+                </View>
               )}
             </>
           )}
@@ -122,6 +121,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: 24, gap: 12 },
   stack: { gap: 12 },
+  filterBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   fail: { fontSize: 13, color: colors.fail },
   link: { color: colors.accent, fontSize: 15 },
   button: {

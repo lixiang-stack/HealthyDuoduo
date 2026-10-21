@@ -1,0 +1,55 @@
+# 03: `/` 改为成员概览（待处理 + 各类最近一次）
+
+**What to build:** 打开 App 第一屏就是当前成员的概览：有没有要处理的报告、每类最近一次是什么、全部档案与设置入口；后端地址、连通状态、重新检测从根页收进设置页。概览只消费报告摘要，待处理只给计数入口，不铺卡片；同一份报告不会在概览出现两张卡。
+
+**Blocked by:** 02（档案筛选）。
+
+**Status:** resolved
+
+## 验收清单
+
+- [x] App 标题为「成员概览」；顶部「查看谁的档案」+ 当前成员 chips（沿用现有 `MemberChips` 与当前成员上下文）+ 「管理成员」→ `/members`；「上传检查单」→ `/upload`。
+- [x] 待处理：`待核对 · N 份`（M>0 时追加 `· M 项`）→ `/timeline?filter=partial`；`识别失败 · K 份` → `/timeline?filter=failed`；两者都为 0 时只显示 `没有待处理的报告。`，不显示入口。
+- [x] 待核对口径：`status === 'partial'` 且非影像单；M = 这些报告的 `unreviewed_low_confidence_count` 之和；M=0 时省略「· M 项」。失败报告不计入待核对。
+- [x] 各类最近一次：按 `report_type` 从数据派生，`sortReports` 后每类取首次出现的一份，类别顺序按最近日期降序；无日期沉底、同日期按 `report_id`；失败报告参与、不隐藏；每类一张卡，复用现有 `ReportCard`（类别 / 日期 / 状态 / 徽标），点进详情。
+- [x] 概览只消费当前成员的摘要，不为类别卡额外拉详情；影像单的检查项目名称不出现在概览卡。
+- [x] 概览不设「最近归档」：待处理只给计数，类别卡每类一张；同一份报告不在概览重复出现。
+- [x] 全部档案（N 份）→ `/timeline`，N = 当前成员全部报告数；底部「设置」→ `/settings`。
+- [x] 空态与异常态：加载中 `正在加载概览…`（ActivityIndicator）；无成员沿用「还没有家庭成员。先到家庭成员建一个。」并链到 `/members`，不显示上传与报告区块；有成员未选中 `选择一个成员查看其报告概览。`；选中成员无报告只显示现有「这位成员还没有检查单。拍一张检查单，几秒后这里会出现归档卡片。」引导并隐藏待处理 / 类别 / 全部档案；未配置后端 `尚未配置后端地址，请先到设置填写。`；加载失败 `加载失败:{detail}` + 「重试」。
+- [x] 设置入口在概览底部常驻；`/` 不再出现后端地址、连通状态、重新检测；这些仍在 `/settings`，不改设置页。
+- [x] `ReportCard` 支持概览专用 testID 前缀（默认 `report-card`），概览卡用 `overview-latest-${id}`，不与档案页 `report-card-${id}` 撞 locator。
+- [x] 纯函数 `pendingSummary` / `latestByCategory` 有单测：partial 含无低置信项的、排除影像单；失败份数；`success` 为 0；空列表；每类一份、日期最新者胜、无日期沉底、同日期按 `report_id`；100 条混合类别下类别数稳定、不重复。
+- [x] 概览文案只陈述事实，不出现「健康概况 / 异常预警 / 风险」等解读词。
+- [x] E2E：设置用例的 `/` 断言改为「查看谁的档案」；后端不可达用例改为「加载失败」；新增概览用例（小明待核对 0 份、显示空态且入口隐藏、类别最近一次含 cbc_03 与 us_03、全部档案 3 份；切妈妈后待核对 1 份、只含 cbc_04、全部档案 1 份；从妈妈概览点「待核对」、从小明概览点「全部档案」进入对应档案视图）；识别失败为 0 时入口隐藏；11 条全绿。
+- [x] `docs/agents/app-e2e.md` 完成判据 10/10 → 11/11。
+- [x] `npm run typecheck`、`npm test` 全绿。
+- [ ] `npx expo lint` 全绿（阻塞于仓库基线：无 committed ESLint 配置；见 Comments）。
+
+## 实现提示
+
+- 纯逻辑继续放在 `reports/overview.ts`：本票落 `pendingSummary` / `latestByCategory`，复用 02 的共享判定，保证「待核对 N 份」与 `/timeline?filter=partial` 列表一致。
+- 类别从 `report_type` 派生，不硬编码类别清单；概览卡只传摘要，不请求详情。
+- 路由不变：`/` 是概览，`/timeline` 是全部档案，不新增 `/overview` / `/reports`。
+- 新增 locator：`overview-pending-partial`、`overview-pending-failed`、`overview-pending-empty`、`overview-latest-${id}`；`report-card-${id}` 继续只用于档案页与详情头部。
+- 新增 E2E 用例放在上传用例之前、核对用例之前：上传会给小明加第 4 份，核对会把待核对清零；spec 的 3 份 / 1 份口径依赖这个顺序。
+- 识别失败非零入口不在 E2E 覆盖：现有 seed 无 failed 报告；用单测与手工（全空白/糊图）覆盖。
+- 手工验收：390×844 首屏不滚动可看到待处理区；概览行数不随报告总数增长；同类别多份只显示最近一份；删除最后一份后回 `/timeline` 为空态不崩。
+
+## Comments
+
+**数据前置（票 02 实现时发现，2026-10-21）**
+
+- `cbc_03` 实际 `status=success`（单条低置信项不翻转报告状态）；小明「待核对」为 0 份，真实 `partial` 只有妈妈的 `cbc_04`（1 份）。
+- 本票 E2E 的「小明待核对 1 份」需按实际数据改为小明 0 份、妈妈 1 份；类别最近一次与全部档案份数不受影响（小明仍 3 份，类别仍含 cbc_03 / us_03）。
+
+**实现（2026-10-21，票 03）**
+
+- `pendingSummary` / `latestByCategory` 落在 `reports/overview.ts`；`/` 重写为成员概览；`ReportCard` 支持 `testIDPrefix`（概览 `overview-latest-*`，档案仍 `report-card-*`）；`_layout` index 标题改「成员概览」；设置链接在概览底部常驻（含 error 态）。
+- 验证：`npm run typecheck` 通过；`npm test -- --runInBand` 14 suites / 95 tests 全绿；`npm run e2e` 11/11 通过；`docs/agents/app-e2e.md` 改为 11/11。
+- 刻意不抽「概览/档案」共享屏幕骨架：两页共用的 seam 是 `useMemberReports`（spec 选的边界）；四态分支各自保留，便于档案筛选与概览空态独立演进；若后续出现第三处同构骨架再抽。
+- Lint 基线同票 01/02：无 committed ESLint 配置；`npx expo lint` auto-config 后报 3 个未改动文件（`upload.tsx`、`LineZoom.tsx`、`review/components.tsx`）；本次改动文件无 lint 报错，自动生成的配置与依赖已还原，未新增依赖。
+
+**未决口径（2026-10-21 用户实测，暂不改）**
+
+- 用户 `member=aaa`：7 份待核对、5 项；核对完 5 项后仍剩 3 份。原因是 `partial` 可由低置信项、缺日期、缺数值分别触发；3 份没有低置信项，没有核对动作可触发，状态不会翻转。
+- 当前 spec 口径有意包含这些报告（避免 dateless partial 被漏掉），故保留；后续若要分清，可拆「待核对 / 信息不完整」或补录日期，另立票。

@@ -1,7 +1,7 @@
 // 核对交互组件(票 09):指标项核对卡(确认/修正/编辑器;核对页与详情页共用)与
 // OCR 行区域缩放对照 LineZoom。flag 只展示服务端返回值(修正后由服务端按值×范围
 // 重算),无手改入口;修正字段限 name/value/unit/ref_range 四项纸面事实。
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import type { ApiClient } from '../api/client';
@@ -38,18 +38,13 @@ export function ReviewItemCard({
   onUpdated: (result: ReviewResult) => void;
 }) {
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState<CorrectionDraft>(() => draftFromItem(item));
+  const [draft, setDraft] = useState<CorrectionDraft>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
 
-  // 非编辑态跟随最新生效值(单响应刷新后草稿复位;编辑中保留用户输入)。
-  useEffect(() => {
-    if (!editing) {
-      setDraft(draftFromItem(item));
-    }
-  }, [item, editing]);
-
-  const correction = buildCorrection(item, draft);
+  // 非编辑态直接用最新生效值;编辑态保留用户输入(单响应刷新不覆盖正在编辑的草稿)。
+  const currentDraft = editing ? (draft ?? draftFromItem(item)) : draftFromItem(item);
+  const correction = buildCorrection(item, currentDraft);
   const layout = stripLayout(parseRefRange(item.ref_range), parseNumericForm(item.value));
   const flagColor = FLAG_COLORS[item.flag];
   const statusLabel = reviewStatusLabel(item.review_status);
@@ -61,6 +56,7 @@ export function ReviewItemCard({
     try {
       onUpdated(await reviewItem(client, reportId, item.item_id, request));
       setEditing(false);
+      setDraft(undefined);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : String(submitError));
     } finally {
@@ -74,8 +70,10 @@ export function ReviewItemCard({
       <TextInput
         testID={`review-field-${key}-${item.item_id}`}
         style={styles.editorInput}
-        value={draft[key]}
-        onChangeText={(text) => setDraft((prev) => ({ ...prev, [key]: text }))}
+        value={currentDraft[key]}
+        onChangeText={(text) =>
+          setDraft((prev) => ({ ...(prev ?? draftFromItem(item)), [key]: text }))
+        }
         placeholder={label}
         placeholderTextColor={colors.muted}
       />
@@ -125,7 +123,7 @@ export function ReviewItemCard({
               disabled={busy}
               onPress={() => {
                 setEditing(false);
-                setDraft(draftFromItem(item));
+                setDraft(undefined);
               }}
             >
               <Text style={styles.actionGhostText}>取消</Text>
@@ -151,7 +149,10 @@ export function ReviewItemCard({
             testID={`review-correct-${item.item_id}`}
             style={styles.actionGhost}
             disabled={busy}
-            onPress={() => setEditing(true)}
+            onPress={() => {
+              setDraft(undefined);
+              setEditing(true);
+            }}
           >
             <Text style={styles.actionGhostText}>修正</Text>
           </Pressable>

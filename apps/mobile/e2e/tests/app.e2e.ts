@@ -44,8 +44,7 @@ describe('App E2E', { serial: true, timeout: 300_000 }, () => {
     await expect(screen.getByText(/已连通 · 版本/)).toBeVisible();
 
     await app.open('/');
-    await expect(screen.getByText(API_BASE_URL)).toBeVisible();
-    await expect(screen.getByText(/已连通 · 版本/)).toBeVisible();
+    await expect(screen.getByText('查看谁的档案')).toBeVisible();
   });
 
   test('创建并切换家庭成员', async ({ app, browser, screen }) => {
@@ -60,7 +59,7 @@ describe('App E2E', { serial: true, timeout: 300_000 }, () => {
     await expect(screen.getByTestId(testID.memberRow(baby!.member_id))).toContainText('当前成员');
   });
 
-  test('时间线按成员过滤报告', async ({ app, browser, screen }) => {
+  test('档案按成员过滤报告', async ({ app, browser, screen }) => {
     await openConfigured(app, browser, '/timeline', { memberId: seed.xiaoming.member_id });
     await expect(screen.getByTestId(testID.reportCard(seed.reviewReport.report_id))).toBeVisible();
     await expect(screen.getByTestId(testID.reportCard(seed.healReport.report_id))).toHaveCount(0);
@@ -83,6 +82,72 @@ describe('App E2E', { serial: true, timeout: 300_000 }, () => {
     );
   });
 
+  test('成员概览与待处理入口', async ({ app, browser, screen }) => {
+    await openConfigured(app, browser, '/', { memberId: seed.xiaoming.member_id });
+    await expect(screen.getByText('查看谁的档案')).toBeVisible();
+    // cbc_03 实际是 success;小明待核对 / 失败都为 0 → 空态,不显示入口。
+    await expect(screen.getByTestId(testID.overviewPendingEmpty)).toContainText('没有待处理的报告。');
+    await expect(screen.getByTestId(testID.overviewPendingPartial)).toHaveCount(0);
+    await expect(screen.getByTestId(testID.overviewPendingFailed)).toHaveCount(0);
+    await expect(screen.getByTestId(testID.overviewLatest(seed.reviewReport.report_id))).toBeVisible();
+    await expect(screen.getByTestId(testID.overviewLatest(seed.imaging03.report_id))).toBeVisible();
+    await expect(screen.getByTestId(testID.overviewLatest(seed.imaging01.report_id))).toHaveCount(0);
+    await expect(screen.getByText('全部档案（3 份）')).toBeVisible();
+
+    await screen.getByTestId(testID.memberChip(seed.mama.member_id)).tap();
+    await expect(screen.getByTestId(testID.overviewPendingPartial)).toContainText(
+      /待核对 · 1 份 · \d+ 项/,
+    );
+    await expect(screen.getByTestId(testID.overviewPendingFailed)).toHaveCount(0);
+    await expect(screen.getByTestId(testID.overviewPendingEmpty)).toHaveCount(0);
+    await expect(screen.getByTestId(testID.overviewLatest(seed.healReport.report_id))).toBeVisible();
+    await expect(screen.getByTestId(testID.overviewLatest(seed.reviewReport.report_id))).toHaveCount(0);
+    await expect(screen.getByTestId(testID.overviewLatest(seed.imaging03.report_id))).toHaveCount(0);
+    await expect(screen.getByTestId(testID.overviewLatest(seed.imaging01.report_id))).toHaveCount(0);
+    await expect(screen.getByText('全部档案（1 份）')).toBeVisible();
+
+    await screen.getByTestId(testID.overviewPendingPartial).tap();
+    await browser.waitForURL(/\/timeline\?filter=partial$/);
+    await expect(screen.getByTestId(testID.archiveFilterBanner)).toContainText(
+      '只看待核对 · 1 份',
+    );
+    await expect(screen.getByTestId(testID.reportCard(seed.healReport.report_id))).toBeVisible();
+
+    await openConfigured(app, browser, '/', { memberId: seed.xiaoming.member_id });
+    await screen.getByText('全部档案（3 份）').tap();
+    await browser.waitForURL(/\/timeline$/);
+    await expect(screen.getByTestId(testID.reportCard(seed.reviewReport.report_id))).toBeVisible();
+    await expect(screen.getByTestId(testID.reportCard(seed.imaging01.report_id))).toBeVisible();
+    await expect(screen.getByTestId(testID.reportCard(seed.imaging03.report_id))).toBeVisible();
+  });
+
+  test('全部档案与筛选', async ({ app, browser, screen }) => {
+    // cbc_03 实际是 success(单条低置信项不翻转报告状态);真实 partial 是妈妈的 cbc_04。
+    await openConfigured(app, browser, '/timeline?filter=partial', {
+      memberId: seed.mama.member_id,
+    });
+    await expect(screen.getByTestId(testID.archiveFilterBanner)).toContainText(
+      '只看待核对 · 1 份',
+    );
+    await expect(screen.getByTestId(testID.reportCard(seed.healReport.report_id))).toBeVisible();
+
+    await screen.getByTestId(testID.archiveFilterClear).tap();
+    await expect(screen.getByTestId(testID.archiveFilterBanner)).toHaveCount(0);
+    await expect(screen.getByTestId(testID.reportCard(seed.healReport.report_id))).toBeVisible();
+
+    await openConfigured(app, browser, '/timeline?filter=failed', {
+      memberId: seed.xiaoming.member_id,
+    });
+    await expect(screen.getByTestId(testID.archiveFilterBanner)).toContainText(
+      '只看识别失败 · 0 份',
+    );
+    await expect(screen.getByTestId(testID.archiveEmpty)).toContainText('没有符合筛选条件的报告。');
+    await screen.getByText('查看全部档案').tap();
+    await expect(screen.getByTestId(testID.reportCard(seed.reviewReport.report_id))).toBeVisible();
+    await expect(screen.getByTestId(testID.reportCard(seed.imaging01.report_id))).toBeVisible();
+    await expect(screen.getByTestId(testID.reportCard(seed.imaging03.report_id))).toBeVisible();
+  });
+
   test('上传样张后时间线出现新报告', async ({ app, browser, screen }) => {
     await stubFileChooser(browser);
     await openConfigured(app, browser, '/upload', { memberId: seed.xiaoming.member_id });
@@ -96,7 +161,7 @@ describe('App E2E', { serial: true, timeout: 300_000 }, () => {
     expect(payload.duplicate).toBe(false);
     await expect(screen.getByTestId('upload-result')).toContainText('已归档');
 
-    await screen.getByText('去时间线查看').tap();
+    await screen.getByText('去档案查看').tap();
     await expect(screen.getByTestId(testID.reportCard(payload.report.report_id))).toBeVisible();
   });
 
@@ -185,6 +250,10 @@ describe('App E2E', { serial: true, timeout: 300_000 }, () => {
     await screen.getByTestId(testID.reviewConfirm(pending!.item_id)).tap();
     await expect(screen.getByTestId(testID.reviewItem(pending!.item_id))).toHaveCount(0);
 
+    // 核对页常驻「去档案查看」:有剩余项时也能一次回到 /timeline。
+    await screen.getByText('去档案查看').tap();
+    await browser.waitForURL(/\/timeline$/);
+
     await openConfigured(app, browser, `/report/${seed.reviewReport.report_id}`, {
       memberId: seed.xiaoming.member_id,
     });
@@ -243,12 +312,12 @@ describe('App E2E', { serial: true, timeout: 300_000 }, () => {
     expect(payload.report.items[0]!.item_id).not.toBe(seed.healReport.items[0]!.item_id);
     await expect(screen.getByTestId('upload-result')).toContainText('已归档');
 
-    await screen.getByText('去时间线查看').tap();
+    await screen.getByText('去档案查看').tap();
     await expect(screen.getByTestId(testID.reportCard(payload.report.report_id))).toBeVisible();
   });
 
   test('后端不可达时首页显示失败态', async ({ app, browser, screen }) => {
     await openConfigured(app, browser, '/', { baseUrl: 'http://127.0.0.1:1/api/v1' });
-    await expect(screen.getByText('无法连接后端')).toBeVisible();
+    await expect(screen.getByText(/加载失败/)).toBeVisible();
   });
 });

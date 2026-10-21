@@ -52,15 +52,18 @@ export function ReportBadges({ report }: { report: ReportSummary }) {
 export function ReportCard({
   report,
   examName,
+  testIDPrefix = 'report-card',
 }: {
   report: ReportSummary;
   /** 影像单检查项目(票 02):仅详情页传入,时间线/核对页头部保持原样。 */
   examName?: string;
+  /** 概览卡用独立前缀,避免与档案页 report-card-${id} 撞 locator。 */
+  testIDPrefix?: string;
 }) {
   const failed = report.status === 'failed';
   const status = reportStatusLabel(report);
   return (
-    <View testID={`report-card-${report.report_id}`} style={styles.card}>
+    <View testID={`${testIDPrefix}-${report.report_id}`} style={styles.card}>
       <View style={styles.headerRow}>
         <Text style={styles.type}>{report.report_type}</Text>
         {status ? (
@@ -185,7 +188,7 @@ export function ReportManageCard({
       try {
         onReassigned(await reassignReport(client, report.report_id, targetId));
         const target = members?.find((m) => m.member_id === targetId);
-        setNotice(`已改派给「${target?.name ?? targetId}」,时间线上已移到该成员名下。`);
+        setNotice(`已改派给「${target?.name ?? targetId}」,已移到该成员名下。`);
         closePanel();
       } catch (submitError) {
         setError(message(submitError));

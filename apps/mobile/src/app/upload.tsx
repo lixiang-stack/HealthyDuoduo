@@ -62,7 +62,6 @@ export default function UploadScreen() {
       return;
     }
     const startedAt = Date.now();
-    setElapsedMs(0);
     const timer = setInterval(() => setElapsedMs(Date.now() - startedAt), 1000);
     return () => clearInterval(timer);
   }, [upload.status]);
@@ -92,6 +91,7 @@ export default function UploadScreen() {
     }
     void (async () => {
       setUpload({ status: 'uploading' });
+      setElapsedMs(0);
       try {
         const resolved = await resolveApiClient();
         if (!resolved) {
@@ -224,7 +224,7 @@ export default function UploadScreen() {
                   ) : null}
                   <View style={sharedStyles.horizontal}>
                     <Link href="/timeline" style={styles.link}>
-                      去时间线查看
+                      去档案查看
                     </Link>
                     <Pressable style={styles.buttonGhost} onPress={() => setUpload({ status: 'idle' })}>
                       <Text style={styles.link}>再传一张</Text>

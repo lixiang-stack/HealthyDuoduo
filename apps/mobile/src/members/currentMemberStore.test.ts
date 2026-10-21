@@ -4,6 +4,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CURRENT_MEMBER_STORAGE_KEY, loadCurrentMemberId, saveCurrentMemberId } from './currentMemberStore';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
+  // Jest 的 mock factory 被提升到 import 之前，只能 require 取 mock 模块。
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
 );
 

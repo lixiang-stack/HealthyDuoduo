@@ -11,6 +11,8 @@ import { zoomCrop, type Size } from './zoom';
 /** OCR 行缩放视口高(px):约三分之一屏宽,行文读到字级。 */
 const ZOOM_VIEWPORT_HEIGHT = 96;
 
+type ImageState = { url: string; natural?: Size; failed: boolean };
+
 export function LineZoom({
   imageUrl,
   lines,
@@ -21,23 +23,20 @@ export function LineZoom({
   testID?: string;
 }) {
   const [viewport, setViewport] = useState<Size>();
-  const [natural, setNatural] = useState<Size>();
-  const [failed, setFailed] = useState(false);
+  const [imageState, setImageState] = useState<ImageState>();
 
   useEffect(() => {
     let cancelled = false;
-    setNatural(undefined);
-    setFailed(false);
     Image.getSize(
       imageUrl,
       (width, height) => {
         if (!cancelled) {
-          setNatural({ width, height });
+          setImageState({ url: imageUrl, natural: { width, height }, failed: false });
         }
       },
       () => {
         if (!cancelled) {
-          setFailed(true);
+          setImageState({ url: imageUrl, failed: true });
         }
       },
     );
@@ -46,7 +45,10 @@ export function LineZoom({
     };
   }, [imageUrl]);
 
-  const crop = viewport && natural ? zoomCrop(natural, lines, viewport) : undefined;
+  // 只认当前 URL 的加载结果;URL 变化时旧结果自然失效,无需在 effect 里同步清状态。
+  const current = imageState?.url === imageUrl ? imageState : undefined;
+  const crop = viewport && current?.natural ? zoomCrop(current.natural, lines, viewport) : undefined;
+  const failed = current?.failed ?? false;
   return (
     <View
       testID={testID}
