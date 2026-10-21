@@ -1,10 +1,6 @@
-import { Link, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { Link } from 'expo-router';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { listMembers, type Member } from '../api/members';
-import { listReports, type ReportSummary } from '../api/reports';
-import { resolveApiClient } from '../api/resolveClient';
 import { sharedStyles } from '../components/styles';
 import { colors } from '../components/theme';
 import { MemberChips } from '../members/components';
@@ -12,43 +8,16 @@ import { useCurrentMember } from '../members/CurrentMemberContext';
 import { sortMembers } from '../members/order';
 import { ReportCard } from '../reports/components';
 import { sortReports } from '../reports/order';
+import { useMemberReports } from '../reports/useMemberReports';
 
 // 时间线页(票 06):按当前成员过滤报告;卡片含类别、日期、状态文案、flag 徽标与
 // 「待核对 N 项」;failed 展示失败原因。空态引导上传,加载与错误可重试。
-type ScreenState =
-  | { status: 'loading' }
-  | { status: 'unconfigured' }
-  | { status: 'error'; detail: string }
-  | { status: 'ready'; members: Member[]; reports: ReportSummary[] };
-
 export default function TimelineScreen() {
   const { currentMemberId, selectMember } = useCurrentMember();
-  const [state, setState] = useState<ScreenState>({ status: 'loading' });
-
-  const reload = useCallback(async () => {
-    const resolved = await resolveApiClient();
-    if (!resolved) {
-      setState({ status: 'unconfigured' });
-      return;
-    }
-    try {
-      const members = await listMembers(resolved.client);
-      const selected = members.find((m) => m.member_id === currentMemberId);
-      const reports = selected ? await listReports(resolved.client, selected.member_id) : [];
-      setState({ status: 'ready', members, reports });
-    } catch (error) {
-      setState({ status: 'error', detail: error instanceof Error ? error.message : String(error) });
-    }
-  }, [currentMemberId]);
-
-  useFocusEffect(
-    useCallback(() => {
-      void reload();
-    }, [reload]),
-  );
+  const { state, reload } = useMemberReports(currentMemberId);
 
   const members = state.status === 'ready' ? sortMembers(state.members) : [];
-  const selected = state.status === 'ready' && members.some((m) => m.member_id === currentMemberId);
+  const selected = state.status === 'ready' && state.hasCurrentMember;
   const reports = state.status === 'ready' ? sortReports(state.reports) : [];
 
   return (
