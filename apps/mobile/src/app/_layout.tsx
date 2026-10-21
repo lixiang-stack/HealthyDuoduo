@@ -7,7 +7,7 @@ export default function RootLayout() {
   return (
     <CurrentMemberProvider>
       <Stack>
-        <Stack.Screen name="index" options={{ title: '后端连通状态' }} />
+        <Stack.Screen name="index" options={{ title: '成员概览' }} />
         <Stack.Screen name="settings" options={{ title: '设置' }} />
         <Stack.Screen name="members" options={{ title: '家庭成员' }} />
         <Stack.Screen name="timeline" options={{ title: '全部档案' }} />
