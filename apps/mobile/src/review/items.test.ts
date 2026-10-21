@@ -8,6 +8,7 @@ import {
   needsReview,
   pendingItems,
   reviewStatusLabel,
+  shouldShowZoom,
 } from './items';
 
 // 真实形状的指标项(字段取自 shared stack 样例报告:单核细胞比率低置信 high;
@@ -120,6 +121,43 @@ describe('applyReviewResult', () => {
     expect(after.items[0].value).toBe('5.6');
     expect(after.items[0].review_status).toBe('corrected');
     expect(after.items[1]).toBe(before.items[1]); // 其余项原样
+  });
+});
+
+describe('shouldShowZoom', () => {
+  const line = { line: 169, box: [[1, 2], [3, 2], [3, 4], [1, 4]] };
+
+  it('低置信项默认展开;高置信项默认收起(未点修正也能按需展开)', () => {
+    expect(
+      shouldShowZoom(item({ low_confidence: true, ocr_lines: [line] }), { editing: false }),
+    ).toBe(true);
+    expect(
+      shouldShowZoom(item({ low_confidence: false, ocr_lines: [line] }), { editing: false }),
+    ).toBe(false);
+    expect(
+      shouldShowZoom(item({ low_confidence: false, ocr_lines: [line] }), {
+        open: true,
+        editing: false,
+      }),
+    ).toBe(true);
+    expect(
+      shouldShowZoom(item({ low_confidence: true, ocr_lines: [line] }), {
+        open: false,
+        editing: false,
+      }),
+    ).toBe(false);
+  });
+
+  it('无 OCR 行链接不显示定位(不渲染空视口);编辑态在有行链接时仍可见', () => {
+    expect(shouldShowZoom(item({ low_confidence: true, ocr_lines: [] }), { editing: false })).toBe(
+      false,
+    );
+    expect(shouldShowZoom(item({ low_confidence: false, ocr_lines: [] }), { editing: true })).toBe(
+      false,
+    );
+    expect(shouldShowZoom(item({ low_confidence: false, ocr_lines: [line] }), { editing: true })).toBe(
+      true,
+    );
   });
 });
 

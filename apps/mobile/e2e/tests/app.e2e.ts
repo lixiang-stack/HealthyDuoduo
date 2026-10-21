@@ -271,6 +271,28 @@ describe('App E2E', { serial: true, timeout: 300_000 }, () => {
     await expect(screen.getByTestId(testID.reviewItem(target!.item_id))).toContainText('已修正');
   });
 
+  test('高置信未知项无需修改即可展开原图定位', async ({ app, browser, screen }) => {
+    const unknown = seed.healReport.items.find(
+      (item) => item.flag === 'unknown' && !item.low_confidence,
+    );
+    const lowConfidence = seed.healReport.items.find((item) => item.low_confidence);
+    expect(unknown).toBeDefined();
+    expect(lowConfidence).toBeDefined();
+
+    await openConfigured(app, browser, `/report/${seed.healReport.report_id}`, {
+      memberId: seed.mama.member_id,
+    });
+    // 高置信未知项默认收起;无需先点「修正」即可展开(票 03)。
+    await expect(screen.getByTestId(testID.reviewZoom(unknown!.item_id))).toHaveCount(0);
+    await expect(screen.getByTestId(testID.reviewZoomToggle(unknown!.item_id))).toBeVisible();
+    await screen.getByTestId(testID.reviewZoomToggle(unknown!.item_id)).tap();
+    await expect(screen.getByTestId(testID.reviewZoom(unknown!.item_id))).toBeVisible();
+    await screen.getByTestId(testID.reviewZoomToggle(unknown!.item_id)).tap();
+    await expect(screen.getByTestId(testID.reviewZoom(unknown!.item_id))).toHaveCount(0);
+    // 低置信项保持默认展开。
+    await expect(screen.getByTestId(testID.reviewZoom(lowConfidence!.item_id))).toBeVisible();
+  });
+
   test('改归属、删除与同图重传', async ({ app, browser, screen }) => {
     await openConfigured(app, browser, `/report/${seed.healReport.report_id}`, {
       memberId: seed.mama.member_id,

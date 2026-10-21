@@ -77,6 +77,8 @@ export async function stubFileChooser(browser: Browser): Promise<void> {
   reviewItem: (itemId: number) => `review-item-${itemId}`,
   reviewConfirm: (itemId: number) => `review-confirm-${itemId}`,
   reviewCorrect: (itemId: number) => `review-correct-${itemId}`,
+  reviewZoomToggle: (itemId: number) => `review-zoom-toggle-${itemId}`,
+  reviewZoom: (itemId: number) => `review-zoom-${itemId}`,
   reviewValue: (itemId: number) => `review-field-value-${itemId}`,
   reviewSave: (itemId: number) => `review-save-${itemId}`,
 } as const;

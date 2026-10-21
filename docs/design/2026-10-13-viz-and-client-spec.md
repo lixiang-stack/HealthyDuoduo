@@ -166,6 +166,8 @@ App / 验证环境
 - 报告状态由后端按剩余未核对低置信项**派生**（`unreviewed_low_confidence_count` 为响应派生值，不落列）：partial → success 单向、永不回退；`success` / `failed` 恒定。无「全部处理完」的显式回收动作。  
 - 客户端不做比置信度更复杂的判断；核对结果以 API 为准反映到页面。
 
+> **2026-10-21 修订（review-clarity 01–04）：** `unknown` 是「值与参考范围无法比较」的结果状态，不参与 `partial`、不进核对队列；核对队列仍只收未核对的低置信项。确认只在未核对的低置信项暴露，已确认/已修正项不再显示确认（服务端仍保留重复确认能力，ADR-0005 状态机不变）。可由修正在详情页补齐的未知项另见「待补录」小节（`.scratch/review-clarity/issues/05-pending-backfill-section.md`）。依据：`docs/design/2026-10-21-unknown-in-review.md`、`docs/design/2026-10-21-confirm-vs-correct.md`。
+
 #### 指标趋势（P1，本期签订范围）
 
 - 同一指标以（词典规范名 + 归一单位）为连接键，在当前成员下的跨报告折线图。  

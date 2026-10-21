@@ -23,6 +23,15 @@ export function pendingItems(items: ReportItem[]): ReportItem[] {
   return items.filter((item) => item.review_status === 'unreviewed' && item.low_confidence);
 }
 
+/** 原图定位可见性:有 OCR 行链接,且(用户展开或正在修正)。低置信项默认展开;
+ *  高置信项默认收起,但无需先点「修正」即可展开;无行链接不渲染空视口。 */
+export function shouldShowZoom(
+  item: Pick<ReportItem, 'low_confidence' | 'ocr_lines'>,
+  state: { open?: boolean; editing: boolean },
+): boolean {
+  return item.ocr_lines.length > 0 && (state.editing || (state.open ?? item.low_confidence));
+}
+
 /** 指标项核对状态文案(纯事实侧;unreviewed 无标签,显示即「未处理」)。 */
 export function reviewStatusLabel(status: ReportItem['review_status']): string | undefined {
   switch (status) {
