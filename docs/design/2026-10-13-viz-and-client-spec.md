@@ -166,7 +166,7 @@ App / 验证环境
 - 报告状态由后端按剩余未核对低置信项**派生**（`unreviewed_low_confidence_count` 为响应派生值，不落列）：partial → success 单向、永不回退；`success` / `failed` 恒定。无「全部处理完」的显式回收动作。  
 - 客户端不做比置信度更复杂的判断；核对结果以 API 为准反映到页面。
 
-> **2026-10-21 修订（review-clarity 01–04）：** `unknown` 是「值与参考范围无法比较」的结果状态，不参与 `partial`、不进核对队列；核对队列仍只收未核对的低置信项。确认只在未核对的低置信项暴露，已确认/已修正项不再显示确认（服务端仍保留重复确认能力，ADR-0005 状态机不变）。可由修正在详情页补齐的未知项另见「待补录」小节（`.scratch/review-clarity/issues/05-pending-backfill-section.md`）。依据：`docs/design/2026-10-21-unknown-in-review.md`、`docs/design/2026-10-21-confirm-vs-correct.md`。
+> **2026-10-21 修订（review-clarity v2）：** `unknown` 是「值与参考范围无法比较」的结果状态，不参与 `partial`、不进核对队列；核对队列仍只收未核对的低置信项。确认只在未核对的低置信且不可补录项暴露；可操作未知（缺值 + 可解析范围、参考范围上下界写反）只给补录/修正，避免确认后同一项又变成另一个待办（服务端仍保留重复确认能力，ADR-0005 状态机不变）。待补录入口的形态与去留由 `.scratch/review-clarity-v2/issues/03-backfill-entry-decision.md` 在重做审计后决定。依据：`.scratch/review-clarity-v2/spec.md`。
 
 #### 指标趋势（P1，本期签订范围）
 
