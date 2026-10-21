@@ -10,7 +10,7 @@ export default function RootLayout() {
         <Stack.Screen name="index" options={{ title: '后端连通状态' }} />
         <Stack.Screen name="settings" options={{ title: '设置' }} />
         <Stack.Screen name="members" options={{ title: '家庭成员' }} />
-        <Stack.Screen name="timeline" options={{ title: '报告时间线' }} />
+        <Stack.Screen name="timeline" options={{ title: '全部档案' }} />
         <Stack.Screen name="report/[report_id]" options={{ title: '报告详情' }} />
         <Stack.Screen name="review/[report_id]" options={{ title: '核对报告' }} />
         <Stack.Screen name="upload" options={{ title: '上传检查单' }} />

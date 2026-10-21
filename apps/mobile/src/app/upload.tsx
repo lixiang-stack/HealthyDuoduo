@@ -224,7 +224,7 @@ export default function UploadScreen() {
                   ) : null}
                   <View style={sharedStyles.horizontal}>
                     <Link href="/timeline" style={styles.link}>
-                      去时间线查看
+                      去档案查看
                     </Link>
                     <Pressable style={styles.buttonGhost} onPress={() => setUpload({ status: 'idle' })}>
                       <Text style={styles.link}>再传一张</Text>

@@ -185,7 +185,7 @@ export function ReportManageCard({
       try {
         onReassigned(await reassignReport(client, report.report_id, targetId));
         const target = members?.find((m) => m.member_id === targetId);
-        setNotice(`已改派给「${target?.name ?? targetId}」,时间线上已移到该成员名下。`);
+        setNotice(`已改派给「${target?.name ?? targetId}」,已移到该成员名下。`);
         closePanel();
       } catch (submitError) {
         setError(message(submitError));

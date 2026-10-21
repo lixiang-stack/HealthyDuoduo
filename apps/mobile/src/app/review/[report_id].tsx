@@ -84,19 +84,17 @@ export default function ReviewScreen() {
           ) : (
             <View style={styles.card}>
               <Text style={sharedStyles.muted}>没有需要核对的低置信项。</Text>
-              <View style={sharedStyles.horizontal}>
-                <Link href="/timeline" style={styles.link}>
-                  去时间线查看
-                </Link>
-                <Link
-                  href={{ pathname: '/report/[report_id]', params: { report_id: report.report_id } }}
-                  style={styles.link}
-                >
-                  查看报告详情
-                </Link>
-              </View>
+              <Link
+                href={{ pathname: '/report/[report_id]', params: { report_id: report.report_id } }}
+                style={styles.link}
+              >
+                查看报告详情
+              </Link>
             </View>
           )}
+          <Link href="/timeline" style={styles.link}>
+            去档案查看
+          </Link>
         </View>
       ) : null}
     </ScrollView>
