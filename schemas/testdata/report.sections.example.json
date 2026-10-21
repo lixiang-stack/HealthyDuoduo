@@ -2,19 +2,7 @@
   "report_type": "影像",
   "report_date": "2024-09-15",
   "status": "success",
-  "items": [
-    {
-      "name": "股骨长",
-      "value": "22",
-      "unit": "mm",
-      "ref_range": null,
-      "method": null,
-      "flag": "unknown",
-      "low_confidence": false,
-      "raw_text": "股骨长 22mm",
-      "ocr_line_numbers": [5]
-    }
-  ],
+  "items": [],
   "sections": [
     {
       "kind": "exam_name",

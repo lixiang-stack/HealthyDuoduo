@@ -31,16 +31,33 @@ func noReportError(sha string) error {
 // schemas/testdata/http/report.summary.failed.json)。
 const failReasonNoItems = "no metric items recognized"
 
-// applyFailInvariant 空指标项不变量(viz-and-client 票 03):报告级产出「成功且零指标项」
-// 不可能出现——items 为空一律判 failed。归一化就地生效,返回应写入 reports.fail_reason
-// 的值(nil = 非 failed;随 upsert 全量写,重算复原时旧原因一并清除)。识别端契约校验与
-// 存储镜像校验是双保险,绕过识别端直灌的写入也在此挡下。
+// failReasonNoBody 叙述型报告(影像)无正文段落失败的固定原因(票 04)。
+const failReasonNoBody = "no report body recognized"
+
+// hasReportBody 报告段落中是否含叙述正文(findings/impression;exam_name 不算)。
+func hasReportBody(sections []contract.ReportSection) bool {
+	for _, s := range sections {
+		if s.Kind == contract.SectionKindFindings || s.Kind == contract.SectionKindImpression {
+			return true
+		}
+	}
+	return false
+}
+
+// applyFailInvariant 空指标项不变量(viz-and-client 票 03;票 04 叙事后开口):
+// 「成功且零指标项」只在报告携带 sections(叙述型报告)时合法;零 items + 空 sections
+// 一律判 failed。归一化就地生效,返回应写入 reports.fail_reason 的值(nil = 非 failed;
+// 随 upsert 全量写,重算复原时旧原因一并清除)。识别端契约校验与存储镜像校验是双保险,
+// 绕过识别端直灌的写入也在此挡下。
 func applyFailInvariant(report *contract.Report) *string {
-	if len(report.Items) == 0 && report.Status != contract.StatusFailed {
+	if len(report.Items) == 0 && len(report.Sections) == 0 && report.Status != contract.StatusFailed {
 		report.Status = contract.StatusFailed
 	}
 	if report.Status == contract.StatusFailed && len(report.Items) == 0 {
 		reason := failReasonNoItems
+		if report.ReportType == contract.ReportTypeImaging && !hasReportBody(report.Sections) {
+			reason = failReasonNoBody
+		}
 		return &reason
 	}
 	return nil

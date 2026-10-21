@@ -22,6 +22,8 @@ partial 触发(review 2026-10-12 收敛 + 低置信占比补丁):指标 value �
 印形保留原文;归一只改展示一致性(hdd trend sameUnit/delta),原文留痕在
 raw_text,不改变置信标记(决策 #7)。
 未解析日期且无兜底 → report_date=null+partial;类别失败或无产出 → failed。
+叙述型报告(影像;min_section_hits>0)只按正文段落派生 status:findings/impression
+至少一段 → success,否则 failed;不产出指标项,也不进入 partial(票 04)。
 
 样本收窄边界(review):规则与词典由已入库真实样本驱动;新样本若引入
 新版式/新指标名,预期行为是「未命中的行被跳过、指标缺失 → partial/failed」,
@@ -61,7 +63,9 @@ LOW_CONF_PARTIAL_RATIO = 0.5
 UNKNOWN_REPORT_TYPE = "unknown"
 
 # 报告级段落字段(识别端契约 ReportSection 与叙述型词典 category.section_anchors 的键)。
-SECTION_FIELDS = ("exam_name", "findings", "impression")
+# 正文锚 = 报告叙述主体;exam_name 只用于段落抽取,不参与类别判定(票 04)。
+BODY_SECTION_KINDS = ("findings", "impression")
+SECTION_FIELDS = ("exam_name", *BODY_SECTION_KINDS)
 
 # 日期标签,按优先级降序取首个命中行里的日期(打印/申请最低;检验最高)
 _DATE_LABELS = (
@@ -188,7 +192,7 @@ class DictItem:
 class LabDict:
     """一个报告类别的词典(数据文件 *_dict.yaml 的加载产物);单位字面量与
     别名索引在加载时一次派生。mode=table(默认,表头带/行带版式)或
-    narrative(影像叙述体:别名 + 后随数值的行内配对,见 _extract_narrative)。"""
+    narrative(叙述体:别名 + 后随数值的行内配对,见 _extract_narrative)。"""
 
     report_type: str
     title_keywords: tuple[str, ...]
@@ -199,6 +203,8 @@ class LabDict:
     mode: str = "table"
     # 报告级段落锚(字段 → 行首锚词);非叙述体类别为空。
     section_anchors: dict[str, tuple[str, ...]] = field(default_factory=dict)
+    # 正文锚命中阈值(叙述型类别≥1;0 = 不按段落分类)。
+    min_section_hits: int = 0
 
 
 @lru_cache(maxsize=1)
@@ -215,7 +221,7 @@ def _build_dict(path: Path) -> LabDict:
             aliases=tuple(it.get("aliases", [])) + (it["name"],),
             units=frozenset(u.lower() for u in it.get("units", [])),
         )
-        for it in raw["items"]
+        for it in raw.get("items") or []
     )
     alias_map: dict[str, DictItem] = {}
     for it in items:
@@ -239,12 +245,13 @@ def _build_dict(path: Path) -> LabDict:
     return LabDict(
         report_type=raw["report_type"],
         title_keywords=tuple(raw["category"]["title_keywords"]),
-        min_matched_items=int(raw["category"]["min_matched_items"]),
+        min_matched_items=int(raw["category"].get("min_matched_items", 0)),
         items=items,
         alias_map=alias_map,
         unit_literals=tuple(sorted(set(literals), key=len, reverse=True)),
         mode=str(raw["category"].get("mode", "table")),
         section_anchors=section_anchors,
+        min_section_hits=int(raw["category"].get("min_section_hits", 0)),
     )
 
 
@@ -1025,7 +1032,7 @@ def run_postprocess(ocr: OCRResult, date_hint: str | None = None) -> Report:
 
     header_bands = _header_bands(cells)
 
-    selected = _select_category(cells, header_bands)
+    selected = _select_category(cells, header_bands, ocr.txts)
     if selected is None:
         return Report(report_type=UNKNOWN_REPORT_TYPE, report_date=date, status=Status.FAILED, items=[])
     d, pairs = selected
@@ -1054,7 +1061,12 @@ def run_postprocess(ocr: OCRResult, date_hint: str | None = None) -> Report:
         if piece.value is None:
             partial = True
 
-    if not items:
+    if d.min_section_hits > 0:
+        # 按正文段落分类的报告(影像)只反映叙述正文:至少一段 findings/impression →
+        # success,否则 failed;日期未印、低置信都不再降级 partial(票 04)。
+        has_body = any(s.kind in BODY_SECTION_KINDS for s in sections)
+        status = Status.SUCCESS if has_body else Status.FAILED
+    elif not items:
         status = Status.FAILED
     else:
         low_conf_majority = (
@@ -1096,30 +1108,42 @@ def _title_region_cells(
 def _select_category(
     cells: list[_Cell],
     header_bands: list[list[_Cell]],
+    txts: list[str],
 ) -> tuple[LabDict, list[tuple[DictItem, _RowPiece]]] | None:
     """多词典注册表分发(P3 A1 内容优先分类)。
 
-    判定由内容驱动:命中项数 ≥ min_matched_items 的词典「达标」;达标者中命中项数
-    多者胜出,并列时标题(标题区内)命中者胜出,再并列取注册表先者(文件名序)。
-    仅当没有任何词典达标时,才回退到标题命中的词典——标题不再是「硬覆盖」,正文
-    偶发提及无法把报告抢到不相干类别。
+    判定由内容驱动:指标项命中 ≥ min_matched_items,或正文锚(findings/impression)
+    命中 ≥ min_section_hits 的词典「达标」。达标者按 (正文锚命中数, 指标项命中数,
+    标题区命中) 排序,再并列取注册表先者(文件名序)。仅当没有任何词典达标时,才回退
+    到标题命中的词典——标题不再是「硬覆盖」,正文偶发提及无法把报告抢到不相干类别。
+    exam_name 锚只用于段落抽取,不参与分类(票 04)。
 
     标题区分层(见 _title_region_cells)用于达标者并列裁决;兜底层仍允许全页匹配,
     因为报告未达标时往往正是「标题词被印成项目名」的样本(如 glu_03 的糖化血红蛋白)。
     """
     title_cells = _title_region_cells(cells, header_bands)
     best: tuple[LabDict, list[tuple[DictItem, _RowPiece]]] | None = None
-    best_key: tuple[bool, int, bool] | None = None
+    best_key: tuple[bool, int, int, bool] | None = None
     for d in load_dicts():
         if d.mode == "narrative":
             pairs = _extract_narrative(cells, d)
         else:
             pairs = _extract_items(cells, header_bands, d)
-        qualified = len(pairs) >= d.min_matched_items
+        body_anchors = {
+            kind: words
+            for kind, words in d.section_anchors.items()
+            if kind in BODY_SECTION_KINDS
+        }
+        section_hits = len(_extract_sections(txts, body_anchors))
+        qualified = (
+            d.min_matched_items > 0 and len(pairs) >= d.min_matched_items
+        ) or (
+            d.min_section_hits > 0 and section_hits >= d.min_section_hits
+        )
         if not qualified and not any(kw in c.text for c in cells for kw in d.title_keywords):
             continue
         title_region = any(kw in c.text for c in title_cells for kw in d.title_keywords)
-        key = (qualified, len(pairs), title_region)
+        key = (qualified, section_hits, len(pairs), title_region)
         if best_key is not None and key <= best_key:
             continue
         best, best_key = (d, pairs), key

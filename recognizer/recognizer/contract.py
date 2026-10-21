@@ -120,11 +120,13 @@ class Report(BaseModel):
     )
 
     @model_validator(mode="after")
-    def _empty_items_must_be_failed(self) -> "Report":
-        # 不变量(viz-and-client 票 03):零指标项的报告一律 failed——「成功且零指标项」
-        # 连构造都不可能,与识别端后处理规则(空产出 → failed)互为表里,契约层锁死。
-        if not self.items and self.status is not Status.FAILED:
-            raise ValueError("report with no items must have status=failed (empty-items invariant)")
+    def _empty_items_must_be_failed_or_sectioned(self) -> "Report":
+        # 不变量(票 03/04):零指标项只允许 failed,或叙述型报告携带 sections(影像单
+        # 以段落为主体);「成功/待核对且零指标项且无段落」仍连构造都不可能。
+        if not self.items and not self.sections and self.status is not Status.FAILED:
+            raise ValueError(
+                "report with no items and no sections must have status=failed (empty-items invariant)"
+            )
         return self
 
     @model_serializer(mode="wrap")

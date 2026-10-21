@@ -1,6 +1,6 @@
 package storage
 
-// 迁移冒烟:goose 链(0001..0007)应用后 schema 形状符合 M0 契约(票 02)。
+// 迁移冒烟:goose 链(0001..0008)应用后 schema 形状符合 M0 契约(票 02)。
 // 需要真库:设 HDD_TEST_DSN(如 postgres://postgres:smoke@127.0.0.1:55432/postgres)后运行;
 // 未设则整体 Skip——CI 门禁跑 go test ./... 时默认跳过,共享栈验证走 e2e 外环
 // (docs/agents/e2e.md「schemas/迁移」行)。冒烟姿势:一次性 PG 容器 + 本测试。
@@ -31,13 +31,13 @@ func TestMigrationSmokeM0Contract(t *testing.T) {
 		t.Fatalf("migrate: %v", err)
 	}
 
-	// goose 已升到 0007 且幂等(Open 内重复 Migrate 不报错)。
+	// goose 已升到 0008 且幂等(Open 内重复 Migrate 不报错)。
 	var latest int
 	if err := pool.QueryRow(ctx, `SELECT max(version_id) FROM goose_db_version`).Scan(&latest); err != nil {
 		t.Fatalf("read goose version: %v", err)
 	}
-	if latest != 7 {
-		t.Fatalf("goose version = %d, want 7", latest)
+	if latest != 8 {
+		t.Fatalf("goose version = %d, want 8", latest)
 	}
 
 	// reports.sections(0007,ADR-0008):可选报告段落 JSONB,可空(存量/非叙述型 NULL)。
@@ -188,6 +188,82 @@ func TestMigrationSmokeM0Contract(t *testing.T) {
 			t.Fatalf("after report delete: items=%d pairs=%d images=%d, want 0/0/2 (image retained)", items, pairs, images)
 		}
 	})
+}
+
+// TestMigration0008DeletesImagingItems 0008 一次性清理:影像报告 items 与其修正对删除,
+// 报告行与其他类别 items 保留(票 04;reparse 后仍为零 items,可经上方用例另行验证)。
+func TestMigration0008DeletesImagingItems(t *testing.T) {
+	dsn := os.Getenv("HDD_TEST_DSN")
+	if dsn == "" {
+		t.Skip("HDD_TEST_DSN not set: migration smoke runs against a disposable PG container")
+	}
+	ctx := context.Background()
+	db, err := sql.Open("pgx", dsn)
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	defer db.Close()
+	goose.SetBaseFS(migrationsFS)
+	if err := goose.SetDialect("postgres"); err != nil {
+		t.Fatalf("goose dialect: %v", err)
+	}
+	if err := goose.UpContext(ctx, db, migrationsDir); err != nil {
+		t.Fatalf("up to latest: %v", err)
+	}
+	if err := goose.DownToContext(ctx, db, migrationsDir, 7); err != nil {
+		t.Fatalf("down to 0007: %v", err)
+	}
+	defer func() {
+		if _, err := db.ExecContext(context.Background(), `
+			DELETE FROM reports WHERE image_sha256 IN ('img-imaging','img-cbc');
+			DELETE FROM ocr_results WHERE image_sha256 IN ('img-imaging','img-cbc');
+			DELETE FROM images WHERE sha256 IN ('img-imaging','img-cbc');`); err != nil {
+			t.Logf("cleanup seeded rows: %v", err)
+		}
+	}()
+	if _, err := db.ExecContext(ctx, `
+		INSERT INTO images (sha256, original_filename) VALUES ('img-imaging', 'us.jpg'), ('img-cbc', 'cbc.jpg');
+		INSERT INTO ocr_results (image_sha256, engine_output) VALUES ('img-imaging', '{}'), ('img-cbc', '{}');
+		INSERT INTO reports (image_sha256, ocr_result_id, report_type, status, sections)
+		VALUES ('img-imaging', (SELECT id FROM ocr_results WHERE image_sha256='img-imaging'),
+		        '影像', 'success', '[{"kind":"impression","text":"正常。","ocr_line_numbers":[0]}]'::jsonb),
+		       ('img-cbc', (SELECT id FROM ocr_results WHERE image_sha256='img-cbc'),
+		        '血常规', 'success', NULL);
+		INSERT INTO report_items (report_sha256, name, flag, raw_text, low_confidence)
+		VALUES ('img-cbc', '血红蛋白', 'normal', '血红蛋白 128 g/L', false);`); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	var imagingItemID int64
+	if err := db.QueryRowContext(ctx, `INSERT INTO report_items
+		(report_sha256, name, flag, raw_text, low_confidence)
+		VALUES ('img-imaging', '股骨长', 'unknown', '股骨长 22mm', false) RETURNING id`).
+		Scan(&imagingItemID); err != nil {
+		t.Fatalf("seed imaging item: %v", err)
+	}
+	var pairID int64
+	if err := db.QueryRowContext(ctx, `INSERT INTO correction_pairs
+		(item_id, before_name, before_value, before_unit, before_ref_range,
+		 after_name, after_value, after_unit, after_ref_range, raw_text, ocr_line_numbers)
+		VALUES ($1, '股骨长','22','mm',NULL, '股骨长','23','mm',NULL, '股骨长 22mm', ARRAY[0])
+		RETURNING id`, imagingItemID).Scan(&pairID); err != nil {
+		t.Fatalf("seed correction pair: %v", err)
+	}
+	if err := goose.UpContext(ctx, db, migrationsDir); err != nil {
+		t.Fatalf("up 0008: %v", err)
+	}
+	var reports, imagingItems, cbcItems, pairs int
+	if err := db.QueryRowContext(ctx, `SELECT
+		(SELECT count(*) FROM reports WHERE image_sha256 IN ('img-imaging','img-cbc')),
+		(SELECT count(*) FROM report_items WHERE report_sha256='img-imaging'),
+		(SELECT count(*) FROM report_items WHERE report_sha256='img-cbc'),
+		(SELECT count(*) FROM correction_pairs WHERE id=$1)`, pairID).
+		Scan(&reports, &imagingItems, &cbcItems, &pairs); err != nil {
+		t.Fatal(err)
+	}
+	if reports != 2 || imagingItems != 0 || cbcItems != 1 || pairs != 0 {
+		t.Fatalf("after 0008: reports=%d imaging_items=%d cbc_items=%d pairs=%d, want 2/0/1/0",
+			reports, imagingItems, cbcItems, pairs)
+	}
 }
 
 // TestMigration0007DownUp 0007 升降版:down 删除 sections 列,up 重新加回(0006 为空占位)。

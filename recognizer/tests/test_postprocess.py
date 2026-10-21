@@ -8,7 +8,9 @@
 - 任一组成行 score < 0.8 → 该项 low_confidence;占比过半(≥50%)→ 整单 partial;
 - 日期:标签行(检验时间 > … > 报告时间)抽取,解析失败时用 date_hint 兜底;
 - 类别失败或无指标 → failed;
-- 类别命中且有产出:数值缺失/日期缺失 → partial,否则 success(低置信留在条目标记)。
+- 类别命中且有产出:数值缺失/日期缺失 → partial,否则 success(低置信留在条目标记);
+- 叙述型报告(影像)以正文段落为准:findings/impression 至少一段 → success,否则 failed,
+  不产出指标项(票 04)。
 """
 
 import json
@@ -527,6 +529,31 @@ def test_registry_title_fallback_when_no_dict_qualifies(monkeypatch, tmp_path) -
     assert r.report_type == "尿常规"
 
 
+def test_registry_body_anchor_outranks_item_count(monkeypatch, tmp_path) -> None:
+    """排序键:达标后正文锚命中优先于指标项命中(票 04)。"""
+    table = _urine_dict(tmp_path, min_matched=2)
+    narrative_raw = {
+        "report_type": "影像",
+        "category": {
+            "title_keywords": ["超声"],
+            "mode": "narrative",
+            "min_section_hits": 1,
+            "section_anchors": {"findings": ["检查所见"]},
+        },
+        "items": [],
+    }
+    path = tmp_path / "test_imaging_dict.yaml"
+    path.write_text(yaml.safe_dump(narrative_raw, allow_unicode=True), encoding="utf-8")
+    imaging = _build_dict(path)
+    monkeypatch.setattr(_postprocess, "load_dicts", lambda: (table, imaging))
+    cells = _bare_roles() + row(30, "尿胆原", "5.0", unit="mmol/L", ref="1-10")
+    cells += row(55, "尿糖", "5.0", unit="mmol/L", ref="1-10")
+    cells += [{"x": 100, "y": 90, "text": "检查所见：宫内单活胎。"}]
+    r = run_postprocess(mk_ocr(cells))
+    assert r.report_type == "影像"
+    assert r.items == []
+
+
 def test_registry_title_region_breaks_qualified_tie(monkeypatch, tmp_path) -> None:
     """两类均达标且命中项数并列:标题(限标题区)命中者胜出。"""
     def build(report_type: str, title_kw: str, names: list[str]):
@@ -575,65 +602,48 @@ def test_registry_tie_follows_registry_order(monkeypatch, tmp_path) -> None:
     assert r.report_type == "尿常规"
 
 
-# ---------- 叙述体抽取(P3,category.mode=narrative,现 影像词典) ----------
+# ---------- 叙述型报告(影像;票 04:段落主体,不抽取指标项) ----------
 
 
-def test_narrative_alias_bridge_value() -> None:
-    cells = [{"x": 100, "y": -40, "text": "本院超声检查报告单"},
-             {"x": 100, "y": 0, "text": "颈项透明层厚度（NT）2.6mm，头臀长59mm。"}]
-    r = run_postprocess(mk_ocr(cells))
-    assert r.report_type == "影像"
-    assert item_of(r, "颈项透明层厚度").value == "2.6"
-    assert item_of(r, "颈项透明层厚度").unit == "mm"
-    assert item_of(r, "头臀长").value == "59"
+def test_imaging_dict_has_no_measurement_items() -> None:
+    """影像词典删除全部产科测量项,只保留正文段落锚。"""
+    imaging = next(d for d in _postprocess.load_dicts() if d.report_type == "影像")
+    assert imaging.items == ()
+    assert imaging.min_section_hits == 1
 
 
-def test_narrative_remote_number_not_fused() -> None:
-    """远距数字不误认:「NT筛查、11-14周」的 11 不应成为 NT 数值。"""
-    cells = [{"x": 100, "y": -40, "text": "本院超声检查报告单"},
-             {"x": 100, "y": 0, "text": "11-14周NT筛查(省免)、11-14周"}]
-    r = run_postprocess(mk_ocr(cells))
-    it = item_of(r, "颈项透明层厚度")
-    assert it.value is None  # 桥接失败 → 无数值,标题行仅留痕
-    assert "NT筛查" in it.raw_text
-
-
-def test_narrative_first_value_wins_over_title_mention() -> None:
-    """同 canonical 多次命中:标题先行无数值 → 后段有数值者胜。"""
-    cells = [{"x": 100, "y": -40, "text": "本院超声检查报告单"},
-             {"x": 100, "y": 0, "text": "NT筛查(省免)"},
-             {"x": 100, "y": 30, "text": "（NT）2.6mm"}]
-    r = run_postprocess(mk_ocr(cells))
-    it = item_of(r, "颈项透明层厚度")
-    assert it.value == "2.6"
-    assert "2.6mm" in it.raw_text
-
-
-def test_narrative_new_measurements() -> None:
-    """首批影像测量项:HL/鼻骨长/NF/侧脑室/后颅窝池 在同一叙述行内配对(us_02 形态)。"""
+def test_imaging_body_anchor_qualifies_without_items() -> None:
     cells = [
         {"x": 100, "y": -40, "text": "本院超声检查报告单"},
-        {"x": 100, "y": 0, "text": "BPD 57mm，HL36mm，鼻骨长：5.8mm，NF:4.7mm，侧脑室 9.1mm，后颅窝池4.0mm。"},
+        {"x": 100, "y": 0, "text": "超声提示：宫内单活胎。"},
     ]
     r = run_postprocess(mk_ocr(cells))
     assert r.report_type == "影像"
-    for name, value in (
-        ("肱骨长", "36"),
-        ("鼻骨长", "5.8"),
-        ("颈项皮肤褶皱厚度", "4.7"),
-        ("侧脑室宽度", "9.1"),
-        ("后颅窝池宽度", "4.0"),
-    ):
-        assert item_of(r, name).value == value
-    assert item_of(r, "肱骨长").unit == "mm"
+    assert r.items == []
+    assert r.status == "success"
 
 
-def test_narrative_aliases_are_specific() -> None:
-    """narrative 别名专指性硬约束:不得用裸后缀词与单字方向词,防 NT/胎盘厚度误配。"""
-    imaging = next(d for d in _postprocess.load_dicts() if d.report_type == "影像")
-    forbidden = {"厚度", "宽度", "长度", "左", "右"}
-    offenders = sorted({a for it in imaging.items for a in it.aliases if a in forbidden})
-    assert not offenders, f"narrative 泛别名必须专指: {offenders}"
+def test_imaging_exam_name_anchor_alone_does_not_classify() -> None:
+    """exam_name 锚(检查项目/部位/内容)只用于段落抽取,不参与分类。"""
+    cells = [
+        {"x": 100, "y": -40, "text": "某某医院检查报告单"},
+        {"x": 100, "y": 0, "text": "检查项目：产科检查（中孕）"},
+    ]
+    r = run_postprocess(mk_ocr(cells))
+    assert r.report_type == "unknown"
+    assert r.items == []
+
+
+def test_imaging_title_fallback_without_body_keeps_type_but_failed() -> None:
+    """正文锚缺失但标题命中超声/彩超:仍按影像归类,因无正文段落判 failed。"""
+    cells = [
+        {"x": 100, "y": -40, "text": "本院超声检查报告单"},
+        {"x": 100, "y": 0, "text": "检查项目：产科胎儿彩超检查（中孕）"},
+    ]
+    r = run_postprocess(mk_ocr(cells))
+    assert r.report_type == "影像"
+    assert r.status == "failed"
+    assert r.items == []
 
 
 # ---------- 报告级段落(影像单;锚表在词典 category.section_anchors) ----------
@@ -659,8 +669,8 @@ def test_sections_anchor_tail_and_following_lines() -> None:
     assert section_of(r, "impression").ocr_line_numbers == [5, 6]
 
 
-def test_sections_exam_name_minimal_termination_and_failed_no_items() -> None:
-    """us_03 形态:exam_name 不吞后续行;零指标项 failed 影像单仍保留段落。"""
+def test_sections_exam_name_minimal_termination_and_success_without_items() -> None:
+    """us_03 形态:exam_name 不吞后续行;仅有超声提示也是 success(票 04)。"""
     cells = [
         {"x": 100, "y": -40, "text": "超声检查报告单"},
         {"x": 100, "y": 0, "text": "检查项目：产科胎儿彩超检查（中孕）"},
@@ -669,7 +679,7 @@ def test_sections_exam_name_minimal_termination_and_failed_no_items() -> None:
         {"x": 100, "y": 45, "text": "超声提示：宫内单活胎。"},
     ]
     r = run_postprocess(mk_ocr(cells))
-    assert r.status == "failed" and r.items == []
+    assert r.status == "success" and r.items == []
     assert r.report_date == "2024-09-15"
     assert section_of(r, "exam_name").text == "产科胎儿彩超检查（中孕）"
     assert section_of(r, "exam_name").ocr_line_numbers == [1]
@@ -726,17 +736,17 @@ def test_sections_absent_for_table_reports() -> None:
     assert "sections" not in json.loads(r.model_dump_json())
 
 
-def test_sections_do_not_affect_status() -> None:
-    """段落只留痕:status 仍只看指标项与日期(日期+值齐 → success)。"""
+def test_sections_status_ignores_report_date() -> None:
+    """影像 status 只看正文段落:日期未印不降级 partial(票 04)。"""
     cells = [
         {"x": 100, "y": -40, "text": "超声检查报告单"},
-        {"x": 100, "y": 0, "text": "检查日期：2024-09-15"},
-        {"x": 100, "y": 15, "text": "超声提示：正常。"},
-        {"x": 100, "y": 30, "text": "股骨长 22mm"},
+        {"x": 100, "y": 0, "text": "超声提示：正常。"},
     ]
     r = run_postprocess(mk_ocr(cells))
+    assert r.report_date is None
     assert r.status == "success"
-    assert section_of(r, "impression").text == "正常。\n股骨长 22mm"
+    assert r.items == []
+    assert section_of(r, "impression").text == "正常。"
 
 
 # ---------- 单位规一化(印刷损耗形 → 词典注册的规范印形,unit_families.yaml) ----------
@@ -796,15 +806,19 @@ def test_vertical_fallback_rejects_prose_cells() -> None:
 
 
 def test_vertical_fallback_allows_small_row_overlap() -> None:
-    """相邻 OCR 行框小幅重叠(us_02 侧脑室 9.1mm):仍取正下方,不被远行门牌号抢走。"""
+    """名称行与正下方数值行框小幅重叠:表内零碎片行仍取同列最近数值。"""
     cells = [
-        {"x": 100, "y": -40, "text": "本院超声检查报告单"},
-        {"x": 40, "y": 0, "w": 340, "text": "双侧侧脑室室，左："},
-        {"x": 35, "y": 15, "w": 240, "text": "9.1mm，右：8.2mm"},
-        {"x": 35, "y": 120, "w": 140, "text": "L.13.脐带"},
+        {"x": 100, "y": -60, "text": "市人民医院血常规报告单"},
+        {"x": 20, "y": 0, "text": "序号"},
+        {"x": 160, "y": 0, "text": "项目名称"},
+        {"x": 360, "y": 0, "text": "结果"},
+        {"x": 470, "y": 0, "text": "单位"},
+        {"x": 580, "y": 0, "text": "参考值"},
+        {"x": 150, "y": 40, "w": 90, "text": "白细胞计数"},
+        {"x": 150, "y": 56, "w": 70, "text": "5.3"},
     ]
-    r = run_postprocess(mk_ocr(cells))
-    assert item_of(r, "侧脑室宽度").value == "9.1"
+    it = item_of(run_postprocess(mk_ocr(cells)), "白细胞计数")
+    assert it.value == "5.3"
 
 
 def test_vertical_fallback_accepts_leading_value() -> None:

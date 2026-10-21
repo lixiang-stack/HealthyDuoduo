@@ -13,22 +13,18 @@ import {
   seedData,
   stubFileChooser,
   testID,
-  type ReportDetail,
   type Seed,
   type UploadResult,
 } from '../support';
 
 let seed!: Seed;
 
-// 影像单详情主体(票 03):指标项 / 未知 / 待核对 / 逐项核对不出现;原图入口可展开。
-async function expectImagingDetail(screen: Screen, report: ReportDetail): Promise<void> {
+// 影像单详情主体(票 03/04):指标项 / 未知 / 待核对 / 逐项核对不出现;原图入口可展开。
+async function expectImagingDetail(screen: Screen): Promise<void> {
   await expect(screen.getByText(/指标项/)).toHaveCount(0);
   await expect(screen.getByText(/未知/)).toHaveCount(0);
   await expect(screen.getByText(/待核对/)).toHaveCount(0);
   await expect(screen.getByText(/逐项核对/)).toHaveCount(0);
-  for (const item of report.items) {
-    await expect(screen.getByTestId(testID.reviewItem(item.item_id))).toHaveCount(0);
-  }
   await expect(screen.getByTestId(testID.reportImageToggle)).toBeVisible();
   await expect(screen.getByTestId(testID.reportImage)).toHaveCount(0);
   await screen.getByTestId(testID.reportImageToggle).tap();
@@ -115,8 +111,8 @@ describe('App E2E', { serial: true, timeout: 300_000 }, () => {
     const impressionIndex = sections.indexOf(impression);
     expect(report.report_date).toBe('2024-09-15');
     expect(sections.some((section) => section.kind === 'findings')).toBe(false);
-    // 后端数据仍有指标项(本期不改抽取);App 仅对影像单不呈现。
-    expect(report.items.length).toBeGreaterThan(0);
+    // 影像单不再产出指标项(票 04);详情只呈现段落 + 原图。
+    expect(report.items.length).toBe(0);
 
     await openConfigured(app, browser, `/report/${report.report_id}`, {
       memberId: seed.xiaoming.member_id,
@@ -134,7 +130,7 @@ describe('App E2E', { serial: true, timeout: 300_000 }, () => {
       impression.text,
     );
 
-    await expectImagingDetail(screen, report);
+    await expectImagingDetail(screen);
   });
 
   test('影像单 us_01:检查项目 / 检查所见 / 超声提示三段完整,段落卡可缩放原图', async ({
@@ -151,7 +147,7 @@ describe('App E2E', { serial: true, timeout: 300_000 }, () => {
     const impressionIndex = sections.indexOf(impression);
     expect(examName).toBeDefined();
     expect(report.report_date).toBeNull();
-    expect(report.items.length).toBeGreaterThan(0);
+    expect(report.items.length).toBe(0);
 
     await openConfigured(app, browser, `/report/${report.report_id}`, {
       memberId: seed.xiaoming.member_id,
@@ -168,7 +164,7 @@ describe('App E2E', { serial: true, timeout: 300_000 }, () => {
       impression.text,
     );
 
-    await expectImagingDetail(screen, report);
+    await expectImagingDetail(screen);
 
     await screen.getByTestId(testID.reportSection(findingsIndex)).tap();
     await expect(screen.getByTestId(testID.reportSectionZoom(findingsIndex))).toBeVisible();

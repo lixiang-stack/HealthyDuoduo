@@ -56,12 +56,12 @@ func TestWriteReportEmptyItemsInvariantSmoke(t *testing.T) {
 	st := NewStore(pool)
 	defer st.Close()
 
-	// 直灌违规(success/partial + 零指标项)→ 拒绝且不留痕。
+	// 直灌违规(success/partial + 零指标项 + 空 sections)→ 拒绝且不留痕。
 	for _, status := range []string{contract.StatusSuccess, contract.StatusPartial} {
 		bogus := contract.Report{ReportType: "血常规", Status: status}
 		if err := st.WriteReport(ctx, "inv-a", 1, bogus, nil); err == nil {
 			t.Fatalf("empty items with status %q accepted, want invariant rejection", status)
-		} else if !strings.Contains(err.Error(), "report with no items must be failed") {
+		} else if !strings.Contains(err.Error(), "report with no items and no sections must be failed") {
 			t.Fatalf("empty items with status %q: expect invariant error, got %v", status, err)
 		}
 		var n int
@@ -73,13 +73,29 @@ func TestWriteReportEmptyItemsInvariantSmoke(t *testing.T) {
 		}
 	}
 
+	// 叙述型报告(票 04):零指标项 + 非空 sections 是合法形状 → 落库留痕。
+	narrative := contract.Report{
+		ReportType: contract.ReportTypeImaging,
+		Status:     contract.StatusSuccess,
+		Sections: []contract.ReportSection{
+			{Kind: contract.SectionKindFindings, Text: "宫内单活胎。", OCRLineNumbers: []int32{0}},
+		},
+	}
+	if err := st.WriteReport(ctx, "inv-a", 1, narrative, nil); err != nil {
+		t.Fatalf("narrative zero-item write: %v", err)
+	}
+	gotStatus, gotReason := invariantStatusAndReason(t, pool, "inv-a")
+	if gotStatus != contract.StatusSuccess || gotReason != nil {
+		t.Fatalf("stored narrative: status=%q fail_reason=%v, want success/NULL", gotStatus, gotReason)
+	}
+
 	// 真实 failed-empty(拍糊/空白图)+ 失败原因 → 落库留痕。
 	reason := "no metric items recognized"
 	failed := contract.Report{ReportType: "其他专项", Status: contract.StatusFailed}
 	if err := st.WriteReport(ctx, "inv-a", 1, failed, &reason); err != nil {
 		t.Fatalf("failed-empty write: %v", err)
 	}
-	gotStatus, gotReason := invariantStatusAndReason(t, pool, "inv-a")
+	gotStatus, gotReason = invariantStatusAndReason(t, pool, "inv-a")
 	if gotStatus != contract.StatusFailed || gotReason == nil || *gotReason != reason {
 		t.Fatalf("stored after failed write: status=%q fail_reason=%v", gotStatus, gotReason)
 	}
