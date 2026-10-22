@@ -1,6 +1,7 @@
 # 仓库根 = 两个镜像的共享构建上下文(recognizer/hdd):白名单只放进镜像 S 所需源码,
 # 未列入(datas/samples/hdd 二进制等)一律排除。recognizer 镜像只 COPY recognizer/,
-# hdd 镜像只 COPY cmd/internal 与 go.mod/sum——上下文放宽不改变各自镜像内容。
+# hdd 镜像 COPY cmd/internal、go.mod/sum 与 recognizer/recognizer/flag_policy.yaml
+# (共享比较策略,ADR-0010)——上下文放宽不改变各自镜像内容。
 *
 !recognizer/
 !cmd/

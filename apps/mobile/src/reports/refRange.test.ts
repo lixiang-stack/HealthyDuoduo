@@ -1,4 +1,4 @@
-import { parseNumericForm, parseRefRange, stripLayout } from './refRange';
+import { isReversedInterval, parseNumericForm, parseRefRange, stripLayout } from './refRange';
 
 // 条带 POC 定稿规则(票 07;真实数据形态取自共享栈 report_items 的 ref_range/value):
 // 区间 3-10 / 0.4-8.0 / 3.5--5.5、单侧 <5 / <9.0 / 男:0-15、
@@ -36,6 +36,16 @@ describe('parseNumericForm', () => {
     expect(parseNumericForm('未见')).toEqual({ kind: 'none' });
     expect(parseNumericForm('10.8x')).toEqual({ kind: 'none' });
     expect(parseNumericForm('18.30↓20.00')).toEqual({ kind: 'none' });
+  });
+});
+
+describe('isReversedInterval', () => {
+  it('上下界写反才为 true;parseRefRange 归一化后不能判断', () => {
+    expect(isReversedInterval('13.5--9.5')).toBe(true);
+    expect(isReversedInterval('3.5--9.5')).toBe(false);
+    expect(isReversedInterval('男:20-10')).toBe(true);
+    expect(isReversedInterval('<5')).toBe(false);
+    expect(isReversedInterval(null)).toBe(false);
   });
 });
 

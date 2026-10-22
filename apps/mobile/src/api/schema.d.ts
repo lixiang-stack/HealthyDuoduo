@@ -248,10 +248,11 @@ export interface components {
          * @enum {string}
          */
         ReportStatus: "success" | "partial" | "failed";
-        /** @description 按 flag 异常计数徽标口径(时间线卡片);缺档即 0。 */
+        /** @description 按 flag 异常计数徽标口径(时间线卡片);缺档即 0。unknown 只统计可操作/抽取失败原因,no_reference/信息项/叙述体不计数。 */
         FlagCounts: {
             high: number;
             low: number;
+            abnormal: number;
             unknown: number;
         };
         /** @description 时间线卡片;详情响应复用本头部字段(ReportDetail 加 items)。 */
@@ -340,10 +341,15 @@ export interface components {
             /** @description 检测方法/实验方法列原样(如 '化学发光法');无该列或解析失败为 null */
             method: string | null;
             /**
-             * @description 数值与参考范围比较结果;无参考范围或非数值为 unknown
+             * @description 值 vs 参考范围比较结果;high/low 只用于有方向的数值异常,abnormal 只用于无方向的定性异常,unknown 表示本应能比较但失败/暂不支持
              * @enum {unknown}
              */
-            flag: "normal" | "high" | "low" | "unknown";
+            flag: "normal" | "high" | "low" | "abnormal" | "unknown";
+            /**
+             * @description flag=unknown 的原因;normal/high/low/abnormal 不出现该键
+             * @enum {unknown}
+             */
+            flag_reason?: "ocr_miss" | "ocr_merge" | "extractor_pairing" | "no_reference" | "qualitative_unsupported" | "unverified" | "narrative" | "informational" | "indeterminate" | "scalar_ref" | "other";
             /** @description 该指标项任一组成行 OCR score < 0.8 时为 true(决策 #7) */
             low_confidence: boolean;
             /** @description 该指标项对应的原始 OCR 行文本,供人工核对 */
@@ -369,12 +375,16 @@ export interface components {
         };
         /**
          * @description 核对请求体(单一契约字段集):confirm 分支只带 action(确认不产生修正对);
-         *     correct 分支必带 action 且至少一项 value/unit/name/ref_range。
+         *     correct 分支必带 action 且至少一项 value/unit/name/ref_range;
+         *     no_reference 分支只带 action(家长确认纸面没有参考范围,flag 仍 unknown + reason=no_reference)。
          *     无 flag 字段——additionalProperties:false 直接拒绝手改 flag 请求。
          */
         ReviewRequest: {
             /** @constant */
             action: "confirm";
+        } | {
+            /** @constant */
+            action: "no_reference";
         } | ({
             /** @constant */
             action: "correct";
@@ -432,7 +442,7 @@ export interface components {
             /** @description 解释跨院参考范围差异 */
             method: string | null;
             /** @enum {string} */
-            flag: "normal" | "high" | "low" | "unknown";
+            flag: "normal" | "high" | "low" | "abnormal" | "unknown";
             low_confidence: boolean;
             /**
              * @description 响应派生信任标记(review_status ∈ {confirmed, corrected}):实心 =

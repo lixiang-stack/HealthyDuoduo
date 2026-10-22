@@ -9,10 +9,13 @@ import { reviewItem, type ReportItem, type ReviewResult } from '../api/reports';
 import { LineZoom } from '../components/LineZoom';
 import { colors } from '../components/theme';
 import { parseNumericForm, parseRefRange, stripLayout, type StripLayout } from '../reports/refRange';
-import { flagLabel } from '../reports/status';
+import { itemFlagLabel } from '../reports/status';
 import {
   buildCorrection,
+  canMarkNoReference,
   draftFromItem,
+  flagReasonText,
+  reviewActions,
   reviewStatusLabel,
   shouldShowZoom,
   type CorrectionDraft,
@@ -24,6 +27,7 @@ const FLAG_COLORS: Record<ReportItem['flag'], string> = {
   normal: colors.ok,
   high: colors.fail,
   low: colors.low,
+  abnormal: colors.fail,
   unknown: colors.muted,
 };
 
@@ -60,6 +64,7 @@ export function ReviewItemCard({
   const flagColor = FLAG_COLORS[item.flag];
   const statusLabel = reviewStatusLabel(item.review_status);
   const showZoom = shouldShowZoom(item, { open: zoomOpen, editing });
+  const actions = reviewActions(item);
 
   const submit = async (request: Parameters<typeof reviewItem>[3]) => {
     setBusy(true);
@@ -100,7 +105,7 @@ export function ReviewItemCard({
         <Text style={styles.itemName}>{item.name}</Text>
         {item.low_confidence ? <Text style={styles.lowTag}>低置信</Text> : null}
         {statusLabel ? <Text style={styles.reviewTag}>{statusLabel}</Text> : null}
-        <Text style={[styles.itemFlag, { color: flagColor }]}>{flagLabel(item.flag)}</Text>
+        <Text style={[styles.itemFlag, { color: flagColor }]}>{itemFlagLabel(item)}</Text>
       </View>
       <View style={styles.itemValueRow}>
         <Text style={[styles.itemValue, { color: flagColor }]}>
@@ -114,6 +119,9 @@ export function ReviewItemCard({
         )}
       </View>
       {layout ? <MetricStrip layout={layout} color={flagColor} /> : null}
+      {item.flag === 'unknown' && flagReasonText(item.flag_reason) ? (
+        <Text style={styles.itemReason}>{flagReasonText(item.flag_reason)}</Text>
+      ) : null}
       {showZoom ? (
         <LineZoom
           testID={`review-zoom-${item.item_id}`}
@@ -163,32 +171,57 @@ export function ReviewItemCard({
         </View>
       ) : (
         <View style={styles.actions}>
-          {/* 确认是对「未确信」项的动作:已确认后再点是无变化空操作,禁用;
-              已修正项仍可再确认/再修正(决策可重复,ADR-0005)。 */}
-          <Pressable
-            testID={`review-confirm-${item.item_id}`}
-            style={[
-              styles.actionPrimary,
-              (busy || item.review_status === 'confirmed') && styles.actionDisabled,
-            ]}
-            disabled={busy || item.review_status === 'confirmed'}
-            onPress={() => void submit({ action: 'confirm' })}
-          >
-            <Text style={styles.actionPrimaryText}>确认</Text>
-          </Pressable>
-          <Pressable
-            testID={`review-correct-${item.item_id}`}
-            style={styles.actionGhost}
-            disabled={busy}
-            onPress={() => {
-              setDraft(undefined);
-              setEditing(true);
-            }}
-          >
-            <Text style={styles.actionGhostText}>修正</Text>
-          </Pressable>
+          {/* 可操作 unknown 只给补录主操作;低置信未核对给确认;其余无 filled。
+              每卡最多一个 filled primary(票 02 口径)。 */}
+          {actions.primary === 'confirm' ? (
+            <Pressable
+              testID={`review-confirm-${item.item_id}`}
+              style={[styles.actionPrimary, busy && styles.actionDisabled]}
+              disabled={busy}
+              onPress={() => void submit({ action: 'confirm' })}
+            >
+              <Text style={styles.actionPrimaryText}>确认</Text>
+            </Pressable>
+          ) : null}
+          {actions.primary === 'backfill' ? (
+            <Pressable
+              testID={`review-backfill-${item.item_id}`}
+              style={[styles.actionPrimary, busy && styles.actionDisabled]}
+              disabled={busy}
+              onPress={() => {
+                setDraft(undefined);
+                setEditing(true);
+              }}
+            >
+              <Text style={styles.actionPrimaryText}>补录缺失信息</Text>
+            </Pressable>
+          ) : null}
+          {actions.primary !== 'backfill' ? (
+            <Pressable
+              testID={`review-correct-${item.item_id}`}
+              style={styles.actionGhost}
+              disabled={busy}
+              onPress={() => {
+                setDraft(undefined);
+                setEditing(true);
+              }}
+            >
+              <Text style={styles.actionGhostText}>{actions.correctLabel}</Text>
+            </Pressable>
+          ) : null}
+          {canMarkNoReference(item) ? (
+            <Pressable
+              testID={`review-no-reference-${item.item_id}`}
+              style={styles.actionGhost}
+              disabled={busy}
+              onPress={() => void submit({ action: 'no_reference' })}
+            >
+              <Text style={styles.actionGhostText}>标记无参考范围</Text>
+            </Pressable>
+          ) : null}
         </View>
       )}
+      {actions.helper ? <Text style={styles.itemHelper}>{actions.helper}</Text> : null}
       {error ? <Text style={styles.error}>核对失败:{error}</Text> : null}
     </View>
   );
@@ -276,6 +309,8 @@ const styles = StyleSheet.create({
   itemValue: { fontSize: 20, fontVariant: ['tabular-nums'] },
   itemUnit: { fontSize: 13 },
   itemRef: { fontSize: 13, color: colors.muted },
+  itemReason: { fontSize: 12, color: colors.muted, lineHeight: 18 },
+  itemHelper: { fontSize: 12, color: colors.muted, lineHeight: 18 },
   itemRaw: { fontSize: 12, color: colors.muted, lineHeight: 18 },
   zoomLink: { fontSize: 12, color: colors.accent },
   stripTrack: {

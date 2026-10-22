@@ -12,6 +12,9 @@ RUN CGO_ENABLED=0 go build -o /out/hdd ./cmd/hdd
 
 FROM alpine:3.20
 COPY --from=build /out/hdd /usr/local/bin/hdd
+# 定性比较策略与识别端共读同一份(修正后 flag 服务端重算,ADR-0005)。
+COPY recognizer/recognizer/flag_policy.yaml /app/flag_policy.yaml
+ENV HDD_FLAG_POLICY=/app/flag_policy.yaml
 EXPOSE 8080
 # serve 即常驻入口;--addr 缺省 :8080 绑定全部网卡,compose 端口映射直出 LAN。
 ENTRYPOINT ["hdd"]

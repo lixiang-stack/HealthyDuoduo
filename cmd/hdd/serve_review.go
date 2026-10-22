@@ -16,8 +16,9 @@ import (
 
 // 核对动作枚举(契约 ReviewRequest 的 oneOf 两分支)。
 const (
-	reviewActionConfirm = "confirm"
-	reviewActionCorrect = "correct"
+	reviewActionConfirm     = "confirm"
+	reviewActionCorrect     = "correct"
+	reviewActionNoReference = "no_reference"
 )
 
 // reviewBody 核对请求体解码形状:action 必带;四项纸面事实用 optField 区分
@@ -41,6 +42,11 @@ func (b reviewBody) reviewAction() (*pipeline.ReviewAction, error) {
 			return nil, errors.New("confirm must not carry correction fields")
 		}
 		return &pipeline.ReviewAction{Confirm: true}, nil
+	case reviewActionNoReference:
+		if b.Value.set || b.Unit.set || b.Name.set || b.RefRange.set {
+			return nil, errors.New("no_reference must not carry correction fields")
+		}
+		return &pipeline.ReviewAction{NoReference: true}, nil
 	case reviewActionCorrect:
 		if !b.Value.set && !b.Unit.set && !b.Name.set && !b.RefRange.set {
 			return nil, errors.New("correct requires at least one of value, unit, name, ref_range")
@@ -63,7 +69,7 @@ func (b reviewBody) reviewAction() (*pipeline.ReviewAction, error) {
 		}
 		return action, nil
 	default:
-		return nil, errors.New(`action must be "confirm" or "correct"`)
+		return nil, errors.New(`action must be "confirm", "correct" or "no_reference"`)
 	}
 }
 

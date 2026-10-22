@@ -42,6 +42,7 @@ const FLAG_LABELS: Record<Flag, string> = {
   normal: '正常',
   high: '偏高',
   low: '偏低',
+  abnormal: '异常',
   unknown: '未知',
 };
 
@@ -50,18 +51,44 @@ export function flagLabel(flag: Flag): string {
   return FLAG_LABELS[flag];
 }
 
-/** 异常徽标(偏高/偏低/未知;normal 不计,为 0 的档不出现)。
+/** 指标项最终标签:unknown 不一律写「未知」,按 reason 给中性事实文案。 */
+export function itemFlagLabel(item: Pick<ReportItem, 'flag' | 'flag_reason'>): string {
+  if (item.flag !== 'unknown') {
+    return flagLabel(item.flag);
+  }
+  switch (item.flag_reason) {
+    case 'informational':
+      return '信息项';
+    case 'no_reference':
+      return '无参考范围';
+    case 'qualitative_unsupported':
+      return '定性结果';
+    case 'unverified':
+      return '待核实';
+    case 'narrative':
+      return '叙述体';
+    case 'indeterminate':
+      return '不确定';
+    default:
+      return '未知';
+  }
+}
+
+/** 异常徽标(偏高/偏低/异常/可操作未知;normal 不计,为 0 的档不出现)。
  * 影像单不呈现指标项,未知档按报告类别关闭。 */
 export function flagBadges(
   report: Pick<ReportSummary, 'report_type' | 'flag_counts'>,
 ): string[] {
-  const { high, low, unknown } = report.flag_counts;
+  const { high, low, abnormal, unknown } = report.flag_counts;
   const badges: string[] = [];
   if (high > 0) {
     badges.push(`偏高 ${high}`);
   }
   if (low > 0) {
     badges.push(`偏低 ${low}`);
+  }
+  if (abnormal > 0) {
+    badges.push(`异常 ${abnormal}`);
   }
   if (!isImagingReport(report) && unknown > 0) {
     badges.push(`未知 ${unknown}`);

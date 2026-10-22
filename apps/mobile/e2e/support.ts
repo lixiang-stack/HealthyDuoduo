@@ -76,6 +76,7 @@ export async function stubFileChooser(browser: Browser): Promise<void> {
   reportImage: 'report-image',
   reviewItem: (itemId: number) => `review-item-${itemId}`,
   reviewConfirm: (itemId: number) => `review-confirm-${itemId}`,
+  reviewBackfill: (itemId: number) => `review-backfill-${itemId}`,
   reviewCorrect: (itemId: number) => `review-correct-${itemId}`,
   reviewZoomToggle: (itemId: number) => `review-zoom-toggle-${itemId}`,
   reviewZoom: (itemId: number) => `review-zoom-${itemId}`,

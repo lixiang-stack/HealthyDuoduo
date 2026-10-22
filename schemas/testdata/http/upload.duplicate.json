@@ -10,6 +10,7 @@
     "flag_counts": {
       "high": 5,
       "low": 2,
+      "abnormal": 0,
       "unknown": 1
     },
     "unreviewed_low_confidence_count": 1,

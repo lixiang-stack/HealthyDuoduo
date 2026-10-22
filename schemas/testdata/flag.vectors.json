@@ -1,38 +1,573 @@
 {
-  "_note": "flag 语义共享测试向量:识别端 _flag(recognizer/recognizer/postprocess.py)与数据服务 ComputeFlag(internal/pipeline/flag.go)双侧读同一份。改语义先改此表,两侧测试强制通过;ref/value 为印刷原样字符串,null = 无值。",
+  "_note": "flag 语义共享测试向量:识别端 _compare(recognizer/recognizer/postprocess.py)与数据服务 Compare(internal/pipeline/flag.go)双侧读同一份。改语义先改此表,两侧测试强制通过;ref/value 为印刷原样字符串,null = 无值。",
   "cases": [
-    {"note": "区间内", "value": "128", "ref": "115-150", "flag": "normal"},
-    {"note": "高于上界", "value": "10.8", "ref": "3-10", "flag": "high"},
-    {"note": "低于下界", "value": "300", "ref": "316-354", "flag": "low"},
-    {"note": "下界含等号", "value": "3", "ref": "3-10", "flag": "normal"},
-    {"note": "上界含等号", "value": "10", "ref": "3-10", "flag": "normal"},
-    {"note": "刚越上界", "value": "10.1", "ref": "3-10", "flag": "high"},
-    {"note": "双横线", "value": "4.76", "ref": "3.5--5.5", "flag": "normal"},
-    {"note": "波浪号", "value": "4.76", "ref": "3.5~5.5", "flag": "normal"},
-    {"note": "全角破折号", "value": "4.76", "ref": "3.5—5.5", "flag": "normal"},
-    {"note": "半角空格", "value": "5", "ref": "3 - 10", "flag": "normal"},
-    {"note": "上下界写反", "value": "10", "ref": "10-3", "flag": "unknown"},
-    {"note": "性别前缀区间内", "value": "8", "ref": "男:0-15", "flag": "normal"},
-    {"note": "性别前缀超上界", "value": "16", "ref": "男:0-15", "flag": "high"},
-    {"note": "性别前缀女形", "value": "16", "ref": "女：0-15", "flag": "high"},
-    {"note": "小于上界内", "value": "4", "ref": "<8", "flag": "normal"},
-    {"note": "小于上界外", "value": "9", "ref": "<8", "flag": "high"},
-    {"note": "小于等于界内", "value": "7", "ref": "≤8", "flag": "normal"},
-    {"note": "小于等于边界值与 < 同判(识别端口径)", "value": "8", "ref": "≤8", "flag": "high"},
-    {"note": "大于下界内", "value": "9", "ref": ">7.5", "flag": "normal"},
-    {"note": "大于下界外", "value": "3", "ref": ">7.5", "flag": "low"},
-    {"note": "大于等于界内", "value": "8", "ref": "≥7.5", "flag": "normal"},
-    {"note": "大于等于边界值与 > 同判(识别端口径)", "value": "7.5", "ref": "≥7.5", "flag": "low"},
-    {"note": "比较式尾随文字按前缀匹配", "value": "1", "ref": "<2.00 mg/L", "flag": "normal"},
-    {"note": "检出限比较式值", "value": "<2.00", "ref": "0-5", "flag": "unknown"},
-    {"note": "区间型值", "value": "70-80", "ref": "60-90", "flag": "unknown"},
-    {"note": "参考范围文本", "value": "128", "ref": "优良", "flag": "unknown"},
-    {"note": "参考范围空串", "value": "128", "ref": "", "flag": "unknown"},
-    {"note": "值为空串", "value": "", "ref": "3-10", "flag": "unknown"},
-    {"note": "值带空白", "value": " 10.8 ", "ref": "3-10", "flag": "high"},
-    {"note": "值为 null", "value": null, "ref": "3-10", "flag": "unknown"},
-    {"note": "参考范围 null", "value": "128", "ref": null, "flag": "unknown"},
-    {"note": "真实语料:餐后2h血糖", "value": "11.84", "ref": "3.89-7.8", "flag": "high"},
-    {"note": "真实语料:糖化血红蛋白", "value": "6.50", "ref": "4-6", "flag": "high"}
+    {
+      "note": "区间内",
+      "value": "128",
+      "ref": "115-150",
+      "flag": "normal",
+      "name": null,
+      "reason": null
+    },
+    {
+      "note": "高于上界",
+      "value": "10.8",
+      "ref": "3-10",
+      "flag": "high",
+      "name": null,
+      "reason": null
+    },
+    {
+      "note": "低于下界",
+      "value": "300",
+      "ref": "316-354",
+      "flag": "low",
+      "name": null,
+      "reason": null
+    },
+    {
+      "note": "下界含等号",
+      "value": "3",
+      "ref": "3-10",
+      "flag": "normal",
+      "name": null,
+      "reason": null
+    },
+    {
+      "note": "上界含等号",
+      "value": "10",
+      "ref": "3-10",
+      "flag": "normal",
+      "name": null,
+      "reason": null
+    },
+    {
+      "note": "刚越上界",
+      "value": "10.1",
+      "ref": "3-10",
+      "flag": "high",
+      "name": null,
+      "reason": null
+    },
+    {
+      "note": "双横线",
+      "value": "4.76",
+      "ref": "3.5--5.5",
+      "flag": "normal",
+      "name": null,
+      "reason": null
+    },
+    {
+      "note": "波浪号",
+      "value": "4.76",
+      "ref": "3.5~5.5",
+      "flag": "normal",
+      "name": null,
+      "reason": null
+    },
+    {
+      "note": "全角破折号",
+      "value": "4.76",
+      "ref": "3.5—5.5",
+      "flag": "normal",
+      "name": null,
+      "reason": null
+    },
+    {
+      "note": "半角空格",
+      "value": "5",
+      "ref": "3 - 10",
+      "flag": "normal",
+      "name": null,
+      "reason": null
+    },
+    {
+      "note": "上下界写反",
+      "value": "10",
+      "ref": "10-3",
+      "flag": "unknown",
+      "name": null,
+      "reason": "other"
+    },
+    {
+      "note": "性别前缀区间内",
+      "value": "8",
+      "ref": "男:0-15",
+      "flag": "normal",
+      "name": null,
+      "reason": null
+    },
+    {
+      "note": "性别前缀超上界",
+      "value": "16",
+      "ref": "男:0-15",
+      "flag": "high",
+      "name": null,
+      "reason": null
+    },
+    {
+      "note": "性别前缀女形",
+      "value": "16",
+      "ref": "女：0-15",
+      "flag": "high",
+      "name": null,
+      "reason": null
+    },
+    {
+      "note": "小于上界内",
+      "value": "4",
+      "ref": "<8",
+      "flag": "normal",
+      "name": null,
+      "reason": null
+    },
+    {
+      "note": "小于上界外",
+      "value": "9",
+      "ref": "<8",
+      "flag": "high",
+      "name": null,
+      "reason": null
+    },
+    {
+      "note": "小于等于界内",
+      "value": "7",
+      "ref": "≤8",
+      "flag": "normal",
+      "name": null,
+      "reason": null
+    },
+    {
+      "note": "小于等于边界值与 < 同判(识别端口径)",
+      "value": "8",
+      "ref": "≤8",
+      "flag": "high",
+      "name": null,
+      "reason": null
+    },
+    {
+      "note": "大于下界内",
+      "value": "9",
+      "ref": ">7.5",
+      "flag": "normal",
+      "name": null,
+      "reason": null
+    },
+    {
+      "note": "大于下界外",
+      "value": "3",
+      "ref": ">7.5",
+      "flag": "low",
+      "name": null,
+      "reason": null
+    },
+    {
+      "note": "大于等于界内",
+      "value": "8",
+      "ref": "≥7.5",
+      "flag": "normal",
+      "name": null,
+      "reason": null
+    },
+    {
+      "note": "大于等于边界值与 > 同判(识别端口径)",
+      "value": "7.5",
+      "ref": "≥7.5",
+      "flag": "low",
+      "name": null,
+      "reason": null
+    },
+    {
+      "note": "比较式尾随文字按前缀匹配",
+      "value": "1",
+      "ref": "<2.00 mg/L",
+      "flag": "normal",
+      "name": null,
+      "reason": null
+    },
+    {
+      "note": "检出限比较式值",
+      "value": "<2.00",
+      "ref": "0-5",
+      "flag": "normal",
+      "name": null,
+      "reason": null
+    },
+    {
+      "note": "区间型值",
+      "value": "70-80",
+      "ref": "60-90",
+      "flag": "normal",
+      "name": null,
+      "reason": null
+    },
+    {
+      "note": "参考范围文本",
+      "value": "128",
+      "ref": "优良",
+      "flag": "unknown",
+      "name": null,
+      "reason": "other"
+    },
+    {
+      "note": "参考范围空串",
+      "value": "128",
+      "ref": "",
+      "flag": "unknown",
+      "name": null,
+      "reason": "other"
+    },
+    {
+      "note": "值为空串",
+      "value": "",
+      "ref": "3-10",
+      "flag": "unknown",
+      "name": null,
+      "reason": "other"
+    },
+    {
+      "note": "值带空白",
+      "value": " 10.8 ",
+      "ref": "3-10",
+      "flag": "high",
+      "name": null,
+      "reason": null
+    },
+    {
+      "note": "值为 null",
+      "value": null,
+      "ref": "3-10",
+      "flag": "unknown",
+      "name": null,
+      "reason": "other"
+    },
+    {
+      "note": "参考范围 null",
+      "value": "128",
+      "ref": null,
+      "flag": "unknown",
+      "name": null,
+      "reason": "other"
+    },
+    {
+      "note": "真实语料:餐后2h血糖",
+      "value": "11.84",
+      "ref": "3.89-7.8",
+      "flag": "high",
+      "name": null,
+      "reason": null
+    },
+    {
+      "note": "真实语料:糖化血红蛋白",
+      "value": "6.50",
+      "ref": "4-6",
+      "flag": "high",
+      "name": null,
+      "reason": null
+    },
+    {
+      "note": "标量参考 0 与值 0",
+      "name": null,
+      "value": "0",
+      "ref": "0",
+      "flag": "normal",
+      "reason": null
+    },
+    {
+      "note": "标量参考 0 与正值",
+      "name": null,
+      "value": "0.14",
+      "ref": "0",
+      "flag": "high",
+      "reason": null
+    },
+    {
+      "note": "标量参考 0.0 与值 0",
+      "name": null,
+      "value": "0",
+      "ref": "0.0",
+      "flag": "normal",
+      "reason": null
+    },
+    {
+      "note": "非零标量参考不支持",
+      "name": null,
+      "value": "5",
+      "ref": "5",
+      "flag": "unknown",
+      "reason": "scalar_ref"
+    },
+    {
+      "note": "单侧值小于上界内",
+      "name": null,
+      "value": "<2.00",
+      "ref": "0-30",
+      "flag": "normal",
+      "reason": null
+    },
+    {
+      "note": "单侧值等于上界内",
+      "name": null,
+      "value": "<6.00",
+      "ref": "0-6",
+      "flag": "normal",
+      "reason": null
+    },
+    {
+      "note": "单侧值对单侧参考",
+      "name": null,
+      "value": "<8",
+      "ref": "<8",
+      "flag": "normal",
+      "reason": null
+    },
+    {
+      "note": "单侧值真实语料透明质酸",
+      "name": null,
+      "value": "<50.0000",
+      "ref": "<110",
+      "flag": "normal",
+      "reason": null
+    },
+    {
+      "note": "单侧值真实语料 TG-Ab",
+      "name": null,
+      "value": "<0.9",
+      "ref": "<4.0",
+      "flag": "normal",
+      "reason": null
+    },
+    {
+      "note": "单侧值高于上界",
+      "name": null,
+      "value": ">5",
+      "ref": "0-3",
+      "flag": "high",
+      "reason": null
+    },
+    {
+      "note": "单侧值低于下界",
+      "name": null,
+      "value": "<2",
+      "ref": "3-5",
+      "flag": "low",
+      "reason": null
+    },
+    {
+      "note": "单侧值跨边界",
+      "name": null,
+      "value": "<2",
+      "ref": "1-5",
+      "flag": "unknown",
+      "reason": "indeterminate"
+    },
+    {
+      "note": "区间值在单侧范围内",
+      "name": null,
+      "value": "1-2",
+      "ref": "<5",
+      "flag": "normal",
+      "reason": null
+    },
+    {
+      "note": "区间值真实语料红细胞镜检",
+      "name": null,
+      "value": "70-80",
+      "ref": "0-3",
+      "flag": "high",
+      "reason": null
+    },
+    {
+      "note": "区间值跨边界",
+      "name": null,
+      "value": "1-2",
+      "ref": "2-5",
+      "flag": "unknown",
+      "reason": "indeterminate"
+    },
+    {
+      "note": "区间值真实语料",
+      "name": null,
+      "value": "70-80",
+      "ref": "60-90",
+      "flag": "normal",
+      "reason": null
+    },
+    {
+      "note": "值与参考都是短横",
+      "name": null,
+      "value": "-",
+      "ref": "-",
+      "flag": "normal",
+      "reason": null
+    },
+    {
+      "note": "值阴性参考短横",
+      "name": null,
+      "value": "阴性",
+      "ref": "-",
+      "flag": "normal",
+      "reason": null
+    },
+    {
+      "note": "值阴性参考阴性",
+      "name": null,
+      "value": "阴性",
+      "ref": "阴性(-)",
+      "flag": "normal",
+      "reason": null
+    },
+    {
+      "note": "值阳性参考短横",
+      "name": null,
+      "value": "+",
+      "ref": "-",
+      "flag": "abnormal",
+      "reason": null
+    },
+    {
+      "note": "值阳性参考阴性",
+      "name": "ANA(IIF)",
+      "value": "阳性(+)",
+      "ref": "阴性(-)",
+      "flag": "abnormal",
+      "reason": null
+    },
+    {
+      "note": "定性阴性由项目策略判正常",
+      "name": "尿潜血",
+      "value": "阴性",
+      "ref": null,
+      "flag": "normal",
+      "reason": null
+    },
+    {
+      "note": "定性阳性由项目策略判异常",
+      "name": "尿潜血",
+      "value": "+",
+      "ref": null,
+      "flag": "abnormal",
+      "reason": null
+    },
+    {
+      "note": "HBsAb 阴性是信息项",
+      "name": "乙肝表面抗体",
+      "value": "阴性",
+      "ref": null,
+      "flag": "unknown",
+      "reason": "informational"
+    },
+    {
+      "note": "HBsAb 阳性正常",
+      "name": "乙肝表面抗体",
+      "value": "阳性",
+      "ref": null,
+      "flag": "normal",
+      "reason": null
+    },
+    {
+      "note": "血型是信息项",
+      "name": "ABO血型",
+      "value": "B型",
+      "ref": null,
+      "flag": "unknown",
+      "reason": "informational"
+    },
+    {
+      "note": "RhD 是信息项",
+      "name": "RH血型",
+      "value": "RhD(+)",
+      "ref": null,
+      "flag": "unknown",
+      "reason": "informational"
+    },
+    {
+      "note": "ANA 核型是信息项",
+      "name": "抗核抗体主荧光核型",
+      "value": "核均质型",
+      "ref": null,
+      "flag": "unknown",
+      "reason": "informational"
+    },
+    {
+      "note": "尿颜色正常",
+      "name": "尿液颜色",
+      "value": "淡黄",
+      "ref": null,
+      "flag": "normal",
+      "reason": null
+    },
+    {
+      "note": "尿透明度异常",
+      "name": "尿透明度",
+      "value": "浑浊",
+      "ref": null,
+      "flag": "abnormal",
+      "reason": null
+    },
+    {
+      "note": "HBeAb 是信息项",
+      "name": "乙肝e抗体",
+      "value": "阳性",
+      "ref": null,
+      "flag": "unknown",
+      "reason": "informational"
+    },
+    {
+      "note": "HBsAg 阴性正常",
+      "name": "乙肝表面抗原",
+      "value": "阴性",
+      "ref": null,
+      "flag": "normal",
+      "reason": null
+    },
+    {
+      "note": "HBsAg 阳性异常",
+      "name": "乙肝表面抗原",
+      "value": "阳性",
+      "ref": null,
+      "flag": "abnormal",
+      "reason": null
+    },
+    {
+      "note": "全角短横两边",
+      "name": null,
+      "value": "－",
+      "ref": "－",
+      "flag": "normal",
+      "reason": null
+    },
+    {
+      "note": "全角加号对短横",
+      "name": null,
+      "value": "＋",
+      "ref": "-",
+      "flag": "abnormal",
+      "reason": null
+    },
+    {
+      "note": "计算项纸面无参考范围",
+      "name": "谷草/谷丙比值",
+      "value": "1.35",
+      "ref": null,
+      "flag": "unknown",
+      "reason": "no_reference"
+    },
+    {
+      "note": "半定量 3+ 对阴性",
+      "name": null,
+      "value": "3+",
+      "ref": "阴性",
+      "flag": "abnormal",
+      "reason": null
+    },
+    {
+      "note": "尿胆原 norm. 对阴性",
+      "name": "尿胆原",
+      "value": "norm.",
+      "ref": "阴性",
+      "flag": "normal",
+      "reason": null
+    }
   ]
 }

@@ -3,10 +3,14 @@ import type { ReportDetail, ReportItem } from '../api/reports';
 import {
   applyReviewResult,
   buildCorrection,
+  canMarkNoReference,
   countFlagCounts,
   draftFromItem,
+  flagReasonText,
+  isBackfillItem,
   needsReview,
   pendingItems,
+  reviewActions,
   reviewStatusLabel,
   shouldShowZoom,
 } from './items';
@@ -39,7 +43,7 @@ function report(overrides: Partial<ReportDetail> = {}): ReportDetail {
     report_date: '2026-10-01',
     status: 'partial',
     fail_reason: null,
-    flag_counts: { high: 1, low: 0, unknown: 0 },
+    flag_counts: { high: 1, low: 0, abnormal: 0, unknown: 0 },
     unreviewed_low_confidence_count: 1,
     items: [item()],
     ...overrides,
@@ -95,11 +99,55 @@ describe('countFlagCounts', () => {
       item({ flag: 'high' }),
       item({ flag: 'low' }),
       item({ flag: 'low' }),
-      item({ flag: 'unknown' }),
+      item({ flag: 'abnormal' }),
+      item({ flag: 'unknown', flag_reason: 'ocr_miss' }),
+      item({ flag: 'unknown', flag_reason: 'no_reference' }),
+      item({ flag: 'unknown', flag_reason: 'informational' }),
       item({ flag: 'normal' }),
     ]);
-    expect(counts).toEqual({ high: 1, low: 2, unknown: 1 });
-    expect(countFlagCounts([])).toEqual({ high: 0, low: 0, unknown: 0 });
+    expect(counts).toEqual({ high: 1, low: 2, abnormal: 1, unknown: 1 });
+    expect(countFlagCounts([])).toEqual({ high: 0, low: 0, abnormal: 0, unknown: 0 });
+  });
+});
+
+describe('flagReasonText', () => {
+  it('unknown reason 给出发生了什么 + 下一步提示', () => {
+    expect(flagReasonText('ocr_miss')).toContain('OCR 输出里没有');
+    expect(flagReasonText('ocr_merge')).toContain('粘在一起');
+    expect(flagReasonText('no_reference')).toContain('无需处理');
+    expect(flagReasonText(undefined)).toBeUndefined();
+  });
+});
+
+describe('canMarkNoReference', () => {
+  it('有值、无范围、非信息项才可标记无参考范围', () => {
+    expect(canMarkNoReference(item({ value: '4.19', ref_range: null, flag: 'unknown', flag_reason: 'ocr_miss', low_confidence: false }))).toBe(true);
+    expect(canMarkNoReference(item({ value: null, ref_range: null, flag: 'unknown' }))).toBe(false);
+    expect(canMarkNoReference(item({ value: '4.19', ref_range: null, flag: 'unknown', flag_reason: 'informational' }))).toBe(false);
+    expect(canMarkNoReference(item({ value: '4.19', ref_range: null, flag: 'unknown', flag_reason: 'no_reference' }))).toBe(false);
+  });
+});
+
+describe('isBackfillItem / reviewActions', () => {
+  it('缺值 + 可解析范围、数值 + 反向范围才可补录', () => {
+    expect(isBackfillItem(item({ value: null, ref_range: '0-20', flag: 'unknown', flag_reason: 'ocr_miss' }))).toBe(true);
+    expect(isBackfillItem(item({ value: null, ref_range: '20-0', flag: 'unknown', flag_reason: 'ocr_merge' }))).toBe(true);
+    expect(isBackfillItem(item({ value: '17.3', ref_range: '13.5--9.5', flag: 'unknown', flag_reason: 'ocr_merge' }))).toBe(true);
+    expect(isBackfillItem(item({ value: null, ref_range: '5', flag: 'unknown', flag_reason: 'ocr_miss' }))).toBe(false);
+    expect(isBackfillItem(item({ value: '17.3', ref_range: '3.5--9.5', flag: 'unknown' }))).toBe(false);
+    expect(isBackfillItem(item({ value: '阴性', ref_range: '0-20', flag: 'unknown' }))).toBe(false);
+    expect(isBackfillItem(item({ value: null, ref_range: '0-20', flag: 'unknown', flag_reason: 'no_reference' }))).toBe(false);
+  });
+
+  it('可补录不给确认,只给补录主操作;低置信非补录给确认', () => {
+    const backfill = reviewActions(item({ value: null, ref_range: '0-20', flag: 'unknown', flag_reason: 'ocr_miss' }));
+    expect(backfill).toMatchObject({ confirm: false, primary: 'backfill', correctLabel: '补录缺失信息' });
+    const low = reviewActions(item({ value: null, ref_range: null, flag: 'unknown', flag_reason: 'ocr_miss' }));
+    expect(low).toMatchObject({ confirm: true, primary: 'confirm', correctLabel: '修正' });
+    const high = reviewActions(item({ low_confidence: false, value: '0', ref_range: null, flag: 'unknown', flag_reason: 'ocr_miss' }));
+    expect(high).toMatchObject({ confirm: false, primary: null, correctLabel: '修正' });
+    const corrected = reviewActions(item({ value: null, ref_range: '0-20', flag: 'unknown', flag_reason: 'ocr_miss', review_status: 'corrected' }));
+    expect(corrected).toMatchObject({ primary: 'backfill', correctLabel: '补录缺失信息' });
   });
 });
 
@@ -107,7 +155,7 @@ describe('applyReviewResult', () => {
   it('单响应刷新整屏:替换本次指标项、更新报告级派生、重算 flag 徽标', () => {
     const before = report({
       items: [item({ item_id: 1 }), item({ item_id: 2, low_confidence: false, flag: 'normal' })],
-      flag_counts: { high: 1, low: 0, unknown: 0 },
+      flag_counts: { high: 1, low: 0, abnormal: 0, unknown: 0 },
     });
     const after = applyReviewResult(before, {
       report_id: before.report_id,
@@ -117,7 +165,7 @@ describe('applyReviewResult', () => {
     });
     expect(after.status).toBe('success');
     expect(after.unreviewed_low_confidence_count).toBe(0);
-    expect(after.flag_counts).toEqual({ high: 0, low: 0, unknown: 0 }); // 修正后按新值重算
+    expect(after.flag_counts).toEqual({ high: 0, low: 0, abnormal: 0, unknown: 0 }); // 修正后按新值重算
     expect(after.items[0].value).toBe('5.6');
     expect(after.items[0].review_status).toBe('corrected');
     expect(after.items[1]).toBe(before.items[1]); // 其余项原样

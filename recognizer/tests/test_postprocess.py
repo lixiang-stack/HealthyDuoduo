@@ -223,6 +223,24 @@ def test_offset_columns_pair_by_header_baseline() -> None:
     assert item_of(r, "白细胞计数").flag == "normal"
 
 
+def test_qualitative_short_dash_value_and_ref_normal() -> None:
+    """值与参考都印 "-" 时进入定性比较,结果为 normal(不是 unknown)。"""
+    cells = [
+        {"x": 100, "y": -60, "text": "尿常规报告单"},
+        {"x": 20, "y": 0, "text": "序号"},
+        {"x": 160, "y": 0, "text": "项目名称"},
+        {"x": 360, "y": 0, "text": "结果"},
+        {"x": 470, "y": 0, "text": "单位"},
+        {"x": 580, "y": 0, "text": "参考值"},
+    ]
+    for idx, name in enumerate(["尿潜血", "尿白细胞酯酶", "尿蛋白质", "尿葡萄糖", "尿酮体"]):
+        cells += row(30 + idx * 32, name, "-", ref="-")
+    r = run_postprocess(mk_ocr(cells))
+    assert item_of(r, "尿潜血").flag == "normal"
+    assert item_of(r, "尿潜血").value == "-"
+    assert item_of(r, "尿潜血").ref_range == "-"
+
+
 def test_fused_name_value() -> None:
     """名称熔断数值(cbc_02/05 版式):平均红细胞血红蛋白浓度324。"""
     ocr = mk_ocr(header_row() + row(30, "平均红细胞血红蛋白浓度324", "g/L", unit="g/L", ref="316-354"))
@@ -472,7 +490,7 @@ def test_title_keyword_detects_category() -> None:
 
 
 _CBC_ROW_NAMES = ["白细胞计数", "红细胞计数", "血红蛋白", "红细胞压积", "血小板",
-                  "淋巴细胞比率", "中性细胞比率", "单核细胞比率", "血小板压积", "淋巴细胞数"]
+                  "淋巴细胞比率", "中性细胞比率", "单核细胞比率", "血小板比积", "淋巴细胞数"]
 
 _URINE_ITEM_NAMES = ["尿胆原", "尿糖", "尿蛋白", "尿酮体", "尿潜血",
                      "尿亚硝酸盐", "尿胆红素", "尿比重", "尿pH", "尿白细胞"]

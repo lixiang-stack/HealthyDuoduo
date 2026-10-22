@@ -17,11 +17,15 @@ import (
 // MVP 手写而未用 sqlc 生成:查询量小;所有 SQL 集中为本文件常量,用户值一律走参数占位
 // ($1..),无字符串拼接注入面。
 type Store struct {
-	pool *pgxpool.Pool
+	pool       *pgxpool.Pool
+	flagPolicy *pipeline.FlagPolicy
 }
 
 // NewStore 包装已打开(且完成迁移)的连接池。
 func NewStore(pool *pgxpool.Pool) *Store { return &Store{pool: pool} }
+
+// SetFlagPolicy 注入修正后 flag 重算用的共享比较策略(组合根注入;nil = 仅数值比较)。
+func (s *Store) SetFlagPolicy(policy *pipeline.FlagPolicy) { s.flagPolicy = policy }
 
 // Close 关闭连接池。
 func (s *Store) Close() { s.pool.Close() }
@@ -70,7 +74,7 @@ const (
 		 WHERE r.report_type = $1 AND date_trunc('year', r.report_date) = date_trunc('year', $2::date)
 		 ORDER BY r.report_date DESC NULLS LAST, r.image_sha256 ASC`
 
-	sqlItemsByReport = `SELECT name, value, unit, ref_range, method, flag, low_confidence, raw_text
+	sqlItemsByReport = `SELECT name, value, unit, ref_range, method, flag, flag_reason, low_confidence, raw_text
 		 FROM report_items WHERE report_sha256 = $1 ORDER BY id`
 
 	// trend:同一指标项名(report_items.name = 词典规范名)的跨报告时序点,升序;
@@ -100,7 +104,7 @@ const (
 
 	// 指标项含外部句柄与核对状态(上传响应回读;行序 = id 升序与写入序一致)。
 	// ocr_line_numbers 存量行可为 NULL(0005 前入库),COALESCE 归空数组。
-	sqlItemsWithReviewStatus = `SELECT id, name, value, unit, ref_range, method, flag, low_confidence, raw_text, review_status,
+	sqlItemsWithReviewStatus = `SELECT id, name, value, unit, ref_range, method, flag, flag_reason, low_confidence, raw_text, review_status,
 		   COALESCE(ocr_line_numbers, '{}')
 		 FROM report_items WHERE report_sha256 = $1 ORDER BY id`
 
@@ -124,14 +128,17 @@ const (
 	sqlReportLock = `SELECT image_sha256 FROM reports WHERE image_sha256 = $1 FOR UPDATE`
 
 	// 单指标项按报告内身份取行(核对动作前读;id 与报告不匹配即不存在)。
-	sqlItemForReview = `SELECT id, name, value, unit, ref_range, method, flag, low_confidence, raw_text, review_status,
+	sqlItemForReview = `SELECT id, name, value, unit, ref_range, method, flag, flag_reason, low_confidence, raw_text, review_status,
 		   COALESCE(ocr_line_numbers, '{}')
 		 FROM report_items WHERE report_sha256 = $1 AND id = $2`
 
 	sqlItemReviewConfirm = `UPDATE report_items SET review_status = 'confirmed' WHERE id = $1`
 
+	sqlItemReviewNoReference = `UPDATE report_items SET flag_reason = 'no_reference', review_status = 'confirmed'
+		 WHERE id = $1`
+
 	sqlItemReviewCorrect = `UPDATE report_items SET name = $2, value = $3, unit = $4, ref_range = $5, flag = $6,
-		   review_status = 'corrected' WHERE id = $1`
+		   flag_reason = $7, review_status = 'corrected' WHERE id = $1`
 
 	// 修正对 append-only(ADR-0005;before→after 四项纸面事实全集 + 原始行文 + OCR 行号)。
 	sqlCorrectionPairInsert = `INSERT INTO correction_pairs
@@ -173,8 +180,8 @@ const (
 	sqlItemsDeleteByReport = `DELETE FROM report_items WHERE report_sha256 = $1`
 
 	sqlItemInsert = `INSERT INTO report_items
-		 (report_sha256, name, value, unit, ref_range, method, flag, low_confidence, raw_text, ocr_line_numbers)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`
+		 (report_sha256, name, value, unit, ref_range, method, flag, flag_reason, low_confidence, raw_text, ocr_line_numbers)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`
 
 	// 成员(迁移 0004;显示名 + 是否孩子两档,无删除):列表按 id 升序 = 创建序返回,
 	// 孩子优先由客户端做;改动用 COALESCE 只覆盖传入字段(nil = 保持不变)。
@@ -198,14 +205,19 @@ const reportColumnsSQL = `r.image_sha256, r.ocr_result_id, r.report_type,
 // reportSummaryColumnsSQL 报告摘要(ReportSummary)投影:头部 + 聚合列(见 reportAggregateSQL)。
 const reportSummaryColumnsSQL = `r.image_sha256, r.member_id, r.report_type,
 	   COALESCE(to_char(r.report_date, 'YYYY-MM-DD'), ''), r.status, r.fail_reason,
-	   agg.high, agg.low, agg.unknown, agg.unreviewed_low`
+	   agg.high, agg.low, agg.abnormal, agg.unknown, agg.unreviewed_low`
 
 // reportAggregateSQL 单报告的 flag 聚合与未核对低置信计数(横向子查询,逐报告就地聚合)。
 // unreviewed_low 以报告 status = partial 为门:success 免核对、failed 无项均恒 0(契约口径)。
 const reportAggregateSQL = `SELECT
 		   COUNT(*) FILTER (WHERE i.flag = 'high') AS high,
 		   COUNT(*) FILTER (WHERE i.flag = 'low') AS low,
-		   COUNT(*) FILTER (WHERE i.flag = 'unknown') AS unknown,
+		   COUNT(*) FILTER (WHERE i.flag = 'abnormal') AS abnormal,
+		   COUNT(*) FILTER (WHERE i.flag = 'unknown' AND (
+		       i.flag_reason IS NULL OR i.flag_reason IN
+		       ('ocr_miss', 'ocr_merge', 'extractor_pairing', 'unverified',
+		        'indeterminate', 'scalar_ref', 'other')
+		   )) AS unknown,
 		   COUNT(*) FILTER (WHERE r.status = 'partial' AND i.review_status = 'unreviewed' AND i.low_confidence) AS unreviewed_low
 	   FROM report_items i WHERE i.report_sha256 = r.image_sha256`
 
@@ -304,7 +316,7 @@ func (s *Store) ItemsByImage(ctx context.Context, reportSha string) ([]contract.
 	var items []contract.ReportItem
 	for rows.Next() {
 		var it contract.ReportItem
-		if err := rows.Scan(&it.Name, &it.Value, &it.Unit, &it.RefRange, &it.Method, &it.Flag, &it.LowConfidence, &it.RawText); err != nil {
+		if err := rows.Scan(&it.Name, &it.Value, &it.Unit, &it.RefRange, &it.Method, &it.Flag, &it.FlagReason, &it.LowConfidence, &it.RawText); err != nil {
 			return nil, err
 		}
 		items = append(items, it)
@@ -378,7 +390,8 @@ func (s *Store) querySummaries(ctx context.Context, query string, args ...any) (
 		var r pipeline.ReportSummary
 		var date string
 		if err := rows.Scan(&r.Sha256, &r.MemberID, &r.ReportType, &date, &r.Status, &r.FailReason,
-			&r.FlagCounts.High, &r.FlagCounts.Low, &r.FlagCounts.Unknown, &r.UnreviewedLowConfidenceCount); err != nil {
+			&r.FlagCounts.High, &r.FlagCounts.Low, &r.FlagCounts.Abnormal, &r.FlagCounts.Unknown,
+			&r.UnreviewedLowConfidenceCount); err != nil {
 			return nil, err
 		}
 		if date != "" {
@@ -400,7 +413,7 @@ func (s *Store) ItemsWithReviewStatus(ctx context.Context, reportSha string) ([]
 	for rows.Next() {
 		var it pipeline.ReportItemRow
 		if err := rows.Scan(&it.ItemID, &it.Name, &it.Value, &it.Unit, &it.RefRange, &it.Method,
-			&it.Flag, &it.LowConfidence, &it.RawText, &it.ReviewStatus, &it.OCRLineNumbers); err != nil {
+			&it.Flag, &it.FlagReason, &it.LowConfidence, &it.RawText, &it.ReviewStatus, &it.OCRLineNumbers); err != nil {
 			return nil, err
 		}
 		out = append(out, it)
@@ -488,20 +501,24 @@ func (s *Store) ReviewItem(ctx context.Context, reportSha string, itemID int64, 
 	var current pipeline.ReportItemRow
 	err = tx.QueryRow(ctx, sqlItemForReview, reportSha, itemID).Scan(
 		&current.ItemID, &current.Name, &current.Value, &current.Unit, &current.RefRange, &current.Method,
-		&current.Flag, &current.LowConfidence, &current.RawText, &current.ReviewStatus, &current.OCRLineNumbers)
+		&current.Flag, &current.FlagReason, &current.LowConfidence, &current.RawText, &current.ReviewStatus, &current.OCRLineNumbers)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil // 指标项不存在或不属于该报告
 	} else if err != nil {
 		return nil, fmt.Errorf("read report item: %w", err)
 	}
 
-	next, pair := pipeline.ApplyReviewAction(current, action)
-	if pair == nil {
+	next, pair := pipeline.ApplyReviewActionWithPolicy(current, action, s.flagPolicy)
+	if action.NoReference {
+		if _, err := tx.Exec(ctx, sqlItemReviewNoReference, current.ItemID); err != nil {
+			return nil, fmt.Errorf("mark no reference: %w", err)
+		}
+	} else if pair == nil {
 		if _, err := tx.Exec(ctx, sqlItemReviewConfirm, current.ItemID); err != nil {
 			return nil, fmt.Errorf("confirm item: %w", err)
 		}
 	} else {
-		if _, err := tx.Exec(ctx, sqlItemReviewCorrect, current.ItemID, next.Name, next.Value, next.Unit, next.RefRange, next.Flag); err != nil {
+		if _, err := tx.Exec(ctx, sqlItemReviewCorrect, current.ItemID, next.Name, next.Value, next.Unit, next.RefRange, next.Flag, next.FlagReason); err != nil {
 			return nil, fmt.Errorf("correct item: %w", err)
 		}
 		if _, err := tx.Exec(ctx, sqlCorrectionPairInsert, current.ItemID,
@@ -581,8 +598,8 @@ func (s *Store) WriteReport(ctx context.Context, reportSha string, ocrID int64, 
 	}
 	for _, it := range report.Items {
 		if _, err := tx.Exec(ctx, sqlItemInsert,
-			reportSha, it.Name, it.Value, it.Unit, it.RefRange, it.Method, it.Flag, it.LowConfidence, it.RawText,
-			it.OCRLineNumbers); err != nil {
+			reportSha, it.Name, it.Value, it.Unit, it.RefRange, it.Method, it.Flag, it.FlagReason,
+			it.LowConfidence, it.RawText, it.OCRLineNumbers); err != nil {
 			return fmt.Errorf("write report item %q: %w", it.Name, err)
 		}
 	}

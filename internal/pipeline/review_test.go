@@ -115,6 +115,84 @@ func TestApplyReviewActionCorrectNameAndUnit(t *testing.T) {
 	}
 }
 
+func TestApplyReviewActionScalarZeroReference(t *testing.T) {
+	row := ReportItemRow{
+		ItemID: 11,
+		ReportItem: contract.ReportItem{
+			Name:     "有核红细胞绝对值",
+			Value:    str("0.00"),
+			RefRange: nil,
+			Flag:     FlagUnknown,
+			RawText:  "有核红细胞绝对值  NRBC#  0.00  *10",
+		},
+	}
+	next, _ := ApplyReviewAction(row, ReviewAction{RefRange: str("0")})
+	if next.Flag != FlagNormal || next.FlagReason != nil {
+		t.Fatalf("scalar 0 correction = %q/%v, want normal/nil", next.Flag, next.FlagReason)
+	}
+}
+
+func TestApplyReviewActionNoReference(t *testing.T) {
+	row := ReportItemRow{
+		ItemID:       10,
+		ReviewStatus: ReviewStatusUnreviewed,
+		ReportItem: contract.ReportItem{
+			Name:     "中性细胞数",
+			Value:    str("4.19"),
+			RefRange: nil,
+			Flag:     FlagUnknown,
+			RawText:  "NEUT  中性细胞数  4.19",
+		},
+	}
+	next, pair := ApplyReviewAction(row, ReviewAction{NoReference: true})
+	if pair != nil {
+		t.Fatalf("no_reference pair = %+v, want nil(不改纸面事实)", pair)
+	}
+	if next.ReviewStatus != ReviewStatusConfirmed || next.Flag != FlagUnknown {
+		t.Fatalf("no_reference state = %q/%q, want confirmed/unknown", next.ReviewStatus, next.Flag)
+	}
+	if next.FlagReason == nil || *next.FlagReason != FlagReasonNoReference {
+		t.Fatalf("no_reference reason = %v, want no_reference", next.FlagReason)
+	}
+}
+
+func TestApplyReviewActionWithPolicyQualitative(t *testing.T) {
+	policy, err := LoadFlagPolicy("../../recognizer/recognizer/flag_policy.yaml")
+	if err != nil {
+		t.Fatalf("load policy: %v", err)
+	}
+	row := ReportItemRow{
+		ItemID:       8,
+		ReviewStatus: ReviewStatusUnreviewed,
+		ReportItem: contract.ReportItem{
+			Name:     "尿潜血",
+			Value:    str("+"),
+			RefRange: str("-"),
+			Flag:     FlagUnknown,
+			RawText:  "尿潜血  +  -",
+		},
+	}
+	next, _ := ApplyReviewActionWithPolicy(row, ReviewAction{Value: str("-")}, policy)
+	if next.Flag != FlagNormal || next.FlagReason != nil {
+		t.Fatalf("qualitative -/- = %q/%v, want normal/nil", next.Flag, next.FlagReason)
+	}
+
+	noRef := ReportItemRow{
+		ItemID: 9,
+		ReportItem: contract.ReportItem{
+			Name:     "谷草/谷丙比值",
+			Value:    str("1.35"),
+			RefRange: nil,
+			Flag:     FlagUnknown,
+			RawText:  "谷草/谷丙比值  1.35  计算法",
+		},
+	}
+	next, _ = ApplyReviewActionWithPolicy(noRef, ReviewAction{Value: str("1.35")}, policy)
+	if next.Flag != FlagUnknown || next.FlagReason == nil || *next.FlagReason != FlagReasonNoReference {
+		t.Fatalf("no-reference item = %q/%v, want unknown/no_reference", next.Flag, next.FlagReason)
+	}
+}
+
 func TestApplyReviewActionCorrectToUnparsable(t *testing.T) {
 	row := reviewRow()
 	next, _ := ApplyReviewAction(row, ReviewAction{Value: str("查")})

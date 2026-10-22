@@ -8,6 +8,7 @@
   "flag_counts": {
     "high": 0,
     "low": 0,
+    "abnormal": 0,
     "unknown": 0
   },
   "unreviewed_low_confidence_count": 0,

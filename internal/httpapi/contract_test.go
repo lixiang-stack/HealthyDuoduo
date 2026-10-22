@@ -161,6 +161,7 @@ var reconcileCases = []fixtureCase{
 	{"upload.duplicate.json", "UploadResult", unmarshal[UploadResult]},
 	{"report.conflict.json", "Error", unmarshal[Error]},
 	{"review.request.confirm.json", "ReviewRequest", unmarshal[ReviewRequest]},
+	{"review.request.no_reference.json", "ReviewRequest", unmarshal[ReviewRequest]},
 	{"review.request.correct.json", "ReviewRequest", unmarshal[ReviewRequest]},
 	{"review.result.json", "ReviewResult", unmarshal[ReviewResult]},
 	{"correction.pair.json", "CorrectionPair", unmarshal[CorrectionPair]},
@@ -221,7 +222,7 @@ func TestFixturesRoundTripGoMirror(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := string(out); got != `{"high":5,"low":2,"unknown":1}` {
+	if got := string(out); got != `{"high":5,"low":2,"abnormal":0,"unknown":1}` {
 		t.Errorf("FlagCounts marshal = %s", got)
 	}
 }

@@ -33,12 +33,13 @@ type ReportsList struct {
 	Reports []ReportSummary `json:"reports"`
 }
 
-// FlagCounts components/FlagCounts:「异常」计数徽标口径 = 偏高 / 偏低 / 未知三档
+// FlagCounts components/FlagCounts:「异常」计数徽标口径 = 偏高 / 偏低 / 异常 / 可操作未知四档
 // 非负整数;normal 不计(详情页逐项染色)。
 type FlagCounts struct {
-	High    int `json:"high"`
-	Low     int `json:"low"`
-	Unknown int `json:"unknown"`
+	High     int `json:"high"`
+	Low      int `json:"low"`
+	Abnormal int `json:"abnormal"`
+	Unknown  int `json:"unknown"`
 }
 
 // ReportHeader 报告级公共头部(ReportSummary 与 ReportDetail 共用投影)。
@@ -93,6 +94,7 @@ type ReportItem struct {
 	RefRange      *string       `json:"ref_range"`
 	Method        *string       `json:"method"`
 	Flag          string        `json:"flag"`
+	FlagReason    *string       `json:"flag_reason,omitempty"`
 	LowConfidence bool          `json:"low_confidence"`
 	RawText       string        `json:"raw_text"`
 	ReviewStatus  string        `json:"review_status"`
@@ -127,7 +129,7 @@ type UploadResult struct {
 // value × ref_range 重算,契约不提供手改入口(additionalProperties:false 拒收 flag)。
 // confirm 分支不得携带修正字段(omitted 非 null);correct 分支至少携带一项。
 type ReviewRequest struct {
-	Action   string  `json:"action"` // confirm | correct
+	Action   string  `json:"action"` // confirm | correct | no_reference
 	Value    *string `json:"value,omitempty"`
 	Unit     *string `json:"unit,omitempty"`
 	Name     *string `json:"name,omitempty"`

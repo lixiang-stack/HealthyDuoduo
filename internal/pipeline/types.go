@@ -98,11 +98,12 @@ type ReportStore interface {
 // review_status ≠ 本值即视为报告已有核对决策(同图重传 409 的判定依据)。
 const ReviewStatusUnreviewed = "unreviewed"
 
-// FlagCounts 「异常」计数徽标口径 = 偏高/偏低/未知三档;normal 不计(详情页逐项染色)。
+// FlagCounts 「异常」计数徽标口径 = 偏高/偏低/异常/可操作未知四档;normal 不计(详情页逐项染色)。
 type FlagCounts struct {
-	High    int
-	Low     int
-	Unknown int
+	High     int
+	Low      int
+	Abnormal int
+	Unknown  int
 }
 
 // ReportSummary 时间线卡片/上传响应头部的业务视图(serve 报告域;票 06)。
@@ -161,7 +162,7 @@ type TrendRow struct {
 	ReportDate    *string
 	Value         *string
 	Unit          *string
-	Flag          string // normal | high | low | unknown(4.2)
+	Flag          string // normal | high | low | abnormal | unknown(4.2)
 	LowConfidence bool   // 任一组成行 score < LOW_SCORE_THRESHOLD(决策 #7 透传)
 }
 
