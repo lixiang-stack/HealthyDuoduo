@@ -8,12 +8,15 @@ import lft05Json from '../../../../samples/expected/report/lft_05.json';
 import lft06Json from '../../../../samples/expected/report/lft_06.json';
 import {
   chartLayout,
+  defaultSelectedIndex,
   formatSeriesMeta,
   isAbnormalFlag,
+  isFilledPoint,
   latestAbnormalByCategory,
   selectAbnormalCandidates,
   selectSeries,
   trendKey,
+  trendUnavailableReason,
   type TrendCandidate,
 } from './trends';
 
@@ -398,6 +401,38 @@ describe('selectSeries', () => {
   });
 });
 
+describe('defaultSelectedIndex', () => {
+  it('优先候选报告对应的点', () => {
+    const series = selectSeries([altLow(), altHigh()], 'U/L', 'lft_05');
+    expect(defaultSelectedIndex(series)).toBe(0);
+
+    const latest = selectSeries([altLow(), altHigh()], 'U/L', 'lft_02');
+    expect(defaultSelectedIndex(latest)).toBe(1);
+  });
+
+  it('候选点缺失时回落最新点;空序列取 0', () => {
+    const dateless = pointOf(lft02, '丙氨酸转氨酶', 'dateless', { report_date: null });
+    const series = selectSeries([altLow(), altHigh(), dateless], 'U/L', 'missing');
+    expect(defaultSelectedIndex(series)).toBe(1);
+    expect(defaultSelectedIndex(selectSeries([], 'U/L', 'missing'))).toBe(0);
+  });
+
+  it('候选点是缺日期项时仍选它', () => {
+    const dateless = pointOf(lft02, '丙氨酸转氨酶', 'dateless', { report_date: null });
+    const series = selectSeries([altLow(), dateless], 'U/L', 'dateless');
+    expect(defaultSelectedIndex(series)).toBe(1);
+  });
+});
+
+describe('isFilledPoint', () => {
+  it('实心 = reviewed || !low_confidence', () => {
+    expect(isFilledPoint({ reviewed: true, low_confidence: true })).toBe(true);
+    expect(isFilledPoint({ reviewed: true, low_confidence: false })).toBe(true);
+    expect(isFilledPoint({ reviewed: false, low_confidence: false })).toBe(true);
+    expect(isFilledPoint({ reviewed: false, low_confidence: true })).toBe(false);
+  });
+});
+
 describe('chartLayout', () => {
   it('两点按日期横向展开;y 域含参考范围,非负从 0 起', () => {
     const series = selectSeries([altLow(), altHigh()], 'U/L', 'lft_02');
@@ -514,8 +549,143 @@ describe('chartLayout', () => {
       points: [],
       bands: [],
       line: '',
+      yTicks: [],
+      xLabels: [],
+      plot: { left: 0, right: 0, top: 0, bottom: 0 },
       domain: { min: 0, max: 0 },
     });
+  });
+});
+
+describe('chartLayout detail mode', () => {
+  it('y 轴取整为 0/500/1000,给出 3 个刻度与首尾日期标签', () => {
+    const series = selectSeries([altLow(), altHigh()], 'U/L', 'lft_02');
+    const layout = chartLayout(series, 320, 180, { axes: true });
+
+    expect(layout.yTicks.map((tick) => tick.value)).toEqual([0, 500, 1000]);
+    expect(layout.yTicks.map((tick) => tick.label)).toEqual(['0', '500', '1000']);
+    expect(layout.yTicks[0].y).toBeGreaterThan(layout.yTicks[1].y);
+    expect(layout.yTicks[1].y).toBeGreaterThan(layout.yTicks[2].y);
+    expect(layout.plot).toEqual({ left: 38, right: 310, top: 10, bottom: 156 });
+    expect(layout.xLabels).toEqual([
+      { x: 38, label: '2017-11-18', anchor: 'start' },
+      { x: 310, label: '2021-08-02', anchor: 'end' },
+    ]);
+  });
+
+  it('单点居中,只给一个居中日期标签', () => {
+    const series = selectSeries([pointOf(lft04, '总胆红素', 'lft_04')], 'μmol/L', 'lft_04');
+    const layout = chartLayout(series, 320, 180, { axes: true });
+
+    expect(layout.points[0].x).toBe(174);
+    expect(layout.xLabels).toEqual([{ x: 174, label: '2011-07-02', anchor: 'middle' }]);
+    expect(layout.yTicks).toHaveLength(3);
+  });
+
+  it('同日期点微偏移', () => {
+    const series = selectSeries(
+      [pointOf(lft02, '丙氨酸转氨酶', 'a'), pointOf(lft02, '天冬氨酸转氨酶', 'b')],
+      'U/L',
+      'a',
+    );
+    const layout = chartLayout(series, 320, 180, { axes: true });
+
+    expect(layout.points[0].x).not.toBe(layout.points[1].x);
+    expect(layout.points[0].x).toBeLessThan(174);
+    expect(layout.points[1].x).toBeGreaterThan(174);
+    expect(layout.xLabels).toHaveLength(1);
+  });
+
+  it('selectedIndex 放大选中点;缺省放大最新点', () => {
+    const series = selectSeries([altLow(), altHigh()], 'U/L', 'lft_02');
+    const first = chartLayout(series, 320, 180, { axes: true, selectedIndex: 0 });
+    expect(first.points.map((point) => point.selected)).toEqual([true, false]);
+
+    const fallback = chartLayout(series, 320, 180, { axes: true });
+    expect(fallback.points.map((point) => point.selected)).toEqual([false, true]);
+
+    const none = chartLayout(series, 320, 180, { axes: true, selectedIndex: null });
+    expect(none.points.some((point) => point.selected)).toBe(false);
+  });
+
+  it('详情模式同样按点分段参考带;单侧从绘图区底部起,标量参考退化为 1px', () => {
+    const oneSided = selectSeries(
+      [pointOf(lft05, '总胆红素', 'lft_05'), pointOf(lft02, '总胆红素', 'lft_02')],
+      'μmol/L',
+      'lft_02',
+    );
+    const bounded = chartLayout(oneSided, 320, 180, { axes: true });
+    expect(bounded.bands).toHaveLength(2);
+    expect(bounded.bands[1].y + bounded.bands[1].height).toBeCloseTo(156, 6);
+
+    const noRef = selectSeries(
+      [pointOf(lft05, '丙氨酸转氨酶', 'lft_05', { ref_range: null }), altHigh()],
+      'U/L',
+      'lft_02',
+    );
+    expect(chartLayout(noRef, 320, 180, { axes: true }).bands).toHaveLength(1);
+
+    const scalarRef = selectSeries(
+      [pointOf(lft05, '岩藻糖苷酶', 'lft_05', { ref_range: '18.40' })],
+      'U/L',
+      'lft_05',
+    );
+    expect(chartLayout(scalarRef, 320, 180, { axes: true }).bands[0].height).toBe(1);
+  });
+
+  it('实心 / 空心与迷你图同口径', () => {
+    const series = selectSeries(
+      [
+        pointOf(lft05, '丙氨酸转氨酶', 'normal_high_confidence', { reviewed: false }),
+        pointOf(lft02, '丙氨酸转氨酶', 'hollow', {
+          reviewed: false,
+          low_confidence: true,
+          report_date: '2020-01-01',
+        }),
+        pointOf(lft02, '丙氨酸转氨酶', 'reviewed', {
+          reviewed: true,
+          low_confidence: true,
+          report_date: '2021-08-02',
+        }),
+      ],
+      'U/L',
+      'reviewed',
+    );
+    expect(chartLayout(series, 320, 180, { axes: true }).points.map((point) => point.filled)).toEqual(
+      [true, false, true],
+    );
+  });
+});
+
+describe('trendUnavailableReason', () => {
+  const altCandidate = candidateOf(lft02, '丙氨酸转氨酶', 'lft_02');
+
+  it('有可绘制点时不返回原因', () => {
+    const series = selectSeries([altLow(), altHigh()], 'U/L', 'lft_02');
+    expect(trendUnavailableReason(series, altCandidate)).toBeUndefined();
+  });
+
+  it('最近一次为非数值结果', () => {
+    const series = selectSeries(
+      [pointOf(cbc07, 'C反应蛋白', 'cbc_07', { unit: 'U/L' })],
+      'U/L',
+      'cbc_07',
+    );
+    expect(
+      trendUnavailableReason(series, candidateOf(cbc07, 'C反应蛋白', 'cbc_07')),
+    ).toBe('最近一次为非数值结果');
+  });
+
+  it('最近一次缺日期', () => {
+    const series = selectSeries([], 'U/L', 'lft_02');
+    expect(
+      trendUnavailableReason(series, { ...altCandidate, reportDate: null }),
+    ).toBe('最近一次缺日期');
+  });
+
+  it('没有可绘制的数值点', () => {
+    const series = selectSeries([], 'U/L', 'lft_02');
+    expect(trendUnavailableReason(series, altCandidate)).toBe('没有可绘制的数值点');
   });
 });
 

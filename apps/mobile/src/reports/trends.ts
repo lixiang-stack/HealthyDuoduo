@@ -1,5 +1,5 @@
-// 异常指标趋势纯逻辑(票 03):先从当前成员的最新非 failed 报告里选出异常指标候选,
-// 再按候选单位把趋势端点返回的全部单位点切成同单位序列,最后生成迷你图几何与元信息。
+// 异常指标趋势纯逻辑(票 03/04):先从当前成员的最新非 failed 报告里选出异常指标候选,
+// 再按候选单位把趋势端点返回的全部单位点切成同单位序列,最后生成迷你图/完整图几何与元信息。
 // 序列只来自趋势端点;这里不做跨报告拼装,也不做跨单位换算。
 import type { ReportDetail, ReportItem, ReportSummary, TrendPoint } from '../api/reports';
 
@@ -8,6 +8,10 @@ import { parseNumericForm, parseRefRange, type NumericForm } from './refRange';
 import { DATE_UNKNOWN_LABEL } from './status';
 
 const SAME_DATE_STEP = 4;
+const SPARKLINE_PADDING = 8;
+const DETAIL_PADDING = { left: 38, right: 10, top: 10, bottom: 24 };
+
+export const TREND_UNAVAILABLE_LABEL = '暂无可用数值趋势';
 
 export type AbnormalFlag = 'high' | 'low' | 'abnormal';
 
@@ -39,7 +43,7 @@ export type TrendSeries = {
   selectedPoint: TrendPoint | undefined;
 };
 
-export type ChartLayoutOptions = { axes: false };
+export type ChartLayoutOptions = { axes: boolean; selectedIndex?: number | null };
 
 export type TrendChartPoint = {
   reportId: string;
@@ -48,6 +52,7 @@ export type TrendChartPoint = {
   flag: ReportItem['flag'];
   filled: boolean;
   latest: boolean;
+  selected: boolean;
   x: number;
   y: number;
 };
@@ -59,11 +64,35 @@ export type TrendChartBand = {
   height: number;
 };
 
+export type TrendChartTick = {
+  value: number;
+  y: number;
+  label: string;
+};
+
+export type TrendChartXLabel = {
+  x: number;
+  label: string;
+  anchor: 'start' | 'middle' | 'end';
+};
+
+export type TrendChartPlot = {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+};
+
 export type TrendChartLayout = {
   points: TrendChartPoint[];
   bands: TrendChartBand[];
   /** SVG polyline 的 points 属性;单点为空串(不画线)。 */
   line: string;
+  /** 完整图的 3 个取整 y 刻度;迷你图为空。 */
+  yTicks: TrendChartTick[];
+  /** 完整图的首尾日期标签;迷你图为空。 */
+  xLabels: TrendChartXLabel[];
+  plot: TrendChartPlot;
   domain: { min: number; max: number };
 };
 
@@ -204,7 +233,22 @@ export function selectSeries(
   };
 }
 
-/** 数值点 + 参考范围端点共同决定 y 域;非负数据从 0 起(8% 边距后再夹回 0)。 */
+/** 详情层默认选中项:候选报告对应的点;找不到时回落最新点。 */
+export function defaultSelectedIndex(series: TrendSeries): number {
+  const index = series.listPoints.findIndex(
+    (point) => point.report_id === series.selectedPoint?.report_id,
+  );
+  return index >= 0 ? index : Math.max(0, series.listPoints.length - 1);
+}
+
+/** 信任标记:实心 = 已核对或非低置信;空心 = 未核对低置信。 */
+export function isFilledPoint(
+  point: Pick<TrendPoint, 'reviewed' | 'low_confidence'>,
+): boolean {
+  return point.reviewed || !point.low_confidence;
+}
+
+/** 数值点 + 参考范围端点共同决定 y 域;非负数据从 0 起(8% 边距只作用于上界)。 */
 function anchorsOf(point: TrendPoint): number[] {
   const anchors: number[] = [];
   const value = parseNumericForm(point.value);
@@ -229,21 +273,20 @@ function yDomain(points: TrendPoint[]): { min: number; max: number } | undefined
   }
   const rawMin = Math.min(...anchors);
   const rawMax = Math.max(...anchors);
-  let min = rawMin;
-  let max = rawMax;
-  if (rawMin === rawMax) {
-    const pad = Math.max(Math.abs(rawMin), 1) * 0.08;
-    min -= pad;
-    max += pad;
-  } else {
-    const pad = (rawMax - rawMin) * 0.08;
-    min -= pad;
-    max += pad;
-  }
-  if (!anchors.some((anchor) => anchor < 0)) {
-    min = 0;
-  }
-  return { min, max };
+  const span = rawMax - rawMin;
+  const pad = span === 0 ? Math.max(Math.abs(rawMin), 1) * 0.08 : span * 0.08;
+  return { min: 0, max: rawMax + pad };
+}
+
+/** 完整图 y 轴取整:非负数从 0 起,上下界按跨度的一半量级取整。 */
+function niceDomain(domain: { min: number; max: number }): { min: number; max: number } {
+  const span = domain.max - domain.min;
+  const step = 10 ** Math.floor(Math.log10(span / 2));
+  return { min: 0, max: Math.ceil(domain.max / step) * step };
+}
+
+function formatTick(value: number): string {
+  return String(Number(value.toFixed(3)));
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -270,34 +313,54 @@ function refBounds(
 }
 
 /**
- * 图几何:迷你图(axes=false)与票 04 的完整图共用。x 按日期,单点居中,
+ * 图几何:迷你图(axes=false)与完整图(axes=true)共用。x 按日期,单点居中,
  * 同日点微偏移;y 域含参考范围;band 按点分段;实心/空心由信任标记决定。
+ * 完整图额外给出 3 个取整 y 刻度与首尾日期标签,并放大 selectedIndex。
  */
 export function chartLayout(
   series: TrendSeries,
   width: number,
   height: number,
-  _options: ChartLayoutOptions = { axes: false },
+  options: ChartLayoutOptions,
 ): TrendChartLayout {
   const points = series.chartPoints;
-  const domain = yDomain(points);
-  if (!domain) {
-    return { points: [], bands: [], line: '', domain: { min: 0, max: 0 } };
+  const rawDomain = yDomain(points);
+  const emptyPlot = { left: 0, right: 0, top: 0, bottom: 0 };
+  if (!rawDomain) {
+    return {
+      points: [],
+      bands: [],
+      line: '',
+      yTicks: [],
+      xLabels: [],
+      plot: emptyPlot,
+      domain: { min: 0, max: 0 },
+    };
   }
+  const domain = options.axes ? niceDomain(rawDomain) : rawDomain;
 
-  const plotLeft = 8;
-  const plotRight = Math.max(plotLeft, width - 8);
-  const plotTop = 8;
-  const plotBottom = Math.max(plotTop, height - 8);
-  const plotWidth = plotRight - plotLeft;
+  const plot = options.axes
+    ? {
+        left: DETAIL_PADDING.left,
+        right: Math.max(DETAIL_PADDING.left, width - DETAIL_PADDING.right),
+        top: DETAIL_PADDING.top,
+        bottom: Math.max(DETAIL_PADDING.top, height - DETAIL_PADDING.bottom),
+      }
+    : {
+        left: SPARKLINE_PADDING,
+        right: Math.max(SPARKLINE_PADDING, width - SPARKLINE_PADDING),
+        top: SPARKLINE_PADDING,
+        bottom: Math.max(SPARKLINE_PADDING, height - SPARKLINE_PADDING),
+      };
+  const plotWidth = plot.right - plot.left;
 
   const times = points.map((point) => Date.parse(point.report_date));
   const minTime = Math.min(...times);
   const maxTime = Math.max(...times);
   const positions = times.map((time) =>
     minTime === maxTime
-      ? plotLeft + plotWidth / 2
-      : plotLeft + ((time - minTime) / (maxTime - minTime)) * plotWidth,
+      ? plot.left + plotWidth / 2
+      : plot.left + ((time - minTime) / (maxTime - minTime)) * plotWidth,
   );
 
   const sameDate = new Map<string, number[]>();
@@ -312,13 +375,15 @@ export function chartLayout(
     }
     indices.forEach((pointIndex, order) => {
       const offset = (order - (indices.length - 1) / 2) * SAME_DATE_STEP;
-      positions[pointIndex] = clamp(positions[pointIndex] + offset, plotLeft, plotRight);
+      positions[pointIndex] = clamp(positions[pointIndex] + offset, plot.left, plot.right);
     });
   }
 
   const yFor = (value: number) =>
-    plotBottom - ((value - domain.min) / (domain.max - domain.min)) * (plotBottom - plotTop);
+    plot.bottom - ((value - domain.min) / (domain.max - domain.min)) * (plot.bottom - plot.top);
 
+  const selectedIndex =
+    options.selectedIndex === undefined ? points.length - 1 : options.selectedIndex;
   const layoutPoints: TrendChartPoint[] = points.map((point, index) => {
     const value = Number(point.value);
     return {
@@ -326,8 +391,9 @@ export function chartLayout(
       reportDate: point.report_date,
       value,
       flag: point.flag,
-      filled: point.reviewed || !point.low_confidence,
+      filled: isFilledPoint(point),
       latest: index === points.length - 1,
+      selected: index === selectedIndex,
       x: positions[index],
       y: yFor(value),
     };
@@ -340,7 +406,7 @@ export function chartLayout(
       return;
     }
     const x = layoutPoints[index].x;
-    const nextX = index < points.length - 1 ? layoutPoints[index + 1].x : plotRight;
+    const nextX = index < points.length - 1 ? layoutPoints[index + 1].x : plot.right;
     const top = yFor(bounds.high);
     const bottom = yFor(bounds.low);
     bands.push({
@@ -356,7 +422,40 @@ export function chartLayout(
       ? layoutPoints.map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(' ')
       : '';
 
-  return { points: layoutPoints, bands, line, domain };
+  const yTicks = options.axes
+    ? [domain.min, (domain.min + domain.max) / 2, domain.max].map((value) => ({
+        value,
+        y: yFor(value),
+        label: formatTick(value),
+      }))
+    : [];
+  const xLabels = options.axes ? buildXLabels(points, plot) : [];
+
+  return { points: layoutPoints, bands, line, yTicks, xLabels, plot, domain };
+}
+
+function buildXLabels(
+  points: ChartableTrendPoint[],
+  plot: TrendChartPlot,
+): TrendChartXLabel[] {
+  if (points.length === 0) {
+    return [];
+  }
+  const first = points[0];
+  const last = points[points.length - 1];
+  if (points.length === 1 || first.report_date === last.report_date) {
+    return [
+      {
+        x: plot.left + (plot.right - plot.left) / 2,
+        label: first.report_date,
+        anchor: 'middle',
+      },
+    ];
+  }
+  return [
+    { x: plot.left, label: first.report_date, anchor: 'start' },
+    { x: plot.right, label: last.report_date, anchor: 'end' },
+  ];
 }
 
 /**
@@ -392,4 +491,21 @@ export function formatSeriesMeta(series: TrendSeries, candidate: TrendCandidate)
   }
 
   return parts.join(' · ');
+}
+
+/** 详情图不可画时的中性原因;有可绘制数值点时不返回原因。 */
+export function trendUnavailableReason(
+  series: TrendSeries,
+  candidate: TrendCandidate,
+): string | undefined {
+  if (series.chartPoints.length > 0) {
+    return undefined;
+  }
+  if (parseNumericForm(candidate.item.value).kind !== 'scalar') {
+    return '最近一次为非数值结果';
+  }
+  if (candidate.reportDate === null) {
+    return '最近一次缺日期';
+  }
+  return '没有可绘制的数值点';
 }
