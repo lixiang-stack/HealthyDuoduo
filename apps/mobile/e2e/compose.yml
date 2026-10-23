@@ -1,0 +1,7 @@
+# App E2E 专用栈覆盖(仅 e2e/run.sh 使用,共享 deploy 栈不加载)。
+# 识别服务对固定样本回放 samples/expected 下的 golden,non-OCR 用例不再依赖真实
+# 识别结果;未列出的样本(OCR smoke)仍走真实 OCR。见 docs/agents/app-e2e.md。
+services:
+  recognizer:
+    environment:
+      RECOGNIZER_REPLAY_SAMPLES: cbc_02,cbc_03,cbc_04,us_01,us_03,glu_02

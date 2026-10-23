@@ -1,8 +1,10 @@
 # App E2E
 
 家长侧 App 的 UI 层端到端回归：Expo Web（同一套 React 组件与数据流）跑在**专用 compose 栈**上，
-用确定性 locator/expect 校验核心链路。与 `docs/agents/e2e.md` 的 Pipeline E2E（recognizer/CLI 数据链路、
-共享栈 + 快照）是两条互不替代的回路；决策见 `docs/adr/0007-app-e2e-isolated-stack.md`。
+用确定性 locator/expect 校验核心链路。报告内容由识别端的 **golden 回放**提供，不依赖真实 OCR 的
+当次输出；真实 OCR 只保留一张粗粒度 smoke。与 `docs/agents/e2e.md` 的 Pipeline E2E
+（recognizer/CLI 数据链路、共享栈 + 快照）是两条互不替代的回路；决策见
+`docs/adr/0007-app-e2e-isolated-stack.md`。
 
 ## 跑一条回路
 
@@ -16,7 +18,7 @@ npm run e2e -- --headed        # 参数透传给 e2e run(如 --headed/--grep)
 E2E_KEEP_STACK=1 npm run e2e   # 跑完保留栈,便于手工看 Web/API(下次运行前仍会重建)
 ```
 
-完成判据：12/12 通过；失败时看 `.e2e/results/<test>/trace.md` 与应用日志 `.e2e/logs/expo.log`。
+完成判据：14/14 通过；失败时看 `.e2e/results/<test>/trace.md` 与应用日志 `.e2e/logs/expo.log`。
 
 ## 专用栈
 
@@ -27,24 +29,39 @@ E2E_KEEP_STACK=1 npm run e2e   # 跑完保留栈,便于手工看 Web/API(下次�
 | 55432 | postgres | 临时卷 `hdd-e2e_pgdata` |
 | 58333 | seaweedfs S3 | 临时卷 `hdd-e2e_seaweeddata` |
 
-每轮 `run.sh` 先 `down -v` 再 `up`，seed 经真实上传端点入档 `samples/cbc_03.png`（核对）、
-`samples/cbc_04.png`（自愈）与影像单 `samples/us_01.webp` / `samples/us_03.jpeg`（报告段落
-三段 / 无检查所见锚）；`duplicate:true` 即视为栈未重置并失败。共享 `deploy` 栈（8080 等）不受影响。
+每轮 `run.sh` 先 `down -v` 再 `up`，并叠加载 `e2e/compose.yml`：识别服务通过
+`RECOGNIZER_REPLAY_SAMPLES` 对这些样本**按图像 sha256 回放** `samples/expected/{ocr,report}`
+下的 golden，不再跑真实 OCR：`cbc_02`（生命周期）、`cbc_03`（核对）、`cbc_04`（自愈）、
+`us_01` / `us_03`（影像段落）、`glu_02`（上传）。seed 仍经真实上传端点入档；`duplicate:true`
+即视为栈未重置并失败。共享 `deploy` 栈（8080 等）不加载该覆盖、不暴露回放入口。
+
+不在回放名单里的样本仍走真实 OCR，供 `ocr-smoke.e2e.ts` 使用（`cbc_01` / `us_02`）。
+该 smoke 只断言上传成功、报告非空、类型/日期/段落合理，不驱动改归属/筛选/核对等 UI 行为；
+逐项识别质量继续由 Pipeline E2E/golden 覆盖。
 
 ## 用例与选择器
 
-- 用例在 `apps/mobile/e2e/tests/app.e2e.ts`：一条 serial 核心链路 + 一条错误态；无 agent/模型调用。
+- `app.e2e.ts`（11 条，serial）：设置/健康检查、成员、时间线过滤、概览、档案筛选、上传、
+  两张影像单、核对确认/修正、可补录未知、高置信未知原图定位；无 agent/模型调用。
+- `lifecycle.e2e.ts`（1 条）：改归属 / 删除 / 同图重传。独立成员 + `cbc_02` fixture，与主链路
+  不共享数据；破坏性操作失败不连坐跳过其他文件。
+- `error-state.e2e.ts`（1 条）：后端不可达的首页失败态；不依赖 seed/栈数据。
+- `ocr-smoke.e2e.ts`（1 条）：真实 OCR smoke（2 张样张），只做粗粒度 API 断言。
 - 契约类型复用 `src/api/schema.d.ts`；API/样张/testID 约定集中在 `e2e/support.ts`。
 - 关键控件带 `testID`（RNW 渲染为 `data-testid`）：成员 chip/行、上传选择/提交/结果、报告卡、
-  报告检查项目/段落卡/段落缩放、核对项/确认/修正、详情管理卡（改归属/删除/确认）。改控件时
-  同步改 `support.ts` 的 `testID`。
+  报告徽标（偏高/偏低/异常/未知/待核对）、检查项目/段落卡/段落缩放、核对项/状态/原因/确认/修正、
+  详情管理卡（改归属/删除/确认）。改控件时同步改 `support.ts` 的 `testID`。
+- 用例断言优先用 testID 与 fixture 派生值；`isBackfillItem` / `flagReasonText` /
+  `reviewStatusLabel` 复用 `src/review/rules.ts`，不复制规则或原因文案。
 - Web 相册通道在 headless 下会打开原生 chooser 并被取消（expo-image-picker 随即移除 input）；
   `stubFileChooser` 屏蔽该次 click，测试再用 `setInputFiles` 注入文件。
 
 ## 边界与升级
 
 - 只测 Web：相机、权限、原生文件/键盘/网络是盲区；原生目标后续用同一框架的 mobile 引擎接入。
-- 首版本地运行；连续 10 次全绿后升级为路径过滤（`apps/mobile/**`、`cmd/hdd/**`、`internal/**`、
-  `schemas/**`）的 PR 必过 job。CI job 形态参考 `npx e2e guide running` 与官方 GitHub Actions 文档。
+- golden 回放只固定识别产物；上传/存储/API/DB/UI 仍走真实链路。`samples/expected` 重生成后若
+  用例前提变化，`seedData` 的显式断言会在 `beforeAll` 点名 fixture 与缺口。
+- 已接入路径过滤的 PR 必过 job（`.github/workflows/app-e2e.yml`，覆盖 `apps/mobile/**`、
+  `cmd/hdd/**`、`internal/**`、`schemas/**`、`recognizer/**`、`deploy/**`、`samples/**`）。
 - 框架 pre-1.0：升级 `e2e`/`@e2e-dev/web` 作为独立改动，跑一条回路验证后再提交。
 - 遥测：`run.sh` 已设 `E2E_TELEMETRY_DISABLED=1`。

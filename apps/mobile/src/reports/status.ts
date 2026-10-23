@@ -74,24 +74,28 @@ export function itemFlagLabel(item: Pick<ReportItem, 'flag' | 'flag_reason'>): s
   }
 }
 
+/** 异常徽标档位(normal 不计);kind 供 UI 生成稳定 testID,label 为展示文案。 */
+export type FlagBadgeKind = Exclude<Flag, 'normal'>;
+export type FlagBadge = { kind: FlagBadgeKind; label: string };
+
 /** 异常徽标(偏高/偏低/异常/可操作未知;normal 不计,为 0 的档不出现)。
  * 影像单不呈现指标项,未知档按报告类别关闭。 */
 export function flagBadges(
   report: Pick<ReportSummary, 'report_type' | 'flag_counts'>,
-): string[] {
+): FlagBadge[] {
   const { high, low, abnormal, unknown } = report.flag_counts;
-  const badges: string[] = [];
+  const badges: FlagBadge[] = [];
   if (high > 0) {
-    badges.push(`偏高 ${high}`);
+    badges.push({ kind: 'high', label: `偏高 ${high}` });
   }
   if (low > 0) {
-    badges.push(`偏低 ${low}`);
+    badges.push({ kind: 'low', label: `偏低 ${low}` });
   }
   if (abnormal > 0) {
-    badges.push(`异常 ${abnormal}`);
+    badges.push({ kind: 'abnormal', label: `异常 ${abnormal}` });
   }
   if (!isImagingReport(report) && unknown > 0) {
-    badges.push(`未知 ${unknown}`);
+    badges.push({ kind: 'unknown', label: `未知 ${unknown}` });
   }
   return badges;
 }
@@ -101,7 +105,7 @@ export function unreviewedBadge(count: number): string | undefined {
   return count > 0 ? `待核对 ${count} 项` : undefined;
 }
 
-export type ReportBadgeLabels = { flags: string[]; unreviewed?: string };
+export type ReportBadgeLabels = { flags: FlagBadge[]; unreviewed?: string };
 
 /** 报告级徽标(时间线/详情共用):影像单不呈现指标项、没有核对入口,
  * 未知与待核对徽标都不显示;其余类别保持原口径。 */

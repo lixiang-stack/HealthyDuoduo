@@ -82,8 +82,10 @@ export default function TimelineScreen() {
                     filter ? (
                       <View testID="archive-empty" style={styles.stack}>
                         <Text style={sharedStyles.muted}>没有符合筛选条件的报告。</Text>
-                        <Link href="/timeline" style={styles.link}>
-                          查看全部档案
+                        <Link asChild href="/timeline">
+                          <Pressable testID="archive-show-all">
+                            <Text style={styles.link}>查看全部档案</Text>
+                          </Pressable>
                         </Link>
                       </View>
                     ) : (

@@ -1,11 +1,15 @@
-// App E2E 主用例集:一条串行核心链路(设置 → 成员 → 时间线 → 上传 → 核对 → 自愈)
-// 加一条后端不可达错误态。全部走确定性 locator/expect;无 agent/模型调用。
-// 运行入口:apps/mobile `npm run e2e`(专用栈启停见 e2e/run.sh)。
+// App E2E 主用例集:一条串行核心链路(设置 → 成员 → 时间线 → 上传 → 核对),
+// 报告内容来自专用栈的 golden 回放(见 e2e/support.ts);破坏性生命周期与错误态
+// 在独立文件,避免连坐跳过。运行入口:apps/mobile `npm run e2e`(专用栈见 e2e/run.sh)。
 import { beforeAll, describe, test } from '@e2e-dev/web';
 import { expect } from 'e2e';
 import type { Screen } from 'e2e';
 
-import { isReversedInterval, parseNumericForm, parseRefRange } from '../../src/reports/refRange';
+import { latestByCategory, pendingSummary } from '../../src/reports/overview';
+import { parseNumericForm } from '../../src/reports/refRange';
+import { EXAM_NAME_KIND, SECTION_LABELS, examNameText } from '../../src/reports/sections';
+import { reportDateLabel, uploadResultText } from '../../src/reports/status';
+import { flagReasonText, isBackfillItem, reviewStatusLabel } from '../../src/review/rules';
 import {
   API_BASE_URL,
   listMembers,
@@ -20,41 +24,12 @@ import {
 
 let seed!: Seed;
 
-type SeedItem = Seed['healReport']['items'][number];
-
-// 与 App `isBackfillItem` 同口径的 E2E 选样条件(只依赖纯解析函数,避免把 RN 模块
-// 带进 e2e 类型环境)。用例不绑定具体指标名/OCR 结果。
-const BACKFILL_REASONS = new Set<NonNullable<SeedItem['flag_reason']>>([
-  'ocr_miss',
-  'ocr_merge',
-  'extractor_pairing',
-]);
-const BACKFILL_REASON_TEXT: Partial<Record<NonNullable<SeedItem['flag_reason']>, string>> = {
-  ocr_miss: 'OCR 输出里没有可直接配对的完整值/范围',
-  ocr_merge: 'OCR 把相邻列内容粘在一起',
-  extractor_pairing: '识别到了值/范围，但未归到该项',
-};
-
-function isBackfillUnknown(item: SeedItem): boolean {
-  if (item.flag !== 'unknown') {
-    return false;
-  }
-  if (item.flag_reason && !BACKFILL_REASONS.has(item.flag_reason)) {
-    return false;
-  }
-  const ref = parseRefRange(item.ref_range);
-  if (item.value === null) {
-    return ref.kind === 'interval' || ref.kind === 'bound';
-  }
-  return parseNumericForm(item.value).kind === 'scalar' && isReversedInterval(item.ref_range);
-}
-
 // 影像单详情主体(票 03/04):指标项 / 未知 / 待核对 / 逐项核对不出现;原图入口可展开。
-async function expectImagingDetail(screen: Screen): Promise<void> {
-  await expect(screen.getByText(/指标项/)).toHaveCount(0);
-  await expect(screen.getByText(/未知/)).toHaveCount(0);
-  await expect(screen.getByText(/待核对/)).toHaveCount(0);
-  await expect(screen.getByText(/逐项核对/)).toHaveCount(0);
+async function expectImagingDetail(screen: Screen, reportId: string): Promise<void> {
+  await expect(screen.getByTestId(testID.reportItemsTitle)).toHaveCount(0);
+  await expect(screen.getByTestId(testID.reportBadge(reportId, 'unknown'))).toHaveCount(0);
+  await expect(screen.getByTestId(testID.reportBadge(reportId, 'unreviewed'))).toHaveCount(0);
+  await expect(screen.getByTestId(testID.reportPendingEntry)).toHaveCount(0);
   await expect(screen.getByTestId(testID.reportImageToggle)).toBeVisible();
   await expect(screen.getByTestId(testID.reportImage)).toHaveCount(0);
   await screen.getByTestId(testID.reportImageToggle).tap();
@@ -95,56 +70,87 @@ describe('App E2E', { serial: true, timeout: 300_000 }, () => {
     await expect(screen.getByTestId(testID.reportCard(seed.healReport.report_id))).toHaveCount(0);
     // 影像单不呈现指标项:卡片无未知 / 待核对徽标,未印日期文案按类别区分(票 03)。
     const imaging01Card = screen.getByTestId(testID.reportCard(seed.imaging01.report_id));
-    const imaging03Card = screen.getByTestId(testID.reportCard(seed.imaging03.report_id));
-    await expect(imaging01Card).toContainText('检查单未印日期');
-    await expect(imaging01Card).not.toContainText(/未知|待核对/);
-    await expect(imaging03Card).not.toContainText(/未知|待核对/);
+    await expect(imaging01Card).toContainText(reportDateLabel(seed.imaging01));
+    await expect(
+      screen.getByTestId(testID.reportBadge(seed.imaging01.report_id, 'unknown')),
+    ).toHaveCount(0);
+    await expect(
+      screen.getByTestId(testID.reportBadge(seed.imaging01.report_id, 'unreviewed')),
+    ).toHaveCount(0);
+    await expect(
+      screen.getByTestId(testID.reportBadge(seed.imaging03.report_id, 'unknown')),
+    ).toHaveCount(0);
+    await expect(
+      screen.getByTestId(testID.reportBadge(seed.imaging03.report_id, 'unreviewed')),
+    ).toHaveCount(0);
+    // cbc_03 是 success 且无 unknown:核对项不产生时间线徽标。
+    await expect(
+      screen.getByTestId(testID.reportBadge(seed.reviewReport.report_id, 'unknown')),
+    ).toHaveCount(0);
+    await expect(
+      screen.getByTestId(testID.reportBadge(seed.reviewReport.report_id, 'unreviewed')),
+    ).toHaveCount(0);
 
     await screen.getByTestId(testID.memberChip(seed.mama.member_id)).tap();
     await expect(screen.getByTestId(testID.reportCard(seed.healReport.report_id))).toBeVisible();
     await expect(screen.getByTestId(testID.reportCard(seed.reviewReport.report_id))).toHaveCount(0);
-    // 检验单卡片保持原样:未知徽标与非零待核对徽标仍显示。
-    await expect(screen.getByTestId(testID.reportCard(seed.healReport.report_id))).toContainText(
-      /未知 \d+/,
-    );
-    await expect(screen.getByTestId(testID.reportCard(seed.healReport.report_id))).toContainText(
-      /待核对 \d+ 项/,
-    );
+    // 检验单卡片保持原样:未知徽标与非零待核对徽标仍显示(文案由 fixture 派生)。
+    await expect(
+      screen.getByTestId(testID.reportBadge(seed.healReport.report_id, 'unknown')),
+    ).toBeVisible();
+    await expect(
+      screen.getByTestId(testID.reportBadge(seed.healReport.report_id, 'unreviewed')),
+    ).toBeVisible();
   });
 
   test('成员概览与待处理入口', async ({ app, browser, screen }) => {
+    const xiaomingReports = [seed.reviewReport, seed.imaging01, seed.imaging03];
+    const xiaomingLatest = latestByCategory(xiaomingReports);
+
     await openConfigured(app, browser, '/', { memberId: seed.xiaoming.member_id });
     await expect(screen.getByText('查看谁的档案')).toBeVisible();
-    // cbc_03 实际是 success;小明待核对 / 失败都为 0 → 空态,不显示入口。
-    await expect(screen.getByTestId(testID.overviewPendingEmpty)).toContainText('没有待处理的报告。');
+    // cbc_03 是 success;小明待核对 / 失败都为 0 → 空态,不显示入口。
+    await expect(screen.getByTestId(testID.overviewPendingEmpty)).toBeVisible();
     await expect(screen.getByTestId(testID.overviewPendingPartial)).toHaveCount(0);
     await expect(screen.getByTestId(testID.overviewPendingFailed)).toHaveCount(0);
-    await expect(screen.getByTestId(testID.overviewLatest(seed.reviewReport.report_id))).toBeVisible();
-    await expect(screen.getByTestId(testID.overviewLatest(seed.imaging03.report_id))).toBeVisible();
-    await expect(screen.getByTestId(testID.overviewLatest(seed.imaging01.report_id))).toHaveCount(0);
-    await expect(screen.getByText('全部档案（3 份）')).toBeVisible();
+    for (const report of xiaomingReports) {
+      const latest = xiaomingLatest.some((entry) => entry.report_id === report.report_id);
+      await expect(screen.getByTestId(testID.overviewLatest(report.report_id))).toHaveCount(
+        latest ? 1 : 0,
+      );
+    }
+    await expect(screen.getByTestId(testID.overviewAllReports)).toContainText(
+      `${xiaomingReports.length} 份`,
+    );
 
+    const mamaReports = [seed.healReport];
+    const mamaPending = pendingSummary(mamaReports);
     await screen.getByTestId(testID.memberChip(seed.mama.member_id)).tap();
     await expect(screen.getByTestId(testID.overviewPendingPartial)).toContainText(
-      /待核对 · 1 份 · \d+ 项/,
+      `${mamaPending.partialReports} 份`,
+    );
+    await expect(screen.getByTestId(testID.overviewPendingPartial)).toContainText(
+      `${mamaPending.unreviewedItems} 项`,
     );
     await expect(screen.getByTestId(testID.overviewPendingFailed)).toHaveCount(0);
     await expect(screen.getByTestId(testID.overviewPendingEmpty)).toHaveCount(0);
-    await expect(screen.getByTestId(testID.overviewLatest(seed.healReport.report_id))).toBeVisible();
-    await expect(screen.getByTestId(testID.overviewLatest(seed.reviewReport.report_id))).toHaveCount(0);
+    for (const report of mamaReports) {
+      await expect(screen.getByTestId(testID.overviewLatest(report.report_id))).toBeVisible();
+    }
     await expect(screen.getByTestId(testID.overviewLatest(seed.imaging03.report_id))).toHaveCount(0);
-    await expect(screen.getByTestId(testID.overviewLatest(seed.imaging01.report_id))).toHaveCount(0);
-    await expect(screen.getByText('全部档案（1 份）')).toBeVisible();
+    await expect(screen.getByTestId(testID.overviewAllReports)).toContainText(
+      `${mamaReports.length} 份`,
+    );
 
     await screen.getByTestId(testID.overviewPendingPartial).tap();
     await browser.waitForURL(/\/timeline\?filter=partial$/);
     await expect(screen.getByTestId(testID.archiveFilterBanner)).toContainText(
-      '只看待核对 · 1 份',
+      `${mamaPending.partialReports} 份`,
     );
     await expect(screen.getByTestId(testID.reportCard(seed.healReport.report_id))).toBeVisible();
 
     await openConfigured(app, browser, '/', { memberId: seed.xiaoming.member_id });
-    await screen.getByText('全部档案（3 份）').tap();
+    await screen.getByTestId(testID.overviewAllReports).tap();
     await browser.waitForURL(/\/timeline$/);
     await expect(screen.getByTestId(testID.reportCard(seed.reviewReport.report_id))).toBeVisible();
     await expect(screen.getByTestId(testID.reportCard(seed.imaging01.report_id))).toBeVisible();
@@ -152,12 +158,12 @@ describe('App E2E', { serial: true, timeout: 300_000 }, () => {
   });
 
   test('全部档案与筛选', async ({ app, browser, screen }) => {
-    // cbc_03 实际是 success(单条低置信项不翻转报告状态);真实 partial 是妈妈的 cbc_04。
+    const mamaPending = pendingSummary([seed.healReport]);
     await openConfigured(app, browser, '/timeline?filter=partial', {
       memberId: seed.mama.member_id,
     });
     await expect(screen.getByTestId(testID.archiveFilterBanner)).toContainText(
-      '只看待核对 · 1 份',
+      `${mamaPending.partialReports} 份`,
     );
     await expect(screen.getByTestId(testID.reportCard(seed.healReport.report_id))).toBeVisible();
 
@@ -165,14 +171,16 @@ describe('App E2E', { serial: true, timeout: 300_000 }, () => {
     await expect(screen.getByTestId(testID.archiveFilterBanner)).toHaveCount(0);
     await expect(screen.getByTestId(testID.reportCard(seed.healReport.report_id))).toBeVisible();
 
+    const xiaomingReports = [seed.reviewReport, seed.imaging01, seed.imaging03];
+    const xiaomingPending = pendingSummary(xiaomingReports);
     await openConfigured(app, browser, '/timeline?filter=failed', {
       memberId: seed.xiaoming.member_id,
     });
     await expect(screen.getByTestId(testID.archiveFilterBanner)).toContainText(
-      '只看识别失败 · 0 份',
+      `${xiaomingPending.failedReports} 份`,
     );
-    await expect(screen.getByTestId(testID.archiveEmpty)).toContainText('没有符合筛选条件的报告。');
-    await screen.getByText('查看全部档案').tap();
+    await expect(screen.getByTestId(testID.archiveEmpty)).toBeVisible();
+    await screen.getByTestId(testID.archiveShowAll).tap();
     await expect(screen.getByTestId(testID.reportCard(seed.reviewReport.report_id))).toBeVisible();
     await expect(screen.getByTestId(testID.reportCard(seed.imaging01.report_id))).toBeVisible();
     await expect(screen.getByTestId(testID.reportCard(seed.imaging03.report_id))).toBeVisible();
@@ -180,7 +188,7 @@ describe('App E2E', { serial: true, timeout: 300_000 }, () => {
 
   test('上传样张后时间线出现新报告', async ({ app, browser, screen }) => {
     await stubFileChooser(browser);
-    await openConfigured(app, browser, '/upload', { memberId: seed.xiaoming.member_id });
+    await openConfigured(app, browser, '/upload', { memberId: seed.uploadMember.member_id });
     await screen.getByTestId('upload-pick-library').tap();
     await browser.locator('[data-testid="file-input"]').setInputFiles(samplePath('glu_02.jpeg'));
     await expect(screen.getByText('glu_02.jpeg')).toBeVisible();
@@ -189,9 +197,10 @@ describe('App E2E', { serial: true, timeout: 300_000 }, () => {
     await screen.getByTestId('upload-submit').tap();
     const payload = await (await responsePromise).json<UploadResult>();
     expect(payload.duplicate).toBe(false);
-    await expect(screen.getByTestId('upload-result')).toContainText('已归档');
+    expect(payload.report.items.length).toBeGreaterThan(0);
+    await expect(screen.getByTestId('upload-result')).toContainText(uploadResultText(payload));
 
-    await screen.getByText('去档案查看').tap();
+    await screen.getByTestId(testID.uploadOpenTimeline).tap();
     await expect(screen.getByTestId(testID.reportCard(payload.report.report_id))).toBeVisible();
   });
 
@@ -204,28 +213,27 @@ describe('App E2E', { serial: true, timeout: 300_000 }, () => {
     const sections = report.sections ?? [];
     const impression = sections.find((section) => section.kind === 'impression')!;
     const impressionIndex = sections.indexOf(impression);
-    expect(report.report_date).toBe('2024-09-15');
-    expect(sections.some((section) => section.kind === 'findings')).toBe(false);
-    // 影像单不再产出指标项(票 04);详情只呈现段落 + 原图。
+    const examName = examNameText(report.sections);
+    expect(examName).toBeDefined();
     expect(report.items.length).toBe(0);
 
     await openConfigured(app, browser, `/report/${report.report_id}`, {
       memberId: seed.xiaoming.member_id,
     });
-    await expect(screen.getByTestId(testID.reportExamName)).toContainText('检查项目');
     await expect(screen.getByTestId(testID.reportExamName)).toContainText(
-      '产科胎儿彩超检查（中孕）',
+      SECTION_LABELS[EXAM_NAME_KIND],
     );
-    await expect(screen.getByText('2024-09-15')).toBeVisible();
-    await expect(screen.getByText('检查所见')).toHaveCount(0);
+    await expect(screen.getByTestId(testID.reportExamName)).toContainText(examName!);
+    await expect(screen.getByText(reportDateLabel(report))).toBeVisible();
+    await expect(screen.getByText(SECTION_LABELS.findings)).toHaveCount(0);
     await expect(screen.getByTestId(testID.reportSection(impressionIndex))).toContainText(
-      '超声提示',
+      SECTION_LABELS.impression,
     );
     await expect(screen.getByTestId(testID.reportSection(impressionIndex))).toContainText(
       impression.text,
     );
 
-    await expectImagingDetail(screen);
+    await expectImagingDetail(screen, report.report_id);
   });
 
   test('影像单 us_01:检查项目 / 检查所见 / 超声提示三段完整,段落卡可缩放原图', async ({
@@ -235,31 +243,40 @@ describe('App E2E', { serial: true, timeout: 300_000 }, () => {
   }) => {
     const report = seed.imaging01;
     const sections = report.sections ?? [];
-    const examName = sections.find((section) => section.kind === 'exam_name');
+    const examName = examNameText(report.sections);
     const findings = sections.find((section) => section.kind === 'findings')!;
     const findingsIndex = sections.indexOf(findings);
     const impression = sections.find((section) => section.kind === 'impression')!;
     const impressionIndex = sections.indexOf(impression);
     expect(examName).toBeDefined();
-    expect(report.report_date).toBeNull();
     expect(report.items.length).toBe(0);
 
     await openConfigured(app, browser, `/report/${report.report_id}`, {
       memberId: seed.xiaoming.member_id,
     });
-    await expect(screen.getByTestId(testID.reportExamName)).toContainText('检查项目');
-    await expect(screen.getByTestId(testID.reportExamName)).toContainText(examName!.text);
+    await expect(screen.getByTestId(testID.reportExamName)).toContainText(
+      SECTION_LABELS[EXAM_NAME_KIND],
+    );
+    await expect(screen.getByTestId(testID.reportExamName)).toContainText(examName!);
     // 影像单未印日期:明确「未印」,不显示检验单口径的「日期未知」(票 03)。
-    await expect(screen.getByText('检查单未印日期')).toBeVisible();
-    await expect(screen.getByText('日期未知')).toHaveCount(0);
-    await expect(screen.getByTestId(testID.reportSection(findingsIndex))).toContainText('检查所见');
-    await expect(screen.getByTestId(testID.reportSection(findingsIndex))).toContainText(findings.text);
-    await expect(screen.getByTestId(testID.reportSection(impressionIndex))).toContainText('超声提示');
+    await expect(screen.getByText(reportDateLabel(report))).toBeVisible();
+    await expect(
+      screen.getByText(reportDateLabel({ ...report, report_type: seed.reviewReport.report_type })),
+    ).toHaveCount(0);
+    await expect(screen.getByTestId(testID.reportSection(findingsIndex))).toContainText(
+      SECTION_LABELS.findings,
+    );
+    await expect(screen.getByTestId(testID.reportSection(findingsIndex))).toContainText(
+      findings.text,
+    );
+    await expect(screen.getByTestId(testID.reportSection(impressionIndex))).toContainText(
+      SECTION_LABELS.impression,
+    );
     await expect(screen.getByTestId(testID.reportSection(impressionIndex))).toContainText(
       impression.text,
     );
 
-    await expectImagingDetail(screen);
+    await expectImagingDetail(screen, report.report_id);
 
     await screen.getByTestId(testID.reportSection(findingsIndex)).tap();
     await expect(screen.getByTestId(testID.reportSectionZoom(findingsIndex))).toBeVisible();
@@ -281,47 +298,56 @@ describe('App E2E', { serial: true, timeout: 300_000 }, () => {
     await expect(screen.getByTestId(testID.reviewItem(pending!.item_id))).toHaveCount(0);
 
     // 核对页常驻「去档案查看」:有剩余项时也能一次回到 /timeline。
-    await screen.getByText('去档案查看').tap();
+    await screen.getByTestId(testID.reviewOpenTimeline).tap();
     await browser.waitForURL(/\/timeline$/);
 
     await openConfigured(app, browser, `/report/${seed.reviewReport.report_id}`, {
       memberId: seed.xiaoming.member_id,
     });
-    await expect(screen.getByTestId(testID.reviewItem(pending!.item_id))).toContainText('已确认');
+    await expect(screen.getByTestId(testID.reviewItem(pending!.item_id))).toContainText(
+      reviewStatusLabel('confirmed')!,
+    );
     // 检验单详情保持原路径:指标项标题仍在(票 03 只改影像单)。
-    await expect(screen.getByText(/指标项/)).toBeVisible();
+    await expect(screen.getByTestId(testID.reportItemsTitle)).toBeVisible();
 
     const target = seed.reviewReport.items.find(
-      (item) => item.item_id !== pending!.item_id && item.value !== null,
+      (item) =>
+        item.item_id !== pending!.item_id &&
+        item.value !== null &&
+        parseNumericForm(item.value).kind === 'scalar',
     );
     expect(target).toBeDefined();
     await screen.getByTestId(testID.reviewCorrect(target!.item_id)).tap();
     await screen.getByTestId(testID.reviewValue(target!.item_id)).fill(`${target!.value}0`);
     await screen.getByTestId(testID.reviewSave(target!.item_id)).tap();
-    await expect(screen.getByTestId(testID.reviewItem(target!.item_id))).toContainText('已修正');
+    await expect(screen.getByTestId(testID.reviewItem(target!.item_id))).toContainText(
+      reviewStatusLabel('corrected')!,
+    );
   });
 
   test('可补录未知只给补录主操作,并显示原因', async ({ app, browser, screen }) => {
     const item = seed.healReport.items.find(
-      (entry) => entry.flag_reason !== null && isBackfillUnknown(entry),
+      (entry) => entry.flag_reason !== null && isBackfillItem(entry),
     );
     expect(item).toBeDefined();
-    const reason = BACKFILL_REASON_TEXT[item!.flag_reason!];
+    const reason = flagReasonText(item!.flag_reason);
     expect(reason).toBeDefined();
     await openConfigured(app, browser, `/report/${seed.healReport.report_id}`, {
       memberId: seed.mama.member_id,
     });
-    const card = screen.getByTestId(testID.reviewItem(item!.item_id));
-    await expect(card).toContainText(reason!);
+    await expect(screen.getByTestId(testID.reviewReason(item!.item_id))).toContainText(reason!);
     await expect(screen.getByTestId(testID.reviewBackfill(item!.item_id))).toBeVisible();
     await expect(screen.getByTestId(testID.reviewConfirm(item!.item_id))).toHaveCount(0);
   });
 
   test('高置信未知项无需修改即可展开原图定位', async ({ app, browser, screen }) => {
     const unknown = seed.healReport.items.find(
-      (item) => item.flag === 'unknown' && !item.low_confidence,
+      (item) =>
+        item.flag === 'unknown' && !item.low_confidence && item.ocr_lines.length > 0,
     );
-    const lowConfidence = seed.healReport.items.find((item) => item.low_confidence);
+    const lowConfidence = seed.healReport.items.find(
+      (item) => item.low_confidence && item.ocr_lines.length > 0,
+    );
     expect(unknown).toBeDefined();
     expect(lowConfidence).toBeDefined();
 
@@ -337,55 +363,5 @@ describe('App E2E', { serial: true, timeout: 300_000 }, () => {
     await expect(screen.getByTestId(testID.reviewZoom(unknown!.item_id))).toHaveCount(0);
     // 低置信项保持默认展开。
     await expect(screen.getByTestId(testID.reviewZoom(lowConfidence!.item_id))).toBeVisible();
-  });
-
-  test('改归属、删除与同图重传', async ({ app, browser, screen }) => {
-    await openConfigured(app, browser, `/report/${seed.healReport.report_id}`, {
-      memberId: seed.mama.member_id,
-    });
-    // 检验单详情保持原路径:待核对 / 未知徽标、指标项与逐项核对入口仍在(票 03 只改影像单)。
-    await expect(screen.getByText('待核对')).toBeVisible();
-    await expect(screen.getByText(/未知 \d+/)).toBeVisible();
-    const unknownItem = seed.healReport.items.find((item) => item.flag === 'unknown');
-    expect(unknownItem).toBeDefined();
-    await expect(screen.getByTestId(testID.reviewItem(unknownItem!.item_id))).toContainText('未知');
-    await expect(screen.getByText(/指标项/)).toBeVisible();
-    await expect(screen.getByText(/逐项核对/)).toBeVisible();
-
-    await screen.getByTestId('report-manage-reassign').tap();
-    await screen.getByTestId(testID.memberChip(seed.xiaoming.member_id)).tap();
-    await expect(screen.getByText('把报告从「E2E 妈妈」改派给「E2E 小明」?')).toBeVisible();
-    await screen.getByTestId('report-manage-confirm-reassign').tap();
-    await expect(screen.getByTestId('report-manage-notice')).toContainText('已改派给「E2E 小明」');
-
-    await screen.getByTestId('report-manage-delete').tap();
-    await screen.getByTestId('report-manage-confirm-delete').tap();
-    await browser.waitForURL(/\/timeline$/);
-    await screen.getByTestId(testID.memberChip(seed.xiaoming.member_id)).tap();
-    await expect(screen.getByTestId(testID.reportCard(seed.healReport.report_id))).toHaveCount(0);
-
-    await stubFileChooser(browser);
-    await openConfigured(app, browser, '/upload', { memberId: seed.xiaoming.member_id });
-    await screen.getByTestId('upload-pick-library').tap();
-    await browser.locator('[data-testid="file-input"]').setInputFiles(samplePath('cbc_04.png'));
-    await expect(screen.getByText('cbc_04.png')).toBeVisible();
-
-    const responsePromise = browser.waitForResponse(/\/api\/v1\/reports$/);
-    await screen.getByTestId('upload-submit').tap();
-    const payload = await (await responsePromise).json<UploadResult>();
-    expect(payload.duplicate).toBe(false);
-    // report_id 即图像 sha256:同图重传内容身份不变,新在归档行(指标项 id 全换)。
-    expect(payload.report.report_id).toBe(seed.healReport.report_id);
-    expect(payload.report.items.length).toBeGreaterThan(0);
-    expect(payload.report.items[0]!.item_id).not.toBe(seed.healReport.items[0]!.item_id);
-    await expect(screen.getByTestId('upload-result')).toContainText('已归档');
-
-    await screen.getByText('去档案查看').tap();
-    await expect(screen.getByTestId(testID.reportCard(payload.report.report_id))).toBeVisible();
-  });
-
-  test('后端不可达时首页显示失败态', async ({ app, browser, screen }) => {
-    await openConfigured(app, browser, '/', { baseUrl: 'http://127.0.0.1:1/api/v1' });
-    await expect(screen.getByText(/加载失败/)).toBeVisible();
   });
 });

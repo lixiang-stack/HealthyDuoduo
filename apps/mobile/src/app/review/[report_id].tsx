@@ -92,8 +92,10 @@ export default function ReviewScreen() {
               </Link>
             </View>
           )}
-          <Link href="/timeline" style={styles.link}>
-            去档案查看
+          <Link asChild href="/timeline">
+            <Pressable testID="review-open-timeline">
+              <Text style={styles.link}>去档案查看</Text>
+            </Pressable>
           </Link>
         </View>
       ) : null}
