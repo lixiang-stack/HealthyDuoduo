@@ -41,6 +41,8 @@ func newServeHandler(d *deps, corsOrigin string) http.Handler {
 	mux.HandleFunc("GET /api/v1/members", handleListMembers(d.members))
 	mux.HandleFunc("POST /api/v1/members", handleCreateMember(d.members))
 	mux.HandleFunc("PATCH /api/v1/members/{member_id}", handleUpdateMember(d.members))
+	// 趋势端点(票 02):成员维度指标时序(unit 门控;无点 = 200 + [])。
+	mux.HandleFunc("GET /api/v1/members/{member_id}/indicators/{name}/trend", handleGetTrend(d))
 	// 报告端点(票 06/07):时间线(成员过滤)、multipart 上传(sha256 幂等)、详情(含 OCR 行链接)。
 	mux.HandleFunc("GET /api/v1/reports", handleListReports(d.reports))
 	mux.HandleFunc("POST /api/v1/reports", handleUploadReport(d))
