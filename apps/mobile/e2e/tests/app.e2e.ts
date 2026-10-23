@@ -335,6 +335,14 @@ describe('App E2E', { serial: true, timeout: 300_000 }, () => {
     await openConfigured(app, browser, `/report/${seed.healReport.report_id}`, {
       memberId: seed.mama.member_id,
     });
+    // ref_range=null 只陈述数据事实,不推断纸面未印或抽取/OCR 漏掉(票 04)。
+    const missingRef = seed.healReport.items.find(
+      (entry) => entry.name === '血清淀粉样蛋白A',
+    );
+    expect(missingRef).toBeDefined();
+    await expect(screen.getByTestId(testID.reviewItem(missingRef!.item_id))).toContainText(
+      '无参考范围',
+    );
     await expect(screen.getByTestId(testID.reviewReason(item!.item_id))).toContainText(reason!);
     await expect(screen.getByTestId(testID.reviewBackfill(item!.item_id))).toBeVisible();
     await expect(screen.getByTestId(testID.reviewConfirm(item!.item_id))).toHaveCount(0);
