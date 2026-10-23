@@ -1,6 +1,6 @@
 # Spec：核对清晰度 v2（证据重做 + 确认显隐 + 待补录入口）
 
-Status: ready-for-agent
+Status: resolved
 
 日期：2026-10-21；分支：`review-clarity-v2`。
 
@@ -73,11 +73,13 @@ Status: ready-for-agent
 
 | 票 | 内容 | 依赖 | 状态 |
 | --- | --- | --- | --- |
-| 01 | 重做 unknown 审计（去重 + 根因分层 + 原图核验） | 无 | ready-for-agent |
-| 02 | 确认动作按状态显隐 + 共享 `isBackfillItem` | 无 | ready-for-agent |
-| 03 | 待补录入口：先决策（筛选 chip / 小节 / 不做） | 01、02 | ready-for-human |
-| 04 | `参考范围未识别` → `无参考范围` | 无 | ready-for-agent |
-| 05（条件） | 待补录入口实现（仅当 03 选“做”） | 03 | 03 通过后再建 |
+| 01 | 重做 unknown 审计（去重 + 根因分层 + 原图核验） | 无 | resolved |
+| 02 | 确认动作按状态显隐 + 共享 `isBackfillItem` | 无 | resolved（核心行为已实现；按复核关闭） |
+| 03 | 待补录入口：先决策（筛选 chip / 小节 / 不做） | 01、02 | resolved（选 C：暂缓入口） |
+| 04 | `参考范围未识别` → `无参考范围` | 无 | resolved |
+| 05（条件） | 待补录入口实现（仅当 03 选“做”） | 03 | 不建（03 选 C） |
+
+> 2026-10-23 收口：02 复核为已实现（未补的测试/helper 缺口见票内 Comments）；03 选 C（暂缓入口，不建 05）；04 已改文案并补 E2E。详见各票 Comments。
 
 ## 验收
 

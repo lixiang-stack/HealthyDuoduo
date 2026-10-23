@@ -31,9 +31,8 @@ const FLAG_COLORS: Record<ReportItem['flag'], string> = {
   unknown: colors.muted,
 };
 
-// 参考范围缺失时的中性事实文案:可能是纸面未印,也可能是抽取/OCR 漏掉——不写成
-// 「未印」,避免把数据链路缺陷说成纸面事实。
-const MISSING_REF_RANGE_LABEL = '参考范围未识别';
+// 参考范围缺失时的中性事实文案:只陈述数据事实,不推断是纸面未印还是抽取/OCR 漏掉。
+const MISSING_REF_RANGE_LABEL = '无参考范围';
 
 // ReviewItemCard 指标项核对卡:与详情指标项同一展示(名称/值/单位/参考范围/条带/
 // 原文/低置信高亮)+ 核对状态标签、确认/修正动作与四项纸面事实编辑器。

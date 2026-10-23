@@ -4,7 +4,9 @@
 
 **Blocked by:** None（可立即开始；不依赖票 01 的审计数字）。
 
-**Status:** ready-for-agent
+**Status:** resolved
+
+> 2026-10-23 复核：核心行为已由后续 `unknown-reasons` 迭代落地；未补的验收缺口见 Comments，按本轮决定关闭本票。
 
 ## 验收清单
 
@@ -44,3 +46,10 @@
 - 票 03 会消费 `isBackfillItem`；本票不定义 `backfillItems`，避免又出现旧 05/06 的循环依赖。
 
 ## Comments
+
+**复核（2026-10-23，分支 `review-clarity-v2-followup`）**
+
+- 核心行为已由后续 `unknown-reasons` 迭代落地（`80d48d1`）：`isReversedInterval`（`apps/mobile/src/reports/refRange.ts:70`）、`isBackfillItem` / `reviewActions`（`apps/mobile/src/review/rules.ts:51`、`apps/mobile/src/review/items.ts:90`）、`ReviewItemCard` 按 primary 显隐并新增 `review-backfill-*`（`apps/mobile/src/review/components.tsx:178`）。低置信可操作 unknown 不再出现确认；E2E 已有 cbc_04 可补录项无确认断言。
+- 按本轮决定不补票面剩余验收缺口：不可操作 unknown 的解释由更细的 `flagReasonText` 承担，不叠加票面 helper；单测矩阵与 cbc_03/cbc_04 的其余 E2E 场景保留现状。
+- `unknown-reasons` 迭代为 `isBackfillItem` 增加了 `flag_reason` 抽取类限定（`ocr_miss` / `ocr_merge` / `extractor_pairing`）；票面结构矩阵仍成立，本票不改回。
+- 服务端/契约/数据库零改动。
