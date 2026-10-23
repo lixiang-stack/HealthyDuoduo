@@ -390,9 +390,10 @@ func toAPIReportHeader(sum pipeline.ReportSummary) httpapi.ReportHeader {
 		Status:     sum.Status,
 		FailReason: sum.FailReason,
 		FlagCounts: httpapi.FlagCounts{
-			High:    sum.FlagCounts.High,
-			Low:     sum.FlagCounts.Low,
-			Unknown: sum.FlagCounts.Unknown,
+			High:     sum.FlagCounts.High,
+			Low:      sum.FlagCounts.Low,
+			Abnormal: sum.FlagCounts.Abnormal,
+			Unknown:  sum.FlagCounts.Unknown,
 		},
 		UnreviewedLowConfidenceCount: sum.UnreviewedLowConfidenceCount,
 	}
@@ -451,6 +452,7 @@ func toAPIItem(it pipeline.ReportItemRow, ocr *contract.OCRResult) httpapi.Repor
 		RefRange:      it.RefRange,
 		Method:        it.Method,
 		Flag:          it.Flag,
+		FlagReason:    it.FlagReason,
 		LowConfidence: it.LowConfidence,
 		RawText:       it.RawText,
 		ReviewStatus:  it.ReviewStatus,

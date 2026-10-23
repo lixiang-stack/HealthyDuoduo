@@ -1,0 +1,110 @@
+version: 1
+# 定性比较策略（comparison policy）。
+#
+# 只负责「值/参考范围都是定性文本时怎么比较」，不包含 OCR 别名/单位/词典；
+# 抽取词典仍只在识别端。Go 数据服务只读取本文件用于修正后的 flag 重算
+#（ADR-0005），不读取 *_dict.yaml。
+#
+# 医学口径说明（需临床复核）：
+# - negative = 阴性/正常/未见/未检出，是多数尿试纸与感染标志物的正常值；
+# - weak_positive / positive = 弱阳性/阳性/+-/+/++，判 abnormal；
+# - 血型、RhD、ANA 核型、HBeAb/HBcAb 是信息项，不做 normal/abnormal；
+# - HBsAb 阳性表示有抗体，阴性不是疾病异常，归 informational；
+# - 抗坏血酸阳性是尿试纸干扰项，归 informational；
+# - 尿颜色/透明度受饮水/药物影响，异常只作提示。
+normalizers:
+  negative:
+    - 阴性
+    - 阴性(-)
+    - 阴性(一)
+    - "-"
+    - "－"
+    - "—"
+    - "−"
+    - 正常
+    - Normal
+    - normal
+    - norm.
+    - norm
+    - 未见
+    - 未检出
+    - 未找到
+    - negative
+  weak_positive:
+    - 弱阳性
+    - "+-"
+    - "±"
+    - 可疑
+    - 临界
+    - weak positive
+  positive:
+    - 阳性
+    - 阳性(+)
+    - "+"
+    - "++"
+    - "+++"
+    - "++++"
+    - "1+"
+    - "2+"
+    - "3+"
+    - "4+"
+    - 找到
+    - 检出
+    - positive
+
+# 纸面本身通常不印参考范围的计算项(不是 OCR 漏);只放有稳定依据的项目。
+no_reference_items:
+  - 谷草/谷丙比值
+no_reference_method_keywords:
+  - 计算
+
+profiles:
+  negative_normal:
+    normal: [negative]
+    abnormal: [weak_positive, positive]
+  positive_normal:
+    normal: [positive]
+    informational: [negative, weak_positive]
+  informational:
+    informational_all: true
+  negative_or_zero_normal:
+    normal: [negative]
+    normal_values: ["0"]
+    abnormal: [weak_positive, positive]
+  vitamin_c:
+    normal: [negative]
+    informational: [weak_positive, positive]
+  urine_color:
+    normal_values: [淡黄, 黄色, 无色]
+    abnormal_values: [深黄, 琥珀色, 红色, 棕色, 乳白色]
+  urine_clarity:
+    normal_values: [清澈, 清亮, 透明]
+    abnormal_values: [浑浊, 混浊]
+
+items:
+  尿潜血: negative_normal
+  尿白细胞酯酶: negative_normal
+  尿蛋白质: negative_normal
+  尿葡萄糖: negative_normal
+  尿酮体: negative_normal
+  尿亚硝酸盐: negative_normal
+  尿胆红素: negative_normal
+  尿胆原: negative_normal
+  抗坏血酸: vitamin_c
+  尿液颜色: urine_color
+  尿透明度: urine_clarity
+  滴虫: negative_normal
+  尿粘液丝: negative_normal
+  结晶: negative_or_zero_normal
+  抗体筛查: negative_normal
+  乙肝表面抗原: negative_normal
+  乙肝e抗原: negative_normal
+  乙肝表面抗体: positive_normal
+  乙肝e抗体: informational
+  乙肝核心抗体: informational
+  ANA(IIF): negative_normal
+  抗线粒体抗体: negative_normal
+  抗平滑肌抗体: negative_normal
+  抗核抗体主荧光核型: informational
+  ABO血型: informational
+  RH血型: informational

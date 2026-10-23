@@ -5,6 +5,7 @@ import { beforeAll, describe, test } from '@e2e-dev/web';
 import { expect } from 'e2e';
 import type { Screen } from 'e2e';
 
+import { isReversedInterval, parseNumericForm, parseRefRange } from '../../src/reports/refRange';
 import {
   API_BASE_URL,
   listMembers,
@@ -18,6 +19,35 @@ import {
 } from '../support';
 
 let seed!: Seed;
+
+type SeedItem = Seed['healReport']['items'][number];
+
+// 与 App `isBackfillItem` 同口径的 E2E 选样条件(只依赖纯解析函数,避免把 RN 模块
+// 带进 e2e 类型环境)。用例不绑定具体指标名/OCR 结果。
+const BACKFILL_REASONS = new Set<NonNullable<SeedItem['flag_reason']>>([
+  'ocr_miss',
+  'ocr_merge',
+  'extractor_pairing',
+]);
+const BACKFILL_REASON_TEXT: Partial<Record<NonNullable<SeedItem['flag_reason']>, string>> = {
+  ocr_miss: 'OCR 输出里没有可直接配对的完整值/范围',
+  ocr_merge: 'OCR 把相邻列内容粘在一起',
+  extractor_pairing: '识别到了值/范围，但未归到该项',
+};
+
+function isBackfillUnknown(item: SeedItem): boolean {
+  if (item.flag !== 'unknown') {
+    return false;
+  }
+  if (item.flag_reason && !BACKFILL_REASONS.has(item.flag_reason)) {
+    return false;
+  }
+  const ref = parseRefRange(item.ref_range);
+  if (item.value === null) {
+    return ref.kind === 'interval' || ref.kind === 'bound';
+  }
+  return parseNumericForm(item.value).kind === 'scalar' && isReversedInterval(item.ref_range);
+}
 
 // 影像单详情主体(票 03/04):指标项 / 未知 / 待核对 / 逐项核对不出现;原图入口可展开。
 async function expectImagingDetail(screen: Screen): Promise<void> {
@@ -269,6 +299,44 @@ describe('App E2E', { serial: true, timeout: 300_000 }, () => {
     await screen.getByTestId(testID.reviewValue(target!.item_id)).fill(`${target!.value}0`);
     await screen.getByTestId(testID.reviewSave(target!.item_id)).tap();
     await expect(screen.getByTestId(testID.reviewItem(target!.item_id))).toContainText('已修正');
+  });
+
+  test('可补录未知只给补录主操作,并显示原因', async ({ app, browser, screen }) => {
+    const item = seed.healReport.items.find(
+      (entry) => entry.flag_reason !== null && isBackfillUnknown(entry),
+    );
+    expect(item).toBeDefined();
+    const reason = BACKFILL_REASON_TEXT[item!.flag_reason!];
+    expect(reason).toBeDefined();
+    await openConfigured(app, browser, `/report/${seed.healReport.report_id}`, {
+      memberId: seed.mama.member_id,
+    });
+    const card = screen.getByTestId(testID.reviewItem(item!.item_id));
+    await expect(card).toContainText(reason!);
+    await expect(screen.getByTestId(testID.reviewBackfill(item!.item_id))).toBeVisible();
+    await expect(screen.getByTestId(testID.reviewConfirm(item!.item_id))).toHaveCount(0);
+  });
+
+  test('高置信未知项无需修改即可展开原图定位', async ({ app, browser, screen }) => {
+    const unknown = seed.healReport.items.find(
+      (item) => item.flag === 'unknown' && !item.low_confidence,
+    );
+    const lowConfidence = seed.healReport.items.find((item) => item.low_confidence);
+    expect(unknown).toBeDefined();
+    expect(lowConfidence).toBeDefined();
+
+    await openConfigured(app, browser, `/report/${seed.healReport.report_id}`, {
+      memberId: seed.mama.member_id,
+    });
+    // 高置信未知项默认收起;无需先点「修正」即可展开(票 03)。
+    await expect(screen.getByTestId(testID.reviewZoom(unknown!.item_id))).toHaveCount(0);
+    await expect(screen.getByTestId(testID.reviewZoomToggle(unknown!.item_id))).toBeVisible();
+    await screen.getByTestId(testID.reviewZoomToggle(unknown!.item_id)).tap();
+    await expect(screen.getByTestId(testID.reviewZoom(unknown!.item_id))).toBeVisible();
+    await screen.getByTestId(testID.reviewZoomToggle(unknown!.item_id)).tap();
+    await expect(screen.getByTestId(testID.reviewZoom(unknown!.item_id))).toHaveCount(0);
+    // 低置信项保持默认展开。
+    await expect(screen.getByTestId(testID.reviewZoom(lowConfidence!.item_id))).toBeVisible();
   });
 
   test('改归属、删除与同图重传', async ({ app, browser, screen }) => {

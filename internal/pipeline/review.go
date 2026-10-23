@@ -10,13 +10,14 @@ const (
 )
 
 // ReviewAction 核对动作:确认(Confirm=true)或修正(至少一项纸面事实非 nil)。
-// flag 不在字段集内——一律由 ComputeFlag 按修正后的 value × ref_range 重算。
+// flag 不在字段集内——一律由 Compare 按修正后的 value × ref_range 重算(含 flag_reason)。
 type ReviewAction struct {
-	Confirm  bool
-	Value    *string
-	Unit     *string
-	Name     *string
-	RefRange *string
+	Confirm     bool
+	NoReference bool
+	Value       *string
+	Unit        *string
+	Name        *string
+	RefRange    *string
 }
 
 // CorrectionPairRecord 一条 append-only 修正对(落库形状,ADR-0005):
@@ -47,7 +48,33 @@ type ReviewOutcome struct {
 // 按修正后的 value × ref_range 重算 flag、置 corrected。每次修正产出恰一条
 // (重放同一修正为 no-op 对,最终生效状态不变——ADR-0005 决策可重复、重试安全)。
 func ApplyReviewAction(current ReportItemRow, action ReviewAction) (ReportItemRow, *CorrectionPairRecord) {
+	return applyReviewAction(current, action, nil)
+}
+
+// ApplyReviewActionWithPolicy 同 ApplyReviewAction,但用显式比较策略重算 flag/reason。
+// 生产路径(Store.ReviewItem)注入共享策略;旧调用方不传策略时退化为数值比较。
+func ApplyReviewActionWithPolicy(
+	current ReportItemRow,
+	action ReviewAction,
+	policy *FlagPolicy,
+) (ReportItemRow, *CorrectionPairRecord) {
+	return applyReviewAction(current, action, policy)
+}
+
+func applyReviewAction(
+	current ReportItemRow,
+	action ReviewAction,
+	policy *FlagPolicy,
+) (ReportItemRow, *CorrectionPairRecord) {
 	next := current
+	if action.NoReference {
+		// 家长确认纸面没有参考范围:不改纸面事实,只记录 unknown 原因并置已确认。
+		next.ReviewStatus = ReviewStatusConfirmed
+		next.Flag = FlagUnknown
+		reason := FlagReasonNoReference
+		next.FlagReason = &reason
+		return next, nil
+	}
 	if action.Confirm {
 		next.ReviewStatus = ReviewStatusConfirmed
 		return next, nil
@@ -65,7 +92,16 @@ func ApplyReviewAction(current ReportItemRow, action ReviewAction) (ReportItemRo
 	if action.RefRange != nil {
 		next.RefRange = action.RefRange
 	}
-	next.Flag = ComputeFlag(next.Value, next.RefRange)
+	flag, reason := Compare(next.Name, next.Value, next.RefRange, policy)
+	if flag == FlagUnknown && next.RefRange == nil && policy.noReferenceMethod(next.Method) {
+		reason = FlagReasonNoReference
+	}
+	next.Flag = flag
+	if reason == "" {
+		next.FlagReason = nil
+	} else {
+		next.FlagReason = &reason
+	}
 	beforeName := current.Name
 	pair := &CorrectionPairRecord{
 		BeforeName:     &beforeName,

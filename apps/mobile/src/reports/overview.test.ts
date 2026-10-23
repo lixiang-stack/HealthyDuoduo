@@ -16,7 +16,7 @@ function report(overrides: Partial<ReportSummary> = {}): ReportSummary {
     report_date: '2026-10-01',
     status: 'success',
     fail_reason: null,
-    flag_counts: { high: 0, low: 0, unknown: 0 },
+    flag_counts: { high: 0, low: 0, abnormal: 0, unknown: 0 },
     unreviewed_low_confidence_count: 0,
     ...overrides,
   };

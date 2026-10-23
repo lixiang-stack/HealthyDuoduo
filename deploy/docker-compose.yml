@@ -41,6 +41,7 @@ services:
       HDD_RECOGNIZER_URL: http://recognizer:8000
       HDD_S3_ENDPOINT: http://seaweedfs:8333
       HDD_S3_BUCKET: raw
+      HDD_FLAG_POLICY: /app/flag_policy.yaml
       # CORS 缺省关闭(家庭常驻实例 = ADR-0006 无鉴权,不放开跨源读取);
       # 浏览器验证通道(Expo Web,localhost:8081)需临时打开:
       #   HDD_SERVE_CORS_ORIGIN='*' docker compose -p deploy -f deploy/docker-compose.yml up -d hdd

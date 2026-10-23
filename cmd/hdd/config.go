@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 
+	"healthyduoduo/internal/pipeline"
 	"healthyduoduo/internal/recognizer"
 	"healthyduoduo/internal/storage"
 )
@@ -19,6 +20,7 @@ type config struct {
 	s3AccessKey   string
 	s3SecretKey   string
 	s3Bucket      string
+	flagPolicy    string
 }
 
 func envConfig() config {
@@ -29,6 +31,7 @@ func envConfig() config {
 		s3AccessKey:   fromEnv("HDD_S3_ACCESS_KEY", ""),
 		s3SecretKey:   fromEnv("HDD_S3_SECRET_KEY", ""),
 		s3Bucket:      fromEnv("HDD_S3_BUCKET", "raw"),
+		flagPolicy:    fromEnv("HDD_FLAG_POLICY", "recognizer/recognizer/flag_policy.yaml"),
 	}
 }
 
@@ -55,7 +58,13 @@ func openDeps(c config) (*deps, func(), error) {
 		pool.Close()
 		return nil, nil, fmt.Errorf("ensure bucket %s: %w", c.s3Bucket, err)
 	}
+	policy, err := pipeline.LoadFlagPolicy(c.flagPolicy)
+	if err != nil {
+		pool.Close()
+		return nil, nil, fmt.Errorf("load flag policy: %w", err)
+	}
 	st := storage.NewStore(pool)
+	st.SetFlagPolicy(policy)
 	d := &deps{
 		store:   st,
 		members: st,

@@ -54,6 +54,7 @@ type ReportItem struct {
 	// Method 是检测方法/实验方法列原样(如 '化学发光法');无该列或解析失败为 null。
 	Method        *string `json:"method"`
 	Flag          string  `json:"flag"`
+	FlagReason    *string `json:"flag_reason,omitempty"`
 	LowConfidence bool    `json:"low_confidence"`
 	RawText       string  `json:"raw_text"`
 	// OCRLineNumbers 该指标项组成 OCR 行的下标(0-based,与 ocr_result 的 txts/boxes 同下标;

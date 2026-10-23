@@ -22,11 +22,31 @@ class Status(_Vocabulary):
     FAILED = "failed"
 
 class Flag(_Vocabulary):
-    """指标项标记(数值 vs 参考范围)。"""
+    """指标项标记(值 vs 参考范围)。
+
+    high/low 只用于有方向的数值异常;abnormal 只用于无方向的定性异常;
+    unknown 只表示本应能比较但失败/暂不支持。
+    """
     NORMAL = "normal"
     HIGH = "high"
     LOW = "low"
+    ABNORMAL = "abnormal"
     UNKNOWN = "unknown"
+
+
+class FlagReason(_Vocabulary):
+    """unknown 的原因(服务端计算;normal/high/low/abnormal 为 None)。"""
+    OCR_MISS = "ocr_miss"
+    OCR_MERGE = "ocr_merge"
+    EXTRACTOR_PAIRING = "extractor_pairing"
+    NO_REFERENCE = "no_reference"
+    QUALITATIVE_UNSUPPORTED = "qualitative_unsupported"
+    UNVERIFIED = "unverified"
+    NARRATIVE = "narrative"
+    INFORMATIONAL = "informational"
+    INDETERMINATE = "indeterminate"
+    SCALAR_REF = "scalar_ref"
+    OTHER = "other"
 
 # Vertex coordinate [x, y]; a text line box is a quadrilateral of four points.
 type Point = tuple[float, float]
@@ -79,12 +99,24 @@ class ReportItem(BaseModel):
     ref_range: str | None = None
     method: str | None = Field(None, description="detection/experimental method as printed")
     flag: Flag
+    flag_reason: FlagReason | None = Field(
+        None, description="unknown 的原因;normal/high/low/abnormal 为 None"
+    )
     low_confidence: bool
     raw_text: str = Field(min_length=1, description="matching raw OCR line text for manual review")
     ocr_line_numbers: list[int] = Field(
         description="indices of the OCR lines composing this item "
         "(0-based, same as txts/boxes; ordered like raw_text)"
     )
+
+    @model_serializer(mode="wrap")
+    def _omit_null_flag_reason(self, handler):
+        # flag_reason 只对 unknown 有意义;normal/high/low/abnormal 不输出该键,
+        # 保持既有 golden/消费方逐字节兼容。
+        data = handler(self)
+        if data.get("flag_reason") is None:
+            data.pop("flag_reason", None)
+        return data
 
 
 class ReportSection(BaseModel):

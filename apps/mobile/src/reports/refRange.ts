@@ -66,6 +66,15 @@ export function parseRefRange(text: string | null | undefined): NumericForm {
   return parseNumericForm(text.trim().replace(SEX_PREFIX_RE, ''));
 }
 
+/** 上下界写反的区间(parseRefRange 会归一为 min/max,不能用来判断反向)。 */
+export function isReversedInterval(text: string | null | undefined): boolean {
+  if (text == null) {
+    return false;
+  }
+  const match = INTERVAL_RE.exec(text.trim().replace(SEX_PREFIX_RE, ''));
+  return match ? Number(match[1]) > Number(match[2]) : false;
+}
+
 /** 参考范围条 + 当前值点位的几何;参考范围无数值形态时为 null(退化纯文本)。 */
 export function stripLayout(ref: NumericForm, value: NumericForm): StripLayout | null {
   if (ref.kind === 'none') {

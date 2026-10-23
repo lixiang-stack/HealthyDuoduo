@@ -4,6 +4,7 @@ import { IMAGING_REPORT_TYPE } from './category';
 import {
   flagBadges,
   flagLabel,
+  itemFlagLabel,
   reportBadgeLabels,
   reportDateLabel,
   reportStatusLabel,
@@ -19,7 +20,7 @@ const report: ReportDetail = {
   report_date: '2026-10-01',
   status: 'success',
   fail_reason: null,
-  flag_counts: { high: 0, low: 0, unknown: 0 },
+  flag_counts: { high: 0, low: 0, abnormal: 0, unknown: 0 },
   unreviewed_low_confidence_count: 0,
   items: [],
 };
@@ -53,23 +54,34 @@ describe('reportDateLabel', () => {
 });
 
 describe('flagLabel', () => {
-  it('指标项 flag 文案:正常/偏高/偏低/未知(中性事实侧)', () => {
+  it('指标项 flag 文案:正常/偏高/偏低/异常/未知(中性事实侧)', () => {
     expect(flagLabel('normal')).toBe('正常');
     expect(flagLabel('high')).toBe('偏高');
     expect(flagLabel('low')).toBe('偏低');
+    expect(flagLabel('abnormal')).toBe('异常');
     expect(flagLabel('unknown')).toBe('未知');
+  });
+
+  it('unknown 按 reason 显示中性事实,不一律写未知', () => {
+    expect(itemFlagLabel({ flag: 'unknown', flag_reason: 'informational' })).toBe('信息项');
+    expect(itemFlagLabel({ flag: 'unknown', flag_reason: 'no_reference' })).toBe('无参考范围');
+    expect(itemFlagLabel({ flag: 'unknown', flag_reason: 'qualitative_unsupported' })).toBe('定性结果');
+    expect(itemFlagLabel({ flag: 'unknown', flag_reason: 'unverified' })).toBe('待核实');
+    expect(itemFlagLabel({ flag: 'unknown', flag_reason: 'ocr_miss' })).toBe('未知');
+    expect(itemFlagLabel({ flag: 'abnormal' })).toBe('异常');
   });
 });
 
 describe('flagBadges', () => {
-  it('按偏高/偏低/未知聚合;normal 不计、为 0 的档不出现', () => {
-    expect(flagBadges({ ...report, flag_counts: { high: 5, low: 2, unknown: 1 } })).toEqual([
+  it('按偏高/偏低/异常/未知聚合;normal 不计、为 0 的档不出现', () => {
+    expect(flagBadges({ ...report, flag_counts: { high: 5, low: 2, abnormal: 1, unknown: 1 } })).toEqual([
       '偏高 5',
       '偏低 2',
+      '异常 1',
       '未知 1',
     ]);
-    expect(flagBadges({ ...report, flag_counts: { high: 0, low: 0, unknown: 0 } })).toEqual([]);
-    expect(flagBadges({ ...report, flag_counts: { high: 3, low: 0, unknown: 2 } })).toEqual([
+    expect(flagBadges({ ...report, flag_counts: { high: 0, low: 0, abnormal: 0, unknown: 0 } })).toEqual([]);
+    expect(flagBadges({ ...report, flag_counts: { high: 3, low: 0, abnormal: 0, unknown: 2 } })).toEqual([
       '偏高 3',
       '未知 2',
     ]);
@@ -77,9 +89,9 @@ describe('flagBadges', () => {
 
   it('影像单按类别关闭未知档(指标项不呈现),偏高/偏低仍保留', () => {
     expect(
-      flagBadges({ ...imaging, flag_counts: { high: 3, low: 1, unknown: 2 } }),
+      flagBadges({ ...imaging, flag_counts: { high: 3, low: 1, abnormal: 0, unknown: 2 } }),
     ).toEqual(['偏高 3', '偏低 1']);
-    expect(flagBadges({ ...imaging, flag_counts: { high: 0, low: 0, unknown: 2 } })).toEqual([]);
+    expect(flagBadges({ ...imaging, flag_counts: { high: 0, low: 0, abnormal: 0, unknown: 2 } })).toEqual([]);
   });
 });
 
@@ -88,14 +100,14 @@ describe('reportBadgeLabels', () => {
     expect(
       reportBadgeLabels({
         ...imaging,
-        flag_counts: { high: 1, low: 0, unknown: 6 },
+        flag_counts: { high: 1, low: 0, abnormal: 0, unknown: 6 },
         unreviewed_low_confidence_count: 1,
       }),
     ).toEqual({ flags: ['偏高 1'], unreviewed: undefined });
     expect(
       reportBadgeLabels({
         ...report,
-        flag_counts: { high: 3, low: 0, unknown: 2 },
+        flag_counts: { high: 3, low: 0, abnormal: 0, unknown: 2 },
         unreviewed_low_confidence_count: 1,
       }),
     ).toEqual({ flags: ['偏高 3', '未知 2'], unreviewed: '待核对 1 项' });

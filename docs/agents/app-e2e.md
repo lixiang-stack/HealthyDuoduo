@@ -16,7 +16,7 @@ npm run e2e -- --headed        # 参数透传给 e2e run(如 --headed/--grep)
 E2E_KEEP_STACK=1 npm run e2e   # 跑完保留栈,便于手工看 Web/API(下次运行前仍会重建)
 ```
 
-完成判据：11/11 通过；失败时看 `.e2e/results/<test>/trace.md` 与应用日志 `.e2e/logs/expo.log`。
+完成判据：12/12 通过；失败时看 `.e2e/results/<test>/trace.md` 与应用日志 `.e2e/logs/expo.log`。
 
 ## 专用栈
 

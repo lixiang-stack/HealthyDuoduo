@@ -56,8 +56,8 @@ items:
   - name: 血小板
     aliases: [血小板总数, PLT, 血小板数目, 血小板计数]
     units: ["10^9/L", "*10^9/L", "10~9/L", "*10~9/L"]
-  - name: 血小板压积
-    aliases: [血小板比积, PCT]
+  - name: 血小板比积
+    aliases: [血小板压积, PCT]
     units: ["%"]
   - name: 血小板分布宽度
     aliases: [PDW]

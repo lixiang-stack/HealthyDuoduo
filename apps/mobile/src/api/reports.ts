@@ -30,7 +30,10 @@ export type CorrectionRequest = {
   name?: string;
   ref_range?: string;
 };
-export type ReviewRequest = { action: 'confirm' } | CorrectionRequest;
+export type ReviewRequest =
+  | { action: 'confirm' }
+  | { action: 'no_reference' }
+  | CorrectionRequest;
 
 export async function listReports(
   client: ApiClient,

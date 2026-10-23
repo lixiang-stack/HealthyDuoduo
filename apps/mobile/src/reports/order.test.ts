@@ -10,7 +10,7 @@ function report(id: string, date: string | null): ReportSummary {
     report_date: date,
     status: 'success',
     fail_reason: null,
-    flag_counts: { high: 0, low: 0, unknown: 0 },
+    flag_counts: { high: 0, low: 0, abnormal: 0, unknown: 0 },
     unreviewed_low_confidence_count: 0,
   };
 }

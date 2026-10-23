@@ -35,13 +35,22 @@ raw_text,不改变置信标记(决策 #7)。
 """
 
 import re
+import unicodedata
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
 
 import yaml
 
-from .contract import Flag, OCRResult, Report, ReportItem, ReportSection, Status
+from .contract import (
+    Flag,
+    FlagReason,
+    OCRResult,
+    Report,
+    ReportItem,
+    ReportSection,
+    Status,
+)
 
 # 词典注册表:每个报告类别一个数据文件(决策 #8:只有规范名/别名/已知单位集,
 # 不内置参考值;参考范围一律从检查单抽取),按文件名序注册。
@@ -50,6 +59,9 @@ DICT_GLOB = "*_dict.yaml"
 
 # 单位族规范印形表(数据文件注册表内,与类别 *_dict.yaml 平行;语义见文件头)
 UNIT_FAMILIES_FILE = DICT_DIR / "unit_families.yaml"
+
+# 定性比较策略(与 Go 数据服务共读;只含比较规则,不含 OCR 别名/单位)
+FLAG_POLICY_FILE = DICT_DIR / "flag_policy.yaml"
 
 # 决策 #7:任一组成行 score < 阈值 → 项 low_confidence(固定常量);报告级触发见
 # LOW_CONF_PARTIAL_RATIO。
@@ -129,6 +141,9 @@ def _qualitative_value(text: str) -> str | None:
     t = _ARROW_RE.sub("", text.strip()).strip()
     if not t or _ROLE_KW_ALL_RE.fullmatch(t):
         return None
+    # 纯符号定性结果(- / + / ± / 全角形态)先于数值提示判定,供 value/ref 两列使用。
+    if re.fullmatch(r"[-+±＋－—−]+", t):
+        return t
     core = re.sub(r"[（(][^（()）]*[)）]", "", t)
     core = core.strip()
     if not core or _HINT_RE.search(core):
@@ -343,6 +358,9 @@ def _decompose(text: str, d: LabDict) -> tuple[str | None, str | None, str | Non
     拆不出的残片不进结构化字段,由 raw_text 保留原文供人工核对。
     """
     s = text.strip()
+    # 纯符号定性结果(- / + / ±)不是单位;留给 _qualitative_value 进 value/ref 槽。
+    if re.fullmatch(r"[-+±＋－—−]+", s):
+        return None, None, None
     # 纯中文非数字文本(如「结果」「审核者：」)不产生任何 fragment,防止伪单位;
     # 短 ASCII 字母串(如 fL、pg)是合法单位形
     if not s or (
@@ -399,6 +417,9 @@ def _decompose(text: str, d: LabDict) -> tuple[str | None, str | None, str | Non
                     unit = tail
             elif _NUMBER_RE.fullmatch(rest.strip()):
                 value = rest.strip()
+            elif m := re.fullmatch(rf"({_NUM})%", rest.strip()):
+                # 数值百分号熔一格('22.8%'、'31%'):value + unit,不当作纯单位。
+                value, unit = m.group(1), "%"
             elif rest.strip() and _ASCII_UNIT_RE.fullmatch(rest.strip()):
                 # 单位字面:ASCII 数字/字母/%/^~// 形态(g/L、fL、pg、f1、109/L、1012/L);
                 # 纯中文词(审核者：、结果、赵志佳)或含中文的垃圾不成立
@@ -418,42 +439,243 @@ def _decompose(text: str, d: LabDict) -> tuple[str | None, str | None, str | Non
     return value, ref, unit or unit_from_prefix
 
 
-def _num(s: str | None) -> float | None:
-    """字符串 → 数值(flag 比较用);value 契约是印刷原样字符串,含比较式/范围串不可比→ None(不猜)。"""
-    if s is None:
-        return None
-    try:
-        return float(s)
-    except (TypeError, ValueError):
-        return None
+@dataclass(frozen=True)
+class _FlagProfile:
+    normal: frozenset[str] = frozenset()
+    abnormal: frozenset[str] = frozenset()
+    informational: frozenset[str] = frozenset()
+    normal_values: frozenset[str] = frozenset()
+    abnormal_values: frozenset[str] = frozenset()
+    informational_all: bool = False
 
 
-def _flag(value: str | None, ref: str | None) -> Flag:
-    """value(印刷原样字符串) vs 参考范围(4.2):normal/high/low/unknown。
+@dataclass(frozen=True)
+class _FlagPolicy:
+    categories: dict[str, str]
+    profiles: dict[str, _FlagProfile]
+    items: dict[str, str]
+    no_reference_items: frozenset[str]
+    no_reference_methods: tuple[str, ...]
 
-    支持 a-b(含 --、~、性别前缀 男:0-15)与 <v / ≤v / >v / ≥v;
-    value 不可数值化(如 '<2.00' 检出限比较式、'70-80' 范围型结果)或参考范围
-    上下界写反(OCR 乱珠)或不可解析 → unknown,不猜。
+
+def _policy_text(text: str) -> str:
+    s = unicodedata.normalize("NFKC", text).strip()
+    s = re.sub(r"\s+", "", s)
+    return s.replace("–", "-").replace("—", "-").replace("−", "-")
+
+
+@lru_cache(maxsize=1)
+def load_flag_policy() -> _FlagPolicy:
+    """定性比较策略(flag_policy.yaml);与 Go 数据服务共读同一份。"""
+    raw = yaml.safe_load(FLAG_POLICY_FILE.read_text(encoding="utf-8"))
+    categories: dict[str, str] = {}
+    for category, aliases in raw["normalizers"].items():
+        for alias in aliases:
+            categories[_policy_text(str(alias))] = category
+    profiles: dict[str, _FlagProfile] = {}
+    for name, p in raw["profiles"].items():
+        profiles[name] = _FlagProfile(
+            normal=frozenset(p.get("normal", [])),
+            abnormal=frozenset(p.get("abnormal", [])),
+            informational=frozenset(p.get("informational", [])),
+            normal_values=frozenset(_policy_text(v) for v in p.get("normal_values", [])),
+            abnormal_values=frozenset(_policy_text(v) for v in p.get("abnormal_values", [])),
+            informational_all=bool(p.get("informational_all", False)),
+        )
+    items = {str(k): str(v) for k, v in raw.get("items", {}).items()}
+    no_reference = frozenset(raw.get("no_reference_items", []))
+    no_reference_methods = tuple(raw.get("no_reference_method_keywords", []))
+    return _FlagPolicy(categories, profiles, items, no_reference, no_reference_methods)
+
+
+@dataclass(frozen=True)
+class _NumForm:
+    kind: str  # scalar | interval | bound
+    a: float = 0.0
+    b: float = 0.0
+    op: str = ""
+
+
+def _num_form(text: str, ref: bool = False) -> _NumForm | None:
+    s = text.strip()
+    if ref:
+        s = _SEX_PREFIX_RE.sub("", s)
+    m = _RANGE_RE.fullmatch(s)
+    if m:
+        return _NumForm("interval", float(m.group(1)), float(m.group(2)))
+    m = _CMP_RE.match(s)
+    if m and (ref or not s[m.end():].strip()):
+        return _NumForm("bound", float(m.group(2)), op=m.group(1))
+    if _NUMBER_RE.fullmatch(s):
+        return _NumForm("scalar", float(s))
+    return None
+
+
+def _value_interval(form: _NumForm) -> tuple[float, float] | None:
+    if form.kind == "interval":
+        return (form.a, form.b) if form.a <= form.b else None
+    if form.kind == "bound":
+        if form.op in "<≤":
+            return (0.0, form.a) if form.a >= 0 else None
+        return (form.a, float("inf"))
+    return (form.a, form.a)
+
+
+def _compare_intervals(vlo: float, vhi: float, rlo: float, rhi: float) -> tuple[Flag, FlagReason | None]:
+    if vhi < rlo:
+        return Flag.LOW, None
+    if vlo > rhi:
+        return Flag.HIGH, None
+    if vlo >= rlo and vhi <= rhi:
+        return Flag.NORMAL, None
+    return Flag.UNKNOWN, FlagReason.INDETERMINATE
+
+
+def _compare_numeric(vform: _NumForm, rform: _NumForm) -> tuple[Flag, FlagReason | None]:
+    if rform.kind == "scalar":
+        # 标量 0 / 0.0 视为精确零点;其他标量语义不明,不猜。
+        if rform.a != 0:
+            return Flag.UNKNOWN, FlagReason.SCALAR_REF
+        rform = _NumForm("interval", 0.0, 0.0)
+    if rform.kind == "interval":
+        if rform.a > rform.b:
+            return Flag.UNKNOWN, FlagReason.OTHER
+        if vform.kind == "scalar":
+            v = vform.a
+            if v < rform.a:
+                return Flag.LOW, None
+            if v > rform.b:
+                return Flag.HIGH, None
+            return Flag.NORMAL, None
+        vints = _value_interval(vform)
+        if vints is None:
+            return Flag.UNKNOWN, FlagReason.OTHER
+        return _compare_intervals(*vints, rform.a, rform.b)
+    if vform.kind == "bound":
+        v_upper = vform.op in "<≤"
+        r_upper = rform.op in "<≤"
+        if v_upper and r_upper:
+            if vform.a < rform.a or (
+                vform.a == rform.a and not (vform.op == "≤" and rform.op == "<")
+            ):
+                return Flag.NORMAL, None
+            return Flag.UNKNOWN, FlagReason.INDETERMINATE
+        if not v_upper and not r_upper:
+            if vform.a > rform.a or (
+                vform.a == rform.a and not (vform.op == "≥" and rform.op == ">")
+            ):
+                return Flag.NORMAL, None
+            return Flag.UNKNOWN, FlagReason.INDETERMINATE
+    vints = _value_interval(vform)
+    if vints is None:
+        return Flag.UNKNOWN, FlagReason.OTHER
+    vlo, vhi = vints
+    if rform.op in "<≤":
+        if vhi < rform.a:
+            return Flag.NORMAL, None
+        if vlo >= rform.a:
+            return Flag.HIGH, None
+        return Flag.UNKNOWN, FlagReason.INDETERMINATE
+    if vlo > rform.a:
+        return Flag.NORMAL, None
+    if vhi <= rform.a:
+        return Flag.LOW, None
+    return Flag.UNKNOWN, FlagReason.INDETERMINATE
+
+
+def _compare_qualitative(
+    name: str | None, value: str, ref: str | None, policy: _FlagPolicy
+) -> tuple[Flag, FlagReason | None]:
+    nv = _policy_text(value)
+    nr = _policy_text(ref) if ref else None
+    vcat = policy.categories.get(nv)
+    rcat = policy.categories.get(nr) if nr else None
+    # 用户明确要求:值、参考都是阴性/短横 → 正常。
+    if vcat == "negative" and rcat == "negative":
+        return Flag.NORMAL, None
+    profile = policy.profiles.get(policy.items.get(name or "", ""))
+    if profile is None and rcat == "negative":
+        profile = policy.profiles.get("negative_normal")
+    if profile is None and rcat == "positive":
+        profile = policy.profiles.get("positive_normal")
+    if profile is None:
+        return Flag.UNKNOWN, FlagReason.QUALITATIVE_UNSUPPORTED
+    if profile.informational_all:
+        return Flag.UNKNOWN, FlagReason.INFORMATIONAL
+    if nv in profile.normal_values or vcat in profile.normal:
+        return Flag.NORMAL, None
+    if nv in profile.abnormal_values or vcat in profile.abnormal:
+        return Flag.ABNORMAL, None
+    if vcat in profile.informational:
+        return Flag.UNKNOWN, FlagReason.INFORMATIONAL
+    return Flag.UNKNOWN, FlagReason.QUALITATIVE_UNSUPPORTED
+
+
+def _compare(name: str | None, value: str | None, ref: str | None) -> tuple[Flag, FlagReason | None]:
+    """value(印刷原样) × ref_range → (flag, reason)。
+
+    - high/low:数值有方向异常;abnormal:定性无方向异常;normal:可比较且正常;
+    - unknown 带 reason;reason 由抽取层进一步细化为 OCR/配对/无范围。
     """
-    vnum = _num(value)
-    if vnum is None or ref is None:
-        return Flag.UNKNOWN
-    r = _SEX_PREFIX_RE.sub("", ref.strip())
-    m = _RANGE_RE.fullmatch(r)
-    if m:
-        lo, hi = float(m.group(1)), float(m.group(2))
-        if lo > hi:
-            return Flag.UNKNOWN
-        if lo <= vnum <= hi:
-            return Flag.NORMAL
-        return Flag.HIGH if vnum > hi else Flag.LOW
-    m = _CMP_RE.match(r)
-    if m:
-        op, v = m.group(1), float(m.group(2))
-        if op in "<≤":
-            return Flag.NORMAL if vnum < v else Flag.HIGH
-        return Flag.NORMAL if vnum > v else Flag.LOW
-    return Flag.UNKNOWN
+    if value is None or not value.strip():
+        return Flag.UNKNOWN, FlagReason.OTHER
+    policy = load_flag_policy()
+    if ref is None and name in policy.no_reference_items:
+        return Flag.UNKNOWN, FlagReason.NO_REFERENCE
+    vform = _num_form(value)
+    rform = _num_form(ref, ref=True) if ref is not None else None
+    if vform is not None and rform is not None:
+        return _compare_numeric(vform, rform)
+    if vform is not None:
+        # 数值值 + 非数值/不可解析参考范围:不猜。
+        return Flag.UNKNOWN, FlagReason.OTHER
+    if rform is not None:
+        return Flag.UNKNOWN, FlagReason.QUALITATIVE_UNSUPPORTED
+    return _compare_qualitative(name, value, ref, policy)
+
+
+def _flag(value: str | None, ref: str | None, name: str | None = None) -> Flag:
+    """兼容旧调用:只返回 flag;需要 reason 用 _compare。"""
+    return _compare(name, value, ref)[0]
+
+
+def _extraction_reason(piece: "_RowPiece", reason: FlagReason | None, raw_text: str) -> FlagReason:
+    """把比较层的通用 reason 细化为卡片可解释的抽取原因。
+
+    只在 flag=unknown 时调用;比较层能判定的语义原因(标量/定性/信息项/
+    indeterminate)原样保留,剩余缺失值/范围按 raw_text 线索分到 OCR/配对。
+    """
+    if reason not in (None, FlagReason.OTHER):
+        return reason
+    if piece.ref:
+        m = _RANGE_RE.fullmatch(piece.ref)
+        if m and float(m.group(1)) > float(m.group(2)) and piece.ref in raw_text:
+            return FlagReason.OCR_MERGE
+    if piece.value is None:
+        # 值不在 value 位,但 raw_text 有数值候选 → 配对;否则 OCR 没输出。
+        return FlagReason.EXTRACTOR_PAIRING if _numeric_candidate(raw_text, piece) else FlagReason.OCR_MISS
+    if piece.ref is None:
+        if piece.method and any(k in piece.method for k in load_flag_policy().no_reference_methods):
+            return FlagReason.NO_REFERENCE
+        return FlagReason.EXTRACTOR_PAIRING if _RANGE_RE.search(raw_text) else FlagReason.OCR_MISS
+    return FlagReason.OTHER
+
+
+def _numeric_candidate(raw_text: str, piece: "_RowPiece") -> bool:
+    """raw_text 里是否有不属于 name/ref/unit 的数值候选。"""
+    excluded = _policy_text(piece.item.name if piece.item else "") + _policy_text(piece.ref or "")
+    unit = (piece.unit or "").strip()
+    # 纯单位里的数字(10^9/L、109/L)不算值;但「22.8%」「31%」是值误落 unit,算候选。
+    if not re.fullmatch(rf"{_NUM}%", unit):
+        excluded += _policy_text(unit)
+    # 行首序号(「10 酮体」)和方法括号(「(9-HR)」)不是值候选。
+    text = _policy_text(raw_text)
+    text = re.sub(r"^\d{1,2}", "", text)
+    text = re.sub(r"\([^)]*\)", "", text)
+    for m in re.finditer(_NUM, text):
+        if m.group(0) not in excluded:
+            return True
+    return False
 
 
 @lru_cache(maxsize=1)
@@ -802,7 +1024,7 @@ def _extract_items(
                     v, r, u = _decompose(c.text, d)
                     qual = None
                     if v is None and r is None and u is None:
-                        if role == "value":
+                        if role == "value" or role == "ref":
                             qual = _qualitative_value(c.text)
                         elif role == "method":
                             qual = _method_value(c.text)
@@ -825,6 +1047,9 @@ def _extract_items(
                     # 检测方法格 → method 位(检测方法/实验方法列)。
                     if role == "value" and row.value is None:
                         row.absorb(c, qual, None, None)
+                        used.add(id(c))
+                    elif role == "ref" and row.ref is None:
+                        row.absorb(c, None, qual, None)
                         used.add(id(c))
                     elif role == "method" and row.method is None:
                         row.absorb(c, None, None, None, qual)
@@ -1043,7 +1268,11 @@ def run_postprocess(ocr: OCRResult, date_hint: str | None = None) -> Report:
     for it, piece in pairs:
         raw_cells = sorted(piece.raw_cells, key=lambda c: c.cx)
         raw_text = "  ".join(c.text.strip() for c in raw_cells) or (piece.ref or "")
-        flag = _flag(piece.value, piece.ref)
+        flag, flag_reason = _compare(it.name, piece.value, piece.ref)
+        if flag is Flag.UNKNOWN:
+            flag_reason = _extraction_reason(piece, flag_reason, raw_text)
+        else:
+            flag_reason = None
         low_conf = piece.low_score
         items.append(
             ReportItem(
@@ -1053,6 +1282,7 @@ def run_postprocess(ocr: OCRResult, date_hint: str | None = None) -> Report:
                 ref_range=piece.ref,
                 method=piece.method,
                 flag=flag,
+                flag_reason=flag_reason,
                 low_confidence=low_conf,
                 raw_text=raw_text,
                 ocr_line_numbers=[c.line for c in raw_cells],
