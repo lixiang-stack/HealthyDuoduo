@@ -8,8 +8,9 @@ import type { ApiClient } from '../api/client';
 import { reviewItem, type ReportItem, type ReviewResult } from '../api/reports';
 import { LineZoom } from '../components/LineZoom';
 import { colors } from '../components/theme';
+import { FLAG_COLORS } from '../reports/colors';
 import { parseNumericForm, parseRefRange, stripLayout, type StripLayout } from '../reports/refRange';
-import { itemFlagLabel } from '../reports/status';
+import { itemFlagLabel, MISSING_REF_RANGE_LABEL } from '../reports/status';
 import {
   buildCorrection,
   canMarkNoReference,
@@ -20,19 +21,6 @@ import {
   shouldShowZoom,
   type CorrectionDraft,
 } from './items';
-
-// flag 色板(票 07 实施期定,详情/核对共用):normal 绿 / high 红 / low 蓝 /
-// unknown 中性灰。只表示与参考范围的比较结果,不暗示诊断。
-const FLAG_COLORS: Record<ReportItem['flag'], string> = {
-  normal: colors.ok,
-  high: colors.fail,
-  low: colors.low,
-  abnormal: colors.fail,
-  unknown: colors.muted,
-};
-
-// 参考范围缺失时的中性事实文案:只陈述数据事实,不推断是纸面未印还是抽取/OCR 漏掉。
-const MISSING_REF_RANGE_LABEL = '无参考范围';
 
 // ReviewItemCard 指标项核对卡:与详情指标项同一展示(名称/值/单位/参考范围/条带/
 // 原文/低置信高亮)+ 核对状态标签、确认/修正动作与四项纸面事实编辑器。
