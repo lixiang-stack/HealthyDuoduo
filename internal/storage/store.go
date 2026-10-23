@@ -91,6 +91,17 @@ const (
 		 WHERE i.name = $1 AND r.report_type = $2
 		 ORDER BY r.report_date ASC, r.image_sha256 ASC`
 
+	// trendPointsByMember:HTTP 成员维度趋势(票 02)。与 CLI 的 sqlTrendByName 是不同
+	// 消费面(成员过滤 + 可选 unit + ref/method/review 字段);不合并,避免把 CLI 语义
+	// 耦合进 serve。unit 空串 = 全部单位。
+	sqlTrendPointsByMemberName = `SELECT r.image_sha256,
+		   COALESCE(to_char(r.report_date, 'YYYY-MM-DD'), ''),
+		   i.value, i.unit, i.ref_range, i.method, i.flag, i.low_confidence, i.review_status
+		 FROM report_items i JOIN reports r ON r.image_sha256 = i.report_sha256
+		 WHERE r.member_id = $1 AND i.name = $2
+		   AND ($3 = '' OR i.unit = $3)
+		 ORDER BY r.report_date ASC NULLS LAST, r.image_sha256 ASC, i.id ASC`
+
 	// 报告摘要(serve 时间线/上传响应回读;票 06):flag 聚合与未核对低置信计数
 	// 响应派生、不落列(ADR-0005)——unreviewed 只统计 partial 报告,失败/免核对恒 0。
 	sqlTimeline = `SELECT ` + reportSummaryColumnsSQL + ` FROM reports r
@@ -350,6 +361,29 @@ func (s *Store) trendRows(ctx context.Context, query string, args ...any) ([]pip
 		var r pipeline.TrendRow
 		var date string
 		if err := rows.Scan(&r.Sha256, &r.ReportType, &date, &r.Value, &r.Unit, &r.Flag, &r.LowConfidence); err != nil {
+			return nil, err
+		}
+		if date != "" {
+			r.ReportDate = &date
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+// TrendPoints 成员维度趋势(serve GET /members/{id}/indicators/{name}/trend;票 02):
+// unit 空 = 全部单位;日期升序、dateless 沉底、同日期按报告 sha 与指标项 id 升序。
+func (s *Store) TrendPoints(ctx context.Context, memberID int64, name, unit string) ([]pipeline.TrendPointRow, error) {
+	rows, err := s.pool.Query(ctx, sqlTrendPointsByMemberName, memberID, name, unit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []pipeline.TrendPointRow
+	for rows.Next() {
+		var r pipeline.TrendPointRow
+		var date string
+		if err := rows.Scan(&r.ReportID, &date, &r.Value, &r.Unit, &r.RefRange, &r.Method, &r.Flag, &r.LowConfidence, &r.ReviewStatus); err != nil {
 			return nil, err
 		}
 		if date != "" {

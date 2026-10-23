@@ -94,6 +94,15 @@ type ReportStore interface {
 	ReviewItem(ctx context.Context, reportSha string, itemID int64, action ReviewAction) (*ReviewOutcome, error)
 }
 
+// TrendStore 趋势域持久化边界(serve 趋势端点;票 02)。
+// 与 CLI 的 Store.TrendByName 是不同消费面:成员维度 + 可选 unit + ref/method/review
+// 字段;独立窄接口,CLI fakes 不承担这些方法(ISP)。
+type TrendStore interface {
+	// TrendPoints 成员下同一指标项名称的时序点(unit 空 = 全部单位;日期升序、
+	// dateless 沉底、同日期按报告 sha 与指标项 id 升序)。
+	TrendPoints(ctx context.Context, memberID int64, name, unit string) ([]TrendPointRow, error)
+}
+
 // ReviewStatusUnreviewed 指标项核对状态机(ADR-0005)的初始态;任一指标项
 // review_status ≠ 本值即视为报告已有核对决策(同图重传 409 的判定依据)。
 const ReviewStatusUnreviewed = "unreviewed"
@@ -164,6 +173,20 @@ type TrendRow struct {
 	Unit          *string
 	Flag          string // normal | high | low | abnormal | unknown(4.2)
 	LowConfidence bool   // 任一组成行 score < LOW_SCORE_THRESHOLD(决策 #7 透传)
+}
+
+// TrendPointRow 成员维度趋势点(serve TrendPoint 的存储侧投影;票 02)。
+// ReportDate 缺失时 nil;ReviewStatus 由 handler 派生 reviewed 标记。
+type TrendPointRow struct {
+	ReportID      string
+	ReportDate    *string
+	Value         *string
+	Unit          *string
+	RefRange      *string
+	Method        *string
+	Flag          string
+	LowConfidence bool
+	ReviewStatus  string
 }
 
 // IngestOutcome 入库结果(供 CLI 演示输出)。

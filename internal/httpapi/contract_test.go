@@ -28,6 +28,11 @@ func repoRoot(t *testing.T) string {
 	return abs
 }
 
+const (
+	trendPath             = "/members/{member_id}/indicators/{name}/trend"
+	indicatorNameParamRef = "#/components/parameters/IndicatorName"
+)
+
 // loadFixture 读 HTTP fixture golden。
 func loadFixture(t *testing.T, name string) []byte {
 	t.Helper()
@@ -48,10 +53,10 @@ func TestOpenAPIFrozenPathSet(t *testing.T) {
 		"PATCH /members/{member_id}": true,
 		"GET /reports":               true, "POST /reports": true,
 		"GET /reports/{report_id}": true, "PATCH /reports/{report_id}": true,
-		"DELETE /reports/{report_id}":                      true,
-		"PATCH /reports/{report_id}/items/{item_id}":       true,
-		"GET /images/{sha256}":                             true,
-		"GET /members/{member_id}/indicators/{name}/trend": true,
+		"DELETE /reports/{report_id}":                true,
+		"PATCH /reports/{report_id}/items/{item_id}": true,
+		"GET /images/{sha256}":                       true,
+		"GET " + trendPath:                           true,
 	}
 	got := map[string]bool{}
 	for path, item := range doc["paths"].(map[string]any) {
@@ -71,6 +76,75 @@ func TestOpenAPIFrozenPathSet(t *testing.T) {
 		if !want[g] {
 			t.Errorf("unfrozen endpoint in OpenAPI: %s", g)
 		}
+	}
+}
+
+// TestOpenAPITrendNameParam 趋势路径的 {name} 必须在参数表声明为可复用的 path
+// 参数;漏声明会让 codegen 的 getTrend 只有 member_id,App 无法类型安全调用。
+func TestOpenAPITrendNameParam(t *testing.T) {
+	doc := getOpenAPI(t)
+	paths := doc["paths"].(map[string]any)
+	trend := paths[trendPath].(map[string]any)
+	get := trend["get"].(map[string]any)
+	params, ok := get["parameters"].([]any)
+	if !ok {
+		t.Fatal("trend endpoint has no parameters")
+	}
+
+	var nameParam map[string]any
+	for _, raw := range params {
+		param, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		if ref, ok := param["$ref"].(string); ok && ref == indicatorNameParamRef {
+			nameParam = resolveRef(ref)
+			break
+		}
+	}
+	if nameParam == nil {
+		t.Fatalf("trend endpoint must $ref %s", indicatorNameParamRef)
+	}
+
+	if got := nameParam["name"]; got != "name" {
+		t.Errorf("IndicatorName.name = %v, want name", got)
+	}
+	if got := nameParam["in"]; got != "path" {
+		t.Errorf("IndicatorName.in = %v, want path", got)
+	}
+	if got := nameParam["required"]; got != true {
+		t.Errorf("IndicatorName.required = %v, want true", got)
+	}
+	desc, _ := nameParam["description"].(string)
+	for _, want := range []string{"指标项名称", "通常为词典规范名", "修正后以修正值为准", "URL 编码"} {
+		if !strings.Contains(desc, want) {
+			t.Errorf("IndicatorName.description = %q, missing %q", desc, want)
+		}
+	}
+	schema, ok := nameParam["schema"].(map[string]any)
+	if !ok {
+		t.Fatal("IndicatorName.schema is not an object")
+	}
+	if got := schema["type"]; got != "string" {
+		t.Errorf("IndicatorName.schema.type = %v, want string", got)
+	}
+	if got := jsonCompact(schema["minLength"]); got != "1" {
+		t.Errorf("IndicatorName.schema.minLength = %s, want 1", got)
+	}
+}
+
+// TestOpenAPINotFoundDescription 趋势端点不做词典成员检查,空结果返回 200;
+// NotFound 描述不能再声称「trend name 未收录」。
+func TestOpenAPINotFoundDescription(t *testing.T) {
+	doc := getOpenAPI(t)
+	responses := doc["components"].(map[string]any)["responses"].(map[string]any)
+	notFound := responses["NotFound"].(map[string]any)
+	desc, _ := notFound["description"].(string)
+	if strings.Contains(desc, "trend name 未收录") {
+		t.Errorf("NotFound description still claims trend name 404: %q", desc)
+	}
+	if !strings.Contains(desc, "unknown member") {
+		t.Errorf("NotFound description lost target list: %q", desc)
 	}
 }
 
