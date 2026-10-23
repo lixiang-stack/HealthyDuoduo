@@ -465,7 +465,7 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
-        /** @description 目标不存在(unknown member/report/item/image;或 trend name 未收录) */
+        /** @description 目标不存在(unknown member/report/item/image) */
         NotFound: {
             headers: {
                 [name: string]: unknown;
@@ -481,6 +481,8 @@ export interface components {
         ReportID: string;
         /** @description 指标项不透明句柄(BIGSERIAL;重跑识别后全换) */
         ItemID: number;
+        /** @description 指标项名称(通常为词典规范名;修正后以修正值为准),URL 编码 */
+        IndicatorName: string;
     };
     requestBodies: never;
     headers: never;
@@ -809,6 +811,8 @@ export interface operations {
             header?: never;
             path: {
                 member_id: components["parameters"]["MemberID"];
+                /** @description 指标项名称(通常为词典规范名;修正后以修正值为准),URL 编码 */
+                name: components["parameters"]["IndicatorName"];
             };
             cookie?: never;
         };
