@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # App E2E 本地回路:专用 compose 栈(项目 hdd-e2e)+ Expo Web + 确定性 UI 用例。
+# 叠加载 e2e/compose.yml:识别服务对固定样本回放 golden,其余样本仍走真实 OCR。
 # 每次先重建临时库/卷,不触碰共享 deploy 栈;失败证据在 apps/mobile/.e2e/。
 # 用法:cd apps/mobile && npm run e2e [-- <e2e run 参数>]
 # 环境变量:
@@ -10,6 +11,7 @@ set -euo pipefail
 APP_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 REPO_ROOT="$(cd "$APP_DIR/../.." && pwd)"
 COMPOSE_FILE="$REPO_ROOT/deploy/docker-compose.yml"
+E2E_COMPOSE_FILE="$APP_DIR/e2e/compose.yml"
 PROJECT=hdd-e2e
 
 # 专用端口:与共享 deploy 栈默认端口错开,可同时运行(见 docs/agents/app-e2e.md)。
@@ -25,13 +27,13 @@ export E2E_API_BASE_URL="${E2E_API_BASE_URL:-http://127.0.0.1:${HDD_SERVE_PORT}/
 export E2E_TELEMETRY_DISABLED=1
 
 compose() {
-  docker compose -p "$PROJECT" -f "$COMPOSE_FILE" "$@"
+  docker compose -p "$PROJECT" -f "$COMPOSE_FILE" -f "$E2E_COMPOSE_FILE" "$@"
 }
 
 cleanup() {
   if [ "${E2E_KEEP_STACK:-0}" = "1" ]; then
     echo "E2E stack kept: project=$PROJECT hdd=http://127.0.0.1:${HDD_SERVE_PORT}/api/v1"
-    echo "Stop with: docker compose -p $PROJECT -f $COMPOSE_FILE down -v"
+    echo "Stop with: docker compose -p $PROJECT -f $COMPOSE_FILE -f $E2E_COMPOSE_FILE down -v"
   else
     compose down -v --remove-orphans >/dev/null 2>&1 || true
   fi

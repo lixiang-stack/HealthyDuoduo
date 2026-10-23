@@ -120,7 +120,9 @@ export function ReviewItemCard({
       </View>
       {layout ? <MetricStrip layout={layout} color={flagColor} /> : null}
       {item.flag === 'unknown' && flagReasonText(item.flag_reason) ? (
-        <Text style={styles.itemReason}>{flagReasonText(item.flag_reason)}</Text>
+        <Text testID={`review-reason-${item.item_id}`} style={styles.itemReason}>
+          {flagReasonText(item.flag_reason)}
+        </Text>
       ) : null}
       {showZoom ? (
         <LineZoom

@@ -223,8 +223,10 @@ export default function UploadScreen() {
                     </Link>
                   ) : null}
                   <View style={sharedStyles.horizontal}>
-                    <Link href="/timeline" style={styles.link}>
-                      去档案查看
+                    <Link asChild href="/timeline">
+                      <Pressable testID="upload-open-timeline">
+                        <Text style={styles.link}>去档案查看</Text>
+                      </Pressable>
                     </Link>
                     <Pressable style={styles.buttonGhost} onPress={() => setUpload({ status: 'idle' })}>
                       <Text style={styles.link}>再传一张</Text>

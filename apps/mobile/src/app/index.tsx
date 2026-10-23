@@ -120,8 +120,10 @@ export default function HomeScreen() {
                       </Pressable>
                     </Link>
                   ))}
-                  <Link href="/timeline" style={styles.link}>
-                    全部档案（{reports.length} 份）
+                  <Link asChild href="/timeline">
+                    <Pressable testID="overview-all-reports">
+                      <Text style={styles.link}>全部档案（{reports.length} 份）</Text>
+                    </Pressable>
                   </Link>
                 </View>
               )}

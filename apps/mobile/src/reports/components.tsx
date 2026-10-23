@@ -40,11 +40,22 @@ export function ReportBadges({ report }: { report: ReportSummary }) {
   return (
     <View style={styles.badges}>
       {flags.map((badge) => (
-        <Text key={badge} style={styles.badge}>
-          {badge}
+        <Text
+          key={badge.kind}
+          testID={`report-badge-${report.report_id}-${badge.kind}`}
+          style={styles.badge}
+        >
+          {badge.label}
         </Text>
       ))}
-      {unreviewed ? <Text style={[styles.badge, styles.reviewBadge]}>{unreviewed}</Text> : null}
+      {unreviewed ? (
+        <Text
+          testID={`report-badge-${report.report_id}-unreviewed`}
+          style={[styles.badge, styles.reviewBadge]}
+        >
+          {unreviewed}
+        </Text>
+      ) : null}
     </View>
   );
 }

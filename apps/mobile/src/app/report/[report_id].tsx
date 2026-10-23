@@ -91,15 +91,19 @@ export default function ReportDetailScreen() {
 
           {pending.length > 0 ? (
             <Link
+              asChild
               href={{ pathname: '/review/[report_id]', params: { report_id: report.report_id } }}
-              style={styles.link}
             >
-              逐项核对 {pending.length} 项低置信
+              <Pressable testID="report-pending-entry">
+                <Text style={styles.link}>逐项核对 {pending.length} 项低置信</Text>
+              </Pressable>
             </Link>
           ) : null}
 
           {!imaging && report.items.length > 0 ? (
-            <Text style={styles.sectionTitle}>指标项({report.items.length})</Text>
+            <Text testID="report-items-title" style={styles.sectionTitle}>
+              指标项({report.items.length})
+            </Text>
           ) : null}
           {!imaging
             ? report.items.map((item) => (
