@@ -1,0 +1,633 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>异常指标趋势 · 展示方案对比（PROTOTYPE）</title>
+<style>
+  :root {
+    --text: #111827;
+    --muted: #6b7280;
+    --accent: #2563eb;
+    --ok: #15803d;
+    --fail: #b91c1c;
+    --low: #1d4ed8;
+    --border: #d1d5db;
+    --bg: #ffffff;
+    --soft: #f3f4f6;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #eef1f5;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+    color: var(--text);
+  }
+  .note {
+    max-width: 900px;
+    margin: 22px auto 6px;
+    padding: 0 20px;
+    font-size: 12px;
+    line-height: 1.6;
+    color: #4b5563;
+  }
+  .note b { color: #111827; }
+  .stage { display: flex; justify-content: center; padding: 10px 0 100px; }
+  .phone {
+    width: 390px;
+    height: 844px;
+    background: var(--bg);
+    border-radius: 32px;
+    box-shadow: 0 20px 60px rgba(17, 24, 39, 0.18);
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+  .statusbar {
+    height: 30px;
+    flex: 0 0 30px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 22px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+  }
+  .appbar {
+    height: 48px;
+    flex: 0 0 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--soft);
+    background: #fff;
+  }
+  .appbar .title { font-size: 17px; font-weight: 600; }
+  .appbar .back { font-size: 26px; line-height: 1; color: var(--accent); width: 30px; }
+  .appbar .right { width: 30px; }
+  .screen { flex: 1; overflow-y: auto; padding: 16px 20px 30px; }
+  .member-label { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+  .chips { display: flex; gap: 8px; margin-bottom: 8px; }
+  .chip {
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 14px;
+    color: var(--text);
+    background: #fff;
+  }
+  .chip.selected { border-color: var(--accent); color: var(--accent); background: #eff6ff; }
+  .category { display: flex; align-items: baseline; justify-content: space-between; margin: 18px 0 8px; }
+  .category .name { font-size: 16px; font-weight: 600; }
+  .category .count { font-size: 12px; color: var(--muted); }
+  .card {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 10px;
+    background: #fff;
+  }
+  .row-head { display: flex; align-items: center; gap: 8px; }
+  .name { flex: 1; font-size: 15px; color: var(--text); }
+  .tag {
+    font-size: 11px;
+    padding: 1px 6px;
+    border-radius: 8px;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    white-space: nowrap;
+  }
+  .flag { font-size: 13px; font-weight: 500; white-space: nowrap; }
+  .value-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 6px; }
+  .value { font-size: 22px; font-variant-numeric: tabular-nums; }
+  .unit { font-size: 13px; margin-left: 3px; }
+  .ref { font-size: 13px; color: var(--muted); }
+  .chart { display: block; margin-top: 8px; width: 100%; height: auto; }
+  .meta { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+  .link { font-size: 13px; color: var(--accent); }
+  .row-foot { display: flex; justify-content: flex-end; margin-top: 6px; }
+  .view-link {
+    border: 0;
+    background: transparent;
+    color: var(--accent);
+    font-size: 13px;
+    padding: 2px 0;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .sheet {
+    position: absolute;
+    inset: 0;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    z-index: 10;
+  }
+  .sheet .screen { padding: 16px 20px 32px; }
+  .point-card { border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-top: 12px; }
+  .point-card .date { font-size: 12px; color: var(--muted); }
+  .point-card .big { font-size: 24px; font-variant-numeric: tabular-nums; margin-top: 2px; }
+  .point-card .sub { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.6; }
+  .points { margin-top: 12px; border-top: 1px solid var(--soft); }
+  .point-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--soft);
+    cursor: pointer;
+  }
+  .point-row.selected { background: #f8fafc; }
+  .point-row .dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 9px; }
+  .point-row .date { width: 88px; font-size: 12px; color: var(--muted); flex: 0 0 88px; }
+  .point-row .val { flex: 1; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .point-row .flag { font-size: 12px; }
+  .legend { display: flex; gap: 16px; margin-top: 12px; font-size: 12px; color: var(--muted); align-items: center; flex-wrap: wrap; }
+  .legend .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 4px; vertical-align: middle; }
+  .sheet-note { margin-top: 18px; font-size: 12px; color: var(--muted); line-height: 1.6; }
+  .bar {
+    position: fixed;
+    left: 50%;
+    bottom: 20px;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 6px;
+    background: rgba(17, 24, 39, 0.92);
+    padding: 6px;
+    border-radius: 14px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+    z-index: 100;
+  }
+  .bar button {
+    border: 0;
+    background: transparent;
+    color: #e5e7eb;
+    font-size: 12px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    white-space: nowrap;
+    font-family: inherit;
+  }
+  .bar button.active { background: #fff; color: #111827; font-weight: 600; }
+  .caption {
+    max-width: 900px;
+    margin: 0 auto 18px;
+    padding: 0 20px;
+    font-size: 12px;
+    color: #6b7280;
+    line-height: 1.7;
+  }
+</style>
+</head>
+<body>
+  <div class="note">
+    <b>PROTOTYPE · 仅用于对比展示，不是生产代码。</b>
+    数据取自真实 golden：<code>lft_05 → lft_02</code>（生化）与 <code>cbc_05 → cbc_07</code>（临检）。
+    底部浮条切换 A / B / C；B 里点「查看趋势」打开详情页。
+  </div>
+  <div class="stage">
+    <div class="phone" id="phone">
+      <div class="statusbar"><span>9:41</span><span>▮▮▮</span></div>
+      <div class="appbar" id="appbar">
+        <span class="back">‹</span>
+        <span class="title" id="apptitle">异常指标趋势</span>
+        <span class="right"></span>
+      </div>
+      <div class="screen" id="screen"></div>
+    </div>
+  </div>
+  <div class="caption" id="caption"></div>
+  <div class="bar" id="bar">
+    <button data-view="a">A · 内联小图</button>
+    <button data-view="b">B · 小图 + 点按详情</button>
+    <button data-view="c">C · 每项完整图</button>
+  </div>
+
+<script>
+  const DATA = [
+    {
+      type: '生化',
+      items: [
+        {
+          name: '丙氨酸转氨酶',
+          unit: 'U/L',
+          ref: '7-40',
+          points: [
+            { date: '2017-11-18', value: '27.40', flag: 'normal', ref: '7-40', method: '丙氨酸底物法', low: false, reviewed: false },
+            { date: '2021-08-02', value: '835', flag: 'high', ref: '7-40', method: '丙氨酸底物法', low: false, reviewed: false },
+          ],
+        },
+        {
+          name: '前白蛋白',
+          unit: 'mg/L',
+          ref: '185-350',
+          points: [
+            { date: '2017-11-18', value: '219.24', flag: 'normal', ref: '185-350', method: null, low: false, reviewed: false },
+            { date: '2021-08-02', value: '82', flag: 'low', ref: '185--350', method: null, low: false, reviewed: false },
+          ],
+        },
+        {
+          name: '天冬氨酸转氨酶',
+          unit: 'U/L',
+          ref: '13-35',
+          points: [
+            { date: '2017-11-18', value: '20.00', flag: 'normal', ref: '13-35', method: '天门冬氨酸底物法', low: false, reviewed: false },
+            { date: '2021-08-02', value: '488', flag: 'high', ref: '13-35', method: '天门冬氨酸底物法', low: false, reviewed: false },
+          ],
+        },
+        {
+          name: '总胆汁酸',
+          unit: 'μmol/L',
+          ref: '≤10',
+          points: [
+            { date: '2017-11-18', value: '5.04', flag: 'normal', ref: '0-10', method: '循环酶法', low: false, reviewed: false },
+            { date: '2021-08-02', value: '47', flag: 'high', ref: '≤10', method: '循环酶法', low: false, reviewed: false },
+          ],
+        },
+      ],
+    },
+    {
+      type: '临检',
+      items: [
+        {
+          name: '白细胞计数',
+          unit: '10^9/L',
+          ref: '3.5-9.5',
+          points: [
+            { date: '2019-08-07', value: '18.40', flag: 'high', ref: '4.00-10.000', method: null, low: false, reviewed: false },
+            { date: '2020-01-01', value: '19.64', flag: 'high', ref: '3.5-9.5', method: null, low: false, reviewed: false },
+          ],
+        },
+        {
+          name: '中性细胞比率',
+          unit: '%',
+          ref: '40-75',
+          points: [
+            { date: '2019-08-07', value: '18.10', flag: 'low', ref: '50.00-70.00', method: null, low: false, reviewed: false },
+            { date: '2020-01-01', value: '85.40', flag: 'high', ref: '40-75', method: null, low: false, reviewed: false },
+          ],
+        },
+      ],
+    },
+  ];
+
+  const FLAG_LABEL = { normal: '正常', high: '偏高', low: '偏低', abnormal: '异常', unknown: '未知' };
+  const FLAG_COLOR = { normal: '#15803d', high: '#b91c1c', low: '#1d4ed8', abnormal: '#b91c1c', unknown: '#6b7280' };
+  const CARD_CHART_W = 324;
+  const MINI_H = 56;
+  const FULL_H = 178;
+  const PAD_X = 8;
+  const PAD_Y = 8;
+
+  let view = new URLSearchParams(location.search).get('view') || 'a';
+  let detail = null; // { g, i } when B detail is open
+  let selectedPoint = null;
+
+  const screen = document.getElementById('screen');
+  const appbar = document.getElementById('appbar');
+  const apptitle = document.getElementById('apptitle');
+  const caption = document.getElementById('caption');
+
+  function parseNumeric(raw) {
+    if (raw == null) return null;
+    const s = String(raw).trim().replace(/^[男女][:：]\s*/, '');
+    let m = s.match(/^(\d+(?:\.\d+)?)\s*[-–—~]{1,2}\s*(\d+(?:\.\d+)?)$/);
+    if (m) return { kind: 'interval', low: Math.min(+m[1], +m[2]), high: Math.max(+m[1], +m[2]) };
+    m = s.match(/^([<≤>≥])\s*(\d+(?:\.\d+)?)$/);
+    if (m) return { kind: 'bound', op: m[1], value: +m[2] };
+    m = s.match(/^(\d+(?:\.\d+)?)$/);
+    if (m) return { kind: 'scalar', value: +m[1] };
+    return null;
+  }
+
+  function refBounds(ref, domainMin, domainMax) {
+    const r = parseNumeric(ref);
+    if (!r) return null;
+    if (r.kind === 'interval') return { low: r.low, high: r.high };
+    if (r.kind === 'scalar') return { low: r.value, high: r.value };
+    if (r.op === '<' || r.op === '≤') return { low: domainMin, high: r.value };
+    return { low: r.value, high: domainMax };
+  }
+
+  function fmt(n) {
+    if (Math.abs(n) >= 100) return String(Math.round(n));
+    if (Math.abs(n) >= 10) return String(Math.round(n * 10) / 10);
+    return String(Math.round(n * 100) / 100);
+  }
+
+  function domainOf(points) {
+    const values = [];
+    for (const p of points) {
+      const v = parseNumeric(p.value);
+      if (v && v.kind === 'scalar') values.push(v.value);
+      const r = parseNumeric(p.ref);
+      if (r) {
+        if (r.kind === 'interval') values.push(r.low, r.high);
+        else if (r.kind === 'scalar') values.push(r.value);
+        else values.push(r.value);
+      }
+    }
+    if (!values.length) return null;
+    const hasNegative = values.some((v) => v < 0);
+    let lo = Math.min(...values);
+    let hi = Math.max(...values);
+    if (lo === hi) {
+      const pad = Math.max(Math.abs(lo), 1) * 0.1;
+      lo -= pad;
+      hi += pad;
+    }
+    const pad = (hi - lo) * 0.08;
+    lo -= pad;
+    hi += pad;
+    if (!hasNegative && lo < 0) lo = 0;
+    return { lo, hi };
+  }
+
+  function niceDomain(domain) {
+    const span = domain.hi - domain.lo;
+    if (!(span > 0)) return domain;
+    const step = Math.pow(10, Math.floor(Math.log10(span / 2)));
+    const lo = Math.max(0, Math.floor(domain.lo / step) * step);
+    const hi = Math.ceil(domain.hi / step) * step;
+    return { lo, hi };
+  }
+
+  function xAt(i, n, width) {
+    if (n <= 1) return width / 2;
+    return PAD_X + (i / (n - 1)) * (width - PAD_X * 2);
+  }
+
+  function yAt(v, domain, height) {
+    const frac = (v - domain.lo) / (domain.hi - domain.lo);
+    return height - PAD_Y - frac * (height - PAD_Y * 2);
+  }
+
+  function markerSvg(p, cx, cy, isLatest) {
+    const color = FLAG_COLOR[p.flag] || '#6b7280';
+    const r = isLatest ? 4 : 3;
+    const hollow = p.low && !p.reviewed;
+    const fill = hollow ? '#ffffff' : color;
+    const stroke = color;
+    return `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${hollow ? 2 : 1}" />`;
+  }
+
+  function bandRects(points, domain, width, height, xPositions) {
+    let out = '';
+    const n = points.length;
+    for (let i = 0; i < n; i++) {
+      const p = points[i];
+      const b = refBounds(p.ref, domain.lo, domain.hi);
+      if (!b) continue;
+      const x1 = xPositions[i];
+      const x2 = i < n - 1 ? xPositions[i + 1] : width - PAD_X;
+      const yTop = yAt(b.high, domain, height);
+      const yBottom = yAt(b.low, domain, height);
+      const top = Math.min(yTop, yBottom);
+      const h = Math.max(1, Math.abs(yBottom - yTop));
+      const w = Math.max(1, x2 - x1);
+      out += `<rect x="${x1.toFixed(1)}" y="${top.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" fill="#d1d5db" fill-opacity="0.3" />`;
+    }
+    return out;
+  }
+
+  function miniChart(item) {
+    const points = item.points;
+    const domain = domainOf(points);
+    if (!domain) return '';
+    const n = points.length;
+    const xs = points.map((_, i) => xAt(i, n, CARD_CHART_W));
+    const ys = points.map((p) => {
+      const v = parseNumeric(p.value);
+      return v && v.kind === 'scalar' ? yAt(v.value, domain, MINI_H) : null;
+    });
+    const bands = bandRects(points, domain, CARD_CHART_W, MINI_H, xs);
+    const linePoints = points
+      .map((p, i) => (ys[i] == null ? null : `${xs[i].toFixed(1)},${ys[i].toFixed(1)}`))
+      .filter(Boolean)
+      .join(' ');
+    const line = n > 1 ? `<polyline points="${linePoints}" fill="none" stroke="#9ca3af" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" />` : '';
+    const dots = points
+      .map((p, i) => (ys[i] == null ? '' : markerSvg(p, xs[i], ys[i], i === n - 1)))
+      .join('');
+    return `<svg class="chart" width="${CARD_CHART_W}" height="${MINI_H}" viewBox="0 0 ${CARD_CHART_W} ${MINI_H}" role="img" aria-label="${item.name}趋势">${bands}${line}${dots}</svg>`;
+  }
+
+  function fullChart(item, width = CARD_CHART_W, height = FULL_H) {
+    const points = item.points;
+    const rawDomain = domainOf(points);
+    if (!rawDomain) return '';
+    const domain = niceDomain(rawDomain);
+    const plotLeft = 38;
+    const plotRight = width - 10;
+    const plotTop = 10;
+    const plotBottom = height - 24;
+    const innerW = plotRight - plotLeft;
+    const n = points.length;
+    const xs = points.map((_, i) => (n <= 1 ? plotLeft + innerW / 2 : plotLeft + (i / (n - 1)) * innerW));
+    const yFor = (v) => plotBottom - ((v - domain.lo) / (domain.hi - domain.lo)) * (plotBottom - plotTop);
+    const ys = points.map((p) => {
+      const v = parseNumeric(p.value);
+      return v && v.kind === 'scalar' ? yFor(v.value) : null;
+    });
+
+    // reference bands (stepped per point)
+    let bands = '';
+    for (let i = 0; i < n; i++) {
+      const p = points[i];
+      const b = refBounds(p.ref, domain.lo, domain.hi);
+      if (!b) continue;
+      const x1 = xs[i];
+      const x2 = i < n - 1 ? xs[i + 1] : plotRight;
+      const yTop = yFor(b.high);
+      const yBottom = yFor(b.low);
+      bands += `<rect x="${x1.toFixed(1)}" y="${Math.min(yTop, yBottom).toFixed(1)}" width="${Math.max(1, x2 - x1).toFixed(1)}" height="${Math.max(1, Math.abs(yBottom - yTop)).toFixed(1)}" fill="#d1d5db" fill-opacity="0.45" />`;
+    }
+
+    // grid + y labels
+    let grid = '';
+    const ticks = [domain.hi, (domain.hi + domain.lo) / 2, domain.lo];
+    for (const t of ticks) {
+      const y = yFor(t);
+      grid += `<line x1="${plotLeft}" y1="${y.toFixed(1)}" x2="${plotRight}" y2="${y.toFixed(1)}" stroke="#e5e7eb" stroke-width="1" />`;
+      grid += `<text x="${plotLeft - 6}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-size="10" fill="#6b7280">${fmt(t)}</text>`;
+    }
+
+    // x labels
+    let xlabels = '';
+    const labelIdx = n <= 3 ? points.map((_, i) => i) : [0, n - 1];
+    for (const i of labelIdx) {
+      const x = xs[i];
+      const anchor = i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle';
+      xlabels += `<text x="${x.toFixed(1)}" y="${height - 6}" text-anchor="${anchor}" font-size="10" fill="#6b7280">${points[i].date}</text>`;
+    }
+
+    const linePoints = points
+      .map((p, i) => (ys[i] == null ? null : `${xs[i].toFixed(1)},${ys[i].toFixed(1)}`))
+      .filter(Boolean)
+      .join(' ');
+    const line = n > 1 ? `<polyline points="${linePoints}" fill="none" stroke="#9ca3af" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" />` : '';
+    const dots = points
+      .map((p, i) => (ys[i] == null ? '' : markerSvg(p, xs[i], ys[i], i === n - 1)))
+      .join('');
+
+    return `<svg class="chart" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${item.name}完整趋势">${grid}${bands}${line}${dots}${xlabels}</svg>`;
+  }
+
+  function latestPoint(item) { return item.points[item.points.length - 1]; }
+
+  function rowMeta(item) {
+    const points = item.points;
+    const first = points[0];
+    const last = latestPoint(item);
+    if (points.length === 1) return `${last.date} · 仅 1 次记录`;
+    return `${first.date} – ${last.date} · ${points.length} 次记录`;
+  }
+
+  function rowHtml(item, g, i, mode) {
+    const latest = latestPoint(item);
+    const lowTag = latest.low && !latest.reviewed ? '<span class="tag">低置信</span>' : '';
+    const chart = mode === 'c' ? fullChart(item) : miniChart(item);
+    const link = mode === 'b'
+      ? `<div class="row-foot"><button class="view-link" data-g="${g}" data-i="${i}">查看趋势 ›</button></div>`
+      : '';
+    const extra = mode === 'c'
+      ? `<div class="meta">${rowMeta(item)} · 点按图表上的点查看数值（原型未实现 hover，生产版按此布局）</div>`
+      : `<div class="meta">${rowMeta(item)}</div>`;
+    return `
+      <div class="card">
+        <div class="row-head">
+          <span class="name">${item.name}</span>
+          ${lowTag}
+          <span class="flag" style="color:${FLAG_COLOR[latest.flag]}">${FLAG_LABEL[latest.flag]}</span>
+        </div>
+        <div class="value-row">
+          <span><span class="value" style="color:${FLAG_COLOR[latest.flag]}">${latest.value}</span><span class="unit">${item.unit}</span></span>
+          <span class="ref">参考 ${latest.ref}</span>
+        </div>
+        ${chart}
+        ${extra}
+        ${link}
+      </div>`;
+  }
+
+  function listHtml(mode) {
+    const intro = mode === 'a'
+      ? '一屏看完当前异常项的走势；没有点按，最小实现。'
+      : mode === 'b'
+        ? '列表保持轻盈；需要看日期、参考范围、方法或逐点数值时点进详情。'
+        : '每项直接铺完整趋势图；信息最全，但页面会很长。';
+    let out = `<div class="member-label">查看谁的档案</div><div class="chips"><span class="chip selected">小明</span><span class="chip">妈妈</span></div>`;
+    out += `<div class="meta" style="margin-top:2px;margin-bottom:4px">${intro}</div>`;
+    for (let g = 0; g < DATA.length; g++) {
+      const group = DATA[g];
+      out += `<div class="category"><span class="name">${group.type}</span><span class="count">${group.items.length} 项异常</span></div>`;
+      for (let i = 0; i < group.items.length; i++) out += rowHtml(group.items[i], g, i, mode);
+    }
+    return out;
+  }
+
+  function detailHtml(g, i) {
+    const item = DATA[g].items[i];
+    const latest = latestPoint(item);
+    if (selectedPoint == null || selectedPoint >= item.points.length) selectedPoint = item.points.length - 1;
+    const p = item.points[selectedPoint];
+    const trust = p.low && !p.reviewed ? '未核对低置信（空心）' : p.reviewed ? '已核对（实心）' : '高置信（实心）';
+    const rows = item.points
+      .map((pt, idx) => {
+        const hollow = pt.low && !pt.reviewed;
+        const color = FLAG_COLOR[pt.flag];
+        return `<div class="point-row ${idx === selectedPoint ? 'selected' : ''}" data-p="${idx}">
+          <span class="dot" style="${hollow ? `border:2px solid ${color};background:#fff` : `background:${color}`}"></span>
+          <span class="date">${pt.date}</span>
+          <span class="val">${pt.value} ${item.unit}</span>
+          <span class="flag" style="color:${color}">${FLAG_LABEL[pt.flag]}</span>
+        </div>`;
+      })
+      .join('');
+    return `
+      <div class="appbar" style="flex:0 0 48px">
+        <button class="view-link sheet-back" style="font-size:26px;width:30px;padding:0">‹</button>
+        <span class="title">${item.name}</span>
+        <span style="width:30px"></span>
+      </div>
+      <div class="screen">
+        <div class="meta">${DATA[g].type} · ${item.unit}</div>
+        ${fullChart(item)}
+        <div class="point-card">
+          <div class="date">${p.date}</div>
+          <div class="big" style="color:${FLAG_COLOR[p.flag]}">${p.value} <span style="font-size:13px">${item.unit}</span></div>
+          <div class="sub">参考 ${p.ref} · <span style="color:${FLAG_COLOR[p.flag]}">${FLAG_LABEL[p.flag]}</span></div>
+          <div class="sub">方法：${p.method || '—'} · ${trust}</div>
+        </div>
+        <div class="points">${rows}</div>
+        <div class="legend">
+          <span><span class="dot" style="background:#15803d"></span>实心 = 高置信 / 已核对</span>
+          <span><span class="dot" style="border:2px solid #b91c1c;background:#fff"></span>空心 = 未核对低置信</span>
+        </div>
+        <div class="sheet-note">点按上方任一行，切换下方明细。参考范围随报告变化时分段铺底；跨单位族不连线、不提示。</div>
+      </div>`;
+  }
+
+  function render() {
+    if (view === 'b' && detail) {
+      screen.innerHTML = detailHtml(detail.g, detail.i);
+    } else if (view === 'b') {
+      screen.innerHTML = listHtml('b');
+    } else if (view === 'c') {
+      screen.innerHTML = listHtml('c');
+    } else {
+      screen.innerHTML = listHtml('a');
+    }
+
+    document.querySelectorAll('#bar button').forEach((b) => {
+      b.classList.toggle('active', b.dataset.view === view);
+    });
+
+    const titles = { a: '异常指标趋势', b: detail ? DATA[detail.g].items[detail.i].name : '异常指标趋势', c: '异常指标趋势' };
+    apptitle.textContent = titles[view] || '异常指标趋势';
+    // B 的详情页自带 appbar：隐藏外层 appbar，避免双层标题（真实 App 是独立路由）。
+    appbar.style.display = view === 'b' && detail ? 'none' : 'flex';
+    caption.textContent = view === 'a'
+      ? 'A：列表 + 内联小图。适合第一版：一屏回答「现在哪些指标异常、大致往哪走」。'
+      : view === 'b'
+        ? 'B：列表 + 点按详情。列表仍是小图；点「查看趋势」进入完整图与逐点明细。'
+        : 'C：每项直接完整图。信息最全，但 8–10 项异常时页面会明显变长。';
+
+    if (view === 'b' && detail) {
+      const back = document.querySelector('.sheet-back');
+      if (back) back.addEventListener('click', () => { detail = null; selectedPoint = null; render(); });
+      document.querySelectorAll('.point-row').forEach((row) => {
+        row.addEventListener('click', () => { selectedPoint = Number(row.dataset.p); render(); });
+      });
+    } else {
+      document.querySelectorAll('.view-link').forEach((el) => {
+        el.addEventListener('click', (e) => {
+          if (e.currentTarget.classList.contains('sheet-back')) return;
+          detail = { g: Number(el.dataset.g), i: Number(el.dataset.i) };
+          selectedPoint = null;
+          render();
+        });
+      });
+    }
+  }
+
+  document.querySelectorAll('#bar button').forEach((b) => {
+    b.addEventListener('click', () => {
+      view = b.dataset.view;
+      detail = null;
+      selectedPoint = null;
+      const url = new URL(location.href);
+      url.searchParams.set('view', view);
+      history.replaceState(null, '', url);
+      render();
+    });
+  });
+
+  render();
+</script>
+</body>
+</html>
