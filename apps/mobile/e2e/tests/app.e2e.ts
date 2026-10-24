@@ -12,12 +12,12 @@ import { reportDateLabel, uploadResultText } from '../../src/reports/status';
 import { flagReasonText, isBackfillItem, reviewStatusLabel } from '../../src/review/rules';
 import {
   API_BASE_URL,
-  listMembers,
   openConfigured,
   samplePath,
   seedData,
   stubFileChooser,
   testID,
+  type Member,
   type Seed,
   type UploadResult,
 } from '../support';
@@ -55,13 +55,16 @@ describe('App E2E', { serial: true, timeout: 300_000 }, () => {
   test('创建并切换家庭成员', async ({ app, browser, screen }) => {
     await openConfigured(app, browser, '/members');
     await screen.getByTestId('members-name-input').fill('E2E 宝宝');
+    const responsePromise = browser.waitForResponse(/\/api\/v1\/members$/);
     await screen.getByTestId('members-create').tap();
+    const response = await responsePromise;
+    expect(response.status).toBe(201);
+    const baby = await response.json<Member>();
+    expect(baby.name).toBe('E2E 宝宝');
 
-    const baby = (await listMembers()).find((member) => member.name === 'E2E 宝宝');
-    expect(baby).toBeDefined();
-    await expect(screen.getByTestId(testID.memberSelect(baby!.member_id))).toBeVisible();
-    await screen.getByTestId(testID.memberSelect(baby!.member_id)).tap();
-    await expect(screen.getByTestId(testID.memberRow(baby!.member_id))).toContainText('当前成员');
+    await expect(screen.getByTestId(testID.memberSelect(baby.member_id))).toBeVisible();
+    await screen.getByTestId(testID.memberSelect(baby.member_id)).tap();
+    await expect(screen.getByTestId(testID.memberRow(baby.member_id))).toContainText('当前成员');
   });
 
   test('档案按成员过滤报告', async ({ app, browser, screen }) => {

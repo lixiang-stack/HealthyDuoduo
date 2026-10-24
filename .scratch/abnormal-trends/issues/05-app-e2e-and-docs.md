@@ -4,7 +4,7 @@
 
 **Blocked by:** 03、04。
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 ## 验收清单
 
@@ -65,4 +65,10 @@
 
 ## Comments
 
-（待实现）
+**实现（2026-10-24，分支 `abnormal-trends-page`，基于票 03/04）**
+
+- `seedTrendData()`：四个独立成员（多点 / 单点 / 无异常 / 无报告）+ `lft_05` / `lft_02` / `lft_04` / `lft_03`；`beforeAll` 显式断言 `report_type` / 日期 / 异常数、丙氨酸转氨酶与总胆红素的 value/unit/flag，以及 `method` 为空，golden 漂移时点名样本与缺口。
+- `e2e/compose.yml` 回放追加 `lft_02,lft_03,lft_04,lft_05`。
+- `trends.e2e.ts`：一条串行用例、8 步 / 5 组断言，覆盖首页入口、分组与行/迷你图、正常项不出现、详情图与点卡、选点切换、关闭返回列表、单点、无异常、无报告；成员 chip 用 visible 过滤避免 Expo Router 保留的隐藏页重复 locator。
+- `docs/agents/app-e2e.md`：15/15、用例清单与回放列表在基线已就绪；本次补充 `seedTrendData` 的失败诊断说明。
+- 验证：`npm run typecheck`（含 e2e tsconfig）、`npx expo lint`、`npm test`（146 通过）、`npm run e2e` **15/15 全绿**。未改生产逻辑、依赖或 CI。

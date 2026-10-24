@@ -64,7 +64,8 @@ seed 仍经真实上传端点入档；`duplicate:true` 即视为栈未重置并�
 
 - 只测 Web：相机、权限、原生文件/键盘/网络是盲区；原生目标后续用同一框架的 mobile 引擎接入。
 - golden 回放只固定识别产物；上传/存储/API/DB/UI 仍走真实链路。`samples/expected` 重生成后若
-  用例前提变化，`seedData` 的显式断言会在 `beforeAll` 点名 fixture 与缺口。
+  用例前提变化，`seedData` / `seedTrendData` / `seedLifecycleData` 的显式断言会在 `beforeAll`
+  点名 fixture 与缺口。
 - 已接入路径过滤的 PR 必过 job（`.github/workflows/app-e2e.yml`，覆盖 `apps/mobile/**`、
   `cmd/hdd/**`、`internal/**`、`schemas/**`、`recognizer/**`、`deploy/**`、`samples/**`）。
 - 框架 pre-1.0：升级 `e2e`/`@e2e-dev/web` 作为独立改动，跑一条回路验证后再提交。

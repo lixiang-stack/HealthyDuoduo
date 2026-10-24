@@ -311,6 +311,104 @@ export async function seedData(): Promise<Seed> {
   return { xiaoming, mama, uploadMember, reviewReport, healReport, imaging01, imaging03 };
 }
 
+export type TrendSeed = {
+  multiPoint: Member;
+  singlePoint: Member;
+  noAbnormal: Member;
+  noReports: Member;
+};
+
+// 趋势列表按 summary.flag_counts 决定是否取详情;fixture 直接断言该契约字段。
+function assertTrendFixture(
+  sample: string,
+  report: ReportDetail,
+  expected: { date: string; abnormal: number },
+): void {
+  if (report.report_type !== '生化') {
+    fixtureError(sample, `expected report_type 生化, got ${report.report_type}`);
+  }
+  if (report.report_date !== expected.date) {
+    fixtureError(sample, `expected report_date ${expected.date}, got ${report.report_date}`);
+  }
+  const count =
+    report.flag_counts.high + report.flag_counts.low + report.flag_counts.abnormal;
+  if (count !== expected.abnormal) {
+    fixtureError(sample, `expected ${expected.abnormal} abnormal items, got ${count}`);
+  }
+}
+
+function assertTrendItem(
+  sample: string,
+  report: ReportDetail,
+  expected: {
+    name: string;
+    value: string | null;
+    unit: string | null;
+    flag: ReportDetail['items'][number]['flag'];
+    method: string | null;
+  },
+): void {
+  const item = report.items.find((candidate) => candidate.name === expected.name);
+  if (!item) {
+    fixtureError(sample, `missing item ${expected.name}`);
+  }
+  if (
+    item.value !== expected.value ||
+    item.unit !== expected.unit ||
+    item.flag !== expected.flag ||
+    item.method !== expected.method
+  ) {
+    fixtureError(
+      sample,
+      `unexpected ${expected.name}: ${item.value} ${item.unit} ${item.flag} method=${item.method}`,
+    );
+  }
+}
+
+/** 趋势用例的独立 seed:四个成员覆盖多点 / 单点 / 无异常 / 无报告。
+ *  与主链路不共享图片(样张按 sha256 全局去重)。 */
+export async function seedTrendData(): Promise<TrendSeed> {
+  const multiPoint = await createMember('E2E 趋势', false);
+  const lft05 = await uploadSample('lft_05.jpeg', multiPoint.member_id);
+  assertTrendFixture('lft_05', lft05, { date: '2017-11-18', abnormal: 0 });
+  assertTrendItem('lft_05', lft05, {
+    name: '丙氨酸转氨酶',
+    value: '27.40',
+    unit: 'U/L',
+    flag: 'normal',
+    method: null,
+  });
+
+  const lft02 = await uploadSample('lft_02.jpg', multiPoint.member_id);
+  assertTrendFixture('lft_02', lft02, { date: '2021-08-02', abnormal: 6 });
+  assertTrendItem('lft_02', lft02, {
+    name: '丙氨酸转氨酶',
+    value: '835',
+    unit: 'U/L',
+    flag: 'high',
+    method: null,
+  });
+
+  const singlePoint = await createMember('E2E 趋势单点', false);
+  const lft04 = await uploadSample('lft_04.jpeg', singlePoint.member_id);
+  assertTrendFixture('lft_04', lft04, { date: '2011-07-02', abnormal: 3 });
+  assertTrendItem('lft_04', lft04, {
+    name: '总胆红素',
+    value: '41.00',
+    unit: 'μmol/L',
+    flag: 'high',
+    method: null,
+  });
+
+  const noAbnormal = await createMember('E2E 趋势无异常', false);
+  const lft03 = await uploadSample('lft_03.png', noAbnormal.member_id);
+  assertTrendFixture('lft_03', lft03, { date: '2026-06-16', abnormal: 0 });
+
+  const noReports = await createMember('E2E 趋势空', false);
+
+  return { multiPoint, singlePoint, noAbnormal, noReports };
+}
+
 export type LifecycleSeed = {
   member: Member;
   target: Member;
