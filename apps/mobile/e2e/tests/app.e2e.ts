@@ -14,6 +14,7 @@ import {
   API_BASE_URL,
   openConfigured,
   samplePath,
+  sampleReportId,
   seedData,
   stubFileChooser,
   testID,
@@ -205,6 +206,37 @@ describe('App E2E', { serial: true, timeout: 300_000 }, () => {
 
     await screen.getByTestId(testID.uploadOpenTimeline).tap();
     await expect(screen.getByTestId(testID.reportCard(payload.report.report_id))).toBeVisible();
+  });
+
+  test('一次选择多张图:逐张识别并按行给出核对入口', async ({ app, browser, screen }) => {
+    const successReportId = await sampleReportId('glu_03.jpeg');
+    const reviewReportId = await sampleReportId('glu_01.png');
+    await stubFileChooser(browser);
+    await openConfigured(app, browser, '/upload', { memberId: seed.uploadMember.member_id });
+    await screen.getByTestId('upload-pick-library').tap();
+    await browser
+      .locator('[data-testid="file-input"]')
+      .setInputFiles([samplePath('glu_03.jpeg'), samplePath('glu_01.png')]);
+
+    await expect(screen.getByTestId(testID.uploadSelectedCount)).toContainText('2/9');
+    await expect(screen.getByText('glu_03.jpeg')).toBeVisible();
+    await expect(screen.getByText('glu_01.png')).toBeVisible();
+    await expect(screen.getByTestId(testID.uploadRowRemove(0))).toBeVisible();
+
+    await screen.getByTestId('upload-submit').tap();
+    await expect(screen.getByTestId('upload-result')).toContainText(
+      '共 2 张:1 张已归档,1 张待核对',
+    );
+    await expect(screen.getByTestId(testID.uploadRowStatus(0))).toContainText('已归档');
+    await expect(screen.getByTestId(testID.uploadRowStatus(1))).toContainText('待核对');
+    await expect(screen.getByTestId(testID.uploadRowReview(1))).toBeVisible();
+    await expect(screen.getByTestId(testID.uploadRowOpen(0))).toBeVisible();
+    await expect(screen.getByTestId(testID.uploadRetry)).toHaveCount(0);
+    await expect(screen.getByTestId(testID.uploadContinue)).toBeVisible();
+
+    await screen.getByTestId(testID.uploadOpenTimeline).tap();
+    await expect(screen.getByTestId(testID.reportCard(successReportId))).toBeVisible();
+    await expect(screen.getByTestId(testID.reportCard(reviewReportId))).toBeVisible();
   });
 
   test('影像单 us_03:检查项目 / 超声提示 / 日期 / 原图,不呈现指标项与未知', async ({
