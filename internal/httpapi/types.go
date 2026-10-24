@@ -34,7 +34,7 @@ type ReportsList struct {
 }
 
 // FlagCounts components/FlagCounts:「异常」计数徽标口径 = 偏高 / 偏低 / 异常 / 可操作未知四档
-// 非负整数;normal 不计(详情页逐项染色)。
+// 非负整数;normal 不计(详情页逐项染色);未检测单列 NotTestedCount,不混入本结构。
 type FlagCounts struct {
 	High     int `json:"high"`
 	Low      int `json:"low"`
@@ -52,8 +52,10 @@ type ReportHeader struct {
 	Status     string     `json:"status"`
 	FailReason *string    `json:"fail_reason"`
 	FlagCounts FlagCounts `json:"flag_counts"`
+	// NotTestedCount 本次未检测项数(flag=not_tested;信息徽标,不进入待处理/异常计数)。
+	NotTestedCount int `json:"not_tested_count"`
 	// UnreviewedLowConfidenceCount 响应派生值(不落列,ADR-0005):只统计 partial 报告中
-	// review_status=unreviewed 且 low_confidence 的指标项;failed 不计入。
+	// review_status=unreviewed 且 low_confidence 的指标项;failed 不计入;not_tested 不计入。
 	UnreviewedLowConfidenceCount int `json:"unreviewed_low_confidence_count"`
 }
 

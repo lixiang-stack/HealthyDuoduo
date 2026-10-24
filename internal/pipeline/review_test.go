@@ -173,8 +173,8 @@ func TestApplyReviewActionWithPolicyQualitative(t *testing.T) {
 		},
 	}
 	next, _ := ApplyReviewActionWithPolicy(row, ReviewAction{Value: str("-")}, policy)
-	if next.Flag != FlagNormal || next.FlagReason != nil {
-		t.Fatalf("qualitative -/- = %q/%v, want normal/nil", next.Flag, next.FlagReason)
+	if next.Flag != FlagNotTested || next.FlagReason != nil {
+		t.Fatalf("qualitative -/- = %q/%v, want not_tested/nil", next.Flag, next.FlagReason)
 	}
 
 	noRef := ReportItemRow{

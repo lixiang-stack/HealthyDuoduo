@@ -51,6 +51,7 @@ from .contract import (
     ReportSection,
     Status,
 )
+from .dash_recovery import recover_dash_fields
 
 # 词典注册表:每个报告类别一个数据文件(决策 #8:只有规范名/别名/已知单位集,
 # 不内置参考值;参考范围一律从检查单抽取),按文件名序注册。
@@ -588,9 +589,12 @@ def _compare_qualitative(
 ) -> tuple[Flag, FlagReason | None]:
     nv = _policy_text(value)
     nr = _policy_text(ref) if ref else None
+    # 结果、参考都是裸短横 → 本次未检测(不是正常);已做项目的阴性参考仍走下方正常规则。
+    if nv == "-" and nr == "-":
+        return Flag.NOT_TESTED, None
     vcat = policy.categories.get(nv)
     rcat = policy.categories.get(nr) if nr else None
-    # 用户明确要求:值、参考都是阴性/短横 → 正常。
+    # 值、参考都是阴性文本(含「阴性(-)」等,但不是裸短横)→ 正常。
     if vcat == "negative" and rcat == "negative":
         return Flag.NORMAL, None
     profile = policy.profiles.get(policy.items.get(name or "", ""))
@@ -1250,8 +1254,14 @@ def _extract_sections(
     return sections
 
 
-def run_postprocess(ocr: OCRResult, date_hint: str | None = None) -> Report:
-    """OCR 结果 → 报告。date_hint:ingest --date 兜底;检查单已解析出日期时兜底不生效。"""
+def run_postprocess(
+    ocr: OCRResult, date_hint: str | None = None, image: bytes | None = None
+) -> Report:
+    """OCR 结果 → 报告。date_hint:ingest --date 兜底;检查单已解析出日期时兜底不生效。
+
+    image 为同一次识别的原图字节(可选):RapidOCR 漏掉孤立 '-' 时,用像素确认
+    结果/参考两格确实是短横线后补回 "-";/reparse 只有存库 OCR,无法恢复。
+    """
     cells = _cells(ocr)
     date = _find_date(cells, date_hint)
 
@@ -1264,7 +1274,6 @@ def run_postprocess(ocr: OCRResult, date_hint: str | None = None) -> Report:
     sections = _extract_sections(ocr.txts, d.section_anchors)
 
     items: list[ReportItem] = []
-    partial = False
     for it, piece in pairs:
         raw_cells = sorted(piece.raw_cells, key=lambda c: c.cx)
         raw_text = "  ".join(c.text.strip() for c in raw_cells) or (piece.ref or "")
@@ -1288,8 +1297,20 @@ def run_postprocess(ocr: OCRResult, date_hint: str | None = None) -> Report:
                 ocr_line_numbers=[c.line for c in raw_cells],
             )
         )
-        if piece.value is None:
-            partial = True
+
+    if image is not None and items:
+        for index, (value, ref_range) in recover_dash_fields(image, ocr, items).items():
+            item = items[index]
+            flag, reason = _compare(item.name, value, ref_range)
+            items[index] = item.model_copy(
+                update={
+                    "value": value,
+                    "ref_range": ref_range,
+                    "flag": flag,
+                    "flag_reason": reason if flag is Flag.UNKNOWN else None,
+                }
+            )
+    partial = any(item.value is None for item in items)
 
     if d.min_section_hits > 0:
         # 按正文段落分类的报告(影像)只反映叙述正文:至少一段 findings/impression →
@@ -1299,8 +1320,9 @@ def run_postprocess(ocr: OCRResult, date_hint: str | None = None) -> Report:
     elif not items:
         status = Status.FAILED
     else:
-        low_conf_majority = (
-            sum(1 for it in items if it.low_confidence) / len(items) >= LOW_CONF_PARTIAL_RATIO
+        performed = [it for it in items if it.flag is not Flag.NOT_TESTED]
+        low_conf_majority = bool(performed) and (
+            sum(1 for it in performed if it.low_confidence) / len(performed) >= LOW_CONF_PARTIAL_RATIO
         )
         if partial or date is None or low_conf_majority:
             status = Status.PARTIAL

@@ -7,6 +7,8 @@ version: 1
 #
 # 医学口径说明（需临床复核）：
 # - negative = 阴性/正常/未见/未检出，是多数尿试纸与感染标志物的正常值；
+# - 结果与参考区间都是裸短横 "-" → not_tested（本次未检测），不是 normal；
+#   单侧短横 + 另一侧阴性/阳性文本仍按下面规则比较。
 # - weak_positive / positive = 弱阳性/阳性/+-/+/++，判 abnormal；
 # - 血型、RhD、ANA 核型、HBeAb/HBcAb 是信息项，不做 normal/abnormal；
 # - HBsAb 阳性表示有抗体，阴性不是疾病异常，归 informational；

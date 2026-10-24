@@ -52,6 +52,7 @@ const FLAG_LABELS: Record<Flag, string> = {
   low: '偏低',
   abnormal: '异常',
   unknown: '未知',
+  not_tested: '未检测',
 };
 
 /** 指标项 flag 文案(颜色之外的第二通道:只陈述与参考范围的比较结果)。 */
@@ -82,14 +83,14 @@ export function itemFlagLabel(item: Pick<ReportItem, 'flag' | 'flag_reason'>): s
   }
 }
 
-/** 异常徽标档位(normal 不计);kind 供 UI 生成稳定 testID,label 为展示文案。 */
-export type FlagBadgeKind = Exclude<Flag, 'normal'>;
+/** 异常/信息徽标档位(normal 不计);kind 供 UI 生成稳定 testID,label 为展示文案。 */
+export type FlagBadgeKind = Exclude<Flag, 'normal'> | 'not_tested';
 export type FlagBadge = { kind: FlagBadgeKind; label: string };
 
-/** 异常徽标(偏高/偏低/异常/可操作未知;normal 不计,为 0 的档不出现)。
- * 影像单不呈现指标项,未知档按报告类别关闭。 */
+/** 异常徽标(偏高/偏低/异常/可操作未知;normal 不计,为 0 的档不出现)
+ *  + 未检测信息徽标。影像单不呈现指标项,未知档按报告类别关闭。 */
 export function flagBadges(
-  report: Pick<ReportSummary, 'report_type' | 'flag_counts'>,
+  report: Pick<ReportSummary, 'report_type' | 'flag_counts' | 'not_tested_count'>,
 ): FlagBadge[] {
   const { high, low, abnormal, unknown } = report.flag_counts;
   const badges: FlagBadge[] = [];
@@ -104,6 +105,9 @@ export function flagBadges(
   }
   if (!isImagingReport(report) && unknown > 0) {
     badges.push({ kind: 'unknown', label: `未知 ${unknown}` });
+  }
+  if (report.not_tested_count > 0) {
+    badges.push({ kind: 'not_tested', label: `未检测 ${report.not_tested_count}` });
   }
   return badges;
 }
@@ -120,7 +124,7 @@ export type ReportBadgeLabels = { flags: FlagBadge[]; unreviewed?: string };
 export function reportBadgeLabels(
   report: Pick<
     ReportSummary,
-    'report_type' | 'flag_counts' | 'unreviewed_low_confidence_count'
+    'report_type' | 'flag_counts' | 'not_tested_count' | 'unreviewed_low_confidence_count'
   >,
 ): ReportBadgeLabels {
   return {

@@ -86,7 +86,7 @@ def freeze() -> int:
         sid = _sid(image)
         ocr = run_ocr(image)
         _dump(paths.LOCAL_EXPECTED_OCR / f"{sid}.json", json.loads(ocr.model_dump_json()))
-        report = run_postprocess(ocr)
+        report = run_postprocess(ocr, image=image.read_bytes())
         _dump(paths.LOCAL_EXPECTED_REPORT / f"{sid}.json", json.loads(report.model_dump_json()))
         print(f"{sid:28} {report.report_type:8} {report.status.value:7} items={len(report.items):2}")
     return 0
@@ -102,15 +102,17 @@ def check(check_ocr: bool) -> int:
     changed = 0
     for ocr_path in sorted(paths.LOCAL_EXPECTED_OCR.glob("*.json")):
         sid = ocr_path.stem
-        if check_ocr:
-            image = next((p for p in _images() if _sid(p) == sid), None)
-            if image is not None:
-                want = _ocr_comparable(json.loads(ocr_path.read_text(encoding="utf-8")))
-                got = _ocr_comparable(json.loads(run_ocr(image).model_dump_json()))
-                if got != want:
-                    changed += 1
-                    _diff("OCR", want, got)
-        report = run_postprocess(OCRResult.model_validate(json.loads(ocr_path.read_text(encoding="utf-8"))))
+        image = next((p for p in _images() if _sid(p) == sid), None)
+        if check_ocr and image is not None:
+            want = _ocr_comparable(json.loads(ocr_path.read_text(encoding="utf-8")))
+            got = _ocr_comparable(json.loads(run_ocr(image).model_dump_json()))
+            if got != want:
+                changed += 1
+                _diff("OCR", want, got)
+        report = run_postprocess(
+            OCRResult.model_validate(json.loads(ocr_path.read_text(encoding="utf-8"))),
+            image=image.read_bytes() if image is not None else None,
+        )
         report_path = paths.LOCAL_EXPECTED_REPORT / f"{sid}.json"
         if not report_path.exists():
             print(f"[report] {sid} missing golden {report_path}")
@@ -204,7 +206,11 @@ def score() -> int:
             print(f"{sid:28} (no frozen OCR)")
             continue
         gt = json.loads(vl_path.read_text(encoding="utf-8"))
-        report = run_postprocess(OCRResult.model_validate(json.loads(ocr_path.read_text(encoding="utf-8"))))
+        image = next((p for p in _images() if _sid(p) == sid), None)
+        report = run_postprocess(
+            OCRResult.model_validate(json.loads(ocr_path.read_text(encoding="utf-8"))),
+            image=image.read_bytes() if image is not None else None,
+        )
         preds = [
             {"name": it.name, "value": it.value, "unit": it.unit, "ref": it.ref_range, "raw": it.raw_text}
             for it in report.items

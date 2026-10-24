@@ -17,13 +17,22 @@ export { flagReasonText, isBackfillItem, reviewStatusLabel };
 export function needsReview(report: Pick<ReportDetail, 'status' | 'items'>): boolean {
   return (
     report.status === 'partial' ||
-    report.items.some((item) => item.low_confidence && item.review_status === 'unreviewed')
+    report.items.some(
+      (item) =>
+        item.low_confidence && item.review_status === 'unreviewed' && item.flag !== 'not_tested',
+    )
   );
 }
 
-/** 待核对项 = 未核对的低置信项(「剩余 N 项」的同一口径;行序保持报告原序)。 */
+/** 待核对项 = 未核对的低置信项(「剩余 N 项」的同一口径;行序保持报告原序)。
+ *  未检测项是已知的“本次未做”,不是核对任务。 */
 export function pendingItems(items: ReportItem[]): ReportItem[] {
-  return items.filter((item) => item.review_status === 'unreviewed' && item.low_confidence);
+  return items.filter(
+    (item) =>
+      item.review_status === 'unreviewed' &&
+      item.low_confidence &&
+      item.flag !== 'not_tested',
+  );
 }
 
 /** 原图定位可见性:有 OCR 行链接,且(用户展开或正在修正)。低置信项默认展开;
@@ -88,6 +97,9 @@ export type ReviewActions = {
 /** 卡片动作:可补录 → 只给补录主操作;低置信未核对 → 确认;其余 → 修正/再修正。
  * 每卡最多一个 filled primary(票 02 口径)。 */
 export function reviewActions(item: ReportItem): ReviewActions {
+  if (item.flag === 'not_tested') {
+    return { confirm: false, primary: null, correctLabel: '修正' };
+  }
   if (isBackfillItem(item)) {
     return {
       confirm: false,
@@ -117,6 +129,7 @@ export function applyReviewResult(report: ReportDetail, result: ReviewResult): R
     status: result.status,
     unreviewed_low_confidence_count: result.unreviewed_low_confidence_count,
     flag_counts: countFlagCounts(items),
+    not_tested_count: items.filter((item) => item.flag === 'not_tested').length,
     items,
   };
 }

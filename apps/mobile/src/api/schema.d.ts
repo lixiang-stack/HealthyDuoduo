@@ -272,10 +272,13 @@ export interface components {
             /** @description 识别失败原因(pipeline 产出;仅 failed 报告有值) */
             fail_reason: string | null;
             flag_counts: components["schemas"]["FlagCounts"];
+            /** @description 本次检查未做该项(flag=not_tested)的指标项数;信息徽标,不进入待处理/异常计数。 */
+            not_tested_count: number;
             /**
              * @description 「剩余 N 项未核对」徽标。响应派生值(不落列,ADR-0005):只统计 partial
              *     报告中 review_status=unreviewed 且 low_confidence 的指标项;
-             *     failed 报告无可核对项恒为 0(不进待核对);success 报告恒为 0。
+             *     failed 报告无可核对项恒为 0(不进待核对);success 报告恒为 0;
+             *     not_tested 项不参与该计数。
              */
             unreviewed_low_confidence_count: number;
         };
@@ -288,6 +291,7 @@ export interface components {
             status: components["schemas"]["ReportStatus"];
             fail_reason: string | null;
             flag_counts: components["schemas"]["FlagCounts"];
+            not_tested_count: number;
             unreviewed_low_confidence_count: number;
             /** @description 报告级叙述段落(影像等叙述型报告);缺省或 null 表示无段落,数组顺序即展示顺序 */
             sections?: components["schemas"]["ReportSection"][] | null;
@@ -341,12 +345,12 @@ export interface components {
             /** @description 检测方法/实验方法列原样(如 '化学发光法');无该列或解析失败为 null */
             method: string | null;
             /**
-             * @description 值 vs 参考范围比较结果;high/low 只用于有方向的数值异常,abnormal 只用于无方向的定性异常,unknown 表示本应能比较但失败/暂不支持
+             * @description 值 vs 参考范围比较结果;high/low 只用于有方向的数值异常,abnormal 只用于无方向的定性异常,unknown 表示本应能比较但失败/暂不支持,not_tested 表示本次检查未做该项(结果与参考均为裸短横)
              * @enum {unknown}
              */
-            flag: "normal" | "high" | "low" | "abnormal" | "unknown";
+            flag: "normal" | "high" | "low" | "abnormal" | "unknown" | "not_tested";
             /**
-             * @description flag=unknown 的原因;normal/high/low/abnormal 不出现该键
+             * @description flag=unknown 的原因;normal/high/low/abnormal/not_tested 不出现该键
              * @enum {unknown}
              */
             flag_reason?: "ocr_miss" | "ocr_merge" | "extractor_pairing" | "no_reference" | "qualitative_unsupported" | "unverified" | "narrative" | "informational" | "indeterminate" | "scalar_ref" | "other";
@@ -442,7 +446,7 @@ export interface components {
             /** @description 解释跨院参考范围差异 */
             method: string | null;
             /** @enum {string} */
-            flag: "normal" | "high" | "low" | "abnormal" | "unknown";
+            flag: "normal" | "high" | "low" | "abnormal" | "unknown" | "not_tested";
             low_confidence: boolean;
             /**
              * @description 响应派生信任标记(review_status ∈ {confirmed, corrected}):实心 =

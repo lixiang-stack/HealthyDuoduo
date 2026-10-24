@@ -84,14 +84,14 @@
           "description": "检测方法/实验方法列原样(如 '化学发光法');无该列或解析失败为 null"
         },
         "flag": {
-          "enum": ["normal", "high", "low", "abnormal", "unknown"],
-          "description": "值 vs 参考范围比较结果;high/low 只用于有方向的数值异常,abnormal 只用于无方向的定性异常,unknown 表示本应能比较但失败/暂不支持"
+          "enum": ["normal", "high", "low", "abnormal", "unknown", "not_tested"],
+          "description": "值 vs 参考范围比较结果;high/low 只用于有方向的数值异常,abnormal 只用于无方向的定性异常,unknown 表示本应能比较但失败/暂不支持,not_tested 表示本次检查未做该项(结果与参考均为裸短横)"
         },
         "flag_reason": {
           "enum": ["ocr_miss", "ocr_merge", "extractor_pairing", "no_reference",
                    "qualitative_unsupported", "unverified", "narrative",
                    "informational", "indeterminate", "scalar_ref", "other"],
-          "description": "flag=unknown 的原因;normal/high/low/abnormal 不出现该键"
+          "description": "flag=unknown 的原因;normal/high/low/abnormal/not_tested 不出现该键"
         },
         "low_confidence": {
           "type": "boolean",

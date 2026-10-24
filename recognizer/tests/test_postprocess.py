@@ -22,7 +22,7 @@ import yaml
 from recognizer import paths
 from recognizer import postprocess as _postprocess
 from recognizer.contract import OCRResult
-from recognizer.golden import date_hint_for
+from recognizer.golden import date_hint_for, image_bytes_for
 from recognizer.postprocess import _build_dict, run_postprocess
 
 # 真实注册表快照(分发测试在 monkeypatch 前捕获原词典)
@@ -223,8 +223,8 @@ def test_offset_columns_pair_by_header_baseline() -> None:
     assert item_of(r, "白细胞计数").flag == "normal"
 
 
-def test_qualitative_short_dash_value_and_ref_normal() -> None:
-    """值与参考都印 "-" 时进入定性比较,结果为 normal(不是 unknown)。"""
+def test_qualitative_short_dash_value_and_ref_not_tested() -> None:
+    """值与参考都印裸短横 "-" → 未检测(不是 normal,也不是 unknown)。"""
     cells = [
         {"x": 100, "y": -60, "text": "尿常规报告单"},
         {"x": 20, "y": 0, "text": "序号"},
@@ -236,9 +236,10 @@ def test_qualitative_short_dash_value_and_ref_normal() -> None:
     for idx, name in enumerate(["尿潜血", "尿白细胞酯酶", "尿蛋白质", "尿葡萄糖", "尿酮体"]):
         cells += row(30 + idx * 32, name, "-", ref="-")
     r = run_postprocess(mk_ocr(cells))
-    assert item_of(r, "尿潜血").flag == "normal"
+    assert item_of(r, "尿潜血").flag == "not_tested"
     assert item_of(r, "尿潜血").value == "-"
     assert item_of(r, "尿潜血").ref_range == "-"
+    assert item_of(r, "尿潜血").flag_reason is None
 
 
 def test_fused_name_value() -> None:
@@ -875,6 +876,10 @@ _sample_ids = sorted(p.stem for p in EXPECTED_OCR.glob("*.json")) if EXPECTED_OC
 @pytest.mark.parametrize("sample_id", _sample_ids)
 def test_report_matches_golden(sample_id: str) -> None:
     ocr_data = json.loads((EXPECTED_OCR / f"{sample_id}.json").read_text(encoding="utf-8"))
-    report = run_postprocess(OCRResult.model_validate(ocr_data), date_hint=date_hint_for(sample_id))
+    report = run_postprocess(
+        OCRResult.model_validate(ocr_data),
+        date_hint=date_hint_for(sample_id),
+        image=image_bytes_for(sample_id),
+    )
     golden = json.loads((EXPECTED_REPORT / f"{sample_id}.json").read_text(encoding="utf-8"))
     assert json.loads(report.model_dump_json()) == golden

@@ -398,6 +398,22 @@
       "name": null,
       "value": "-",
       "ref": "-",
+      "flag": "not_tested",
+      "reason": null
+    },
+    {
+      "note": "值短横参考阴性",
+      "name": null,
+      "value": "-",
+      "ref": "阴性",
+      "flag": "normal",
+      "reason": null
+    },
+    {
+      "note": "值短横参考阴性括注",
+      "name": null,
+      "value": "-",
+      "ref": "阴性(-)",
       "flag": "normal",
       "reason": null
     },
@@ -534,7 +550,7 @@
       "name": null,
       "value": "－",
       "ref": "－",
-      "flag": "normal",
+      "flag": "not_tested",
       "reason": null
     },
     {

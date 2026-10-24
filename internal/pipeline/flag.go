@@ -15,11 +15,12 @@ import (
 // flag 枚举(schemas/report.schema.json 同源;storage CHECK 同值)。
 // high/low 只用于有方向的数值异常;abnormal 只用于无方向的定性异常。
 const (
-	FlagNormal   = "normal"
-	FlagHigh     = "high"
-	FlagLow      = "low"
-	FlagAbnormal = "abnormal"
-	FlagUnknown  = "unknown"
+	FlagNormal    = "normal"
+	FlagHigh      = "high"
+	FlagLow       = "low"
+	FlagAbnormal  = "abnormal"
+	FlagUnknown   = "unknown"
+	FlagNotTested = "not_tested"
 )
 
 // flag_reason 枚举(schemas/report.schema.json 同源;只对 unknown 有意义)。
@@ -230,7 +231,11 @@ func compareQualitative(name string, value, refRange *string, policy *FlagPolicy
 	}
 	vcat := policy.categories[vtext]
 	rcat := policy.categories[rtext]
-	// 值、参考都是阴性/短横 → 正常(用户明确口径)。
+	// 结果、参考都是裸短横 → 本次未检测(不是正常);已做项目的阴性参考仍走下方正常规则。
+	if vtext == "-" && rtext == "-" {
+		return FlagNotTested, ""
+	}
+	// 值、参考都是阴性文本(含「阴性(-)」等,但不是裸短横)→ 正常。
 	if vcat == "negative" && rcat == "negative" {
 		return FlagNormal, ""
 	}

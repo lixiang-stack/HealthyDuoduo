@@ -82,13 +82,13 @@ const (
 	sqlTrendByName = `SELECT r.image_sha256, r.report_type,
 		   COALESCE(to_char(r.report_date, 'YYYY-MM-DD'), ''), i.value, i.unit, i.flag, i.low_confidence
 		 FROM report_items i JOIN reports r ON r.image_sha256 = i.report_sha256
-		 WHERE i.name = $1
+		 WHERE i.name = $1 AND i.flag <> 'not_tested'
 		 ORDER BY r.report_date ASC, r.image_sha256 ASC`
 
 	sqlTrendByNameAndType = `SELECT r.image_sha256, r.report_type,
 		   COALESCE(to_char(r.report_date, 'YYYY-MM-DD'), ''), i.value, i.unit, i.flag, i.low_confidence
 		 FROM report_items i JOIN reports r ON r.image_sha256 = i.report_sha256
-		 WHERE i.name = $1 AND r.report_type = $2
+		 WHERE i.name = $1 AND r.report_type = $2 AND i.flag <> 'not_tested'
 		 ORDER BY r.report_date ASC, r.image_sha256 ASC`
 
 	// trendPointsByMember:HTTP 成员维度趋势(票 02)。与 CLI 的 sqlTrendByName 是不同
@@ -98,7 +98,7 @@ const (
 		   COALESCE(to_char(r.report_date, 'YYYY-MM-DD'), ''),
 		   i.value, i.unit, i.ref_range, i.method, i.flag, i.low_confidence, i.review_status
 		 FROM report_items i JOIN reports r ON r.image_sha256 = i.report_sha256
-		 WHERE r.member_id = $1 AND i.name = $2
+		 WHERE r.member_id = $1 AND i.name = $2 AND i.flag <> 'not_tested'
 		   AND ($3 = '' OR i.unit = $3)
 		 ORDER BY r.report_date ASC NULLS LAST, r.image_sha256 ASC, i.id ASC`
 
@@ -162,14 +162,16 @@ const (
 	sqlReportDeriveSuccess = `UPDATE reports SET status = 'success', updated_at = now()
 		 WHERE image_sha256 = $1 AND status = 'partial'
 		   AND NOT EXISTS (SELECT 1 FROM report_items i
-		                   WHERE i.report_sha256 = $1 AND i.review_status = 'unreviewed' AND i.low_confidence)`
+		                   WHERE i.report_sha256 = $1 AND i.review_status = 'unreviewed'
+		                     AND i.low_confidence AND i.flag <> 'not_tested')`
 
 	// 动作后报告级派生读出(状态 + 未核对低置信计数,与 reportAggregateSQL 同口径:
-	// 计数以 partial 为门,success/failed 恒 0)。
+	// 计数以 partial 为门,success/failed 恒 0;not_tested 不计入)。
 	sqlReportReviewState = `SELECT r.status,
 		   (SELECT COUNT(*) FROM report_items i
 		    WHERE i.report_sha256 = r.image_sha256 AND r.status = 'partial'
-		      AND i.review_status = 'unreviewed' AND i.low_confidence)
+		      AND i.review_status = 'unreviewed' AND i.low_confidence
+		      AND i.flag <> 'not_tested')
 		 FROM reports r WHERE r.image_sha256 = $1`
 
 	sqlOCRResultByID = `SELECT engine_output FROM ocr_results WHERE id = $1`
@@ -216,10 +218,11 @@ const reportColumnsSQL = `r.image_sha256, r.ocr_result_id, r.report_type,
 // reportSummaryColumnsSQL 报告摘要(ReportSummary)投影:头部 + 聚合列(见 reportAggregateSQL)。
 const reportSummaryColumnsSQL = `r.image_sha256, r.member_id, r.report_type,
 	   COALESCE(to_char(r.report_date, 'YYYY-MM-DD'), ''), r.status, r.fail_reason,
-	   agg.high, agg.low, agg.abnormal, agg.unknown, agg.unreviewed_low`
+	   agg.high, agg.low, agg.abnormal, agg.unknown, agg.not_tested, agg.unreviewed_low`
 
 // reportAggregateSQL 单报告的 flag 聚合与未核对低置信计数(横向子查询,逐报告就地聚合)。
-// unreviewed_low 以报告 status = partial 为门:success 免核对、failed 无项均恒 0(契约口径)。
+// unreviewed_low 以报告 status = partial 为门:success 免核对、failed 无项均恒 0(契约口径);
+// not_tested 是信息计数,不计入 unknown 与 unreviewed_low。
 const reportAggregateSQL = `SELECT
 		   COUNT(*) FILTER (WHERE i.flag = 'high') AS high,
 		   COUNT(*) FILTER (WHERE i.flag = 'low') AS low,
@@ -229,7 +232,9 @@ const reportAggregateSQL = `SELECT
 		       ('ocr_miss', 'ocr_merge', 'extractor_pairing', 'unverified',
 		        'indeterminate', 'scalar_ref', 'other')
 		   )) AS unknown,
-		   COUNT(*) FILTER (WHERE r.status = 'partial' AND i.review_status = 'unreviewed' AND i.low_confidence) AS unreviewed_low
+		   COUNT(*) FILTER (WHERE i.flag = 'not_tested') AS not_tested,
+		   COUNT(*) FILTER (WHERE r.status = 'partial' AND i.review_status = 'unreviewed'
+		       AND i.low_confidence AND i.flag <> 'not_tested') AS unreviewed_low
 	   FROM report_items i WHERE i.report_sha256 = r.image_sha256`
 
 func (s *Store) ImageBySha256(ctx context.Context, sha string) (*pipeline.Image, error) {
@@ -425,7 +430,7 @@ func (s *Store) querySummaries(ctx context.Context, query string, args ...any) (
 		var date string
 		if err := rows.Scan(&r.Sha256, &r.MemberID, &r.ReportType, &date, &r.Status, &r.FailReason,
 			&r.FlagCounts.High, &r.FlagCounts.Low, &r.FlagCounts.Abnormal, &r.FlagCounts.Unknown,
-			&r.UnreviewedLowConfidenceCount); err != nil {
+			&r.NotTestedCount, &r.UnreviewedLowConfidenceCount); err != nil {
 			return nil, err
 		}
 		if date != "" {
