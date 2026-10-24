@@ -105,6 +105,12 @@ export default function HomeScreen() {
                     </>
                   )}
 
+                  <Link asChild href="/trends">
+                    <Pressable testID="overview-trends">
+                      <Text style={styles.link}>异常指标趋势</Text>
+                    </Pressable>
+                  </Link>
+
                   <Text style={sharedStyles.label}>各类最近一次</Text>
                   {latest.map((report) => (
                     <Link

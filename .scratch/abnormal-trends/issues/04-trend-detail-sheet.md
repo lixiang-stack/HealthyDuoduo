@@ -4,7 +4,7 @@
 
 **Blocked by:** 03。
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 ## 验收清单
 
@@ -54,4 +54,11 @@
 
 ## Comments
 
-（待实现）
+**实现（2026-10-23，分支 `abnormal-trends-page`，基于票 03）**
+
+- 纯逻辑：`chartLayout` 增加 axes 模式（3 个取整 y 刻度、首尾日期标签、绘图区、selectedIndex 放大）、`trendUnavailableReason`、`defaultSelectedIndex`、`isFilledPoint`；单测覆盖刻度取整、单点、同日微偏移、参考带 / 单侧 / 标量、实心空心、选中点与不可画原因。
+- 图表：`TrendDetailChart`（高 180，共享 `chartLayout`；网格 / y 标签 / 日期轴 / 分段参考带 / 实心空心 / 选中点放大）。
+- 详情层：`Modal` + `SafeAreaView` + 头部返回；`最新：{report_type} · {unit}`；完整图、选中点卡片（日期 / 值 / 参考 / flag / method / 信任）、逐点列表、图例、点按提示与元信息。列表点按切换选中点，图同步放大；选中点若不可绘制（非数值 / 缺日期），不放大任何点，避免图与点卡焦点不一致。
+- `/trends` 行改为 `Pressable` + `查看趋势 ›`，打开详情层；详情层只消费已加载的 `series/listPoints`，不额外请求；`Modal` 不卸载列表，关闭后滚动位置保留。
+- `e2e/support.ts` 增加 `trend-detail` / `trend-detail-chart` / `trend-detail-close` / `trend-point-*`。未新增依赖、路由或后端改动。
+- 验证：`npm run typecheck`、`npx expo lint`、`npm test`（146 通过）；另用专用 E2E 栈临时跑真实 Web 用例（首页入口 → 列表 → 详情、图 / 点卡 / 图例 / 元信息、点选、关闭、单点成员、成员切换）通过，临时文件已删除。未做 Expo Go / iOS / Android 手工验收。

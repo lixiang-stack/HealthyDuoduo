@@ -4,7 +4,7 @@
 
 **Blocked by:** 02。
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 ## 验收清单
 
@@ -61,4 +61,11 @@
 
 ## Comments
 
-（待实现）
+**实现（2026-10-23，分支 `abnormal-trends-page`）**
+
+- API：`getTrend` + `TrendPoint` / `TrendResult`；路径 `name` 走生成类型，`unit` 为空时省略；hook 不传 `unit`。
+- 纯逻辑：`reports/trends.ts` 覆盖 flag 过滤、最新非 failed 类别、name+unit 去重、同单位序列与四项计数、迷你图几何（8% 边距 / 非负从 0 / 参考带分段 / 单侧与标量参考 / 实心空心 / 同日点微偏移）、元信息；`trends.test.ts` 29 例直接使用 lft_02 / lft_04 / lft_05 / lft_06、cbc_05 / cbc_07 golden。
+- 数据：`useAbnormalTrends` 只取异常类别详情，按唯一 name+unit 请求趋势；`useMemberReports` 增加 `reportsMemberId` 与请求序号，切换成员时不把旧成员 reports 交给新成员的请求。
+- UI：`TrendSparkline`（高 64、无轴、参考带、实心/空心、最新点放大、无障碍标签）；`/trends` 七态、分组头日期与行数、空态；首页入口与 Stack 标题；`FLAG_COLORS` 移到 `reports/colors.ts`，核对页与趋势共用。
+- `e2e/support.ts` 增加 `overview-trends` / `trend-category-*` / `trend-indicator-*` / `trend-sparkline-*` / `trend-empty-*`；票 04 的详情层 / `查看趋势` / onPress 未提前实现。
+- 验证：`npm run typecheck`、`npx expo lint`、`npm test`（132 通过）、`npx expo export --platform web` 通过；另用专用 E2E 栈临时跑真实 Web 用例（lft_05 + lft_02 多点、lft_04 单点、成员切换）通过，临时文件已删除。未做 Expo Go / iOS / Android 手工验收。

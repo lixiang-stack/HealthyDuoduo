@@ -25,8 +25,16 @@ export function reportStatusLabel(
   return STATUS_LABELS[report.status];
 }
 
-const DATE_UNKNOWN_LABEL = '日期未知';
+export const DATE_UNKNOWN_LABEL = '日期未知';
 const IMAGING_DATE_UNPRINTED_LABEL = '检查单未印日期';
+
+/** 参考范围缺失时的中性事实文案:只陈述数据事实,不推断是纸面未印还是抽取/OCR 漏掉。 */
+export const MISSING_REF_RANGE_LABEL = '无参考范围';
+
+/** 参考范围展示文案:有值写「参考 …」,缺失用中性事实文案。 */
+export function refRangeLabel(refRange: string | null | undefined): string {
+  return refRange ? `参考 ${refRange}` : MISSING_REF_RANGE_LABEL;
+}
 
 /** 日期文案按报告类别取:影像单未印日期时明确说「未印」,不暗示识别失败。 */
 export function reportDateLabel(
@@ -60,7 +68,7 @@ export function itemFlagLabel(item: Pick<ReportItem, 'flag' | 'flag_reason'>): s
     case 'informational':
       return '信息项';
     case 'no_reference':
-      return '无参考范围';
+      return MISSING_REF_RANGE_LABEL;
     case 'qualitative_unsupported':
       return '定性结果';
     case 'unverified':
