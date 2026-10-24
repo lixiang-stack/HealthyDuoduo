@@ -4,4 +4,4 @@
 services:
   recognizer:
     environment:
-      RECOGNIZER_REPLAY_SAMPLES: cbc_02,cbc_03,cbc_04,us_01,us_03,glu_02,lft_02,lft_03,lft_04,lft_05
+      RECOGNIZER_REPLAY_SAMPLES: cbc_02,cbc_03,cbc_04,us_01,us_03,glu_01,glu_02,glu_03,lft_02,lft_03,lft_04,lft_05

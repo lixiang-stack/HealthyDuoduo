@@ -1,5 +1,6 @@
 // App E2E 支撑:契约类型直接复用 App 的 OpenAPI 生成物;API、样张、storage 键、
 // testID 约定单点定义(用例只消费,不散落裸字符串)。
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { basename, resolve } from 'node:path';
 
@@ -23,6 +24,11 @@ const REPO_ROOT = resolve(import.meta.dirname, '../../..');
 const SAMPLES = resolve(REPO_ROOT, 'samples');
 
 export const samplePath = (name: string) => resolve(SAMPLES, name);
+
+/** 报告对外身份 = 图像内容 sha256;UI 断言不必依赖上传响应。 */
+export async function sampleReportId(name: string): Promise<string> {
+  return createHash('sha256').update(await readFile(samplePath(name))).digest('hex');
+}
 
 // 与 App 侧 settings/baseUrlStore.ts、members/currentMemberStore.ts 的键逐字一致
 // (Web 下 AsyncStorage = localStorage;预置后各屏免走设置页)。
@@ -105,6 +111,13 @@ type BadgeKind = FlagBadgeKind | 'unreviewed';
   reviewValue: (itemId: number) => `review-field-value-${itemId}`,
   reviewSave: (itemId: number) => `review-save-${itemId}`,
   uploadOpenTimeline: 'upload-open-timeline',
+  uploadSelectedCount: 'upload-selected-count',
+  uploadRowStatus: (index: number) => `upload-row-status-${index}`,
+  uploadRowReview: (index: number) => `upload-row-review-${index}`,
+  uploadRowOpen: (index: number) => `upload-row-open-${index}`,
+  uploadRowRemove: (index: number) => `upload-remove-${index}`,
+  uploadRetry: 'upload-retry',
+  uploadContinue: 'upload-continue',
   reviewOpenTimeline: 'review-open-timeline',
 } as const;
 
