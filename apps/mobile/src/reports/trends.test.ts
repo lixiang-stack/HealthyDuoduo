@@ -53,7 +53,12 @@ const cbc07 = golden(cbc07Json);
 function countsOf(file: GoldenReport): ReportSummary['flag_counts'] {
   const counts = { high: 0, low: 0, abnormal: 0, unknown: 0 };
   for (const item of file.items) {
-    if (item.flag !== 'normal') {
+    if (
+      item.flag === 'high' ||
+      item.flag === 'low' ||
+      item.flag === 'abnormal' ||
+      item.flag === 'unknown'
+    ) {
       counts[item.flag] += 1;
     }
   }
@@ -73,6 +78,7 @@ function summaryOf(
     status: file.status,
     fail_reason: null,
     flag_counts: countsOf(file),
+    not_tested_count: 0,
     unreviewed_low_confidence_count: 0,
     ...overrides,
   };
@@ -116,6 +122,7 @@ function detailOf(
     status: file.status,
     fail_reason: null,
     flag_counts: countsOf(file),
+    not_tested_count: 0,
     unreviewed_low_confidence_count: 0,
     items: file.items.map((item, index) => toReportItem(item, index + 1)),
     ...overrides,

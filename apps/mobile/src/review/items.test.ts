@@ -44,6 +44,7 @@ function report(overrides: Partial<ReportDetail> = {}): ReportDetail {
     status: 'partial',
     fail_reason: null,
     flag_counts: { high: 1, low: 0, abnormal: 0, unknown: 0 },
+    not_tested_count: 0,
     unreviewed_low_confidence_count: 1,
     items: [item()],
     ...overrides,
@@ -70,6 +71,17 @@ describe('needsReview', () => {
       needsReview(report({ status: 'success', items: [item({ review_status: 'corrected' })] })),
     ).toBe(false);
   });
+
+  it('未检测项即使低置信也不是核对任务', () => {
+    expect(
+      needsReview(
+        report({
+          status: 'success',
+          items: [item({ flag: 'not_tested', value: '-', ref_range: '-', low_confidence: true })],
+        }),
+      ),
+    ).toBe(false);
+  });
 });
 
 describe('pendingItems', () => {
@@ -82,6 +94,12 @@ describe('pendingItems', () => {
       item({ item_id: 5 }),
     ];
     expect(pendingItems(items).map((it) => it.item_id)).toEqual([1, 5]);
+  });
+
+  it('未检测项不进入待核对列表', () => {
+    expect(
+      pendingItems([item({ item_id: 1, flag: 'not_tested', low_confidence: true })]),
+    ).toEqual([]);
   });
 });
 
@@ -104,6 +122,7 @@ describe('countFlagCounts', () => {
       item({ flag: 'unknown', flag_reason: 'no_reference' }),
       item({ flag: 'unknown', flag_reason: 'informational' }),
       item({ flag: 'normal' }),
+      item({ flag: 'not_tested' }),
     ]);
     expect(counts).toEqual({ high: 1, low: 2, abnormal: 1, unknown: 1 });
     expect(countFlagCounts([])).toEqual({ high: 0, low: 0, abnormal: 0, unknown: 0 });
@@ -149,13 +168,26 @@ describe('isBackfillItem / reviewActions', () => {
     const corrected = reviewActions(item({ value: null, ref_range: '0-20', flag: 'unknown', flag_reason: 'ocr_miss', review_status: 'corrected' }));
     expect(corrected).toMatchObject({ primary: 'backfill', correctLabel: '补录缺失信息' });
   });
+
+  it('未检测项没有确认/补录主操作,只保留修正逃生口', () => {
+    expect(reviewActions(item({ flag: 'not_tested', value: '-', ref_range: '-', low_confidence: true }))).toMatchObject({
+      confirm: false,
+      primary: null,
+      correctLabel: '修正',
+    });
+  });
 });
 
 describe('applyReviewResult', () => {
   it('单响应刷新整屏:替换本次指标项、更新报告级派生、重算 flag 徽标', () => {
     const before = report({
-      items: [item({ item_id: 1 }), item({ item_id: 2, low_confidence: false, flag: 'normal' })],
+      items: [
+        item({ item_id: 1 }),
+        item({ item_id: 2, low_confidence: false, flag: 'normal' }),
+        item({ item_id: 3, low_confidence: false, flag: 'not_tested', value: '-', ref_range: '-' }),
+      ],
       flag_counts: { high: 1, low: 0, abnormal: 0, unknown: 0 },
+      not_tested_count: 1,
     });
     const after = applyReviewResult(before, {
       report_id: before.report_id,
@@ -166,6 +198,7 @@ describe('applyReviewResult', () => {
     expect(after.status).toBe('success');
     expect(after.unreviewed_low_confidence_count).toBe(0);
     expect(after.flag_counts).toEqual({ high: 0, low: 0, abnormal: 0, unknown: 0 }); // 修正后按新值重算
+    expect(after.not_tested_count).toBe(1); // 未检测项不受本次修正影响
     expect(after.items[0].value).toBe('5.6');
     expect(after.items[0].review_status).toBe('corrected');
     expect(after.items[1]).toBe(before.items[1]); // 其余项原样

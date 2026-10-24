@@ -21,6 +21,7 @@ const report: ReportDetail = {
   status: 'success',
   fail_reason: null,
   flag_counts: { high: 0, low: 0, abnormal: 0, unknown: 0 },
+  not_tested_count: 0,
   unreviewed_low_confidence_count: 0,
   items: [],
 };
@@ -54,12 +55,13 @@ describe('reportDateLabel', () => {
 });
 
 describe('flagLabel', () => {
-  it('指标项 flag 文案:正常/偏高/偏低/异常/未知(中性事实侧)', () => {
+  it('指标项 flag 文案:正常/偏高/偏低/异常/未知/未检测(中性事实侧)', () => {
     expect(flagLabel('normal')).toBe('正常');
     expect(flagLabel('high')).toBe('偏高');
     expect(flagLabel('low')).toBe('偏低');
     expect(flagLabel('abnormal')).toBe('异常');
     expect(flagLabel('unknown')).toBe('未知');
+    expect(flagLabel('not_tested')).toBe('未检测');
   });
 
   it('unknown 按 reason 显示中性事实,不一律写未知', () => {
@@ -69,6 +71,7 @@ describe('flagLabel', () => {
     expect(itemFlagLabel({ flag: 'unknown', flag_reason: 'unverified' })).toBe('待核实');
     expect(itemFlagLabel({ flag: 'unknown', flag_reason: 'ocr_miss' })).toBe('未知');
     expect(itemFlagLabel({ flag: 'abnormal' })).toBe('异常');
+    expect(itemFlagLabel({ flag: 'not_tested' })).toBe('未检测');
   });
 });
 
@@ -84,6 +87,16 @@ describe('flagBadges', () => {
     expect(flagBadges({ ...report, flag_counts: { high: 3, low: 0, abnormal: 0, unknown: 2 } })).toEqual([
       { kind: 'high', label: '偏高 3' },
       { kind: 'unknown', label: '未知 2' },
+    ]);
+    expect(
+      flagBadges({
+        ...report,
+        flag_counts: { high: 1, low: 0, abnormal: 0, unknown: 0 },
+        not_tested_count: 2,
+      }),
+    ).toEqual([
+      { kind: 'high', label: '偏高 1' },
+      { kind: 'not_tested', label: '未检测 2' },
     ]);
   });
 
@@ -111,12 +124,14 @@ describe('reportBadgeLabels', () => {
       reportBadgeLabels({
         ...report,
         flag_counts: { high: 3, low: 0, abnormal: 0, unknown: 2 },
+        not_tested_count: 1,
         unreviewed_low_confidence_count: 1,
       }),
     ).toEqual({
       flags: [
         { kind: 'high', label: '偏高 3' },
         { kind: 'unknown', label: '未知 2' },
+        { kind: 'not_tested', label: '未检测 1' },
       ],
       unreviewed: '待核对 1 项',
     });

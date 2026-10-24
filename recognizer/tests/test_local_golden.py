@@ -51,6 +51,8 @@ def test_local_report_matches_golden(sample_id: str) -> None:
     ocr = OCRResult.model_validate(
         json.loads((paths.LOCAL_EXPECTED_OCR / f"{sample_id}.json").read_text(encoding="utf-8"))
     )
-    report = run_postprocess(ocr)
+    lg = _local_golden()
+    image = next((p for p in lg._images() if lg._sid(p) == sample_id), None)
+    report = run_postprocess(ocr, image=image.read_bytes() if image is not None else None)
     golden = json.loads((paths.LOCAL_EXPECTED_REPORT / f"{sample_id}.json").read_text(encoding="utf-8"))
     assert json.loads(report.model_dump_json()) == golden

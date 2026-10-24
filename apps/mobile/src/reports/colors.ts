@@ -9,4 +9,5 @@ export const FLAG_COLORS: Record<ReportItem['flag'], string> = {
   low: colors.low,
   abnormal: colors.fail,
   unknown: colors.muted,
+  not_tested: colors.muted,
 };

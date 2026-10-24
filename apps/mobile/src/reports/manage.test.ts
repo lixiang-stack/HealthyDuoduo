@@ -12,6 +12,7 @@ function summary(overrides: Partial<ReportSummary> = {}): ReportSummary {
     status: 'partial',
     fail_reason: null,
     flag_counts: { high: 1, low: 0, abnormal: 0, unknown: 0 },
+    not_tested_count: 0,
     unreviewed_low_confidence_count: 1,
     ...overrides,
   };
