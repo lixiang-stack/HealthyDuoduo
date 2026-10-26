@@ -242,12 +242,16 @@ export default function UploadScreen() {
     [phase],
   );
 
+  const members = state.status === 'ready' ? sortMembers(state.members) : [];
+  // 仅当持久化的当前成员仍在服务端列表里才算已选择(清库/换后端后旧 id 可能已失效)。
+  const selectedMemberId = members.find((m) => m.member_id === currentMemberId)?.member_id;
+
   const runUpload = useCallback(
     async (indexes: number[]) => {
-      if (currentMemberId === undefined || indexes.length === 0 || phase === 'uploading') {
+      if (selectedMemberId === undefined || indexes.length === 0 || phase === 'uploading') {
         return;
       }
-      const memberId = currentMemberId;
+      const memberId = selectedMemberId;
       setPickMessage(undefined);
       setPhase('uploading');
       setElapsedMs(0);
@@ -291,10 +295,9 @@ export default function UploadScreen() {
         setPhase('done');
       }
     },
-    [currentMemberId, images, phase],
+    [selectedMemberId, images, phase],
   );
 
-  const members = state.status === 'ready' ? sortMembers(state.members) : [];
   const settled = outcomes.filter((outcome): outcome is UploadOutcome => outcome !== undefined);
   const retryIndexes = outcomes.flatMap((outcome, index) =>
     outcome?.kind === 'failed' ? [index] : [],
@@ -302,7 +305,7 @@ export default function UploadScreen() {
   const canUpload =
     state.status === 'ready' &&
     members.length > 0 &&
-    currentMemberId !== undefined &&
+    selectedMemberId !== undefined &&
     images.length > 0 &&
     phase === 'idle' &&
     !picking;
@@ -366,11 +369,11 @@ export default function UploadScreen() {
               <Text style={sharedStyles.label}>归属成员</Text>
               <MemberChips
                 members={members}
-                selectedId={currentMemberId}
+                selectedId={selectedMemberId}
                 disabled={phase !== 'idle'}
                 onSelect={selectMember}
               />
-              {currentMemberId === undefined ? (
+              {selectedMemberId === undefined ? (
                 <Text style={sharedStyles.muted}>先选择检查单归属哪位成员。</Text>
               ) : null}
 
