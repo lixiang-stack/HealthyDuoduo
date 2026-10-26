@@ -68,6 +68,25 @@ def test_horizontal_page_is_not_rotated() -> None:
     assert detect_rotation(ocr) == 0
 
 
+def _horizontal_page(header_y: float, footer_y: float) -> OCRResult:
+    return _ocr(
+        [
+            ("西安市人民医院检验报告", 100, header_y, 180, 22),
+            ("姓名：范莹莹", 100, header_y + 40, 110, 22),
+            ("审核者：", 100, footer_y, 80, 22),
+            ("报告日期：2026-09-04", 100, footer_y + 40, 150, 22),
+        ]
+    )
+
+
+def test_upright_horizontal_page_is_not_rotated() -> None:
+    assert detect_rotation(_horizontal_page(header_y=100, footer_y=900)) == 0
+
+
+def test_upside_down_page_rotates_180() -> None:
+    assert detect_rotation(_horizontal_page(header_y=900, footer_y=100)) == 180
+
+
 def test_few_vertical_lines_do_not_trigger_rotation() -> None:
     ocr = _ocr(
         [
@@ -91,6 +110,18 @@ def test_rotate_image_preserves_format_and_swaps_sides() -> None:
     assert rotated.format == "PNG"
     assert rotated.size == (10, 30)
     assert rotated.getpixel((0, 0)) == (255, 255, 255)
+
+
+def test_rotate_image_180_keeps_size_and_flips_corner() -> None:
+    image = Image.new("RGB", (30, 10), "white")
+    image.putpixel((0, 0), (0, 0, 0))
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+
+    rotated = Image.open(io.BytesIO(rotate_image(buffer.getvalue(), 180)))
+
+    assert rotated.size == (30, 10)
+    assert rotated.getpixel((29, 9)) == (0, 0, 0)
 
 
 def test_report_normalizes_sideways_image(monkeypatch) -> None:

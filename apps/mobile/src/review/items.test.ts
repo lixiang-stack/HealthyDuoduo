@@ -5,6 +5,7 @@ import {
   buildCorrection,
   canMarkNoReference,
   countFlagCounts,
+  displayItemName,
   draftFromItem,
   flagReasonText,
   isBackfillItem,
@@ -163,6 +164,87 @@ describe('pendingItems', () => {
     expect(
       pendingItems([item({ item_id: 1, flag: 'not_tested', low_confidence: true })]),
     ).toEqual([]);
+  });
+});
+
+describe('displayItemName', () => {
+  it('优先使用原文印名:红细胞比积 / 淋巴细胞百分比', () => {
+    expect(
+      displayItemName(
+        item({
+          name: '红细胞压积',
+          raw_text: '红细胞比积(9-HR)  HCT  33.50↓  35.00~45.00  %',
+        }),
+      ),
+    ).toBe('红细胞比积');
+    expect(
+      displayItemName(
+        item({
+          name: '淋巴细胞比率',
+          raw_text: '淋巴细胞百分比  LYMPH%  18.30↓20.00~50.00  %',
+        }),
+      ),
+    ).toBe('淋巴细胞百分比');
+  });
+
+  it('保留各报告自己的印法:比值/计数不被统一成另一套名字', () => {
+    expect(
+      displayItemName(
+        item({
+          name: '中性细胞比率',
+          raw_text: '2 中性粒细胞比值  77.40↑  40.00~75.00  %',
+        }),
+      ),
+    ).toBe('中性粒细胞比值');
+    expect(
+      displayItemName(
+        item({
+          name: '中性细胞数',
+          raw_text: '7 中性粒细胞计数  6.56↑  1.80~6.30  10~9/L',
+        }),
+      ),
+    ).toBe('中性粒细胞计数');
+  });
+
+  it('5be 报告:主名称优先取原文印名(含词序不同与百分比/绝对值写法)', () => {
+    const cases: Array<[string, string, string]> = [
+      ['中性细胞数', '中性粒细胞绝对值  NEUT#  6.56↑  1.80~6.30  *10~9/L', '中性粒细胞绝对值'],
+      ['淋巴细胞数', '淋巴细胞绝对值  LYMPH#  1.55  1.10~3.20  *10^9/L', '淋巴细胞绝对值'],
+      ['单核细胞数', '单核细胞绝对值  MONO#  0.31  0.10~0.60  *10^9/L', '单核细胞绝对值'],
+      ['中性细胞比率', '中性粒细胞百分比  NEUT%  77.40↑  40.00~75.00  %', '中性粒细胞百分比'],
+      ['淋巴细胞比率', '淋巴细胞百分比  LYMPH%  18.30↓20.00~50.00  %', '淋巴细胞百分比'],
+      ['单核细胞比率', '单核细胞百分比  MONO%  3.60  3.00~10.00  %', '单核细胞百分比'],
+      ['红细胞压积', '红细胞比积(9-HR)  HCT  33.50↓  35.00~45.00  %', '红细胞比积'],
+      ['血红蛋白', '血红蛋白量(9-HR)  112.00↓1  5.00~150.00  g/L', '血红蛋白量'],
+      ['血小板', '血小板计数(9-HR)  PLT  145.00  125.00~350.00  *10', '血小板计数'],
+      ['红细胞分布宽度-SD', '红细胞分布宽度标准差  RDW-SD  41.40  38.40~47.80  %', '红细胞分布宽度标准差'],
+      ['红细胞分布宽度-CV', '红细胞分布宽度变异系数  RDW-CV  13.30  11.70~15.30  %', '红细胞分布宽度变异系数'],
+      ['血小板平均体积', '平均血小板体积  MPV  10.30  8.40~12.70  fL', '平均血小板体积'],
+      ['血小板比积', '血小板压积  PCT  0.15↓  0.17~0.37  %', '血小板压积'],
+      ['大型血小板比率', '大血小板比率  P-LCR  28.50  14.60~45.00  %', '大血小板比率'],
+    ];
+    for (const [name, rawText, expected] of cases) {
+      expect(displayItemName(item({ name, raw_text: rawText }))).toBe(expected);
+    }
+  });
+
+  it('原文只有缩写或首个中文格是方法时回落规范名;修正后以生效名为准', () => {
+    expect(displayItemName(item({ name: '白细胞计数', raw_text: 'WBC' }))).toBe('白细胞计数');
+    expect(displayItemName(item({ name: 'PH', raw_text: '7 PH(9-HR)  PH  8.00' }))).toBe('PH');
+    expect(
+      displayItemName(
+        item({ name: '尿液颜色', raw_text: '直接观察法  黄色' }),
+      ),
+    ).toBe('尿液颜色');
+    expect(
+      displayItemName(
+        item({
+          name: '家长改过的名字',
+          raw_text: '红细胞比积(9-HR)  HCT  33.50',
+          review_status: 'corrected',
+        }),
+      ),
+    ).toBe('家长改过的名字');
   });
 });
 

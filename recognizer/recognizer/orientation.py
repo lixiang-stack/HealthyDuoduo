@@ -1,8 +1,8 @@
-"""纸面方向纠正:整页横拍时把图像转正后再 OCR。
+"""纸面方向纠正:整页横拍或倒置时把图像转正后再 OCR。
 
-RapidOCR 方向分类只覆盖 0°/180°,手机横拍产生的 90°/270° 页面会以「竖排
-文本框」被识别;部分列(典型是参考区间)因此丢失。这里只在绝大多数文本行
-都是纵向时判定整页横置,再用标题/页脚文字落点选择逆时针或顺时针转正。
+RapidOCR 方向分类能纠正逐行 0°/180°,但不会旋转整页图像;手机横拍产生的
+90°/270° 页面会以「竖排文本框」被识别,倒置页面则文字可读但整页上下颠倒。
+这里按文本行方向与标题/页脚落点判断,统一把整页转正后再 OCR。
 """
 
 from __future__ import annotations
@@ -35,8 +35,9 @@ _FOOTER_WORDS = (
     "备注",
 )
 
-# 方向候选(逆时针角度):90 = 向左转正,270 = 向右转正。
+# 方向候选(逆时针角度):90 = 向左转正,180 = 上下颠倒,270 = 向右转正。
 _CCW = 90
+_UPSIDE_DOWN = 180
 _CW = 270
 
 
@@ -48,20 +49,19 @@ class _Line:
 
 
 def detect_rotation(ocr: OCRResult) -> int:
-    """返回整页需要逆时针旋转的角度:0 / 90 / 270。
-
-    只处理横置页面;倒置(180°)交给 RapidOCR 自带方向分类。
-    """
+    """返回整页需要逆时针旋转的角度:0 / 90 / 180 / 270。"""
     lines = [_line(text, box) for text, box in zip(ocr.txts, ocr.boxes, strict=True)]
     if len(lines) < _MIN_LINES:
         return 0
     vertical = sum(1 for line, box in zip(lines, ocr.boxes, strict=True) if _is_vertical(box))
-    if vertical / len(lines) < _VERTICAL_RATIO:
-        return 0
+    if vertical / len(lines) >= _VERTICAL_RATIO:
+        ccw_score = _orientation_score(lines, _CCW)
+        cw_score = _orientation_score(lines, _CW)
+        return _CW if cw_score > ccw_score else _CCW
 
-    ccw_score = _orientation_score(lines, _CCW)
-    cw_score = _orientation_score(lines, _CW)
-    return _CW if cw_score > ccw_score else _CCW
+    upright_score = _orientation_score(lines, 0)
+    upside_score = _orientation_score(lines, _UPSIDE_DOWN)
+    return _UPSIDE_DOWN if upside_score > upright_score else 0
 
 
 def rotate_image(data: bytes, rotation: int) -> bytes:
@@ -99,10 +99,15 @@ def _orientation_score(lines: list[_Line], rotation: int) -> int:
 
 
 def _rotate_point(line: _Line, rotation: int) -> _Line:
-    # 只用于排序/落点比较,不依赖原图宽高:逆时针 (x,y)→(y,-x),顺时针 (x,y)→(-y,x)。
+    # 只用于排序/落点比较,不依赖原图宽高:逆时针 (x,y)→(y,-x),顺时针 (x,y)→(-y,x),
+    # 180° (x,y)→(-x,-y)。
     if rotation == _CCW:
         return _Line(text=line.text, x=line.y, y=-line.x)
-    return _Line(text=line.text, x=-line.y, y=line.x)
+    if rotation == _UPSIDE_DOWN:
+        return _Line(text=line.text, x=-line.x, y=-line.y)
+    if rotation == _CW:
+        return _Line(text=line.text, x=-line.y, y=line.x)
+    return line
 
 
 def _hits(lines: list[_Line], words: tuple[str, ...]) -> int:

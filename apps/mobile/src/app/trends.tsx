@@ -12,6 +12,7 @@ import { TrendDetailSheet } from '../reports/TrendDetailSheet';
 import { TrendSparkline } from '../reports/TrendChart';
 import { flagLabel, refRangeLabel, reportDateLabel } from '../reports/status';
 import { formatSeriesMeta, TREND_UNAVAILABLE_LABEL } from '../reports/trends';
+import { displayItemName } from '../review/items';
 import {
   useAbnormalTrends,
   type TrendGroup,
@@ -178,6 +179,7 @@ function TrendIndicatorCard({
 }) {
   const { candidate, series } = row;
   const item = candidate.item;
+  const name = displayItemName(item);
   const flagColor = FLAG_COLORS[item.flag];
   const lowConfidence = item.low_confidence && item.review_status === 'unreviewed';
 
@@ -189,7 +191,7 @@ function TrendIndicatorCard({
       style={styles.card}
     >
       <View style={styles.cardHeader}>
-        <Text style={styles.itemName}>{item.name}</Text>
+        <Text style={styles.itemName}>{name}</Text>
         {lowConfidence ? <Text style={styles.lowTag}>低置信</Text> : null}
         <Text style={[styles.flag, { color: flagColor }]}>{flagLabel(item.flag)}</Text>
       </View>
@@ -205,7 +207,7 @@ function TrendIndicatorCard({
       ) : (
         <TrendSparkline
           series={series}
-          name={item.name}
+          name={name}
           testID={`trend-sparkline-${index}`}
         />
       )}

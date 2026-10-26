@@ -37,6 +37,85 @@ export function pendingItems(items: ReportItem[]): ReportItem[] {
   );
 }
 
+const CJK_CHAR_RE = /[\u3400-\u9fff]/;
+const RAW_CELL_SEPARATOR_RE = /\s{2,}/;
+const METHOD_SUFFIX_RE = /[（(]\s*(?:\d+\s*-\s*HR|省免|互认)[^）)]*[）)]/gi;
+const STAR_PREFIX_RE = /^[*＊※✱]+\s*/;
+const SERIAL_PREFIX_RE = /^\d{1,3}(?=\s|[\u3400-\u9fff])/;
+const SERIAL_DOT_RE = /^\d{1,3}[.、．]\s*/;
+
+function cjkChars(text: string): string[] {
+  return [...text].filter((char) => CJK_CHAR_RE.test(char));
+}
+
+function commonPrefixLength(a: string, b: string): number {
+  let i = 0;
+  while (i < a.length && i < b.length && a[i] === b[i]) {
+    i += 1;
+  }
+  return i;
+}
+
+function longestCommonSubstringLength(a: string, b: string): number {
+  let best = 0;
+  const previous = new Array<number>(b.length + 1).fill(0);
+  for (let i = 1; i <= a.length; i += 1) {
+    let diagonal = 0;
+    for (let j = 1; j <= b.length; j += 1) {
+      const saved = previous[j];
+      if (a[i - 1] === b[j - 1]) {
+        previous[j] = diagonal + 1;
+        best = Math.max(best, previous[j]);
+      } else {
+        previous[j] = 0;
+      }
+      diagonal = saved;
+    }
+  }
+  return best;
+}
+
+/** 印名与规范名至少共享 2 字前缀或 3 字公共子串:排除「黄色」「直接观察法」这类值/方法格。 */
+function sharesName(canonical: string, candidate: string): boolean {
+  return (
+    commonPrefixLength(canonical, candidate) >= 2 ||
+    longestCommonSubstringLength(canonical, candidate) >= 3
+  );
+}
+
+/** 展示名:未修正时优先用 raw_text 里印出的中文名称(去掉序号/星号/互认后缀),
+ *  让卡片主名称与原文一致;修正后以生效名称为准。规范名 name 仍用于趋势连接。
+ *  找不到可靠印名(如原文只有缩写 WBC/PH、或首个中文格是检测方法)时回落 name。 */
+export function displayItemName(
+  item: Pick<ReportItem, 'name' | 'raw_text' | 'review_status'>,
+): string {
+  if (item.review_status === 'corrected' || !CJK_CHAR_RE.test(item.name)) {
+    return item.name;
+  }
+  const canonical = cjkChars(item.name).join('');
+  for (const part of item.raw_text.split(RAW_CELL_SEPARATOR_RE)) {
+    let text = part.trim();
+    text = text
+      .replace(STAR_PREFIX_RE, '')
+      .replace(SERIAL_PREFIX_RE, '')
+      .replace(STAR_PREFIX_RE, '')
+      .replace(SERIAL_DOT_RE, '');
+    text = text.replace(METHOD_SUFFIX_RE, '').trim();
+    if (!text || !CJK_CHAR_RE.test(text)) {
+      continue;
+    }
+    const candidate = cjkChars(text).join('');
+    if (!sharesName(canonical, candidate)) {
+      continue;
+    }
+    if (/(?:法|检查)$/.test(text) && text !== item.name) {
+      continue;
+    }
+    return text;
+  }
+  return item.name;
+}
+
 /** 原图定位可见性:有 OCR 行链接,且(用户展开或正在修正)。低置信项默认展开;
  *  高置信项默认收起,但无需先点「修正」即可展开;无行链接不渲染空视口。 */
 export function shouldShowZoom(
