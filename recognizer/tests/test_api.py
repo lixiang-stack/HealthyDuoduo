@@ -10,13 +10,14 @@ from jsonschema import Draft202012Validator
 
 from recognizer import paths
 from recognizer.api import app
+from recognizer.contract import OCRResult
 from recognizer.golden import date_hint_for
+from recognizer.postprocess import run_postprocess
 
 SAMPLES = paths.SAMPLES
 SCHEMA = paths.SCHEMA_OCR
 REPORT_SCHEMA = paths.SCHEMA_REPORT
 EXPECTED_OCR = paths.EXPECTED_OCR
-EXPECTED_REPORT = paths.EXPECTED_REPORT
 
 _golden_ids = sorted(p.stem for p in EXPECTED_OCR.glob("*.json"))
 
@@ -92,14 +93,20 @@ def test_report_rejects_non_image() -> None:
 
 
 def test_reparse_golden_matches_postprocess() -> None:
-    """验收 P2:POST /reparse 用 golden OCR 重跑后处理,与 golden report 一致。"""
+    """验收 P2:POST /reparse 用 golden OCR 重跑后处理,与无原图的重跑结果一致。
+
+    /reparse 只有存库 OCR、没有原图像素;OCR 漏掉的孤立 '-' 不能在此恢复。
+    """
     if not _golden_ids:
         pytest.skip("no golden OCR files")
     sample_id = _golden_ids[0]
     golden = json.loads((EXPECTED_OCR / f"{sample_id}.json").read_text(encoding="utf-8"))
-    expected = json.loads((EXPECTED_REPORT / f"{sample_id}.json").read_text(encoding="utf-8"))
+    hint = date_hint_for(sample_id)
+    expected = json.loads(
+        run_postprocess(OCRResult.model_validate(golden), date_hint=hint).model_dump_json()
+    )
     payload = {"ocr_result": golden}
-    if (hint := date_hint_for(sample_id)) is not None:
+    if hint is not None:
         payload["date"] = hint
     with TestClient(app) as client:
         response = client.post("/reparse", json=payload)

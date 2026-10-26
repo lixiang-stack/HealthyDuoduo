@@ -23,21 +23,34 @@ SOURCES = paths.EXPECTED_OCR
 TARGETS = paths.EXPECTED_REPORT
 MASKED_DATE = "2020-01-01"
 
-_IMAGE_SUFFIXES = (".jpg", ".jpeg", ".png", ".webp", ".bmp")
+
+def image_path_for(sample_id: str) -> Path | None:
+    """samples 内对应原图;掩码语料条目没有原图,返回 None。"""
+    for ext in paths.IMAGE_SUFFIXES:
+        path = Path(paths.SAMPLES) / f"{sample_id}{ext}"
+        if path.exists():
+            return path
+    return None
 
 
 def date_hint_for(sample_id: str) -> str | None:
     """样本的 date_hint:samples 内有对应原图的样本 None,掩码语料条目 MASKED_DATE。"""
-    has_image = any(
-        (Path(paths.SAMPLES) / f"{sample_id}{ext}").exists() for ext in _IMAGE_SUFFIXES
-    )
-    return None if has_image else MASKED_DATE
+    return None if image_path_for(sample_id) else MASKED_DATE
+
+
+def image_bytes_for(sample_id: str) -> bytes | None:
+    path = image_path_for(sample_id)
+    return path.read_bytes() if path is not None else None
 
 
 def main() -> int:
     for src in sorted(SOURCES.glob("*.json")):
         ocr = OCRResult.model_validate(json.loads(src.read_text(encoding="utf-8")))
-        report = run_postprocess(ocr, date_hint=date_hint_for(src.stem))
+        report = run_postprocess(
+            ocr,
+            date_hint=date_hint_for(src.stem),
+            image=image_bytes_for(src.stem),
+        )
         TARGETS.mkdir(parents=True, exist_ok=True)
         out = TARGETS / src.name
         out.write_text(report.model_dump_json() + "\n", encoding="utf-8")

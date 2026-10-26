@@ -25,13 +25,15 @@ class Flag(_Vocabulary):
     """指标项标记(值 vs 参考范围)。
 
     high/low 只用于有方向的数值异常;abnormal 只用于无方向的定性异常;
-    unknown 只表示本应能比较但失败/暂不支持。
+    unknown 只表示本应能比较但失败/暂不支持;not_tested 表示本次检查未做该项
+    (纸面结果与参考区间均为裸短横 "-"),不是正常、也不是未知。
     """
     NORMAL = "normal"
     HIGH = "high"
     LOW = "low"
     ABNORMAL = "abnormal"
     UNKNOWN = "unknown"
+    NOT_TESTED = "not_tested"
 
 
 class FlagReason(_Vocabulary):

@@ -395,6 +395,7 @@ func toAPIReportHeader(sum pipeline.ReportSummary) httpapi.ReportHeader {
 			Abnormal: sum.FlagCounts.Abnormal,
 			Unknown:  sum.FlagCounts.Unknown,
 		},
+		NotTestedCount:               sum.NotTestedCount,
 		UnreviewedLowConfidenceCount: sum.UnreviewedLowConfidenceCount,
 	}
 }

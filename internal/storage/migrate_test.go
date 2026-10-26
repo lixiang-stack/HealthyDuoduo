@@ -1,6 +1,6 @@
 package storage
 
-// 迁移冒烟:goose 链(0001..0009)应用后 schema 形状符合 M0 契约(票 02)。
+// 迁移冒烟:goose 链(0001..0010)应用后 schema 形状符合 M0 契约(票 02)。
 // 需要真库:设 HDD_TEST_DSN(如 postgres://postgres:smoke@127.0.0.1:55432/postgres)后运行;
 // 未设则整体 Skip——CI 门禁跑 go test ./... 时默认跳过,共享栈验证走 e2e 外环
 // (docs/agents/e2e.md「schemas/迁移」行)。冒烟姿势:一次性 PG 容器 + 本测试。
@@ -31,13 +31,13 @@ func TestMigrationSmokeM0Contract(t *testing.T) {
 		t.Fatalf("migrate: %v", err)
 	}
 
-	// goose 已升到 0009 且幂等(Open 内重复 Migrate 不报错)。
+	// goose 已升到 0010 且幂等(Open 内重复 Migrate 不报错)。
 	var latest int
 	if err := pool.QueryRow(ctx, `SELECT max(version_id) FROM goose_db_version`).Scan(&latest); err != nil {
 		t.Fatalf("read goose version: %v", err)
 	}
-	if latest != 9 {
-		t.Fatalf("goose version = %d, want 9", latest)
+	if latest != 10 {
+		t.Fatalf("goose version = %d, want 10", latest)
 	}
 
 	// reports.sections(0007,ADR-0008):可选报告段落 JSONB,可空(存量/非叙述型 NULL)。

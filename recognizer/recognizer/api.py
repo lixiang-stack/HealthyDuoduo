@@ -72,11 +72,15 @@ def report(
         if fixture is not None:
             return fixture
     ocr_result = _run_ocr(data)
-    report = run_postprocess(ocr_result, date_hint=date)
+    report = run_postprocess(ocr_result, date_hint=date, image=data)
     return ReportResponse(ocr_result=ocr_result, report=report)
 
 
 @app.post("/reparse")
 def reparse(payload: ReparseRequest) -> Report:
-    """复用已存 OCR 结果重跑后处理(规则迭代后历史刷新的端点,实施计划 P2-3)。"""
+    """复用已存 OCR 结果重跑后处理(规则迭代后历史刷新的端点,实施计划 P2-3)。
+
+    只有存库 OCR、没有原图像素:OCR 漏掉的孤立 '-' 无法在此恢复,需走 /report
+    重新识别(或 App 删除后重传)。
+    """
     return run_postprocess(payload.ocr_result, date_hint=payload.date)
