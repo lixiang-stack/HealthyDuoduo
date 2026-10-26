@@ -182,7 +182,7 @@ func (f *fakeServeStore) WriteReport(ctx context.Context, reportSha string, ocrI
 }
 
 // summarize 读时聚合,镜像 SQL(reportAggregateSQL):flag 计数就地算;
-// unreviewed 只统计 partial 报告的低置信未核对项。
+// unreviewed 统计所有报告的未核对低置信项(success 也如实计数)。
 func (f *fakeServeStore) summarize(r *fakeServeReport) pipeline.ReportSummary {
 	sum := r.summary
 	sum.FlagCounts = pipeline.FlagCounts{}
@@ -196,7 +196,7 @@ func (f *fakeServeStore) summarize(r *fakeServeReport) pipeline.ReportSummary {
 		case "unknown":
 			sum.FlagCounts.Unknown++
 		}
-		if sum.Status == contract.StatusPartial && it.ReviewStatus == pipeline.ReviewStatusUnreviewed && it.LowConfidence {
+		if it.ReviewStatus == pipeline.ReviewStatusUnreviewed && it.LowConfidence && it.Flag != "not_tested" {
 			sum.UnreviewedLowConfidenceCount++
 		}
 	}
@@ -339,17 +339,18 @@ func (f *fakeServeStore) hasImage(sha string) bool {
 // fakeUploadRecognizer 可配置识别结果;Report 返回深拷贝(不把 applyFailInvariant
 // 的就地归一化带进下一次调用),OCR 结果取样本形状(行链接用例的数据底)。
 type fakeUploadRecognizer struct {
-	calls  int
-	report *contract.Report
-	err    error
+	calls      int
+	report     *contract.Report
+	normalized []byte
+	err        error
 }
 
-func (f *fakeUploadRecognizer) Report(ctx context.Context, image []byte, filename, date string) (*contract.OCRResult, *contract.Report, error) {
+func (f *fakeUploadRecognizer) Report(ctx context.Context, image []byte, filename, date string) ([]byte, *contract.OCRResult, *contract.Report, error) {
 	f.calls++
 	if f.err != nil {
-		return nil, nil, f.err
+		return nil, nil, nil, f.err
 	}
-	return sampleUploadOCR(), cloneReport(f.report), nil
+	return f.normalized, sampleUploadOCR(), cloneReport(f.report), nil
 }
 
 func (f *fakeUploadRecognizer) Reparse(ctx context.Context, ocr *contract.OCRResult, date string) (*contract.Report, error) {
@@ -496,6 +497,35 @@ func decodeUpload(t *testing.T, status int, raw []byte, wantStatus int) httpapi.
 		t.Fatalf("decode UploadResult: %v; body = %s", err, raw)
 	}
 	return got
+}
+
+// TestServeUploadNormalizedImage_UsesNormalizedIdentity 整页横拍:
+// 识别端返回转正图像 → 报告身份/对象存储使用转正后的 sha;再传原图按 duplicate 返回。
+func TestServeUploadNormalizedImage_UsesNormalizedIdentity(t *testing.T) {
+	srv, st, rec, _ := newReportsTestServer(t)
+	createOne(t, srv, `{"name":"小虎","is_child":true}`)
+	original := []byte("sideways-jpeg-bytes")
+	rec.normalized = []byte("upright-jpeg-bytes")
+
+	status, raw := doUpload(t, srv, original, map[string]string{formMemberID: "1"})
+	got := decodeUpload(t, status, raw, http.StatusCreated)
+
+	wantSha := pipeline.ImageSha256Hex(rec.normalized)
+	if got.Report.ReportID != wantSha {
+		t.Errorf("report_id = %q, want normalized sha %q", got.Report.ReportID, wantSha)
+	}
+	if !st.hasImage(wantSha) {
+		t.Errorf("normalized image missing from store")
+	}
+	if st.hasImage(pipeline.ImageSha256Hex(original)) {
+		t.Errorf("original sideways bytes stored, want only normalized image")
+	}
+
+	status, raw = doUpload(t, srv, original, map[string]string{formMemberID: "1"})
+	again := decodeUpload(t, status, raw, http.StatusOK)
+	if !again.Duplicate || again.Report.ReportID != wantSha {
+		t.Errorf("re-upload = duplicate %v report %q, want duplicate true / %q", again.Duplicate, again.Report.ReportID, wantSha)
+	}
 }
 
 // TestServeUploadNewReport 新图上传:201 + 完整报告(成员归属、聚合计数、
@@ -836,8 +866,8 @@ func TestServeUploadRecognizerFailure(t *testing.T) {
 }
 
 // TestServeListReportsFilterAndCounts 时间线成员过滤 + 卡片字段:failed 的
-// fail_reason 可见、dateless 不崩、徽标按 flag 聚合、待核对只算 partial 的
-// unreviewed 低置信项(success 免核对恒 0),缺省含无主存量报告。
+// fail_reason 可见、dateless 不崩、徽标按 flag 聚合、待核对统计未核对低置信项
+// (success 报告也如实计数),缺省含无主存量报告。
 func TestServeListReportsFilterAndCounts(t *testing.T) {
 	srv, st, _, _ := newReportsTestServer(t)
 	a, b := int64(1), int64(2)
@@ -851,7 +881,7 @@ func TestServeListReportsFilterAndCounts(t *testing.T) {
 		{Name: "平均血红蛋白浓度", Value: &v2, Flag: "low", LowConfidence: low, RawText: "平均血红蛋白浓度  300  g/L  316-354"},
 	}}, nil)
 	st.seedReport("bbb", &a, contract.Report{ReportType: "其他专项", Status: contract.StatusFailed}, &failReason)
-	// 成员 B:success 但含一条低置信未核对项(识别干净免核对:计数必须为 0)。
+	// 成员 B:success 但含一条低置信未核对项(计数如实为 1)。
 	st.seedReport("ccc", &b, contract.Report{ReportType: "尿常规", ReportDate: str("2026-10-01"), Status: contract.StatusSuccess, Items: []contract.ReportItem{
 		{Name: "尿蛋白", Value: &v1, Flag: "unknown", LowConfidence: low, RawText: "尿蛋白  10.8"},
 	}}, nil)
@@ -887,7 +917,7 @@ func TestServeListReportsFilterAndCounts(t *testing.T) {
 		t.Errorf("failed card date/count = %v/%d, want null/0", failed.ReportDate, failed.UnreviewedLowConfidenceCount)
 	}
 
-	// 成员 B:success 免核对,计数恒 0。
+	// 成员 B:success 含一条低置信未核对项,计数如实为 1。
 	status, raw = doJSON(t, srv, http.MethodGet, "/api/v1/reports?member_id=2", "")
 	if status != http.StatusOK {
 		t.Fatalf("GET member 2: status = %d", status)
@@ -895,8 +925,8 @@ func TestServeListReportsFilterAndCounts(t *testing.T) {
 	if err := json.Unmarshal(raw, &list); err != nil {
 		t.Fatal(err)
 	}
-	if len(list.Reports) != 1 || list.Reports[0].UnreviewedLowConfidenceCount != 0 {
-		t.Fatalf("member 2 reports = %+v, want 1 card with count 0 (success 免核对)", list.Reports)
+	if len(list.Reports) != 1 || list.Reports[0].UnreviewedLowConfidenceCount != 1 {
+		t.Fatalf("member 2 reports = %+v, want 1 card with count 1 (success 也统计未核对低置信)", list.Reports)
 	}
 	if list.Reports[0].FlagCounts.Unknown != 1 {
 		t.Errorf("member 2 flag_counts = %+v, want unknown=1(徽标照算)", list.Reports[0].FlagCounts)

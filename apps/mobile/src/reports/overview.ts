@@ -1,5 +1,6 @@
-// 报告口径与概览聚合(纯逻辑,概览与档案共用):待核对 = `status === 'partial'` 且非影像单;
-// 识别失败 = `status === 'failed'`。计数与筛选共用同一判定,避免两处口径漂移。
+// 报告口径与概览聚合(纯逻辑,概览与档案共用):待核对 = `status === 'partial'`、
+// 检验单含可操作未知项,或含未核对低置信项,且非影像单;识别失败 = `status === 'failed'`。
+// 计数与筛选共用同一判定,避免两处口径漂移。
 import type { ReportSummary } from '../api/reports';
 
 import { isImagingReport } from './category';
@@ -13,9 +14,15 @@ export type PendingSummary = {
   failedReports: number;
 };
 
-/** 待核对:partial 且非影像单(与卡片状态文案同口径)。 */
+/** 待核对:partial、success+可操作未知或 success+未核对低置信,且非影像单
+ *  (与卡片状态文案同口径)。 */
 export function isPendingReviewReport(report: ReportSummary): boolean {
-  return report.status === 'partial' && !isImagingReport(report);
+  return (
+    !isImagingReport(report) &&
+    (report.status === 'partial' ||
+      report.flag_counts.unknown > 0 ||
+      report.unreviewed_low_confidence_count > 0)
+  );
 }
 
 /** 识别失败:failed 报告(影像单失败同样计入)。 */
@@ -23,7 +30,8 @@ export function isFailedReport(report: ReportSummary): boolean {
   return report.status === 'failed';
 }
 
-/** 待处理计数:待核对份数、这些报告的未核对低置信项之和、识别失败份数。 */
+/** 待处理计数:待核对份数、这些报告的未核对低置信项之和、识别失败份数。
+ *  份数含 success+可操作未知/未核对低置信;项数只统计低置信,可操作未知以卡片「未知 N」展示。 */
 export function pendingSummary(reports: ReportSummary[]): PendingSummary {
   const pending = reports.filter(isPendingReviewReport);
   return {

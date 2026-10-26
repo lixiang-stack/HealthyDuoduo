@@ -7,6 +7,7 @@ import {
   itemFlagLabel,
   reportBadgeLabels,
   reportDateLabel,
+  reportStatusKind,
   reportStatusLabel,
   unreviewedBadge,
   uploadResultText,
@@ -33,6 +34,30 @@ describe('reportStatusLabel', () => {
     expect(reportStatusLabel({ ...report, status: 'success' })).toBe('识别完成');
     expect(reportStatusLabel({ ...report, status: 'partial' })).toBe('待核对');
     expect(reportStatusLabel({ ...report, status: 'failed' })).toBe('识别失败');
+  });
+
+  it('检验单 success 含可操作未知或未核对低置信时按待核对展示;影像单不降级', () => {
+    const withUnknown = {
+      ...report,
+      status: 'success' as const,
+      flag_counts: { high: 0, low: 0, abnormal: 0, unknown: 2 },
+    };
+    expect(reportStatusKind(withUnknown)).toBe('partial');
+    expect(reportStatusLabel(withUnknown)).toBe('待核对');
+    const withLow = {
+      ...report,
+      status: 'success' as const,
+      unreviewed_low_confidence_count: 1,
+    };
+    expect(reportStatusKind(withLow)).toBe('partial');
+    expect(reportStatusLabel(withLow)).toBe('待核对');
+    expect(
+      reportStatusLabel({
+        ...imaging,
+        flag_counts: { high: 0, low: 0, abnormal: 0, unknown: 2 },
+        unreviewed_low_confidence_count: 1,
+      }),
+    ).toBe('识别完成');
   });
 
   it('影像单不显示没有对应动作的「待核对」;success/failed 仍给出状态', () => {
@@ -139,7 +164,7 @@ describe('reportBadgeLabels', () => {
 });
 
 describe('unreviewedBadge', () => {
-  it('「待核对 N 项」;0 不出徽标(failed 恒 0、success 免核对)', () => {
+  it('「待核对 N 项」;0 不出徽标', () => {
     expect(unreviewedBadge(3)).toBe('待核对 3 项');
     expect(unreviewedBadge(0)).toBeUndefined();
   });
@@ -163,13 +188,56 @@ describe('uploadResultText', () => {
     expect(uploadResultText({ duplicate: false, report })).toBe('识别完成,已归档');
   });
 
+  it('成功但含可操作未知:按待核对项数提示', () => {
+    const withUnknown = {
+      ...report,
+      flag_counts: { high: 0, low: 0, abnormal: 0, unknown: 1 },
+      items: [
+        {
+          item_id: 1,
+          name: '红细胞计数',
+          value: '3.78',
+          unit: null,
+          ref_range: '80~5.10',
+          method: null,
+          flag: 'unknown' as const,
+          flag_reason: 'ocr_merge' as const,
+          low_confidence: false,
+          raw_text: '红细胞计数  3.78  80~5.10',
+          review_status: 'unreviewed' as const,
+          ocr_lines: [],
+          prev: null,
+        },
+      ],
+    };
+    expect(uploadResultText({ duplicate: false, report: withUnknown })).toBe(
+      '已归档,有 1 项待核对',
+    );
+  });
+
   it('待核对:带未核对低置信项数', () => {
     const partial = {
       ...report,
       status: 'partial' as const,
       unreviewed_low_confidence_count: 3,
+      items: [
+        {
+          item_id: 1,
+          name: '单核细胞比率',
+          value: '10.8',
+          unit: '%',
+          ref_range: '3-10',
+          method: null,
+          flag: 'high' as const,
+          low_confidence: true,
+          raw_text: '单核细胞百分比 10.8 % 3-10',
+          review_status: 'unreviewed' as const,
+          ocr_lines: [],
+          prev: null,
+        },
+      ],
     };
-    expect(uploadResultText({ duplicate: false, report: partial })).toBe('已归档,有 3 项待核对');
+    expect(uploadResultText({ duplicate: false, report: partial })).toBe('已归档,有 1 项待核对');
   });
 
   it('识别失败:展示后端失败原因且说明已留痕', () => {

@@ -279,7 +279,7 @@ func TestServeReviewFlagRecompute(t *testing.T) {
 
 // TestServeReviewStatusMonotonic 状态派生单调:partial 有两项未核对低置信时逐项
 // 处理(计数递减、状态不动)→ 最后一项后翻 success;此后任何动作不回 partial;
-// success 报告(免核对)恒定 success、计数恒 0。
+// success 报告状态恒定;success 内的低置信项确认后计数归零。
 func TestServeReviewStatusMonotonic(t *testing.T) {
 	srv, st, _, _ := newReportsTestServer(t)
 	sha := strings.Repeat("a", 64)
@@ -311,11 +311,18 @@ func TestServeReviewStatusMonotonic(t *testing.T) {
 		t.Errorf("confirm high-confidence on success report = %+v", got)
 	}
 
-	// success 报告含低置信项:确认不改状态、计数恒 0(免核对面)。
+	// success 报告含未核对低置信项:计数如实为 1;确认后降为 0,状态仍 success。
 	successSha := strings.Repeat("b", 64)
 	st.seedReport(successSha, nil, contract.Report{ReportType: "尿常规", Status: contract.StatusSuccess, Items: []contract.ReportItem{
 		{Name: "尿蛋白", Value: str("10.8"), Flag: "high", LowConfidence: true, RawText: "尿蛋白  10.8"},
 	}}, nil)
+	successSummary, err := st.SummaryByImage(context.Background(), successSha)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if successSummary == nil || successSummary.UnreviewedLowConfidenceCount != 1 {
+		t.Fatalf("success summary = %+v, want unreviewed_low_confidence_count=1", successSummary)
+	}
 	successItems, err := st.ItemsWithReviewStatus(context.Background(), successSha)
 	if err != nil {
 		t.Fatal(err)

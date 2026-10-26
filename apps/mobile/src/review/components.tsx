@@ -14,6 +14,7 @@ import { itemFlagLabel, MISSING_REF_RANGE_LABEL } from '../reports/status';
 import {
   buildCorrection,
   canMarkNoReference,
+  displayItemName,
   draftFromItem,
   flagReasonText,
   reviewActions,
@@ -52,6 +53,7 @@ export function ReviewItemCard({
   const statusLabel = reviewStatusLabel(item.review_status);
   const showZoom = shouldShowZoom(item, { open: zoomOpen, editing });
   const actions = reviewActions(item);
+  const displayName = displayItemName(item);
 
   const submit = async (request: Parameters<typeof reviewItem>[3]) => {
     setBusy(true);
@@ -89,7 +91,7 @@ export function ReviewItemCard({
       style={[styles.itemCard, item.low_confidence && styles.itemCardLowConfidence]}
     >
       <View style={styles.itemHeader}>
-        <Text style={styles.itemName}>{item.name}</Text>
+        <Text style={styles.itemName}>{displayName}</Text>
         {item.low_confidence ? <Text style={styles.lowTag}>低置信</Text> : null}
         {statusLabel ? <Text style={styles.reviewTag}>{statusLabel}</Text> : null}
         <Text style={[styles.itemFlag, { color: flagColor }]}>{itemFlagLabel(item)}</Text>

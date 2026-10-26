@@ -11,28 +11,109 @@ import { flagReasonText, isBackfillItem, reviewStatusLabel } from './rules';
 
 export { flagReasonText, isBackfillItem, reviewStatusLabel };
 
-/** 核对触发条件(上传返回分岔与详情入口共用):partial,或未核对的低置信项
- *  (含低置信项触发);干净 success(全量高置信/低置信项均已确信)免核对直落;
+/** 核对触发条件(上传返回分岔与详情入口共用):partial、不可忽略的可操作未知项,
+ *  或未核对的低置信项;干净 success(全量高置信、无可操作未知)免核对直落;
  *  failed 无可核对项(展示图像与原因)。 */
 export function needsReview(report: Pick<ReportDetail, 'status' | 'items'>): boolean {
   return (
     report.status === 'partial' ||
     report.items.some(
       (item) =>
-        item.low_confidence && item.review_status === 'unreviewed' && item.flag !== 'not_tested',
+        (item.low_confidence && item.review_status === 'unreviewed' && item.flag !== 'not_tested') ||
+        (item.flag === 'unknown' && isActionableUnknown(item.flag_reason)),
     )
   );
 }
 
-/** 待核对项 = 未核对的低置信项(「剩余 N 项」的同一口径;行序保持报告原序)。
- *  未检测项是已知的“本次未做”,不是核对任务。 */
+/** 待核对项 = 未核对的低置信项 + 可操作未知项(「剩余 N 项」的同一口径;
+ *  行序保持报告原序)。可操作未知确认后仍是 unknown,只有修正值/参考范围才消解,
+ *  所以即使 review_status=confirmed 也保留。未检测项是已知的“本次未做”,不是核对任务。 */
 export function pendingItems(items: ReportItem[]): ReportItem[] {
   return items.filter(
     (item) =>
-      item.review_status === 'unreviewed' &&
-      item.low_confidence &&
-      item.flag !== 'not_tested',
+      item.flag !== 'not_tested' &&
+      ((item.review_status === 'unreviewed' && item.low_confidence) ||
+        (item.flag === 'unknown' && isActionableUnknown(item.flag_reason))),
   );
+}
+
+const CJK_CHAR_RE = /[\u3400-\u9fff]/;
+const RAW_CELL_SEPARATOR_RE = /\s{2,}/;
+const METHOD_SUFFIX_RE = /[（(]\s*(?:\d+\s*-\s*HR|省免|互认)[^）)]*[）)]/gi;
+const STAR_PREFIX_RE = /^[*＊※✱]+\s*/;
+const SERIAL_PREFIX_RE = /^\d{1,3}(?=\s|[\u3400-\u9fff])/;
+const SERIAL_DOT_RE = /^\d{1,3}[.、．]\s*/;
+
+function cjkChars(text: string): string[] {
+  return [...text].filter((char) => CJK_CHAR_RE.test(char));
+}
+
+function commonPrefixLength(a: string, b: string): number {
+  let i = 0;
+  while (i < a.length && i < b.length && a[i] === b[i]) {
+    i += 1;
+  }
+  return i;
+}
+
+function longestCommonSubstringLength(a: string, b: string): number {
+  let best = 0;
+  const previous = new Array<number>(b.length + 1).fill(0);
+  for (let i = 1; i <= a.length; i += 1) {
+    let diagonal = 0;
+    for (let j = 1; j <= b.length; j += 1) {
+      const saved = previous[j];
+      if (a[i - 1] === b[j - 1]) {
+        previous[j] = diagonal + 1;
+        best = Math.max(best, previous[j]);
+      } else {
+        previous[j] = 0;
+      }
+      diagonal = saved;
+    }
+  }
+  return best;
+}
+
+/** 印名与规范名至少共享 2 字前缀或 3 字公共子串:排除「黄色」「直接观察法」这类值/方法格。 */
+function sharesName(canonical: string, candidate: string): boolean {
+  return (
+    commonPrefixLength(canonical, candidate) >= 2 ||
+    longestCommonSubstringLength(canonical, candidate) >= 3
+  );
+}
+
+/** 展示名:未修正时优先用 raw_text 里印出的中文名称(去掉序号/星号/互认后缀),
+ *  让卡片主名称与原文一致;修正后以生效名称为准。规范名 name 仍用于趋势连接。
+ *  找不到可靠印名(如原文只有缩写 WBC/PH、或首个中文格是检测方法)时回落 name。 */
+export function displayItemName(
+  item: Pick<ReportItem, 'name' | 'raw_text' | 'review_status'>,
+): string {
+  if (item.review_status === 'corrected' || !CJK_CHAR_RE.test(item.name)) {
+    return item.name;
+  }
+  const canonical = cjkChars(item.name).join('');
+  for (const part of item.raw_text.split(RAW_CELL_SEPARATOR_RE)) {
+    let text = part.trim();
+    text = text
+      .replace(STAR_PREFIX_RE, '')
+      .replace(SERIAL_PREFIX_RE, '')
+      .replace(STAR_PREFIX_RE, '')
+      .replace(SERIAL_DOT_RE, '');
+    text = text.replace(METHOD_SUFFIX_RE, '').trim();
+    if (!text || !CJK_CHAR_RE.test(text)) {
+      continue;
+    }
+    const candidate = cjkChars(text).join('');
+    if (!sharesName(canonical, candidate)) {
+      continue;
+    }
+    if (/(?:法|检查)$/.test(text) && text !== item.name) {
+      continue;
+    }
+    return text;
+  }
+  return item.name;
 }
 
 /** 原图定位可见性:有 OCR 行链接,且(用户展开或正在修正)。低置信项默认展开;
@@ -47,8 +128,9 @@ export function shouldShowZoom(
 /** flag 聚合徽标计数(与服务端 FlagCounts 同口径:normal 不计,缺档即 0)。
  *  ReviewResult 只带报告级状态/计数与本次指标项,整屏刷新时徽标由客户端按
  *  更新后的全量 items 重算(单响应刷新整屏)。 */
-/** 时间线「未知」徽标只统计可操作/抽取失败;无参考范围/信息项/叙述体不进未知数。 */
-function isActionableUnknown(reason: ReportItem['flag_reason']): boolean {
+/** 可操作未知 = 抽取/比较失败，需要家长补录或修正；无参考范围/信息项/叙述体/
+ *  定性不支持等不需要处理，不计入「未知」与待核对。 */
+export function isActionableUnknown(reason: ReportItem['flag_reason']): boolean {
   return (
     reason !== 'no_reference' &&
     reason !== 'qualitative_unsupported' &&
@@ -94,8 +176,9 @@ export type ReviewActions = {
   helper?: string;
 };
 
-/** 卡片动作:可补录 → 只给补录主操作;低置信未核对 → 确认;其余 → 修正/再修正。
- * 每卡最多一个 filled primary(票 02 口径)。 */
+/** 卡片动作:可补录 → 只给补录主操作;可操作未知 → 不给确认(确认不改变 unknown);
+ *  低置信非可操作未知且未核对 → 确认;其余 → 修正/再修正。
+ *  每卡最多一个 filled primary(票 02 口径)。 */
 export function reviewActions(item: ReportItem): ReviewActions {
   if (item.flag === 'not_tested') {
     return { confirm: false, primary: null, correctLabel: '修正' };
@@ -108,7 +191,11 @@ export function reviewActions(item: ReportItem): ReviewActions {
       helper: '照原图补齐后按值×范围重算。',
     };
   }
-  if (item.low_confidence && item.review_status === 'unreviewed') {
+  if (
+    item.low_confidence &&
+    item.review_status === 'unreviewed' &&
+    !(item.flag === 'unknown' && isActionableUnknown(item.flag_reason))
+  ) {
     return { confirm: true, primary: 'confirm', correctLabel: '修正' };
   }
   return {

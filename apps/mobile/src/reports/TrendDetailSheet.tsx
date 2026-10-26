@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { TrendPoint } from '../api/reports';
 import { colors } from '../components/theme';
+import { displayItemName } from '../review/items';
 import { FLAG_COLORS } from './colors';
 import { flagLabel, DATE_UNKNOWN_LABEL, refRangeLabel } from './status';
 import { TrendDetailChart } from './TrendChart';
@@ -41,6 +42,7 @@ function PointBadge({ point }: { point: TrendPoint }) {
 export function TrendDetailSheet({ row, onClose }: { row: TrendRow; onClose: () => void }) {
   const { candidate, series } = row;
   const item = candidate.item;
+  const name = displayItemName(item);
   const [selectedIndex, setSelectedIndex] = useState(() => defaultSelectedIndex(series));
   const selectedPoint = series.listPoints[selectedIndex];
   // 选中点若不是可绘制点(非数值/缺日期),图中没有对应标记:保持无放大,避免高亮与点卡不一致。
@@ -63,7 +65,7 @@ export function TrendDetailSheet({ row, onClose }: { row: TrendRow; onClose: () 
             <Text style={styles.close}>‹</Text>
           </Pressable>
           <Text style={styles.title} numberOfLines={1}>
-            {item.name}
+            {name}
           </Text>
         </View>
 
@@ -75,7 +77,7 @@ export function TrendDetailSheet({ row, onClose }: { row: TrendRow; onClose: () 
           {series.chartPoints.length > 0 ? (
             <TrendDetailChart
               series={series}
-              name={item.name}
+              name={name}
               selectedIndex={selectedChartIndex >= 0 ? selectedChartIndex : null}
               testID="trend-detail-chart"
             />

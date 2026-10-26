@@ -174,12 +174,18 @@ class Report(BaseModel):
 
 
 class ReportResponse(BaseModel):
-    """POST /report 的响应体:一次请求内 OCR 结果 + 结构化报告(实施计划 4.3;与 ReparseRequest 成对)。"""
+    """POST /report 的响应体:一次请求内 OCR 结果 + 结构化报告(实施计划 4.3;与 ReparseRequest 成对)。
+
+    normalized_image 只在整页横拍/倒置被转正时出现(base64 编码的转正后图像);数据服务
+    用它作为入库身份与展示原图。image_rotation 记录逆时针角度(0/90/180/270),便于排查。
+    """
 
     model_config = ConfigDict(extra="forbid")
 
     ocr_result: OCRResult
     report: Report
+    normalized_image: str | None = None
+    image_rotation: int = 0
 
 
 class ReparseRequest(BaseModel):

@@ -21,7 +21,7 @@ import { MemberChips } from '../members/components';
 import { sortMembers } from '../members/order';
 import { needsReassign, reassignConfirmText } from './manage';
 import { EXAM_NAME_KIND, SECTION_LABELS } from './sections';
-import { reportBadgeLabels, reportDateLabel, reportStatusLabel } from './status';
+import { reportBadgeLabels, reportDateLabel, reportStatusKind, reportStatusLabel } from './status';
 
 // 报告状态色:时间线卡片与详情头部共用。
 export const STATUS_COLORS: Record<ReportSummary['status'], string> = {
@@ -73,12 +73,13 @@ export function ReportCard({
 }) {
   const failed = report.status === 'failed';
   const status = reportStatusLabel(report);
+  const statusKind = reportStatusKind(report);
   return (
     <View testID={`${testIDPrefix}-${report.report_id}`} style={styles.card}>
       <View style={styles.headerRow}>
         <Text style={styles.type}>{report.report_type}</Text>
         {status ? (
-          <Text style={[styles.status, { color: STATUS_COLORS[report.status] }]}>{status}</Text>
+          <Text style={[styles.status, { color: STATUS_COLORS[statusKind] }]}>{status}</Text>
         ) : null}
       </View>
       {examName ? (

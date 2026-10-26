@@ -69,6 +69,54 @@ func TestIngestRepeated_Idempotent(t *testing.T) {
 	}
 }
 
+func TestIngestNormalizedImage_UsesNormalizedIdentity(t *testing.T) {
+	st, rec, obj := newFakeStore(), newFakeRecognizer(), newObjects()
+	original := []byte("sideways-image")
+	rec.normalized = []byte("upright-image")
+	path := writeImage(t, original)
+
+	oc := ingest(t, st, rec, obj, path, "", false)
+
+	wantSha := pipeline.ImageSha256Hex(rec.normalized)
+	if oc.Sha256 != wantSha {
+		t.Errorf("identity = %s, want normalized sha %s", oc.Sha256, wantSha)
+	}
+	if oc.Kind != pipeline.KindNew {
+		t.Errorf("kind = %v, want KindNew", oc.Kind)
+	}
+	if got := obj.puts[wantSha]; string(got) != string(rec.normalized) {
+		t.Errorf("stored object = %q, want normalized bytes %q", got, rec.normalized)
+	}
+	if _, ok := st.reports[wantSha]; !ok {
+		t.Errorf("report missing under normalized sha %s", wantSha)
+	}
+	if got := rec.imageOfCall[1]; string(got) != string(original) {
+		t.Errorf("recognizer image = %q, want original upload %q", got, original)
+	}
+}
+
+func TestIngestNormalizedImage_RepeatedHitsNormalizedReport(t *testing.T) {
+	st, rec, obj := newFakeStore(), newFakeRecognizer(), newObjects()
+	rec.normalized = []byte("upright-image")
+	path := writeImage(t, []byte("sideways-image"))
+
+	first := ingest(t, st, rec, obj, path, "", false)
+	second := ingest(t, st, rec, obj, path, "", false)
+
+	if first.Sha256 != second.Sha256 {
+		t.Errorf("sha differ: %s vs %s", first.Sha256, second.Sha256)
+	}
+	if second.Kind != pipeline.KindCached {
+		t.Errorf("second kind = %v, want KindCached", second.Kind)
+	}
+	if len(st.ocrRows) != 1 {
+		t.Errorf("ocr rows = %d, want 1", len(st.ocrRows))
+	}
+	if len(obj.puts) != 1 {
+		t.Errorf("object puts = %d, want 1", len(obj.puts))
+	}
+}
+
 func TestIngestForce_RerunsAndAppendsOCR(t *testing.T) {
 	st, rec, obj := newFakeStore(), newFakeRecognizer(), newObjects()
 	path := writeImage(t, []byte("fake-image-1"))

@@ -95,7 +95,7 @@ export default function ReportDetailScreen() {
               href={{ pathname: '/review/[report_id]', params: { report_id: report.report_id } }}
             >
               <Pressable testID="report-pending-entry">
-                <Text style={styles.link}>逐项核对 {pending.length} 项低置信</Text>
+                <Text style={styles.link}>逐项核对 {pending.length} 项</Text>
               </Pressable>
             </Link>
           ) : null}

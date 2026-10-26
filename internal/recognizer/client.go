@@ -5,6 +5,7 @@ package recognizer
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -30,8 +31,9 @@ var retryInterval = 1 * time.Second
 // 单次请求超时:覆盖模型加载 + 单张 OCR(机内实测远低于 60s)。
 const requestTimeout = 60 * time.Second
 
-// 响应体读取上限(OCR 结果 JSON 含全部文本行/坐标,常规 <5MB)。
-const maxBodyBytes = 32 << 20
+// 响应体读取上限:OCR 结果 JSON 含全部文本行/坐标;整页横拍转正时还带
+// base64 图像(上限 25MiB 上传 → 约 34MiB base64),留出余量。
+const maxBodyBytes = 64 << 20
 
 // 错误信息中响应体片段的截断上限(定位问题足够,避免整段输出)。
 const maxErrorSnippet = 200
@@ -53,37 +55,45 @@ func New(base string) *Client {
 }
 
 type reportResponse struct {
-	OCRResult contract.OCRResult `json:"ocr_result"`
-	Report    contract.Report    `json:"report"`
+	OCRResult       contract.OCRResult `json:"ocr_result"`
+	Report          contract.Report    `json:"report"`
+	NormalizedImage string             `json:"normalized_image"`
 }
 
-func (c *Client) Report(ctx context.Context, image []byte, filename, date string) (*contract.OCRResult, *contract.Report, error) {
+func (c *Client) Report(ctx context.Context, image []byte, filename, date string) ([]byte, *contract.OCRResult, *contract.Report, error) {
 	var body bytes.Buffer
 	mw := multipart.NewWriter(&body)
 	fw, err := mw.CreateFormFile("image", filename)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	if _, err := fw.Write(image); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	if date != "" {
 		if err := mw.WriteField("date", date); err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 	}
 	if err := mw.Close(); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	raw, err := c.post(ctx, c.reportURL, mw.FormDataContentType(), body.Bytes())
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	var out reportResponse
 	if err := json.Unmarshal(raw, &out); err != nil {
-		return nil, nil, fmt.Errorf("parse /report response: %w (body=%s)", err, truncate(raw))
+		return nil, nil, nil, fmt.Errorf("parse /report response: %w (body=%s)", err, truncate(raw))
 	}
-	return &out.OCRResult, &out.Report, nil
+	var normalized []byte
+	if out.NormalizedImage != "" {
+		normalized, err = base64.StdEncoding.DecodeString(out.NormalizedImage)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("decode normalized_image: %w", err)
+		}
+	}
+	return normalized, &out.OCRResult, &out.Report, nil
 }
 
 func (c *Client) Reparse(ctx context.Context, ocr *contract.OCRResult, date string) (*contract.Report, error) {
@@ -182,6 +192,6 @@ func truncate(raw []byte) string {
 
 // 编译期接口校验(pipeline.Recognizer 的实现)。
 var _ interface {
-	Report(context.Context, []byte, string, string) (*contract.OCRResult, *contract.Report, error)
+	Report(context.Context, []byte, string, string) ([]byte, *contract.OCRResult, *contract.Report, error)
 	Reparse(context.Context, *contract.OCRResult, string) (*contract.Report, error)
 } = (*Client)(nil)

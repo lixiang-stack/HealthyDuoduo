@@ -28,11 +28,25 @@ describe('filterReports', () => {
     report({ report_id: 'partial', status: 'partial' }),
     report({ report_id: 'failed', status: 'failed' }),
     report({ report_id: 'success', status: 'success' }),
+    report({
+      report_id: 'success-unknown',
+      status: 'success',
+      flag_counts: { high: 0, low: 0, abnormal: 0, unknown: 1 },
+    }),
+    report({
+      report_id: 'success-low',
+      status: 'success',
+      unreviewed_low_confidence_count: 1,
+    }),
     report({ report_id: 'imaging-partial', status: 'partial', report_type: '影像' }),
   ];
 
-  it('partial 只保留待核对的非影像报告', () => {
-    expect(filterReports(reports, 'partial').map((r) => r.report_id)).toEqual(['partial']);
+  it('partial 与 success 待核对项只保留待核对的非影像报告', () => {
+    expect(filterReports(reports, 'partial').map((r) => r.report_id)).toEqual([
+      'partial',
+      'success-unknown',
+      'success-low',
+    ]);
   });
 
   it('failed 保留全部识别失败报告(含影像单)', () => {
@@ -51,6 +65,8 @@ describe('filterReports', () => {
       'partial',
       'failed',
       'success',
+      'success-unknown',
+      'success-low',
       'imaging-partial',
     ]);
   });
@@ -68,16 +84,28 @@ describe('filterReports', () => {
       'partial',
       'failed',
       'success',
+      'success-unknown',
+      'success-low',
       'imaging-partial',
     ]);
   });
 });
 
 describe('pendingSummary', () => {
-  it('partial 计份数与未核对项之和;影像单与 failed 不计入待核对', () => {
+  it('partial 与 success+可操作未知计份数;未核对项之和、影像单与 failed 不计入', () => {
     const reports = [
       report({ report_id: 'p1', status: 'partial', unreviewed_low_confidence_count: 2 }),
       report({ report_id: 'p2', status: 'partial', unreviewed_low_confidence_count: 0 }),
+      report({
+        report_id: 'success-unknown',
+        status: 'success',
+        flag_counts: { high: 0, low: 0, abnormal: 0, unknown: 1 },
+      }),
+      report({
+        report_id: 'success-low',
+        status: 'success',
+        unreviewed_low_confidence_count: 1,
+      }),
       report({
         report_id: 'imaging-partial',
         status: 'partial',
@@ -89,8 +117,8 @@ describe('pendingSummary', () => {
       report({ report_id: 'imaging-failed', status: 'failed', report_type: '影像' }),
     ];
     expect(pendingSummary(reports)).toEqual({
-      partialReports: 2,
-      unreviewedItems: 2,
+      partialReports: 4,
+      unreviewedItems: 3,
       failedReports: 2,
     });
   });
