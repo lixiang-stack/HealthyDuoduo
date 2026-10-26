@@ -2,7 +2,7 @@
 
 面向 `apps/mobile` 的本地 release APK 构建流程。云端构建见文末「备选：EAS 云构建」。
 
-实测版本：Expo SDK 57 / React Native 0.86.3 / Gradle 9.3.1 / AGP 8.12 / JDK 21。
+实测版本：Expo SDK 57 / React Native 0.86.3 / Gradle 9.3.1 / AGP 8.12 / JDK 21（SDK 58 升级后尚未重新跑通本地 APK 构建）。
 
 ## 前置条件
 
