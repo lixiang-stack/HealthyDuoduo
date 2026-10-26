@@ -14,12 +14,16 @@ export type PickedImage = {
 };
 
 export type PickImageResult =
-  | { kind: 'picked'; image: PickedImage }
+  | { kind: 'picked'; images: PickedImage[] }
   | { kind: 'cancelled' }
   | { kind: 'denied' }
   | { kind: 'unsupported'; reason: string };
 
-export async function pickImage(source: ImageSource): Promise<PickImageResult> {
+/** 相册一次可选多张(selectionLimit 为本次上限);相机固定单张。 */
+export async function pickImage(
+  source: ImageSource,
+  selectionLimit: number,
+): Promise<PickImageResult> {
   // Web 验证环境没有相机能力,收口为 unsupported(改用文件选择)。
   if (Platform.OS === 'web' && source === 'camera') {
     return { kind: 'unsupported', reason: '验证环境(Web)没有相机,请改用相册/文件选择' };
@@ -31,25 +35,24 @@ export async function pickImage(source: ImageSource): Promise<PickImageResult> {
   if (!permission.granted) {
     return { kind: 'denied' };
   }
-  const options: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'] };
+  const options: ImagePicker.ImagePickerOptions =
+    source === 'camera'
+      ? { mediaTypes: ['images'] }
+      : { mediaTypes: ['images'], allowsMultipleSelection: true, selectionLimit };
   const result =
     source === 'camera'
       ? await ImagePicker.launchCameraAsync(options)
       : await ImagePicker.launchImageLibraryAsync(options);
-  if (result.canceled) {
-    return { kind: 'cancelled' };
-  }
-  const asset = result.assets[0];
-  if (!asset) {
+  if (result.canceled || result.assets.length === 0) {
     return { kind: 'cancelled' };
   }
   return {
     kind: 'picked',
-    image: {
+    images: result.assets.map((asset) => ({
       uri: asset.uri,
       mimeType: asset.mimeType,
       fileName: asset.fileName ?? undefined,
       file: asset.file ?? undefined,
-    },
+    })),
   };
 }

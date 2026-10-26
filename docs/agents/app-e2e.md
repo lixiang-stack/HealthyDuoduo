@@ -18,7 +18,7 @@ npm run e2e -- --headed        # 参数透传给 e2e run(如 --headed/--grep)
 E2E_KEEP_STACK=1 npm run e2e   # 跑完保留栈,便于手工看 Web/API(下次运行前仍会重建)
 ```
 
-完成判据：15/15 通过；失败时看 `.e2e/results/<test>/trace.md` 与应用日志 `.e2e/logs/expo.log`。
+完成判据：16/16 通过；失败时看 `.e2e/results/<test>/trace.md` 与应用日志 `.e2e/logs/expo.log`。
 
 ## 专用栈
 
@@ -32,7 +32,8 @@ E2E_KEEP_STACK=1 npm run e2e   # 跑完保留栈,便于手工看 Web/API(下次�
 每轮 `run.sh` 先 `down -v` 再 `up`，并叠加载 `e2e/compose.yml`：识别服务通过
 `RECOGNIZER_REPLAY_SAMPLES` 对这些样本**按图像 sha256 回放** `samples/expected/{ocr,report}`
 下的 golden，不再跑真实 OCR：`cbc_02`（生命周期）、`cbc_03`（核对）、`cbc_04`（自愈）、
-`us_01` / `us_03`（影像段落）、`glu_02`（上传）、`lft_02` / `lft_03` / `lft_04` / `lft_05`（趋势）。
+`us_01` / `us_03`（影像段落）、`glu_02`（单图上传）、`glu_01` / `glu_03`（多图上传）、
+`lft_02` / `lft_03` / `lft_04` / `lft_05`（趋势）。
 seed 仍经真实上传端点入档；`duplicate:true` 即视为栈未重置并失败。共享 `deploy` 栈（8080 等）
 不加载该覆盖、不暴露回放入口。
 
@@ -42,7 +43,7 @@ seed 仍经真实上传端点入档；`duplicate:true` 即视为栈未重置并�
 
 ## 用例与选择器
 
-- `app.e2e.ts`（11 条，serial）：设置/健康检查、成员、时间线过滤、概览、档案筛选、上传、
+- `app.e2e.ts`（12 条，serial）：设置/健康检查、成员、时间线过滤、概览、档案筛选、上传（单图/多图）、
   两张影像单、核对确认/修正、可补录未知、高置信未知原图定位；无 agent/模型调用。
 - `lifecycle.e2e.ts`（1 条）：改归属 / 删除 / 同图重传。独立成员 + `cbc_02` fixture，与主链路
   不共享数据；破坏性操作失败不连坐跳过其他文件。
@@ -51,7 +52,7 @@ seed 仍经真实上传端点入档；`duplicate:true` 即视为栈未重置并�
 - `trends.e2e.ts`（1 条）：异常指标趋势列表 / 详情 / 单点 / 无异常 / 无报告。独立成员 +
   `lft_02` / `lft_03` / `lft_04` / `lft_05` fixture，不依赖主链路 seed。
 - 契约类型复用 `src/api/schema.d.ts`；API/样张/testID 约定集中在 `e2e/support.ts`。
-- 关键控件带 `testID`（RNW 渲染为 `data-testid`）：成员 chip/行、上传选择/提交/结果、报告卡、
+- 关键控件带 `testID`（RNW 渲染为 `data-testid`）：成员 chip/行、上传选择/提交/逐行状态/移除/重试、报告卡、
   报告徽标（偏高/偏低/异常/未知/待核对）、检查项目/段落卡/段落缩放、核对项/状态/原因/确认/修正、
   趋势分组/指标行/迷你图/详情层/逐点行、详情管理卡（改归属/删除/确认）。改控件时同步改
   `support.ts` 的 `testID`。

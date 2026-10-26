@@ -75,24 +75,39 @@ export function reportImageUrl(baseUrl: string, reportId: string): string {
   return `${baseUrl}/images/${reportId}`;
 }
 
+/** 单张上传等待上限:后端识别 60s 超时 + 1 次重试,再留上传/归档余量。 */
+export const UPLOAD_TIMEOUT_MS = 180_000;
+
 export async function uploadReport(
   client: ApiClient,
   memberId: number,
   image: PickedImage,
 ): Promise<UploadResult> {
-  return unwrap(
-    await client.POST('/reports', {
-      // body 只是 openapi-fetch 的类型载体(契约把图像声明为 string,承载不了
-      // RN 的 {uri,name,type});真实 multipart 由 bodySerializer 经 platform 模块装配。
-      body: { image: image.uri, member_id: memberId },
-      bodySerializer: () => {
-        const form = new FormData();
-        form.append('member_id', String(memberId));
-        appendImagePart(form, image);
-        return form;
-      },
-    }),
-  );
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
+  try {
+    return unwrap(
+      await client.POST('/reports', {
+        // body 只是 openapi-fetch 的类型载体(契约把图像声明为 string,承载不了
+        // RN 的 {uri,name,type});真实 multipart 由 bodySerializer 经 platform 模块装配。
+        body: { image: image.uri, member_id: memberId },
+        bodySerializer: () => {
+          const form = new FormData();
+          form.append('member_id', String(memberId));
+          appendImagePart(form, image);
+          return form;
+        },
+        signal: controller.signal,
+      }),
+    );
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new Error(`上传超时(${UPLOAD_TIMEOUT_MS / 1000} 秒),请检查后端与识别服务后重试`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /** 核对(确认/修正)单次动作;响应含动作后报告级派生状态与本次指标项(单响应刷新整屏)。 */
