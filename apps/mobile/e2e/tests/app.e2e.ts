@@ -87,13 +87,13 @@ describe('App E2E', { serial: true, timeout: 300_000 }, () => {
     await expect(
       screen.getByTestId(testID.reportBadge(seed.imaging03.report_id, 'unreviewed')),
     ).toHaveCount(0);
-    // cbc_03 是 success 且无 unknown:核对项不产生时间线徽标。
+    // cbc_03 是 success 但含未核对低置信项:未知徽标为 0,待核对徽标应显示。
     await expect(
       screen.getByTestId(testID.reportBadge(seed.reviewReport.report_id, 'unknown')),
     ).toHaveCount(0);
     await expect(
       screen.getByTestId(testID.reportBadge(seed.reviewReport.report_id, 'unreviewed')),
-    ).toHaveCount(0);
+    ).toBeVisible();
 
     await screen.getByTestId(testID.memberChip(seed.mama.member_id)).tap();
     await expect(screen.getByTestId(testID.reportCard(seed.healReport.report_id))).toBeVisible();
@@ -110,12 +110,18 @@ describe('App E2E', { serial: true, timeout: 300_000 }, () => {
   test('成员概览与待处理入口', async ({ app, browser, screen }) => {
     const xiaomingReports = [seed.reviewReport, seed.imaging01, seed.imaging03];
     const xiaomingLatest = latestByCategory(xiaomingReports);
+    const xiaomingPending = pendingSummary(xiaomingReports);
 
     await openConfigured(app, browser, '/', { memberId: seed.xiaoming.member_id });
     await expect(screen.getByText('查看谁的档案')).toBeVisible();
-    // cbc_03 是 success;小明待核对 / 失败都为 0 → 空态,不显示入口。
-    await expect(screen.getByTestId(testID.overviewPendingEmpty)).toBeVisible();
-    await expect(screen.getByTestId(testID.overviewPendingPartial)).toHaveCount(0);
+    // cbc_03 是 success 但含未核对低置信项:概览按待核对展示份数与项数。
+    await expect(screen.getByTestId(testID.overviewPendingEmpty)).toHaveCount(0);
+    await expect(screen.getByTestId(testID.overviewPendingPartial)).toContainText(
+      `${xiaomingPending.partialReports} 份`,
+    );
+    await expect(screen.getByTestId(testID.overviewPendingPartial)).toContainText(
+      `${xiaomingPending.unreviewedItems} 项`,
+    );
     await expect(screen.getByTestId(testID.overviewPendingFailed)).toHaveCount(0);
     for (const report of xiaomingReports) {
       const latest = xiaomingLatest.some((entry) => entry.report_id === report.report_id);
