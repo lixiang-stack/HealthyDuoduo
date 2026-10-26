@@ -1,5 +1,5 @@
 // 报告口径与概览聚合(纯逻辑,概览与档案共用):待核对 = `status === 'partial'`、
-// 或检验单含可操作未知项,且非影像单;识别失败 = `status === 'failed'`。
+// 检验单含可操作未知项,或含未核对低置信项,且非影像单;识别失败 = `status === 'failed'`。
 // 计数与筛选共用同一判定,避免两处口径漂移。
 import type { ReportSummary } from '../api/reports';
 
@@ -14,11 +14,14 @@ export type PendingSummary = {
   failedReports: number;
 };
 
-/** 待核对:partial 或 success+可操作未知,且非影像单(与卡片状态文案同口径)。 */
+/** 待核对:partial、success+可操作未知或 success+未核对低置信,且非影像单
+ *  (与卡片状态文案同口径)。 */
 export function isPendingReviewReport(report: ReportSummary): boolean {
   return (
     !isImagingReport(report) &&
-    (report.status === 'partial' || report.flag_counts.unknown > 0)
+    (report.status === 'partial' ||
+      report.flag_counts.unknown > 0 ||
+      report.unreviewed_low_confidence_count > 0)
   );
 }
 
@@ -28,7 +31,7 @@ export function isFailedReport(report: ReportSummary): boolean {
 }
 
 /** 待处理计数:待核对份数、这些报告的未核对低置信项之和、识别失败份数。
- *  份数含 success+可操作未知;项数仍只统计低置信,完整待核对项以核对页为准。 */
+ *  份数含 success+可操作未知/未核对低置信;项数只统计低置信,可操作未知以卡片「未知 N」展示。 */
 export function pendingSummary(reports: ReportSummary[]): PendingSummary {
   const pending = reports.filter(isPendingReviewReport);
   return {

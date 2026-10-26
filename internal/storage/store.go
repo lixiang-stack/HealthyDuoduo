@@ -103,7 +103,8 @@ const (
 		 ORDER BY r.report_date ASC NULLS LAST, r.image_sha256 ASC, i.id ASC`
 
 	// 报告摘要(serve 时间线/上传响应回读;票 06):flag 聚合与未核对低置信计数
-	// 响应派生、不落列(ADR-0005)——unreviewed 只统计 partial 报告,失败/免核对恒 0。
+	// 响应派生、不落列(ADR-0005)——unreviewed 统计未核对低置信项;success 报告
+	// 同样可能有少量低置信项待核对,不再以 status=partial 为门。
 	sqlTimeline = `SELECT ` + reportSummaryColumnsSQL + ` FROM reports r
 		 LEFT JOIN LATERAL (` + reportAggregateSQL + `) agg ON TRUE
 		 WHERE ($1::bigint IS NULL OR r.member_id = $1)
@@ -166,10 +167,10 @@ const (
 		                     AND i.low_confidence AND i.flag <> 'not_tested')`
 
 	// 动作后报告级派生读出(状态 + 未核对低置信计数,与 reportAggregateSQL 同口径:
-	// 计数以 partial 为门,success/failed 恒 0;not_tested 不计入)。
+	// 统计未核对低置信项,not_tested 不计入;success 报告也如实计数)。
 	sqlReportReviewState = `SELECT r.status,
 		   (SELECT COUNT(*) FROM report_items i
-		    WHERE i.report_sha256 = r.image_sha256 AND r.status = 'partial'
+		    WHERE i.report_sha256 = r.image_sha256
 		      AND i.review_status = 'unreviewed' AND i.low_confidence
 		      AND i.flag <> 'not_tested')
 		 FROM reports r WHERE r.image_sha256 = $1`
@@ -221,8 +222,8 @@ const reportSummaryColumnsSQL = `r.image_sha256, r.member_id, r.report_type,
 	   agg.high, agg.low, agg.abnormal, agg.unknown, agg.not_tested, agg.unreviewed_low`
 
 // reportAggregateSQL 单报告的 flag 聚合与未核对低置信计数(横向子查询,逐报告就地聚合)。
-// unreviewed_low 以报告 status = partial 为门:success 免核对、failed 无项均恒 0(契约口径);
-// not_tested 是信息计数,不计入 unknown 与 unreviewed_low。
+// unreviewed_low 统计所有报告的未核对低置信项(success 也可能有少量低置信项;failed 无项
+// 自然为 0);not_tested 是信息计数,不计入 unknown 与 unreviewed_low。
 const reportAggregateSQL = `SELECT
 		   COUNT(*) FILTER (WHERE i.flag = 'high') AS high,
 		   COUNT(*) FILTER (WHERE i.flag = 'low') AS low,
@@ -233,7 +234,7 @@ const reportAggregateSQL = `SELECT
 		        'indeterminate', 'scalar_ref', 'other')
 		   )) AS unknown,
 		   COUNT(*) FILTER (WHERE i.flag = 'not_tested') AS not_tested,
-		   COUNT(*) FILTER (WHERE r.status = 'partial' AND i.review_status = 'unreviewed'
+		   COUNT(*) FILTER (WHERE i.review_status = 'unreviewed'
 		       AND i.low_confidence AND i.flag <> 'not_tested') AS unreviewed_low
 	   FROM report_items i WHERE i.report_sha256 = r.image_sha256`
 

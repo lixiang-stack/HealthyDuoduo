@@ -33,13 +33,19 @@ describe('filterReports', () => {
       status: 'success',
       flag_counts: { high: 0, low: 0, abnormal: 0, unknown: 1 },
     }),
+    report({
+      report_id: 'success-low',
+      status: 'success',
+      unreviewed_low_confidence_count: 1,
+    }),
     report({ report_id: 'imaging-partial', status: 'partial', report_type: '影像' }),
   ];
 
-  it('partial 与 success+可操作未知只保留待核对的非影像报告', () => {
+  it('partial 与 success 待核对项只保留待核对的非影像报告', () => {
     expect(filterReports(reports, 'partial').map((r) => r.report_id)).toEqual([
       'partial',
       'success-unknown',
+      'success-low',
     ]);
   });
 
@@ -60,6 +66,7 @@ describe('filterReports', () => {
       'failed',
       'success',
       'success-unknown',
+      'success-low',
       'imaging-partial',
     ]);
   });
@@ -78,6 +85,7 @@ describe('filterReports', () => {
       'failed',
       'success',
       'success-unknown',
+      'success-low',
       'imaging-partial',
     ]);
   });
@@ -94,6 +102,11 @@ describe('pendingSummary', () => {
         flag_counts: { high: 0, low: 0, abnormal: 0, unknown: 1 },
       }),
       report({
+        report_id: 'success-low',
+        status: 'success',
+        unreviewed_low_confidence_count: 1,
+      }),
+      report({
         report_id: 'imaging-partial',
         status: 'partial',
         report_type: '影像',
@@ -104,8 +117,8 @@ describe('pendingSummary', () => {
       report({ report_id: 'imaging-failed', status: 'failed', report_type: '影像' }),
     ];
     expect(pendingSummary(reports)).toEqual({
-      partialReports: 3,
-      unreviewedItems: 2,
+      partialReports: 4,
+      unreviewedItems: 3,
       failedReports: 2,
     });
   });

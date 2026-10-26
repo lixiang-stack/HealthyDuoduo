@@ -275,9 +275,9 @@ export interface components {
             /** @description 本次检查未做该项(flag=not_tested)的指标项数;信息徽标,不进入待处理/异常计数。 */
             not_tested_count: number;
             /**
-             * @description 「剩余 N 项未核对」徽标。响应派生值(不落列,ADR-0005):只统计 partial
-             *     报告中 review_status=unreviewed 且 low_confidence 的指标项;
-             *     failed 报告无可核对项恒为 0(不进待核对);success 报告恒为 0;
+             * @description 「剩余 N 项未核对」徽标。响应派生值(不落列,ADR-0005):统计报告内
+             *     review_status=unreviewed 且 low_confidence 的指标项;success 报告也可能
+             *     有少量低置信项待核对,如实计数;failed 报告无可核对项自然为 0;
              *     not_tested 项不参与该计数。
              */
             unreviewed_low_confidence_count: number;

@@ -120,8 +120,8 @@ type FlagCounts struct {
 // ReportSummary 时间线卡片/上传响应头部的业务视图(serve 报告域;票 06)。
 // 计数字段为响应派生(不落列,ADR-0005):FlagCounts 按指标项当前 flag 聚合;
 // NotTestedCount 为未检测项数(信息徽标,不进异常/待处理);
-// UnreviewedLowConfidenceCount 只统计 partial 报告的未核对低置信项(failed 无项、
-// success 免核对均恒 0;not_tested 不计入)。
+// UnreviewedLowConfidenceCount 统计未核对低置信项(success 报告也如实计数;
+// failed 无项自然为 0;not_tested 不计入)。
 type ReportSummary struct {
 	Sha256                       string
 	MemberID                     *int64

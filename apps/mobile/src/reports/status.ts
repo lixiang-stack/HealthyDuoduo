@@ -1,5 +1,5 @@
 // 报告状态与徽标文案(纯逻辑,spec 固定映射):success→识别完成、partial→待核对、
-// failed→识别失败;检验单 success 含可操作未知项时也按待核对展示(未知项可修正)。
+// failed→识别失败;检验单 success 含可操作未知项或未核对低置信项时也按待核对展示。
 // 影像单的 partial 没有对应核对动作,不显示状态文案。
 // 徽标按 flag 聚合计数 + 「待核对 N 项」;影像单不呈现指标项,未知与待核对徽标都关闭。
 // 文案中性事实侧,不做解读。
@@ -17,21 +17,31 @@ const STATUS_LABELS: Record<ReportStatus, string> = {
   failed: '识别失败',
 };
 
-/** 报告展示状态:检验单 success 但含可操作未知项时按待核对展示;
+/** 报告展示状态:检验单 success 但含可操作未知项或未核对低置信项时按待核对展示;
  *  影像单不因未知项降级(指标项不呈现)。 */
 export function reportStatusKind(
-  report: Pick<ReportSummary, 'status' | 'report_type' | 'flag_counts'>,
+  report: Pick<
+    ReportSummary,
+    'status' | 'report_type' | 'flag_counts' | 'unreviewed_low_confidence_count'
+  >,
 ): ReportStatus {
-  if (!isImagingReport(report) && report.status === 'success' && report.flag_counts.unknown > 0) {
+  if (
+    !isImagingReport(report) &&
+    report.status === 'success' &&
+    (report.flag_counts.unknown > 0 || report.unreviewed_low_confidence_count > 0)
+  ) {
     return 'partial';
   }
   return report.status;
 }
 
-/** 状态文案按报告类别取:检验单 partial 或 success+可操作未知为「待核对」;影像单
- *  partial 无核对动作,不显示。 */
+/** 状态文案按报告类别取:检验单 partial、success+可操作未知、success+未核对低置信
+ *  均为「待核对」;影像单 partial 无核对动作,不显示。 */
 export function reportStatusLabel(
-  report: Pick<ReportSummary, 'status' | 'report_type' | 'flag_counts'>,
+  report: Pick<
+    ReportSummary,
+    'status' | 'report_type' | 'flag_counts' | 'unreviewed_low_confidence_count'
+  >,
 ): string | undefined {
   if (isImagingReport(report) && report.status === 'partial') {
     return undefined;

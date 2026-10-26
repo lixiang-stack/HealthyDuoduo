@@ -46,7 +46,7 @@ func TestReportStoreSmoke(t *testing.T) {
 		t.Fatalf("seed member B: %v", err)
 	}
 
-	// 四份报告:成员 A 的 partial/failed、成员 B 的 success(免核对面)、无主存量。
+	// 四份报告:成员 A 的 partial/failed、成员 B 的 success(含未核对低置信)、无主存量。
 	if _, err := pool.Exec(ctx, `INSERT INTO images (sha256, original_filename) VALUES ('rep-a','a.jpg'),('rep-b','b.jpg'),('rep-c','c.jpg'),('rep-d','d.jpg')`); err != nil {
 		t.Fatalf("seed images: %v", err)
 	}
@@ -102,8 +102,8 @@ func TestReportStoreSmoke(t *testing.T) {
 		t.Errorf("rep-a unreviewed = %d, want 2 (低置信未核对;confirmed 项不计)", a.UnreviewedLowConfidenceCount)
 	}
 	c := all[1]
-	if c.UnreviewedLowConfidenceCount != 0 {
-		t.Errorf("rep-c unreviewed = %d, want 0 (success 免核对,计数恒 0)", c.UnreviewedLowConfidenceCount)
+	if c.UnreviewedLowConfidenceCount != 1 {
+		t.Errorf("rep-c unreviewed = %d, want 1 (success 也可能有未核对低置信项)", c.UnreviewedLowConfidenceCount)
 	}
 	if c.FlagCounts != (pipeline.FlagCounts{High: 1}) {
 		t.Errorf("rep-c flag_counts = %+v, want {1 0 0}(徽标照算)", c.FlagCounts)

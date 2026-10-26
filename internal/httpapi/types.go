@@ -54,8 +54,9 @@ type ReportHeader struct {
 	FlagCounts FlagCounts `json:"flag_counts"`
 	// NotTestedCount 本次未检测项数(flag=not_tested;信息徽标,不进入待处理/异常计数)。
 	NotTestedCount int `json:"not_tested_count"`
-	// UnreviewedLowConfidenceCount 响应派生值(不落列,ADR-0005):只统计 partial 报告中
-	// review_status=unreviewed 且 low_confidence 的指标项;failed 不计入;not_tested 不计入。
+	// UnreviewedLowConfidenceCount 响应派生值(不落列,ADR-0005):统计报告内
+	// review_status=unreviewed 且 low_confidence 的指标项;success 报告也如实计数;
+	// failed 无项自然为 0;not_tested 不计入。
 	UnreviewedLowConfidenceCount int `json:"unreviewed_low_confidence_count"`
 }
 

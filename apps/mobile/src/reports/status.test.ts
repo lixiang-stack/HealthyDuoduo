@@ -36,7 +36,7 @@ describe('reportStatusLabel', () => {
     expect(reportStatusLabel({ ...report, status: 'failed' })).toBe('识别失败');
   });
 
-  it('检验单 success 含可操作未知项时按待核对展示;影像单不降级', () => {
+  it('检验单 success 含可操作未知或未核对低置信时按待核对展示;影像单不降级', () => {
     const withUnknown = {
       ...report,
       status: 'success' as const,
@@ -44,10 +44,18 @@ describe('reportStatusLabel', () => {
     };
     expect(reportStatusKind(withUnknown)).toBe('partial');
     expect(reportStatusLabel(withUnknown)).toBe('待核对');
+    const withLow = {
+      ...report,
+      status: 'success' as const,
+      unreviewed_low_confidence_count: 1,
+    };
+    expect(reportStatusKind(withLow)).toBe('partial');
+    expect(reportStatusLabel(withLow)).toBe('待核对');
     expect(
       reportStatusLabel({
         ...imaging,
         flag_counts: { high: 0, low: 0, abnormal: 0, unknown: 2 },
+        unreviewed_low_confidence_count: 1,
       }),
     ).toBe('识别完成');
   });
@@ -156,7 +164,7 @@ describe('reportBadgeLabels', () => {
 });
 
 describe('unreviewedBadge', () => {
-  it('「待核对 N 项」;0 不出徽标(failed 恒 0、success 免核对)', () => {
+  it('「待核对 N 项」;0 不出徽标', () => {
     expect(unreviewedBadge(3)).toBe('待核对 3 项');
     expect(unreviewedBadge(0)).toBeUndefined();
   });
