@@ -74,9 +74,12 @@ func TestReport_ParsesBundle(t *testing.T) {
 	defer srv.Close()
 	c := healthyduoduo.New(srv.URL)
 
-	ocr, report, err := c.Report(context.Background(), []byte("fake"), "sample.jpeg", "")
+	normalized, ocr, report, err := c.Report(context.Background(), []byte("fake"), "sample.jpeg", "")
 	if err != nil {
 		t.Fatalf("Report: %v", err)
+	}
+	if normalized != nil {
+		t.Errorf("normalized image = %q, want nil", normalized)
 	}
 	if ocr.Engine != "onnxruntime" || len(ocr.Boxes) != 3 {
 		t.Errorf("ocr = %+v", ocr)
@@ -89,11 +92,27 @@ func TestReport_ParsesBundle(t *testing.T) {
 	}
 }
 
+func TestReport_DecodesNormalizedImage(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ocr_result":{"engine":"onnxruntime"},"report":{"report_type":"血常规","status":"success","items":[]},"normalized_image":"dXByaWdodA==","image_rotation":90}`))
+	}))
+	defer srv.Close()
+
+	normalized, _, _, err := healthyduoduo.New(srv.URL).Report(context.Background(), []byte("x"), "a.jpg", "")
+	if err != nil {
+		t.Fatalf("Report: %v", err)
+	}
+	if string(normalized) != "upright" {
+		t.Errorf("normalized image = %q, want %q", normalized, "upright")
+	}
+}
+
 func TestReport_SendsDateField(t *testing.T) {
 	srv := newServer(t)
 	defer srv.Close()
 	c := healthyduoduo.New(srv.URL)
-	if _, _, err := c.Report(context.Background(), []byte("fake"), "j.jpg", "2026-10-01"); err != nil {
+	if _, _, _, err := c.Report(context.Background(), []byte("fake"), "j.jpg", "2026-10-01"); err != nil {
 		t.Fatalf("Report with date: %v", err)
 	}
 }
@@ -126,7 +145,7 @@ func TestNonJSONErrorBubbles(t *testing.T) {
 		http.Error(w, "boom", http.StatusInternalServerError)
 	}))
 	defer srv.Close()
-	if _, _, err := healthyduoduo.New(srv.URL).Report(context.Background(), []byte("x"), "a.jpg", ""); err == nil {
+	if _, _, _, err := healthyduoduo.New(srv.URL).Report(context.Background(), []byte("x"), "a.jpg", ""); err == nil {
 		t.Fatal("expected error on 500")
 	}
 }

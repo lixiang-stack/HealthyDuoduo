@@ -46,16 +46,17 @@ def _ocr() -> OCRResult:
     )
 
 
-def _image(value: str = "dash", ref: str = "dash", next_row_dash: bool = False) -> bytes:
+def _image(value: str = "dash", ref: str = "dash", next_row_dash: bool = False, thin: bool = False) -> bytes:
     image = Image.new("L", (1200, 120), 255)
     draw = ImageDraw.Draw(image)
+    height = 0 if thin else 2
     if value == "dash":
-        draw.rectangle((370, 36, 395, 38), fill=0)
+        draw.rectangle((370, 36, 380 if thin else 395, 36 + height), fill=0)
     elif value == "plus":
         draw.rectangle((370, 36, 395, 38), fill=0)
         draw.rectangle((381, 30, 383, 46), fill=0)
     if ref == "dash":
-        draw.rectangle((590, 36, 615, 38), fill=0)
+        draw.rectangle((590, 36, 600 if thin else 615, 36 + height), fill=0)
     if next_row_dash:
         # 下一行的 '-' 必须落在当前行 ROI 之外,不能串到当前项。
         draw.rectangle((370, 62, 395, 64), fill=0)
@@ -65,7 +66,7 @@ def _image(value: str = "dash", ref: str = "dash", next_row_dash: bool = False) 
 
 
 def _item(report):
-    return next(item for item in report.items if item.name == "尿潜血")
+    return next(item for item in report.items if item.name == "潜血")
 
 
 def test_both_dash_cells_recover_as_not_tested() -> None:
@@ -75,6 +76,16 @@ def test_both_dash_cells_recover_as_not_tested() -> None:
     assert item.ref_range == "-"
     assert item.flag == "not_tested"
     assert item.flag_reason is None
+    assert report.status == "success"
+
+
+def test_thin_one_pixel_dash_cells_recover_as_not_tested() -> None:
+    """低分辨率短横线可能只有 1px 高;面积阈值不能把它当噪点丢掉。"""
+    report = run_postprocess(_ocr(), image=_image(thin=True))
+    item = _item(report)
+    assert item.value == "-"
+    assert item.ref_range == "-"
+    assert item.flag == "not_tested"
     assert report.status == "success"
 
 

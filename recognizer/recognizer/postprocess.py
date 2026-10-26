@@ -1162,6 +1162,18 @@ def _extract_narrative(cells: list[_Cell], d: LabDict) -> list[tuple[DictItem, _
                                     raw_cells=[piece_cell, vcell],
                                     low_score=piece.low_score),
                           value)
+    # 阶段三:横排表格里的项目名右侧同行值(转正后的产筛风险计算表:
+    # 唐氏综合征 1:1913 / 开放性神经管缺陷 2.5MOM / 母龄风险 33.25岁)。
+    for name in [k for k, v3 in best.items() if v3[2] is None]:
+        piece_cell = best[name][1].raw_cells[0]
+        vcell, value = _right_value(cells, piece_cell, d)
+        if value is not None:
+            it, piece, _ = best[name]
+            best[name] = (it,
+                          _RowPiece(cy=piece.cy, item=it, value=value, unit=None,
+                                    raw_cells=[piece_cell, vcell],
+                                    low_score=piece.low_score),
+                          value)
     return [(it, piece) for it, piece, _ in (best[k] for k in sorted(best))]
 
 
@@ -1195,6 +1207,43 @@ def _vertical_value(
         key = (c.y0 - name_cell.y1, abs(c.cx - name_cell.cx))
         if best is None or key < best[:2]:
             best = (*key, c, val)
+    if best is None:
+        return None, None
+    return best[2], best[3]
+
+
+_RIGHT_VALUE_RE = re.compile(
+    r"(\d+(?:\.\d+)?(?::\d+)?)(?:MOM|岁)?", re.IGNORECASE
+)
+
+
+def _right_value(
+    cells: list[_Cell], name_cell: _Cell, d: LabDict
+) -> tuple[_Cell | None, str | None]:
+    """横排表格回退:名称格**右侧同一行**最近的值格(产筛风险计算表)。
+
+    只接受纯数值/风险比值/带 MOM 或 岁 后缀的值,排除日期、纯参考区间与词典名;
+    行差不超过两格较高者。按 (x0, |dy|) 取最近(风险值列在截断值列左侧);
+    找不到 → (None, None)。
+    """
+    best: tuple[float, float, _Cell, str] | None = None
+    for c in cells:
+        if c is name_cell or c.x0 < name_cell.x1:
+            continue
+        text = c.text.strip()
+        if _DATE_RE.search(text) or _match_name(text, d)[0] is not None:
+            continue
+        if _RANGE_RE.fullmatch(text):
+            continue
+        m = _RIGHT_VALUE_RE.fullmatch(text)
+        if m is None:
+            continue
+        dy = abs(c.cy - name_cell.cy)
+        if dy > max(name_cell.h, c.h):
+            continue
+        key = (c.x0, dy)
+        if best is None or key < best[:2]:
+            best = (*key, c, m.group(1))
     if best is None:
         return None, None
     return best[2], best[3]

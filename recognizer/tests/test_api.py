@@ -79,6 +79,8 @@ def test_report_bundle_contract() -> None:
         )
     assert response.status_code == 200
     body = response.json()
+    assert body["image_rotation"] == 0
+    assert body["normalized_image"] is None
     Draft202012Validator(json.loads(SCHEMA.read_text(encoding="utf-8"))).validate(body["ocr_result"])
     Draft202012Validator(json.loads(REPORT_SCHEMA.read_text(encoding="utf-8"))).validate(body["report"])
     assert body["report"]["report_type"] == "临检"

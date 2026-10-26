@@ -3,6 +3,7 @@
 package pipeline
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -41,26 +42,36 @@ func IngestImage(ctx context.Context, st Store, rec Recognizer, obj ObjectStore,
 	}
 
 	if img != nil {
-		cached, ok, err := st.ReportByImage(ctx, sha)
+		outcome, done, err := cachedOutcome(ctx, st, rec, sha, date, force)
 		if err != nil {
-			return nil, fmt.Errorf("query reports: %w", err)
+			return nil, err
 		}
-		if ok && !force {
-			if date == "" || cached.ReportDate != nil {
-				return &IngestOutcome{Sha256: sha, Kind: KindCached}, nil
-			}
-			// 同图已入库但报告无日期,用户给出 --date:在已存 OCR 上重跑补录(决策 #6)
-			newReport, err := ReparseStored(ctx, st, rec, cached, date)
-			if err != nil {
-				return nil, err
-			}
-			return &IngestOutcome{Sha256: sha, Kind: KindBackfilled, Report: newReport}, nil
+		if done {
+			return outcome, nil
 		}
 	}
 
-	ocr, report, err := rec.Report(ctx, data, filename, date)
+	normalized, ocr, report, err := rec.Report(ctx, data, filename, date)
 	if err != nil {
 		return nil, err
+	}
+	// 整页横拍被识别端转正:转正后的图像才是入库/展示原图与内容身份。
+	if len(normalized) > 0 && !bytes.Equal(normalized, data) {
+		data = normalized
+		sha = ImageSha256Hex(data)
+		img, err = st.ImageBySha256(ctx, sha)
+		if err != nil {
+			return nil, fmt.Errorf("query images: %w", err)
+		}
+		if img != nil {
+			outcome, done, err := cachedOutcome(ctx, st, rec, sha, date, force)
+			if err != nil {
+				return nil, err
+			}
+			if done {
+				return outcome, nil
+			}
+		}
 	}
 	if img == nil {
 		if err := obj.Put(ctx, sha, data); err != nil {
@@ -86,4 +97,25 @@ func IngestImage(ctx context.Context, st Store, rec Recognizer, obj ObjectStore,
 		kind = KindForced
 	}
 	return &IngestOutcome{Sha256: sha, Kind: kind, Report: report}, nil
+}
+
+// cachedOutcome 已入库图像的报告快路径:命中且非 force 时返回缓存/日期补录结果;
+// 未命中或 force 时 done=false,由调用方继续识别或覆盖。
+func cachedOutcome(ctx context.Context, st Store, rec Recognizer, sha, date string, force bool) (*IngestOutcome, bool, error) {
+	cached, ok, err := st.ReportByImage(ctx, sha)
+	if err != nil {
+		return nil, false, fmt.Errorf("query reports: %w", err)
+	}
+	if !ok || force {
+		return nil, false, nil
+	}
+	if date == "" || cached.ReportDate != nil {
+		return &IngestOutcome{Sha256: sha, Kind: KindCached}, true, nil
+	}
+	// 同图已入库但报告无日期,用户给出 --date:在已存 OCR 上重跑补录(决策 #6)
+	newReport, err := ReparseStored(ctx, st, rec, cached, date)
+	if err != nil {
+		return nil, false, err
+	}
+	return &IngestOutcome{Sha256: sha, Kind: KindBackfilled, Report: newReport}, true, nil
 }

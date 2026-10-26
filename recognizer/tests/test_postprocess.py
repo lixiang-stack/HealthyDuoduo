@@ -233,13 +233,13 @@ def test_qualitative_short_dash_value_and_ref_not_tested() -> None:
         {"x": 470, "y": 0, "text": "单位"},
         {"x": 580, "y": 0, "text": "参考值"},
     ]
-    for idx, name in enumerate(["尿潜血", "尿白细胞酯酶", "尿蛋白质", "尿葡萄糖", "尿酮体"]):
+    for idx, name in enumerate(["潜血", "白细胞酯酶", "蛋白质", "葡萄糖", "酮体"]):
         cells += row(30 + idx * 32, name, "-", ref="-")
     r = run_postprocess(mk_ocr(cells))
-    assert item_of(r, "尿潜血").flag == "not_tested"
-    assert item_of(r, "尿潜血").value == "-"
-    assert item_of(r, "尿潜血").ref_range == "-"
-    assert item_of(r, "尿潜血").flag_reason is None
+    assert item_of(r, "潜血").flag == "not_tested"
+    assert item_of(r, "潜血").value == "-"
+    assert item_of(r, "潜血").ref_range == "-"
+    assert item_of(r, "潜血").flag_reason is None
 
 
 def test_fused_name_value() -> None:
@@ -622,6 +622,33 @@ def test_registry_tie_follows_registry_order(monkeypatch, tmp_path) -> None:
 
 
 # ---------- 叙述型报告(影像;票 04:段落主体,不抽取指标项) ----------
+
+
+def test_narrative_right_value_pairs_risk_ratios() -> None:
+    """产筛横排表:项目名右侧同行的风险比值/MOM/年龄值;截断值列不抢先。"""
+    cells = [
+        {"x": 100, "y": -60, "text": "产前筛查报告"},
+        {"x": 20, "y": 30, "text": "唐氏综合征"},
+        {"x": 180, "y": 30, "text": "1:1913"},
+        {"x": 400, "y": 30, "text": "1:270"},
+        {"x": 20, "y": 60, "text": "18-三体综合征"},
+        {"x": 180, "y": 60, "text": "1:19879"},
+        {"x": 300, "y": 60, "text": "<1:1000"},
+        {"x": 400, "y": 60, "text": "1:350"},
+        {"x": 20, "y": 90, "text": "开放性神经管缺陷"},
+        {"x": 180, "y": 90, "text": "<1:1000"},
+        {"x": 400, "y": 90, "text": "2.5MOM"},
+        {"x": 20, "y": 120, "text": "母龄风险"},
+        {"x": 180, "y": 120, "text": "33.25岁"},
+        {"x": 400, "y": 120, "text": "35岁"},
+    ]
+    r = run_postprocess(mk_ocr(cells))
+
+    assert r.report_type == "其他专项"
+    assert item_of(r, "唐氏综合征").value == "1:1913"
+    assert item_of(r, "18-三体综合征").value == "1:19879"
+    assert item_of(r, "开放性神经管缺陷").value == "2.5"
+    assert item_of(r, "母龄风险").value == "33.25"
 
 
 def test_imaging_dict_has_no_measurement_items() -> None:

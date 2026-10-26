@@ -339,17 +339,18 @@ func (f *fakeServeStore) hasImage(sha string) bool {
 // fakeUploadRecognizer 可配置识别结果;Report 返回深拷贝(不把 applyFailInvariant
 // 的就地归一化带进下一次调用),OCR 结果取样本形状(行链接用例的数据底)。
 type fakeUploadRecognizer struct {
-	calls  int
-	report *contract.Report
-	err    error
+	calls      int
+	report     *contract.Report
+	normalized []byte
+	err        error
 }
 
-func (f *fakeUploadRecognizer) Report(ctx context.Context, image []byte, filename, date string) (*contract.OCRResult, *contract.Report, error) {
+func (f *fakeUploadRecognizer) Report(ctx context.Context, image []byte, filename, date string) ([]byte, *contract.OCRResult, *contract.Report, error) {
 	f.calls++
 	if f.err != nil {
-		return nil, nil, f.err
+		return nil, nil, nil, f.err
 	}
-	return sampleUploadOCR(), cloneReport(f.report), nil
+	return f.normalized, sampleUploadOCR(), cloneReport(f.report), nil
 }
 
 func (f *fakeUploadRecognizer) Reparse(ctx context.Context, ocr *contract.OCRResult, date string) (*contract.Report, error) {
@@ -496,6 +497,35 @@ func decodeUpload(t *testing.T, status int, raw []byte, wantStatus int) httpapi.
 		t.Fatalf("decode UploadResult: %v; body = %s", err, raw)
 	}
 	return got
+}
+
+// TestServeUploadNormalizedImage_UsesNormalizedIdentity 整页横拍:
+// 识别端返回转正图像 → 报告身份/对象存储使用转正后的 sha;再传原图按 duplicate 返回。
+func TestServeUploadNormalizedImage_UsesNormalizedIdentity(t *testing.T) {
+	srv, st, rec, _ := newReportsTestServer(t)
+	createOne(t, srv, `{"name":"小虎","is_child":true}`)
+	original := []byte("sideways-jpeg-bytes")
+	rec.normalized = []byte("upright-jpeg-bytes")
+
+	status, raw := doUpload(t, srv, original, map[string]string{formMemberID: "1"})
+	got := decodeUpload(t, status, raw, http.StatusCreated)
+
+	wantSha := pipeline.ImageSha256Hex(rec.normalized)
+	if got.Report.ReportID != wantSha {
+		t.Errorf("report_id = %q, want normalized sha %q", got.Report.ReportID, wantSha)
+	}
+	if !st.hasImage(wantSha) {
+		t.Errorf("normalized image missing from store")
+	}
+	if st.hasImage(pipeline.ImageSha256Hex(original)) {
+		t.Errorf("original sideways bytes stored, want only normalized image")
+	}
+
+	status, raw = doUpload(t, srv, original, map[string]string{formMemberID: "1"})
+	again := decodeUpload(t, status, raw, http.StatusOK)
+	if !again.Duplicate || again.Report.ReportID != wantSha {
+		t.Errorf("re-upload = duplicate %v report %q, want duplicate true / %q", again.Duplicate, again.Report.ReportID, wantSha)
+	}
 }
 
 // TestServeUploadNewReport 新图上传:201 + 完整报告(成员归属、聚合计数、

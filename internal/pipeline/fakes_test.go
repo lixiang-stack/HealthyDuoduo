@@ -150,6 +150,7 @@ type fakeRecognizer struct {
 	dateOfCall      map[int]string
 	lastReparseHint *string
 	report          contract.Report
+	normalized      []byte
 }
 
 func newFakeRecognizer() *fakeRecognizer {
@@ -157,7 +158,7 @@ func newFakeRecognizer() *fakeRecognizer {
 		report: sampleReport("2024-08-19")}
 }
 
-func (f *fakeRecognizer) Report(ctx context.Context, image []byte, filename, date string) (*contract.OCRResult, *contract.Report, error) {
+func (f *fakeRecognizer) Report(ctx context.Context, image []byte, filename, date string) ([]byte, *contract.OCRResult, *contract.Report, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.reportCalls++
@@ -170,7 +171,7 @@ func (f *fakeRecognizer) Report(ctx context.Context, image []byte, filename, dat
 		rep.ReportDate = &d
 		rep.Status = "success"
 	}
-	return sampleOCR(), &rep, nil
+	return f.normalized, sampleOCR(), &rep, nil
 }
 
 func (f *fakeRecognizer) Reparse(ctx context.Context, ocr *contract.OCRResult, date string) (*contract.Report, error) {

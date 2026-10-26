@@ -285,37 +285,24 @@ func handleUploadReport(d *deps) http.HandlerFunc {
 
 		// sha 命中且未显式覆盖:已有报告不含核对决策 → 200 duplicate;含 → 409。
 		if existing != nil && !req.override {
-			items, err := d.reports.ItemsWithReviewStatus(ctx, sha)
-			if err != nil {
-				writeErrorJSON(w, http.StatusInternalServerError, "read report items failed")
-				return
-			}
-			if hasReviewDecisions(items) {
-				writeErrorJSON(w, http.StatusConflict, reviewDecisionConflictMessage)
-				return
-			}
-			if err := assignIfUnowned(ctx, d.reports, existing, req.memberID); err != nil {
-				writeErrorJSON(w, http.StatusInternalServerError, "assign member failed")
-				return
-			}
-			sections, err := d.reports.SectionsByImage(ctx, existing.Sha256)
-			if err != nil {
-				writeErrorJSON(w, http.StatusInternalServerError, "read report sections failed")
-				return
-			}
-			ocr, err := loadReportOCR(ctx, d.reports, existing.Sha256)
-			if err != nil {
-				writeErrorJSON(w, http.StatusInternalServerError, "read report ocr result failed")
-				return
-			}
-			writeJSON(w, http.StatusOK, httpapi.UploadResult{Duplicate: true, Report: toAPIDetail(*existing, sections, items, ocr)})
+			writeDuplicateReport(ctx, w, d.reports, sha, req.memberID)
 			return
 		}
 
 		// 新建归档或显式 override 重跑(override 会重置报告与指标项:item_id 全换、
 		// review_status 回 unreviewed;已有归属不被夺走——改归属走 PATCH 端点)。
-		if _, err := pipeline.IngestImage(ctx, d.store, d.rec, d.obj, req.data, req.filename, "", req.override); err != nil {
+		// 整页横拍时 IngestImage 会以识别端转正后的图像身份入库,后续读回必须用
+		// outcome.Sha256(可能与请求原图的 sha 不同)。
+		outcome, err := pipeline.IngestImage(ctx, d.store, d.rec, d.obj, req.data, req.filename, "", req.override)
+		if err != nil {
 			writeErrorJSON(w, http.StatusInternalServerError, "upload failed: "+err.Error())
+			return
+		}
+		sha = outcome.Sha256
+		if outcome.Kind == pipeline.KindCached {
+			// 原图 sha 未命中、但转正后的图像已归档:按已有报告返回 200 duplicate,
+			// 并保持与普通重复上传相同的核对决策 409 口径。
+			writeDuplicateReport(ctx, w, d.reports, sha, req.memberID)
 			return
 		}
 		summary, err := d.reports.SummaryByImage(ctx, sha)
@@ -349,6 +336,44 @@ func handleUploadReport(d *deps) http.HandlerFunc {
 		}
 		writeJSON(w, http.StatusCreated, httpapi.UploadResult{Duplicate: false, Report: toAPIDetail(*summary, sections, items, ocr)})
 	}
+}
+
+// writeDuplicateReport 回 200 duplicate(无核对决策)或 409(已有核对决策),
+// 两种重复路径(原图 sha 直接命中 / 转正后图像已归档)共用。
+func writeDuplicateReport(ctx context.Context, w http.ResponseWriter, rs pipeline.ReportStore, sha string, memberID int64) {
+	existing, err := rs.SummaryByImage(ctx, sha)
+	if err != nil {
+		writeErrorJSON(w, http.StatusInternalServerError, "lookup report failed")
+		return
+	}
+	if existing == nil {
+		writeErrorJSON(w, http.StatusInternalServerError, "report missing after ingest")
+		return
+	}
+	items, err := rs.ItemsWithReviewStatus(ctx, sha)
+	if err != nil {
+		writeErrorJSON(w, http.StatusInternalServerError, "read report items failed")
+		return
+	}
+	if hasReviewDecisions(items) {
+		writeErrorJSON(w, http.StatusConflict, reviewDecisionConflictMessage)
+		return
+	}
+	if err := assignIfUnowned(ctx, rs, existing, memberID); err != nil {
+		writeErrorJSON(w, http.StatusInternalServerError, "assign member failed")
+		return
+	}
+	sections, err := rs.SectionsByImage(ctx, sha)
+	if err != nil {
+		writeErrorJSON(w, http.StatusInternalServerError, "read report sections failed")
+		return
+	}
+	ocr, err := loadReportOCR(ctx, rs, sha)
+	if err != nil {
+		writeErrorJSON(w, http.StatusInternalServerError, "read report ocr result failed")
+		return
+	}
+	writeJSON(w, http.StatusOK, httpapi.UploadResult{Duplicate: true, Report: toAPIDetail(*existing, sections, items, ocr)})
 }
 
 // assignIfUnowned 归属到本次上传的成员:仅当报告无主时写入(set 后回填视图);

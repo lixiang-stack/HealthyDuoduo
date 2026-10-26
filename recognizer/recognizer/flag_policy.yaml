@@ -84,19 +84,29 @@ profiles:
     abnormal_values: [浑浊, 混浊]
 
 items:
+  潜血: negative_normal
   尿潜血: negative_normal
+  白细胞酯酶: negative_normal
   尿白细胞酯酶: negative_normal
+  蛋白质: negative_normal
   尿蛋白质: negative_normal
+  葡萄糖: negative_normal
   尿葡萄糖: negative_normal
+  酮体: negative_normal
   尿酮体: negative_normal
+  亚硝酸盐: negative_normal
   尿亚硝酸盐: negative_normal
+  胆红素: negative_normal
   尿胆红素: negative_normal
   尿胆原: negative_normal
+  维生素C: vitamin_c
   抗坏血酸: vitamin_c
   尿液颜色: urine_color
+  尿液浊度: urine_clarity
   尿透明度: urine_clarity
   滴虫: negative_normal
   尿粘液丝: negative_normal
+  镜检结晶: negative_or_zero_normal
   结晶: negative_or_zero_normal
   抗体筛查: negative_normal
   乙肝表面抗原: negative_normal

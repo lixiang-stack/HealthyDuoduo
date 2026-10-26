@@ -5,6 +5,9 @@ P1:/ocr(图 → OCR 结果);P2:/report(图 → {ocr_result, report})与 /reparse
 P0 占位 /healthz。
 """
 
+from __future__ import annotations
+
+import base64
 from pathlib import Path
 
 from fastapi import FastAPI, Form, HTTPException, UploadFile, status
@@ -12,6 +15,7 @@ from PIL import UnidentifiedImageError
 
 from .contract import OCRResult, ReparseRequest, Report, ReportResponse
 from .ocr import run_ocr
+from .orientation import detect_rotation, rotate_image
 from .paths import IMAGE_SUFFIXES
 from .postprocess import run_postprocess
 from .replay import Replay
@@ -63,6 +67,9 @@ def report(
     可选 multipart 字段 date(YYYY-MM-DD):检查单未解析出日期时的人工补录兜底
     (决策 #6;补录后报告不再是「日期缺失」partial);已解析出日期时该参数不生效。
 
+    整页横拍(90°/270°)时先在识别端转正并重新 OCR,再跑后处理;转正后的图像
+    随响应返回(base64),数据服务据此入库,展示与核对不再看到横置原图。
+
     App E2E 回放命中固定样本时直接返回预置 golden(date 不参与:fixture 是固定产物);
     未命中仍走真实 OCR。生产/共享栈未配置回放,行为不变。
     """
@@ -72,8 +79,17 @@ def report(
         if fixture is not None:
             return fixture
     ocr_result = _run_ocr(data)
+    rotation = detect_rotation(ocr_result)
+    if rotation != 0:
+        data = rotate_image(data, rotation)
+        ocr_result = _run_ocr(data)
     report = run_postprocess(ocr_result, date_hint=date, image=data)
-    return ReportResponse(ocr_result=ocr_result, report=report)
+    return ReportResponse(
+        ocr_result=ocr_result,
+        report=report,
+        normalized_image=base64.b64encode(data).decode("ascii") if rotation != 0 else None,
+        image_rotation=rotation,
+    )
 
 
 @app.post("/reparse")

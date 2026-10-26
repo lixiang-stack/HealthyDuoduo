@@ -48,10 +48,10 @@ func (f fakeStoreCLI) TrendByName(ctx context.Context, item, reportType string) 
 
 type fakeRecognizerCLI struct{}
 
-func (fakeRecognizerCLI) Report(ctx context.Context, image []byte, filename, date string) (*contract.OCRResult, *contract.Report, error) {
+func (fakeRecognizerCLI) Report(ctx context.Context, image []byte, filename, date string) ([]byte, *contract.OCRResult, *contract.Report, error) {
 	ocr := &contract.OCRResult{Txts: []string{"x"}, Engine: "onnxruntime"}
 	report := &contract.Report{ReportType: "血常规", ReportDate: str("2026-10-01"), Status: "success"}
-	return ocr, report, nil
+	return nil, ocr, report, nil
 }
 func (fakeRecognizerCLI) Reparse(ctx context.Context, ocr *contract.OCRResult, date string) (*contract.Report, error) {
 	return &contract.Report{ReportType: "血常规", Status: "success"}, nil

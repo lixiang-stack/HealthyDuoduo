@@ -41,7 +41,7 @@ func TestReport_RetriesOn5xxThenSucceeds(t *testing.T) {
 	defer srv.Close()
 
 	c := New(srv.URL)
-	_, report, err := c.Report(context.Background(), []byte("x"), "a.jpg", "")
+	_, _, report, err := c.Report(context.Background(), []byte("x"), "a.jpg", "")
 	if err != nil {
 		t.Fatalf("Report after retry: %v", err)
 	}
@@ -68,7 +68,7 @@ func TestReport_NoRetryOn4xx(t *testing.T) {
 	defer srv.Close()
 
 	c := New(srv.URL)
-	if _, _, err := c.Report(context.Background(), []byte("x"), "a.jpg", ""); err == nil {
+	if _, _, _, err := c.Report(context.Background(), []byte("x"), "a.jpg", ""); err == nil {
 		t.Fatal("expected error on 400")
 	}
 	mu.Lock()

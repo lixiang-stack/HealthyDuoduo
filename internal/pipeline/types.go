@@ -17,7 +17,9 @@ import (
 // Recognizer 识别服务边界(POST /report、/reparse,实施计划 4.3)。
 type Recognizer interface {
 	// Report 上传图像(+可选 date 补录)→ {ocr_result, report}。
-	Report(ctx context.Context, image []byte, filename, date string) (*contract.OCRResult, *contract.Report, error)
+	// normalizedImage 非 nil 表示识别端已把整页横拍图像转正;调用方应以它作为
+	// 入库/展示原图与内容身份,ocr/report 也已基于该图像生成。
+	Report(ctx context.Context, image []byte, filename, date string) (normalizedImage []byte, ocr *contract.OCRResult, report *contract.Report, err error)
 	// Reparse 已存 OCR 结果(+可选 date 补录)→ report(规则迭代主路径)。
 	Reparse(ctx context.Context, ocr *contract.OCRResult, date string) (*contract.Report, error)
 }

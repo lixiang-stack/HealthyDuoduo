@@ -117,7 +117,9 @@ def _has_dash(gray: Image.Image, x_bounds: tuple[int, int], y_band: tuple[float,
     pixels = crop.tobytes()
     mask = [[pixels[y * w + x] < _DARK_THRESHOLD for x in range(w)] for y in range(h)]
     h_limit = max(4, int(0.30 * h))
-    min_area = max(12, int(0.30 * h))
+    # 真实短横线可能只有 1px 高(低分辨率/压缩);面积阈值按高度缩放并保留
+    # 6px 下限,兼顾细线与纸面噪点。
+    min_area = max(6, int(0.25 * h))
     flats = 0
     for component_w, component_h, area in _components(mask, w, h):
         if area < min_area:
