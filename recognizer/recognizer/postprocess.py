@@ -1060,15 +1060,22 @@ def _extract_items(
                         used.add(id(c))
                     continue
                 v, r, u = _decompose(c.text, d)
+                # 参考列的单标量 0(如 NRBC 的 "0")在 _decompose 里被当成 value;
+                # 按列角色改回 ref,交给 ComputeFlag 的标量 0 规则比较。非 0 标量
+                # 语义不明,维持原行为(不进 ref 位,避免把 OCR 乱码当参考区间)。
+                ref_value = r
+                if role == "ref" and ref_value is None and v is not None and u is None and float(v) == 0:
+                    ref_value = v
+                    v = None
                 # 值列的纯比较式(<2.00,结果低于检出限)不是参考区间:拆不出数值时其 r
                 # 不进 ref 位,避免挤掉参考列真格(如 webwxgetmsgimg_1 抗dsDNA抗体
                 # "<2.00"值列 挤掉 "0-30"参考列)。复合表头列(「结果判定参考范围」)
                 # 的值格其 r 本是完全区间,仍照旧吸收;熔断式(38.201<8,带首部数值)不受限。
-                ref_ok = r is not None and not (role == "value" and v is None and id(c) not in cell_ref_kw)
+                ref_ok = ref_value is not None and not (role == "value" and v is None and id(c) not in cell_ref_kw)
                 if (v is not None and row.value is None) or (ref_ok and row.ref is None) or (
                     u is not None and row.unit is None
                 ):
-                    row.absorb(c, v, r if ref_ok else None, u)
+                    row.absorb(c, v, ref_value if ref_ok else None, u)
                     used.add(id(c))
                 elif role == "value" and v is None and r is not None and row.value is None:
                     # 值列的纯比较式/范围式(<2.00、1-2)= 检出限或范围型结果,value 契约是

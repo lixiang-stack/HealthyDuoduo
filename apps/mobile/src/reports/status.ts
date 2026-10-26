@@ -1,8 +1,10 @@
 // 报告状态与徽标文案(纯逻辑,spec 固定映射):success→识别完成、partial→待核对、
-// failed→识别失败;影像单的 partial 没有对应核对动作,不显示状态文案。
+// failed→识别失败;检验单 success 含可操作未知项时也按待核对展示(未知项可修正)。
+// 影像单的 partial 没有对应核对动作,不显示状态文案。
 // 徽标按 flag 聚合计数 + 「待核对 N 项」;影像单不呈现指标项,未知与待核对徽标都关闭。
 // 文案中性事实侧,不做解读。
 import type { ReportItem, ReportSummary, UploadResult } from '../api/reports';
+import { pendingItems } from '../review/items';
 
 import { isImagingReport } from './category';
 
@@ -15,14 +17,26 @@ const STATUS_LABELS: Record<ReportStatus, string> = {
   failed: '识别失败',
 };
 
-/** 状态文案按报告类别取:检验单 partial 为「待核对」;影像单 partial 无核对动作,不显示。 */
+/** 报告展示状态:检验单 success 但含可操作未知项时按待核对展示;
+ *  影像单不因未知项降级(指标项不呈现)。 */
+export function reportStatusKind(
+  report: Pick<ReportSummary, 'status' | 'report_type' | 'flag_counts'>,
+): ReportStatus {
+  if (!isImagingReport(report) && report.status === 'success' && report.flag_counts.unknown > 0) {
+    return 'partial';
+  }
+  return report.status;
+}
+
+/** 状态文案按报告类别取:检验单 partial 或 success+可操作未知为「待核对」;影像单
+ *  partial 无核对动作,不显示。 */
 export function reportStatusLabel(
-  report: Pick<ReportSummary, 'status' | 'report_type'>,
+  report: Pick<ReportSummary, 'status' | 'report_type' | 'flag_counts'>,
 ): string | undefined {
   if (isImagingReport(report) && report.status === 'partial') {
     return undefined;
   }
-  return STATUS_LABELS[report.status];
+  return STATUS_LABELS[reportStatusKind(report)];
 }
 
 export const DATE_UNKNOWN_LABEL = '日期未知';
@@ -112,7 +126,8 @@ export function flagBadges(
   return badges;
 }
 
-/** 「待核对 N 项」徽标;N=0(failed 恒 0、success 免核对)不出徽标。 */
+/** 「待核对 N 项」低置信徽标;N=0 不出徽标。success 的可操作未知项通过
+ *  状态文案「待核对」与「未知 N」展示,不混入低置信计数。 */
 export function unreviewedBadge(count: number): string | undefined {
   return count > 0 ? `待核对 ${count} 项` : undefined;
 }
@@ -145,17 +160,19 @@ export function uploadWaitText(elapsedMs: number): string {
     : '正在上传并识别(通常几秒)…';
 }
 
-/** 上传结果轻提示(同步响应驱动):重复/成功/待核对/失败各一分岔,failed 展示后端失败原因。 */
+/** 上传结果轻提示(同步响应驱动):重复/成功/待核对/失败各一分岔,failed 展示后端失败原因。
+ *  待核对项数与核对页同口径(低置信 + 可操作未知)。 */
 export function uploadResultText(result: UploadResult): string {
   if (result.duplicate) {
     return '这张图已经归档过,未重复上传';
   }
-  const { status, unreviewed_low_confidence_count: unreviewed, fail_reason: failReason } = result.report;
+  const { status, fail_reason: failReason } = result.report;
+  const pending = pendingItems(result.report.items).length;
   switch (status) {
     case 'success':
-      return '识别完成,已归档';
+      return pending > 0 ? `已归档,有 ${pending} 项待核对` : '识别完成,已归档';
     case 'partial':
-      return `已归档,有 ${unreviewed} 项待核对`;
+      return `已归档,有 ${pending} 项待核对`;
     case 'failed':
       return `识别失败:${failReason ?? '未识别出指标项'}(已留痕,可重新拍照)`;
   }

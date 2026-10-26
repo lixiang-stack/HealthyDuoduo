@@ -115,6 +115,16 @@ def test_alias_and_serial_strip() -> None:
     assert it.flag == "normal"
 
 
+def test_scalar_zero_in_ref_column_pairs_as_reference() -> None:
+    """参考列单标量 0(有核红细胞)按 ref 收下,不再因 _decompose 把它当 value 而漏配。"""
+    ocr = mk_ocr(header_row() + row(30, "有核红细胞绝对值", "0.00", ref="0"))
+    r = run_postprocess(ocr)
+    it = item_of(r, "有核红细胞绝对值")
+    assert it.value == "0.00"
+    assert it.ref_range == "0"
+    assert it.flag == "normal"
+
+
 def test_value_column_comparison_keeps_real_ref() -> None:
     """值列纯比较式(<2.00,结果低于检出限)不进 ref 位,参考列真格(0-30)正常配对。
 

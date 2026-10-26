@@ -82,6 +82,38 @@ describe('needsReview', () => {
       ),
     ).toBe(false);
   });
+
+  it('可操作未知项触发核对;不可操作未知不触发', () => {
+    expect(
+      needsReview(
+        report({
+          status: 'success',
+          items: [
+            item({
+              flag: 'unknown',
+              flag_reason: 'ocr_merge',
+              low_confidence: false,
+              review_status: 'confirmed',
+            }),
+          ],
+        }),
+      ),
+    ).toBe(true);
+    expect(
+      needsReview(
+        report({
+          status: 'success',
+          items: [
+            item({
+              flag: 'unknown',
+              flag_reason: 'no_reference',
+              low_confidence: false,
+            }),
+          ],
+        }),
+      ),
+    ).toBe(false);
+  });
 });
 
 describe('pendingItems', () => {
@@ -94,6 +126,37 @@ describe('pendingItems', () => {
       item({ item_id: 5 }),
     ];
     expect(pendingItems(items).map((it) => it.item_id)).toEqual([1, 5]);
+  });
+
+  it('可操作未知项进入待核对;确认后仍保留(只有修正能消解)', () => {
+    const items = [
+      item({
+        item_id: 1,
+        flag: 'unknown',
+        flag_reason: 'ocr_miss',
+        low_confidence: false,
+        review_status: 'confirmed',
+      }),
+      item({
+        item_id: 2,
+        flag: 'unknown',
+        flag_reason: 'no_reference',
+        low_confidence: false,
+      }),
+      item({
+        item_id: 3,
+        flag: 'unknown',
+        flag_reason: 'informational',
+        low_confidence: false,
+      }),
+      item({
+        item_id: 4,
+        flag: 'unknown',
+        flag_reason: 'qualitative_unsupported',
+        low_confidence: false,
+      }),
+    ];
+    expect(pendingItems(items).map((it) => it.item_id)).toEqual([1]);
   });
 
   it('未检测项不进入待核对列表', () => {
@@ -158,11 +221,15 @@ describe('isBackfillItem / reviewActions', () => {
     expect(isBackfillItem(item({ value: null, ref_range: '0-20', flag: 'unknown', flag_reason: 'no_reference' }))).toBe(false);
   });
 
-  it('可补录不给确认,只给补录主操作;低置信非补录给确认', () => {
+  it('可补录不给确认,只给补录主操作;可操作未知也不给确认;不可操作低置信仍可确认', () => {
     const backfill = reviewActions(item({ value: null, ref_range: '0-20', flag: 'unknown', flag_reason: 'ocr_miss' }));
     expect(backfill).toMatchObject({ confirm: false, primary: 'backfill', correctLabel: '补录缺失信息' });
     const low = reviewActions(item({ value: null, ref_range: null, flag: 'unknown', flag_reason: 'ocr_miss' }));
-    expect(low).toMatchObject({ confirm: true, primary: 'confirm', correctLabel: '修正' });
+    expect(low).toMatchObject({ confirm: false, primary: null, correctLabel: '修正' });
+    const informational = reviewActions(
+      item({ value: null, ref_range: null, flag: 'unknown', flag_reason: 'informational' }),
+    );
+    expect(informational).toMatchObject({ confirm: true, primary: 'confirm', correctLabel: '修正' });
     const high = reviewActions(item({ low_confidence: false, value: '0', ref_range: null, flag: 'unknown', flag_reason: 'ocr_miss' }));
     expect(high).toMatchObject({ confirm: false, primary: null, correctLabel: '修正' });
     const corrected = reviewActions(item({ value: null, ref_range: '0-20', flag: 'unknown', flag_reason: 'ocr_miss', review_status: 'corrected' }));
