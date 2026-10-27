@@ -1,9 +1,12 @@
 package contract
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -16,6 +19,19 @@ func fixture(t *testing.T, name string) []byte {
 		t.Fatalf("read fixture %s: %v", name, err)
 	}
 	return data
+}
+
+// decodeReport 严格解码报告 fixture:Go struct 缺少 schema 字段时立即失败,
+// 而不是像 json.Unmarshal 那样静默丢弃(ADR-0002 双语契约防漂移)。
+func decodeReport(t *testing.T, name string) Report {
+	t.Helper()
+	dec := json.NewDecoder(bytes.NewReader(fixture(t, name)))
+	dec.DisallowUnknownFields()
+	var got Report
+	if err := dec.Decode(&got); err != nil {
+		t.Fatalf("decode report %s: %v", name, err)
+	}
+	return got
 }
 
 func TestUnmarshalOCRResultFixture(t *testing.T) {
@@ -47,18 +63,18 @@ func TestUnmarshalOCRResultFixture(t *testing.T) {
 }
 
 func TestUnmarshalReportFixture(t *testing.T) {
-	var got Report
-	if err := json.Unmarshal(fixture(t, "report.example.json"), &got); err != nil {
-		t.Fatalf("unmarshal report: %v", err)
-	}
+	got := decodeReport(t, "report.example.json")
 	if got.ReportType != "临检" || got.ReportDate == nil || *got.ReportDate != "2026-10-01" || got.Status != "success" {
 		t.Errorf("Report header = %+v", got)
+	}
+	if len(got.Panels) != 1 || got.Panels[0] != "cbc" {
+		t.Errorf("Report.Panels = %v, want [cbc]", got.Panels)
 	}
 	if len(got.Items) != 1 {
 		t.Fatalf("Items = %d items, want 1", len(got.Items))
 	}
 	item := got.Items[0]
-	if item.Name != "血红蛋白" || item.Flag != "normal" || item.LowConfidence {
+	if item.Name != "血红蛋白" || item.Panel != "cbc" || item.Flag != "normal" || item.LowConfidence {
 		t.Errorf("Item = %+v", item)
 	}
 	if item.Value == nil || *item.Value != "128" {
@@ -79,12 +95,12 @@ func TestUnmarshalReportFixture(t *testing.T) {
 }
 
 func TestUnmarshalReportSectionsFixture(t *testing.T) {
-	var got Report
-	if err := json.Unmarshal(fixture(t, "report.sections.example.json"), &got); err != nil {
-		t.Fatalf("unmarshal report (sections): %v", err)
-	}
+	got := decodeReport(t, "report.sections.example.json")
 	if got.ReportType != "影像" || got.ReportDate == nil || *got.ReportDate != "2024-09-15" {
 		t.Errorf("Report header = %+v", got)
+	}
+	if len(got.Panels) != 1 || got.Panels[0] != "imaging" {
+		t.Errorf("Report.Panels = %v, want [imaging]", got.Panels)
 	}
 	if len(got.Sections) != 3 {
 		t.Fatalf("Sections = %d, want 3", len(got.Sections))
@@ -99,10 +115,7 @@ func TestUnmarshalReportSectionsFixture(t *testing.T) {
 }
 
 func TestUnmarshalReportNullDateFixture(t *testing.T) {
-	var got Report
-	if err := json.Unmarshal(fixture(t, "report.null-date.example.json"), &got); err != nil {
-		t.Fatalf("unmarshal report (null date): %v", err)
-	}
+	got := decodeReport(t, "report.null-date.example.json")
 	if got.ReportDate != nil {
 		t.Errorf("ReportDate = %v, want nil (null)", got.ReportDate)
 	}
@@ -111,5 +124,53 @@ func TestUnmarshalReportNullDateFixture(t *testing.T) {
 	}
 	if !got.Items[0].LowConfidence {
 		t.Errorf("Items[0].LowConfidence = false, want true")
+	}
+}
+
+// jsonSchemaRequired 只取 schema 的必填字段树,用于检查 Go struct 是否镜像。
+type jsonSchemaRequired struct {
+	Required []string                      `json:"required"`
+	Defs     map[string]jsonSchemaRequired `json:"$defs"`
+}
+
+func TestReportSchemaRequiredFieldsMirrorGoStructs(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "schemas", "report.schema.json"))
+	if err != nil {
+		t.Fatalf("read report schema: %v", err)
+	}
+	var schema jsonSchemaRequired
+	if err := json.Unmarshal(data, &schema); err != nil {
+		t.Fatalf("unmarshal report schema: %v", err)
+	}
+	cases := []struct {
+		name     string
+		typ      reflect.Type
+		required []string
+	}{
+		{"Report", reflect.TypeOf(Report{}), schema.Required},
+		{"ReportItem", reflect.TypeOf(ReportItem{}), schema.Defs["reportItem"].Required},
+		{"ReportSection", reflect.TypeOf(ReportSection{}), schema.Defs["reportSection"].Required},
+	}
+	for _, c := range cases {
+		if len(c.required) == 0 {
+			t.Fatalf("%s: schema required list is empty (schema shape changed?)", c.name)
+		}
+		assertRequiredJSONFields(t, c.name, c.typ, c.required)
+	}
+}
+
+func assertRequiredJSONFields(t *testing.T, typeName string, typ reflect.Type, required []string) {
+	t.Helper()
+	tags := make(map[string]bool, typ.NumField())
+	for i := 0; i < typ.NumField(); i++ {
+		tag := strings.Split(typ.Field(i).Tag.Get("json"), ",")[0]
+		if tag != "" && tag != "-" {
+			tags[tag] = true
+		}
+	}
+	for _, name := range required {
+		if !tags[name] {
+			t.Errorf("%s is missing required JSON field %q", typeName, name)
+		}
 	}
 }
