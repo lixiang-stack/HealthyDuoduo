@@ -5,6 +5,7 @@ import {
   flagBadges,
   flagLabel,
   itemFlagLabel,
+  panelDateLabel,
   reportBadgeLabels,
   reportDateLabel,
   reportStatusKind,
@@ -77,6 +78,13 @@ describe('reportDateLabel', () => {
   it('影像单缺日期显示「检查单未印日期」,有日期照常显示', () => {
     expect(reportDateLabel({ ...imaging, report_date: null })).toBe('检查单未印日期');
     expect(reportDateLabel({ ...imaging, report_date: '2024-09-15' })).toBe('2024-09-15');
+  });
+
+  it('项目列表 / 详情按 narrative 选择日期口径', () => {
+    expect(panelDateLabel(null, false)).toBe('日期未知');
+    expect(panelDateLabel(null, true)).toBe('检查单未印日期');
+    expect(panelDateLabel('2021-08-02', false)).toBe('2021-08-02');
+    expect(panelDateLabel('2024-09-15', true)).toBe('2024-09-15');
   });
 });
 

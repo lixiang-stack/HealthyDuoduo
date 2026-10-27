@@ -6,7 +6,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { TrendPoint } from '../api/reports';
 import { colors } from '../components/theme';
-import { displayItemName } from '../review/items';
 import { FLAG_COLORS } from './colors';
 import { flagLabel, DATE_UNKNOWN_LABEL, refRangeLabel } from './status';
 import { TrendDetailChart } from './TrendChart';
@@ -16,8 +15,8 @@ import {
   isFilledPoint,
   trendUnavailableReason,
   TREND_UNAVAILABLE_LABEL,
+  type TrendSeries,
 } from './trends';
-import type { TrendRow } from './useAbnormalTrends';
 
 function trustLabel(point: TrendPoint): string {
   if (point.reviewed) {
@@ -39,17 +38,31 @@ function PointBadge({ point }: { point: TrendPoint }) {
   );
 }
 
-export function TrendDetailSheet({ row, onClose }: { row: TrendRow; onClose: () => void }) {
-  const { candidate, series } = row;
-  const item = candidate.item;
-  const name = displayItemName(item);
+export function TrendDetailSheet({
+  name,
+  reportType,
+  reportDate,
+  latestValue,
+  series,
+  onClose,
+}: {
+  name: string;
+  reportType: string;
+  reportDate: string | null;
+  latestValue: string | null;
+  series: TrendSeries;
+  onClose: () => void;
+}) {
   const [selectedIndex, setSelectedIndex] = useState(() => defaultSelectedIndex(series));
   const selectedPoint = series.listPoints[selectedIndex];
   // 选中点若不是可绘制点(非数值/缺日期),图中没有对应标记:保持无放大,避免高亮与点卡不一致。
   const selectedChartIndex = selectedPoint
     ? series.chartPoints.findIndex((point) => point.report_id === selectedPoint.report_id)
     : -1;
-  const reason = trendUnavailableReason(series, candidate);
+  const reason = trendUnavailableReason(series, {
+    reportDate,
+    item: { value: latestValue },
+  });
 
   return (
     <Modal visible animationType="slide" transparent={false} onRequestClose={onClose}>
@@ -71,7 +84,7 @@ export function TrendDetailSheet({ row, onClose }: { row: TrendRow; onClose: () 
 
         <ScrollView contentContainerStyle={styles.content}>
           <Text style={styles.headerMeta}>
-            {`最新：${candidate.reportType} · ${series.unit ?? '无单位'}`}
+            {`最新：${reportType} · ${series.unit ?? '无单位'}`}
           </Text>
 
           {series.chartPoints.length > 0 ? (
@@ -128,7 +141,7 @@ export function TrendDetailSheet({ row, onClose }: { row: TrendRow; onClose: () 
           </View>
           <Text style={styles.muted}>点按任一行切换选中点。</Text>
 
-          <Text style={styles.meta}>{formatSeriesMeta(series, candidate)}</Text>
+          <Text style={styles.meta}>{formatSeriesMeta(series, { reportDate })}</Text>
         </ScrollView>
       </SafeAreaView>
     </Modal>

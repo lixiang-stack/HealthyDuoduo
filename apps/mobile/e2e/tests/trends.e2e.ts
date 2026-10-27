@@ -3,7 +3,15 @@
 import { beforeAll, describe, test } from '@e2e-dev/web';
 import { expect } from 'e2e';
 
-import { openConfigured, seedTrendData, testID, type TrendSeed } from '../support';
+import {
+  getPanelDetail,
+  listMemberPanels,
+  openConfigured,
+  sampleReportId,
+  seedTrendData,
+  testID,
+  type TrendSeed,
+} from '../support';
 
 const SINGLE_REPORT_META = '2011-07-02 · 仅 1 份报告';
 
@@ -87,6 +95,74 @@ describe('异常指标趋势', { serial: true, timeout: 300_000 }, () => {
     await selectMember(seed.noReports.member_id);
     await expect(screen.getByTestId(testID.trendEmptyReports, { visible: true })).toContainText(
       '这位成员还没有检查单。',
+    );
+  });
+
+  // panel-browse 票 03:混合报告在多项目下出现;项目详情与 ?panel= 筛选同源。
+  // 复用本文件的 lft_02 / lft_05 fixture,不新增图片(样张按 sha256 全局去重)。
+  test('按项目:混合报告、项目详情与 ?panel= 筛选', { timeout: 300_000 }, async ({
+    app,
+    browser,
+    screen,
+  }) => {
+    const memberId = seed.multiPoint.member_id;
+    const panels = await listMemberPanels(memberId);
+    expect(panels.map((panel) => panel.panel)).toEqual([
+      'liver',
+      'kidney',
+      'uric_acid',
+      'lipid',
+    ]);
+    const kidney = panels.find((panel) => panel.panel === 'kidney')!;
+    const liver = panels.find((panel) => panel.panel === 'liver')!;
+    expect(kidney.report_count).toBe(1);
+    expect(liver.report_count).toBe(2);
+
+    await openConfigured(app, browser, '/timeline', { memberId });
+    await screen.getByTestId(testID.archiveViewPanel).tap();
+    for (const panel of panels) {
+      await expect(screen.getByTestId(testID.panelRow(panel.panel), { visible: true })).toBeVisible();
+    }
+    await expect(screen.getByTestId(testID.panelRowMeta('kidney'))).toContainText(
+      `${kidney.report_count} 份 · ${kidney.abnormal_count} 项异常 · ${kidney.item_count} 项指标`,
+    );
+
+    await screen.getByTestId(testID.panelRow('kidney')).tap();
+    await browser.waitForURL(/\/panel\/kidney$/);
+    const detail = await getPanelDetail(memberId, 'kidney');
+    expect(detail.items.map((item) => item.name)).toEqual([
+      '尿素',
+      '肌酐',
+      'eGFR',
+      '血清胱抑素C',
+    ]);
+    await expect(screen.getByTestId(testID.panelDetailHeading)).toContainText('肾功');
+    await expect(screen.getByTestId(testID.panelDetailMeta)).toContainText('1 份报告');
+    await expect(screen.getByTestId(testID.panelDetailMeta)).toContainText('0 项异常');
+    await expect(screen.getByTestId(testID.panelItem(0))).toContainText('尿素');
+    await screen.getByTestId(testID.panelItem(0)).tap();
+    await expect(screen.getByTestId(testID.trendDetail)).toBeVisible();
+    await screen.getByTestId(testID.trendDetailClose).tap();
+
+    await screen.getByTestId(testID.panelReportsLink).tap();
+    await browser.waitForURL(/\/timeline\?panel=kidney$/);
+    await expect(screen.getByTestId(testID.archivePanelBanner)).toContainText(
+      `只看肾功 · ${kidney.report_count} 份`,
+    );
+    await expect(screen.getByTestId(testID.reportCard(await sampleReportId('lft_02.jpg')))).toBeVisible();
+    await expect(screen.getByTestId(testID.reportCard(await sampleReportId('lft_05.jpeg')))).toHaveCount(0);
+
+    // 有异常的项目:异常项内联迷你趋势,报告份数与项目列表一致。
+    await openConfigured(app, browser, '/panel/liver', { memberId });
+    await expect(screen.getByTestId(testID.panelDetailMeta)).toContainText(
+      `${liver.report_count} 份报告`,
+    );
+    await expect(screen.getByTestId(testID.panelAbnormalTitle)).toContainText(
+      `异常 ${liver.abnormal_count} 项`,
+    );
+    await expect(screen.getByTestId(testID.panelItemSparkline(0), { visible: true })).toBeVisible();
+    await expect(screen.getByTestId(testID.panelReportsLink)).toContainText(
+      `${liver.report_count} 份`,
     );
   });
 });

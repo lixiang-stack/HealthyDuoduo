@@ -1,0 +1,34 @@
+{
+  "panels": [
+    {
+      "panel": "liver",
+      "report_count": 3,
+      "item_count": 14,
+      "abnormal_count": 6,
+      "latest_report_date": "2021-08-02",
+      "latest_report_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "report_types": ["生化"],
+      "narrative": false
+    },
+    {
+      "panel": "kidney",
+      "report_count": 2,
+      "item_count": 4,
+      "abnormal_count": 0,
+      "latest_report_date": "2021-08-02",
+      "latest_report_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "report_types": ["生化"],
+      "narrative": false
+    },
+    {
+      "panel": "imaging",
+      "report_count": 1,
+      "item_count": 0,
+      "abnormal_count": 0,
+      "latest_report_date": null,
+      "latest_report_id": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "report_types": ["影像"],
+      "narrative": true
+    }
+  ]
+}

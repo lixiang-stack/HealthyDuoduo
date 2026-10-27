@@ -38,20 +38,24 @@ func handleGetTrend(d *deps) http.HandlerFunc {
 			Points:   make([]httpapi.TrendPoint, 0, len(rows)),
 		}
 		for _, row := range rows {
-			reviewed := row.ReviewStatus == pipeline.ReviewStatusConfirmed ||
-				row.ReviewStatus == pipeline.ReviewStatusCorrected
-			result.Points = append(result.Points, httpapi.TrendPoint{
-				ReportID:      row.ReportID,
-				ReportDate:    row.ReportDate,
-				Value:         row.Value,
-				Unit:          row.Unit,
-				RefRange:      row.RefRange,
-				Method:        row.Method,
-				Flag:          row.Flag,
-				LowConfidence: row.LowConfidence,
-				Reviewed:      reviewed,
-			})
+			result.Points = append(result.Points, toAPITrendPoint(row))
 		}
 		writeJSON(w, http.StatusOK, result)
+	}
+}
+
+// toAPITrendPoint 趋势点投影(项目详情的 latest / points 复用同一 reviewed 派生口径)。
+func toAPITrendPoint(row pipeline.TrendPointRow) httpapi.TrendPoint {
+	return httpapi.TrendPoint{
+		ReportID:      row.ReportID,
+		ReportDate:    row.ReportDate,
+		Value:         row.Value,
+		Unit:          row.Unit,
+		RefRange:      row.RefRange,
+		Method:        row.Method,
+		Flag:          row.Flag,
+		LowConfidence: row.LowConfidence,
+		Reviewed: row.ReviewStatus == pipeline.ReviewStatusConfirmed ||
+			row.ReviewStatus == pipeline.ReviewStatusCorrected,
 	}
 }

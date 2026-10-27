@@ -195,6 +195,53 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/members/{member_id}/panels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 项目列表(按成员)
+         * @description 当前成员非 failed 报告的项目组聚合;只返回 report_count > 0 的项目,没有
+         *     可归类报告时返回空数组。排序:最近报告日期降序(dateless 沉底),同日期按
+         *     固定项目组优先级。failed 报告不参与;未回填存量(panels=[])一律归 other,
+         *     与 App `?panel=` 筛选回退口径一致。
+         */
+        get: operations["listMemberPanels"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/members/{member_id}/panels/{panel}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 项目详情(按成员 + 项目组)
+         * @description 该项目组下全部指标的最新值与跨报告趋势,按 name+unit 分行(跨单位不合并、
+         *     不换算)。异常项在前,其余按最新报告内指标顺序;latest 为空且
+         *     not_tested_count > 0 表示「未检测」;latest_report_not_tested 表示最近一份
+         *     含该指标的报告中此项未检测,数值是最近一次已知值。narrative=true(影像)
+         *     时 items=[]。未知成员 404,非法 panel 400。
+         */
+        get: operations["getPanelDetail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -469,6 +516,60 @@ export interface components {
              */
             reviewed: boolean;
         };
+        PanelsList: {
+            panels: components["schemas"]["PanelSummary"][];
+        };
+        /** @description 项目列表一行;只返回当前成员非 failed 报告里实际出现过的项目。 */
+        PanelSummary: {
+            panel: components["schemas"]["PanelCode"];
+            /** @description 当前成员非 failed 报告里包含该项目的份数 */
+            report_count: number;
+            /** @description 该项目下 name+unit 去重后的指标数(含未检测项) */
+            item_count: number;
+            /** @description 每个 name+unit 取最近非 not_tested 值后 flag ∈ high/low/abnormal 的数量 */
+            abnormal_count: number;
+            /** @description 包含该项目的最新报告日期;只有无日期报告时为 null */
+            latest_report_date: string | null;
+            /** @description 最新报告身份;无报告时为 null(项目列表不返回这种行) */
+            latest_report_id: string | null;
+            /** @description 来源报告类别(other 行显示「其他 · 临检、免疫」) */
+            report_types: string[];
+            /** @description true = 影像等叙述型项目,点击直接打开最新报告详情 */
+            narrative: boolean;
+        };
+        PanelDetail: {
+            panel: components["schemas"]["PanelCode"];
+            /** Format: int64 */
+            member_id: number;
+            /** @description 当前成员非 failed 报告里包含该项目的份数 */
+            report_count: number;
+            latest_report_date: string | null;
+            latest_report_id: string | null;
+            /** @description 来源报告类别(other 详情头部显示) */
+            report_types: string[];
+            /** @description true 时 items=[];App 不打开该详情,项目列表直接进报告详情 */
+            narrative: boolean;
+            items: components["schemas"]["PanelItem"][];
+        };
+        /**
+         * @description 项目详情中按 name+unit 分行的指标。latest 为最近一个非 not_tested 点
+         *     (没有则 null);points 为同组跨报告点,report_date 升序、不含 not_tested。
+         */
+        PanelItem: {
+            /** @description 词典规范名(修正后以修正值为准) */
+            name: string;
+            unit: string | null;
+            /** @description 取 latest 点的参考范围 */
+            ref_range: string | null;
+            latest: components["schemas"]["TrendPoint"] | null;
+            points: components["schemas"]["TrendPoint"][];
+            /** @description 有非 not_tested 点的报告数 */
+            report_count: number;
+            /** @description 该指标被标为 not_tested 的报告数 */
+            not_tested_count: number;
+            /** @description 最近一份含该指标的报告中此项是否为 not_tested */
+            latest_report_not_tested: boolean;
+        };
         Error: {
             /** @description 中性事实侧错误说明(不诊断、不猜测) */
             message: string;
@@ -502,6 +603,8 @@ export interface components {
         ItemID: number;
         /** @description 指标项名称(通常为词典规范名;修正后以修正值为准),URL 编码 */
         IndicatorName: string;
+        /** @description 项目组稳定 code(与 PanelCode 枚举同源;非法 code 返回 400) */
+        Panel: components["schemas"]["PanelCode"];
     };
     requestBodies: never;
     headers: never;
@@ -846,6 +949,55 @@ export interface operations {
                     "application/json": components["schemas"]["TrendResult"];
                 };
             };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listMemberPanels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                member_id: components["parameters"]["MemberID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 项目列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PanelsList"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getPanelDetail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                member_id: components["parameters"]["MemberID"];
+                /** @description 项目组稳定 code(与 PanelCode 枚举同源;非法 code 返回 400) */
+                panel: components["parameters"]["Panel"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 项目详情 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PanelDetail"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             404: components["responses"]["NotFound"];
         };
     };

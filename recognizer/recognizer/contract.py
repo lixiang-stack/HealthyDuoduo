@@ -76,6 +76,7 @@ class Panel(_Vocabulary):
 
 
 # 报告级 panels 的固定排序:命中项数降序;同数按此序,数值小优先(spec §5.3)。
+# 唯一来源是 schemas/report.schema.json $defs.panel.x-panel-order;契约测试锁定。
 PANEL_ORDER: tuple[Panel, ...] = (
     Panel.LIVER,
     Panel.KIDNEY,

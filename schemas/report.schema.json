@@ -68,7 +68,10 @@
       "enum": ["cbc", "urinalysis", "liver", "kidney", "lipid", "glucose",
                "thyroid", "sex_hormone", "uric_acid", "electrolyte", "vitanemia",
                "infection", "autoimmune", "coag", "imaging", "other"],
-      "description": "项目组 code;指标项必须属于其 report_type 的允许集合,other 是唯一跨类别兜底"
+      "x-panel-order": ["liver", "kidney", "lipid", "glucose", "uric_acid", "electrolyte",
+                        "vitanemia", "thyroid", "sex_hormone", "infection", "autoimmune",
+                        "coag", "cbc", "urinalysis", "imaging", "other"],
+      "description": "项目组 code;指标项必须属于其 report_type 的允许集合,other 是唯一跨类别兜底。x-panel-order 是 spec §5.3 固定优先级的唯一来源,Python / Go / App 契约测试锁定同源"
     },
     "reportItem": {
       "type": "object",

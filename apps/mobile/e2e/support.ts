@@ -16,6 +16,8 @@ import { flagReasonText, isBackfillItem } from '../src/review/rules';
 export type Member = components['schemas']['Member'];
 export type ReportDetail = components['schemas']['ReportDetail'];
 export type UploadResult = components['schemas']['UploadResult'];
+export type PanelSummary = components['schemas']['PanelSummary'];
+export type PanelDetail = components['schemas']['PanelDetail'];
 
 /** 专用栈 API 基址;run.sh 以 E2E_API_BASE_URL 导出(与 HDD_SERVE_PORT 同源)。 */
 export const API_BASE_URL = process.env.E2E_API_BASE_URL ?? 'http://127.0.0.1:58080/api/v1';
@@ -81,6 +83,26 @@ type BadgeKind = FlagBadgeKind | 'unreviewed';
   archiveFilterClear: 'archive-filter-clear',
   archiveEmpty: 'archive-empty',
   archiveShowAll: 'archive-show-all',
+  archiveViewTime: 'archive-view-time',
+  archiveViewPanel: 'archive-view-panel',
+  archivePanelBanner: 'archive-panel-banner',
+  archivePanelClear: 'archive-panel-clear',
+  archivePanelsEmpty: 'archive-panels-empty',
+  archiveShowTime: 'archive-show-time',
+  panelRow: (panel: string) => `panel-row-${panel}`,
+  panelRowMeta: (panel: string) => `panel-row-meta-${panel}`,
+  panelDetailHeading: 'panel-detail-heading',
+  panelDetailMeta: 'panel-detail-meta',
+  panelAbnormalTitle: 'panel-abnormal-title',
+  panelRestTitle: 'panel-rest-title',
+  panelRestToggle: 'panel-rest-toggle',
+  panelItem: (index: number) => `panel-item-${index}`,
+  panelItemSparkline: (index: number) => `panel-item-sparkline-${index}`,
+  panelItemNotTested: (index: number) => `panel-item-not-tested-${index}`,
+  panelReportsLink: 'panel-reports-link',
+  panelLatestFailed: 'panel-latest-failed',
+  panelEmpty: 'panel-empty',
+  panelBackToPanels: 'panel-back-to-panels',
   overviewAllReports: 'overview-all-reports',
   overviewPendingPartial: 'overview-pending-partial',
   overviewPendingFailed: 'overview-pending-failed',
@@ -143,6 +165,17 @@ export async function createMember(name: string, isChild: boolean): Promise<Memb
   });
 }
 
+/** 项目列表(与 App 同一契约;E2E 用它派生 UI 断言的计数)。 */
+export async function listMemberPanels(memberId: number): Promise<PanelSummary[]> {
+  const payload = await api<{ panels: PanelSummary[] }>(`/members/${memberId}/panels`);
+  return payload.panels;
+}
+
+/** 项目详情(跨报告点已在响应里;断言 UI 与数据同源)。 */
+export async function getPanelDetail(memberId: number, panel: string): Promise<PanelDetail> {
+  return api<PanelDetail>(`/members/${memberId}/panels/${panel}`);
+}
+
 const MIME_BY_SUFFIX: Record<string, string> = {
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
@@ -155,20 +188,33 @@ export async function uploadSample(name: string, memberId: number): Promise<Repo
   const path = samplePath(name);
   const bytes = await readFile(path);
   const suffix = path.slice(path.lastIndexOf('.')).toLowerCase();
+  return uploadImageBytes(new Uint8Array(bytes), basename(path), memberId, MIME_BY_SUFFIX[suffix]);
+}
+
+/** 无文本白图(98 byte PNG):真实 OCR 返回 failed 报告,用于失败报告不进项目视图的用例。 */
+const BLANK_PNG_BASE64 =
+  'iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAAAAACPAi4CAAAAKUlEQVR4nO3MQREAAAwCIPuX1hD77SAA6VEEAoFAIBAIBAKBQCAQfA8Gpwvw4pr3blgAAAAASUVORK5CYII=';
+
+export async function uploadBlankImage(memberId: number): Promise<ReportDetail> {
+  return uploadImageBytes(Buffer.from(BLANK_PNG_BASE64, 'base64'), 'blank.png', memberId, 'image/png');
+}
+
+async function uploadImageBytes(
+  bytes: Uint8Array,
+  filename: string,
+  memberId: number,
+  mimeType = 'application/octet-stream',
+): Promise<ReportDetail> {
   const form = new FormData();
   form.append('member_id', String(memberId));
-  form.append(
-    'image',
-    new Blob([new Uint8Array(bytes)], { type: MIME_BY_SUFFIX[suffix] ?? 'application/octet-stream' }),
-    basename(path),
-  );
+  form.append('image', new Blob([new Uint8Array(bytes)], { type: mimeType }), filename);
   const result = await api<UploadResult>('/reports', {
     method: 'POST',
     body: form,
     signal: AbortSignal.timeout(120_000),
   });
   if (result.duplicate) {
-    throw new Error(`样张 ${name} 已在库:专用栈未重置,请用 e2e/run.sh 重跑`);
+    throw new Error(`样张 ${filename} 已在库:专用栈未重置,请用 e2e/run.sh 重跑`);
   }
   return result.report;
 }
@@ -436,4 +482,41 @@ export async function seedLifecycleData(): Promise<LifecycleSeed> {
   const report = await uploadSample('cbc_02.png', member.member_id);
   assertPartialUnknownFixture('cbc_02', report);
   return { member, target, report };
+}
+
+function assertReportPanels(sample: string, report: ReportDetail, panels: string[]): void {
+  if (JSON.stringify(report.panels) !== JSON.stringify(panels)) {
+    fixtureError(
+      sample,
+      `expected panels ${JSON.stringify(panels)}, got ${JSON.stringify(report.panels)}`,
+    );
+  }
+}
+
+export type PanelSeed = {
+  thyroid: Member;
+  urinalysis: Member;
+  failed: Member;
+  tft01: ReportDetail;
+  ua05: ReportDetail;
+  failedReport: ReportDetail;
+};
+
+/** 项目浏览用例种子:甲状腺 / 尿常规 / 仅失败报告三个独立成员。
+ *  与其它 E2E 文件不共享图片(样张按 sha256 全局去重);tft_01 / ua_05 走 golden 回放。 */
+export async function seedPanelData(): Promise<PanelSeed> {
+  const thyroid = await createMember('E2E 项目甲状腺', false);
+  const tft01 = await uploadSample('tft_01.jpeg', thyroid.member_id);
+  assertReportPanels('tft_01', tft01, ['thyroid']);
+
+  const urinalysis = await createMember('E2E 项目尿常规', false);
+  const ua05 = await uploadSample('ua_05.jpeg', urinalysis.member_id);
+  assertReportPanels('ua_05', ua05, ['urinalysis']);
+
+  const failed = await createMember('E2E 项目失败', false);
+  const failedReport = await uploadBlankImage(failed.member_id);
+  if (failedReport.status !== 'failed') {
+    fixtureError('blank.png', `expected a failed report, got ${failedReport.status}`);
+  }
+  return { thyroid, urinalysis, failed, tft01, ua05, failedReport };
 }

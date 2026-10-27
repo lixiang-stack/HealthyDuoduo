@@ -194,6 +194,52 @@ type TrendResult struct {
 	Points   []TrendPoint `json:"points"`
 }
 
+// PanelSummary 成员项目列表一行(只包含 report_count > 0 的项目;排序由服务端给:
+// 最近报告日期降序、同日期按 §5.3 固定优先级)。Narrative=true 表示影像等叙述型
+// 项目,App 直接打开最新报告详情,不做项目详情 / 趋势。
+type PanelSummary struct {
+	Panel            string   `json:"panel"`
+	ReportCount      int      `json:"report_count"`
+	ItemCount        int      `json:"item_count"`
+	AbnormalCount    int      `json:"abnormal_count"`
+	LatestReportDate *string  `json:"latest_report_date"`
+	LatestReportID   *string  `json:"latest_report_id"`
+	ReportTypes      []string `json:"report_types"`
+	Narrative        bool     `json:"narrative"`
+}
+
+// PanelsList GET /members/{member_id}/panels 响应信封;没有可归类报告时为空数组。
+type PanelsList struct {
+	Panels []PanelSummary `json:"panels"`
+}
+
+// PanelItem 项目详情中按 name+unit 分行的指标;Latest 是最近一个非 not_tested 点
+// (没有则 null),Points 为同组跨报告点(日期升序,不含 not_tested)。
+// latest_report_not_tested=true 表示最近一份含该指标的报告中此项为未检测,
+// 数值是最近一次已知值,不冒充本次结果。
+type PanelItem struct {
+	Name                  string       `json:"name"`
+	Unit                  *string      `json:"unit"`
+	RefRange              *string      `json:"ref_range"`
+	Latest                *TrendPoint  `json:"latest"`
+	Points                []TrendPoint `json:"points"`
+	ReportCount           int          `json:"report_count"`
+	NotTestedCount        int          `json:"not_tested_count"`
+	LatestReportNotTested bool         `json:"latest_report_not_tested"`
+}
+
+// PanelDetail GET /members/{member_id}/panels/{panel} 响应;narrative=true 时 items=[]。
+type PanelDetail struct {
+	Panel            string      `json:"panel"`
+	MemberID         int64       `json:"member_id"`
+	ReportCount      int         `json:"report_count"`
+	LatestReportDate *string     `json:"latest_report_date"`
+	LatestReportID   *string     `json:"latest_report_id"`
+	ReportTypes      []string    `json:"report_types"`
+	Narrative        bool        `json:"narrative"`
+	Items            []PanelItem `json:"items"`
+}
+
 // Error components/Error:非 2xx 响应统一形状(message 中性事实侧文案)。
 type Error struct {
 	Message string `json:"message"`

@@ -18,7 +18,7 @@ npm run e2e -- --headed        # 参数透传给 e2e run(如 --headed/--grep)
 E2E_KEEP_STACK=1 npm run e2e   # 跑完保留栈,便于手工看 Web/API(下次运行前仍会重建)
 ```
 
-完成判据：16/16 通过；失败时看 `.e2e/results/<test>/trace.md` 与应用日志 `.e2e/logs/expo.log`。
+完成判据：21/21 通过；失败时看 `.e2e/results/<test>/trace.md` 与应用日志 `.e2e/logs/expo.log`。
 
 ## 专用栈
 
@@ -33,31 +33,36 @@ E2E_KEEP_STACK=1 npm run e2e   # 跑完保留栈,便于手工看 Web/API(下次�
 `RECOGNIZER_REPLAY_SAMPLES` 对这些样本**按图像 sha256 回放** `samples/expected/{ocr,report}`
 下的 golden，不再跑真实 OCR：`cbc_02`（生命周期）、`cbc_03`（核对）、`cbc_04`（自愈）、
 `us_01` / `us_03`（影像段落）、`glu_02`（单图上传）、`glu_01` / `glu_03`（多图上传）、
-`lft_02` / `lft_03` / `lft_04` / `lft_05`（趋势）。
+`lft_02` / `lft_03` / `lft_04` / `lft_05`（趋势与按项目）、`tft_01` / `ua_05`（按项目）。
 seed 仍经真实上传端点入档；`duplicate:true` 即视为栈未重置并失败。共享 `deploy` 栈（8080 等）
 不加载该覆盖、不暴露回放入口。
 
 不在回放名单里的样本仍走真实 OCR，供 `ocr-smoke.e2e.ts` 使用（`cbc_01` / `us_02`）。
 该 smoke 只断言上传成功、报告非空、类型/日期/段落合理，不驱动改归属/筛选/核对等 UI 行为；
-逐项识别质量继续由 Pipeline E2E/golden 覆盖。
+逐项识别质量继续由 Pipeline E2E/golden 覆盖。失败的按项目用例用一张 98 byte 无文本白图
+（真实 OCR 返回 `failed`、`panels=[other]`、无指标项），不新增 golden。
 
 ## 用例与选择器
 
-- `app.e2e.ts`（12 条，serial）：设置/健康检查、成员、时间线过滤、概览、档案筛选、上传（单图/多图）、
-  两张影像单、核对确认/修正、可补录未知、高置信未知原图定位；无 agent/模型调用。
+- `app.e2e.ts`（13 条，serial）：设置/健康检查、成员、时间线过滤、概览、档案筛选、上传（单图/多图）、
+  两张影像单、核对确认/修正、可补录未知、高置信未知原图定位、影像按项目行直接进报告；无 agent/模型调用。
+- `panels.e2e.ts`（2 条）：项目列表 / 详情 / 趋势层 / `?panel=` 筛选；尿常规不串肝功 / 血糖；
+  failed 报告不进项目视图与筛选。
 - `lifecycle.e2e.ts`（1 条）：改归属 / 删除 / 同图重传。独立成员 + `cbc_02` fixture，与主链路
   不共享数据；破坏性操作失败不连坐跳过其他文件。
 - `error-state.e2e.ts`（1 条）：后端不可达的首页失败态；不依赖 seed/栈数据。
 - `ocr-smoke.e2e.ts`（1 条）：真实 OCR smoke（2 张样张），只做粗粒度 API 断言。
-- `trends.e2e.ts`（1 条）：异常指标趋势列表 / 详情 / 单点 / 无异常 / 无报告。独立成员 +
-  `lft_02` / `lft_03` / `lft_04` / `lft_05` fixture，不依赖主链路 seed。
+- `upload-ownership.e2e.ts`（1 条）：持久化的当前成员已不存在时要求重新选择，不允许提交孤儿上传。
+- `trends.e2e.ts`（2 条）：异常指标趋势列表 / 详情 / 单点 / 无异常 / 无报告；混合报告按项目浏览
+  与 `?panel=` 筛选。独立成员 + `lft_02` / `lft_03` / `lft_04` / `lft_05` fixture，不依赖主链路 seed。
 - 契约类型复用 `src/api/schema.d.ts`；API/样张/testID 约定集中在 `e2e/support.ts`。
 - 关键控件带 `testID`（RNW 渲染为 `data-testid`）：成员 chip/行、上传选择/提交/逐行状态/移除/重试、报告卡、
   报告徽标（偏高/偏低/异常/未知/待核对）、检查项目/段落卡/段落缩放、核对项/状态/原因/确认/修正、
-  趋势分组/指标行/迷你图/详情层/逐点行、详情管理卡（改归属/删除/确认）。改控件时同步改
+  趋势分组/指标行/迷你图/详情层/逐点行、详情管理卡（改归属/删除/确认）、档案分段/`?panel=` 横幅、
+  项目行/项目详情指标行/迷你趋势/「包含该项目的报告」/最新失败报告提示。改控件时同步改
   `support.ts` 的 `testID`。
 - 用例断言优先用 testID 与 fixture 派生值；`isBackfillItem` / `flagReasonText` /
-  `reviewStatusLabel` 复用 `src/review/rules.ts`，不复制规则或原因文案。
+  `reviewStatusLabel` / `panelItemIsAbnormal` 复用 `src/` 规则，不复制规则或原因文案。
 - Web 相册通道在 headless 下会打开原生 chooser 并被取消（expo-image-picker 随即移除 input）；
   `stubFileChooser` 屏蔽该次 click，测试再用 `setInputFiles` 注入文件。
 
