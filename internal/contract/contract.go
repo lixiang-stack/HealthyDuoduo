@@ -47,7 +47,9 @@ type OCRResult struct {
 // Value 为印刷原样数值字符串(如 '128'、'0.43'、'<2.00');低于检出限等定性结果可直接
 // 承载;需要数值消费侧(如 trend delta)自行 ParseFloat(解析失败不计 delta)。
 type ReportItem struct {
-	Name     string  `json:"name"`
+	Name string `json:"name"`
+	// Panel 是项目组 code(spec §5);必须属于 report_type 的允许集合,other 为跨类别兜底。
+	Panel    string  `json:"panel"`
 	Value    *string `json:"value"`
 	Unit     *string `json:"unit"`
 	RefRange *string `json:"ref_range"`
@@ -75,9 +77,11 @@ type ReportSection struct {
 // encoding/json 对纯日期字符串无法直接反序列化为 time.Time(契约值为原样日期,不承担时区语义)。
 // Sections 可选:非叙述型报告不输出该键,既有 JSON 消费方保持兼容(ADR-0008)。
 type Report struct {
-	ReportType string          `json:"report_type"`
-	ReportDate *string         `json:"report_date"`
-	Status     string          `json:"status"`
-	Items      []ReportItem    `json:"items"`
-	Sections   []ReportSection `json:"sections,omitempty"`
+	ReportType string  `json:"report_type"`
+	ReportDate *string `json:"report_date"`
+	Status     string  `json:"status"`
+	// Panels 是报告级项目组,有序:命中项数降序、同数按固定优先级;Panels[0] 为卡片主标签。
+	Panels   []string        `json:"panels"`
+	Items    []ReportItem    `json:"items"`
+	Sections []ReportSection `json:"sections,omitempty"`
 }
