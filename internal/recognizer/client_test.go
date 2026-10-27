@@ -5,16 +5,19 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 
 	"healthyduoduo/internal/contract"
+	"healthyduoduo/internal/pipeline"
 	healthyduoduo "healthyduoduo/internal/recognizer"
 )
 
 // 端点路径与 sampleResponse 报文都收敛为常量;报文对应 schemas/testdata 种子(实施计划 4.1/4.2)。
 const (
-	reportPath  = "/report"
-	reparsePath = "/reparse"
+	reportPath   = "/report"
+	reparsePath  = "/reparse"
+	classifyPath = "/classify"
 
 	reportBundleJSON  = `{"ocr_result":{"txts":["血红蛋白","128","g/L"],"boxes":[[[100,200],[180,200],[180,230],[100,230]],[[300,200],[360,200],[360,230],[300,230]],[[400,200],[460,200],[460,230],[400,230]]],"scores":[0.99,0.98,0.97],"elapse":1.23,"elapse_list":[0.4,0.05,0.78],"engine":"onnxruntime","model_info":{"det":"PP-OCRv6_small","cls":"PP-OCRv4_mobile","rec":"PP-OCRv6_small"}},"report":{"report_type":"血常规","report_date":"2026-10-01","status":"success","items":[{"name":"血红蛋白","value":"128","unit":"g/L","ref_range":"115-150","flag":"normal","low_confidence":false,"raw_text":"血红蛋白 128 g/L 115-150"}]}}`
 	reparseReportJSON = `{"report_type":"血常规","report_date":null,"status":"partial","items":[]}`
@@ -61,6 +64,27 @@ func newServer(t *testing.T) *httptest.Server {
 			return
 		}
 		_, _ = w.Write([]byte(reparseReportJSON))
+	})
+	mux.HandleFunc(classifyPath, func(w http.ResponseWriter, r *http.Request) {
+		var in struct {
+			ReportType string `json:"report_type"`
+			Items      []struct {
+				Name string  `json:"name"`
+				Unit *string `json:"unit"`
+			} `json:"items"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+			t.Errorf("classify body decode: %v", err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		if in.ReportType != "生化" || len(in.Items) != 2 || in.Items[0].Name != "丙氨酸转氨酶" ||
+			in.Items[1].Name != "肌酐" || in.Items[1].Unit == nil || *in.Items[1].Unit != "μmol/L" {
+			t.Errorf("classify payload = %+v", in)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		_, _ = w.Write([]byte(`{"panels":["liver","kidney"],"item_panels":["liver","kidney"]}`))
 	})
 	return httptest.NewServer(mux)
 }
@@ -137,6 +161,25 @@ func TestReparse_SendsDate(t *testing.T) {
 	c := healthyduoduo.New(srv.URL)
 	if _, err := c.Reparse(context.Background(), sampleOCR(), "2026-01-02"); err != nil {
 		t.Fatalf("Reparse with date: %v", err)
+	}
+}
+
+func TestClassify(t *testing.T) {
+	srv := newServer(t)
+	defer srv.Close()
+	unit := "μmol/L"
+	panels, itemPanels, err := healthyduoduo.New(srv.URL).Classify(context.Background(), "生化", []pipeline.ClassifyItem{
+		{Name: "丙氨酸转氨酶"},
+		{Name: "肌酐", Unit: &unit},
+	})
+	if err != nil {
+		t.Fatalf("Classify: %v", err)
+	}
+	if !reflect.DeepEqual(panels, []string{"liver", "kidney"}) {
+		t.Errorf("panels = %v, want [liver kidney]", panels)
+	}
+	if !reflect.DeepEqual(itemPanels, []string{"liver", "kidney"}) {
+		t.Errorf("item_panels = %v, want [liver kidney]", itemPanels)
 	}
 }
 

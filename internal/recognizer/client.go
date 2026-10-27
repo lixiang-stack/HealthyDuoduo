@@ -7,20 +7,24 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
 	"healthyduoduo/internal/contract"
+	"healthyduoduo/internal/pipeline"
 )
 
-// 端点路径(实施计划 4.3)。
+// 端点路径(实施计划 4.3;classify 为 panel-browse 票 05 的存量回填 / 未来重算)。
 const (
-	reportPath  = "/report"
-	reparsePath = "/reparse"
+	reportPath   = "/report"
+	reparsePath  = "/reparse"
+	classifyPath = "/classify"
 )
 
 // 网络抖动重试:上限(至少一次)与退避间隔;retryInterval 为可变值,供测试缩短退避。
@@ -39,18 +43,20 @@ const maxBodyBytes = 64 << 20
 const maxErrorSnippet = 200
 
 type Client struct {
-	reportURL  string
-	reparseURL string
-	client     *http.Client
+	reportURL   string
+	reparseURL  string
+	classifyURL string
+	client      *http.Client
 }
 
 // New: base 如 http://localhost:8000。
 func New(base string) *Client {
 	base = trimSlash(base)
 	return &Client{
-		reportURL:  base + reportPath,
-		reparseURL: base + reparsePath,
-		client:     &http.Client{Timeout: requestTimeout},
+		reportURL:   base + reportPath,
+		reparseURL:  base + reparsePath,
+		classifyURL: base + classifyPath,
+		client:      &http.Client{Timeout: requestTimeout},
 	}
 }
 
@@ -119,6 +125,54 @@ func (c *Client) Reparse(ctx context.Context, ocr *contract.OCRResult, date stri
 	return &report, nil
 }
 
+// classifyRequest /classify 请求体(识别端 ClassifyRequest 的镜像)。
+type classifyRequest struct {
+	ReportType string         `json:"report_type"`
+	Items      []classifyItem `json:"items"`
+}
+
+type classifyItem struct {
+	Name string  `json:"name"`
+	Unit *string `json:"unit,omitempty"`
+}
+
+// Classify 存量回填用的项目组重算(POST /classify):输入 report_type + 当前指标名 / 单位,
+// 返回报告级 panels 与等长同序的 item_panels。与 postprocess 共用识别端解析器。
+func (c *Client) Classify(ctx context.Context, reportType string, items []pipeline.ClassifyItem) ([]string, []string, error) {
+	payload := classifyRequest{ReportType: reportType, Items: make([]classifyItem, 0, len(items))}
+	for _, item := range items {
+		payload.Items = append(payload.Items, classifyItem{Name: item.Name, Unit: item.Unit})
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return nil, nil, err
+	}
+	body, err := c.post(ctx, c.classifyURL, "application/json", raw)
+	if err != nil {
+		var urlErr *url.Error
+		var statusErr *statusError
+		switch {
+		case errors.As(err, &urlErr):
+			if urlErr.Timeout() || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				return nil, nil, err // 慢响应 / 取消是单份失败,不误报成服务未部署
+			}
+			return nil, nil, fmt.Errorf("%w: %w", pipeline.ErrClassifierUnavailable, err)
+		case errors.As(err, &statusErr) && (statusErr.status >= http.StatusInternalServerError ||
+			statusErr.status == http.StatusNotFound || statusErr.status == http.StatusMethodNotAllowed):
+			return nil, nil, fmt.Errorf("%w: %w", pipeline.ErrClassifierUnavailable, err)
+		}
+		return nil, nil, err
+	}
+	var out struct {
+		Panels     []string `json:"panels"`
+		ItemPanels []string `json:"item_panels"`
+	}
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, nil, fmt.Errorf("parse /classify response: %w (body=%s)", err, truncate(body))
+	}
+	return out.Panels, out.ItemPanels, nil
+}
+
 // post 发送一次 POST 并读取 200 响应体;网络抖动/5xx 视为可重试(至少重试一次)。
 // bytes.NewReader 让 net/http 自动填充 req.GetBody,重试可安全重建请求体。
 func (c *Client) post(ctx context.Context, url, contentType string, body []byte) ([]byte, error) {
@@ -157,6 +211,17 @@ type byteResponse struct {
 	retryable bool
 }
 
+// statusError 识别服务的非 200 响应;保留状态码供调用方区分「端点缺失 / 服务故障」
+// (整体不可用)与单份数据错误(如 /classify 422)。
+type statusError struct {
+	status int
+	body   string
+}
+
+func (e *statusError) Error() string {
+	return fmt.Sprintf("recognizer %d: %s", e.status, e.body)
+}
+
 func (c *Client) roundTrip(req *http.Request) (byteResponse, error) {
 	resp, err := c.client.Do(req)
 	if err != nil {
@@ -168,10 +233,10 @@ func (c *Client) roundTrip(req *http.Request) (byteResponse, error) {
 		return byteResponse{}, fmt.Errorf("read response body: %w", err)
 	}
 	if resp.StatusCode >= http.StatusInternalServerError {
-		return byteResponse{retryable: true}, fmt.Errorf("recognizer %d: %s", resp.StatusCode, truncate(raw))
+		return byteResponse{retryable: true}, &statusError{status: resp.StatusCode, body: truncate(raw)}
 	}
 	if resp.StatusCode != http.StatusOK {
-		return byteResponse{}, fmt.Errorf("recognizer %d: %s", resp.StatusCode, truncate(raw))
+		return byteResponse{}, &statusError{status: resp.StatusCode, body: truncate(raw)}
 	}
 	return byteResponse{body: raw}, nil
 }
@@ -190,8 +255,6 @@ func truncate(raw []byte) string {
 	return s
 }
 
-// 编译期接口校验(pipeline.Recognizer 的实现)。
-var _ interface {
-	Report(context.Context, []byte, string, string) ([]byte, *contract.OCRResult, *contract.Report, error)
-	Reparse(context.Context, *contract.OCRResult, string) (*contract.Report, error)
-} = (*Client)(nil)
+// 编译期接口校验(pipeline.Recognizer / pipeline.PanelClassifier 的实现)。
+var _ pipeline.Recognizer = (*Client)(nil)
+var _ pipeline.PanelClassifier = (*Client)(nil)
