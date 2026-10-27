@@ -53,22 +53,22 @@ func TestReportStoreSmoke(t *testing.T) {
 	if _, err := pool.Exec(ctx, `INSERT INTO ocr_results (image_sha256, engine_output) VALUES ('rep-a','{}'),('rep-b','{}'),('rep-c','{}'),('rep-d','{}')`); err != nil {
 		t.Fatalf("seed ocr_results: %v", err)
 	}
-	if _, err := pool.Exec(ctx, `INSERT INTO reports (image_sha256, ocr_result_id, report_type, report_date, status, member_id, fail_reason) VALUES
-			('rep-a',(SELECT id FROM ocr_results WHERE image_sha256='rep-a'),'血常规','2026-10-02','partial',$1,NULL),
-			('rep-b',(SELECT id FROM ocr_results WHERE image_sha256='rep-b'),'其他专项',NULL,'failed',$1,'no metric items recognized'),
-			('rep-c',(SELECT id FROM ocr_results WHERE image_sha256='rep-c'),'尿常规','2026-10-01','success',$2,NULL),
-			('rep-d',(SELECT id FROM ocr_results WHERE image_sha256='rep-d'),'血糖','2026-09-30','success',NULL,NULL)`,
+	if _, err := pool.Exec(ctx, `INSERT INTO reports (image_sha256, ocr_result_id, report_type, report_date, status, member_id, fail_reason, panels) VALUES
+			('rep-a',(SELECT id FROM ocr_results WHERE image_sha256='rep-a'),'血常规','2026-10-02','partial',$1,NULL,ARRAY['cbc']),
+			('rep-b',(SELECT id FROM ocr_results WHERE image_sha256='rep-b'),'其他专项',NULL,'failed',$1,'no metric items recognized','{}'),
+			('rep-c',(SELECT id FROM ocr_results WHERE image_sha256='rep-c'),'尿常规','2026-10-01','success',$2,NULL,ARRAY['urinalysis']),
+			('rep-d',(SELECT id FROM ocr_results WHERE image_sha256='rep-d'),'血糖','2026-09-30','success',NULL,NULL,'{}')`,
 		memberA, memberB); err != nil {
 		t.Fatalf("seed reports: %v", err)
 	}
-	if _, err := pool.Exec(ctx, `INSERT INTO report_items (report_sha256, name, value, unit, ref_range, flag, low_confidence, raw_text, review_status) VALUES
-			('rep-a','单核细胞比率','10.8','%','3-10','high',true,'单核细胞百分比  10.8  ↑ %  3-10','unreviewed'),
-			('rep-a','平均血红蛋白浓度','300','g/L','316-354','low',true,'平均血红蛋白浓度  300  g/L  316-354','unreviewed'),
-			('rep-a','已确认低置信项','1.0',NULL,NULL,'low',true,'已确认低置信项  1.0','confirmed'),
-			('rep-a','血红蛋白','128','g/L','115-150','normal',false,'血红蛋白  128  g/L  115-150','unreviewed'),
-			('rep-a','某未知项',NULL,NULL,NULL,'unknown',false,'某未知项','unreviewed'),
-			('rep-c','尿蛋白','10.8',NULL,NULL,'high',true,'尿蛋白  10.8','unreviewed'),
-			('rep-d','葡萄糖','128',NULL,NULL,'normal',false,'葡萄糖  128','unreviewed')`); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO report_items (report_sha256, name, panel, value, unit, ref_range, flag, low_confidence, raw_text, review_status) VALUES
+			('rep-a','单核细胞比率','cbc','10.8','%','3-10','high',true,'单核细胞百分比  10.8  ↑ %  3-10','unreviewed'),
+			('rep-a','平均血红蛋白浓度','cbc','300','g/L','316-354','low',true,'平均血红蛋白浓度  300  g/L  316-354','unreviewed'),
+			('rep-a','已确认低置信项','cbc','1.0',NULL,NULL,'low',true,'已确认低置信项  1.0','confirmed'),
+			('rep-a','血红蛋白','cbc','128','g/L','115-150','normal',false,'血红蛋白  128  g/L  115-150','unreviewed'),
+			('rep-a','某未知项','other',NULL,NULL,NULL,'unknown',false,'某未知项','unreviewed'),
+			('rep-c','尿蛋白','urinalysis','10.8',NULL,NULL,'high',true,'尿蛋白  10.8','unreviewed'),
+			('rep-d','葡萄糖','glucose','128',NULL,NULL,'normal',false,'葡萄糖  128','unreviewed')`); err != nil {
 		t.Fatalf("seed report_items: %v", err)
 	}
 	// 行链接下标(0005)按真实形态回填其中一行:读回校验用。
@@ -94,6 +94,9 @@ func TestReportStoreSmoke(t *testing.T) {
 	a := all[0]
 	if a.MemberID == nil || *a.MemberID != memberA || a.ReportType != "血常规" || a.ReportDate == nil || *a.ReportDate != "2026-10-02" {
 		t.Errorf("rep-a summary = %+v", a)
+	}
+	if !reflect.DeepEqual(a.Panels, []string{"cbc"}) {
+		t.Errorf("rep-a panels = %v, want [cbc]", a.Panels)
 	}
 	if a.FlagCounts != (pipeline.FlagCounts{High: 1, Low: 2, Unknown: 1}) {
 		t.Errorf("rep-a flag_counts = %+v, want {1 2 1}", a.FlagCounts)
@@ -173,11 +176,27 @@ func TestReportStoreSmoke(t *testing.T) {
 	if items[2].ReviewStatus != "confirmed" || items[0].ReviewStatus != "unreviewed" {
 		t.Errorf("review_status not read back: %+v", items)
 	}
+	if items[0].Panel != "cbc" || items[4].Panel != "other" {
+		t.Errorf("panel not read back: items[0].panel=%q items[4].panel=%q, want cbc/other", items[0].Panel, items[4].Panel)
+	}
 	if len(items[0].OCRLineNumbers) != 4 || items[0].OCRLineNumbers[0] != 7 || items[0].OCRLineNumbers[3] != 10 {
 		t.Errorf("ocr_line_numbers not read back: %+v", items[0].OCRLineNumbers)
 	}
 	if len(items[1].OCRLineNumbers) != 0 {
 		t.Errorf("NULL ocr_line_numbers = %+v, want 空数组(存量行)", items[1].OCRLineNumbers)
+	}
+
+	// CLI 侧投影同源:ReportByImage / ItemsByImage 也读回 panels / panel。
+	row, ok, err := st.ReportByImage(ctx, "rep-a")
+	if err != nil || !ok {
+		t.Fatalf("ReportByImage(rep-a) = (%v, %v), want found", row, err)
+	}
+	if !reflect.DeepEqual(row.Panels, []string{"cbc"}) {
+		t.Errorf("ReportByImage panels = %v, want [cbc]", row.Panels)
+	}
+	cliItems, err := st.ItemsByImage(ctx, "rep-a")
+	if err != nil || len(cliItems) != 5 || cliItems[0].Panel != "cbc" {
+		t.Errorf("ItemsByImage = %+v, %v; want 5 items with first panel cbc", cliItems, err)
 	}
 
 	// WriteReport(override 重跑镜像)不触碰 member_id:归属保持;items 全量替换。
@@ -188,7 +207,11 @@ func TestReportStoreSmoke(t *testing.T) {
 	v := "130"
 	if err := st.WriteReport(ctx, "rep-a", ocrID, contract.Report{
 		ReportType: "血常规", ReportDate: strPtr("2026-10-02"), Status: contract.StatusSuccess,
-		Items: []contract.ReportItem{{Name: "血红蛋白", Value: &v, Flag: "normal", RawText: "血红蛋白  130", OCRLineNumbers: []int32{3, 4}}},
+		Panels: []string{"cbc"},
+		Items: []contract.ReportItem{
+			{Name: "血红蛋白", Panel: "cbc", Value: &v, Flag: "normal", RawText: "血红蛋白  130", OCRLineNumbers: []int32{3, 4}},
+			{Name: "未分组项", Value: &v, Flag: "normal", RawText: "未分组项  130"},
+		},
 	}, nil); err != nil {
 		t.Fatalf("WriteReport override: %v", err)
 	}
@@ -199,12 +222,18 @@ func TestReportStoreSmoke(t *testing.T) {
 	if after.MemberID == nil || *after.MemberID != memberA {
 		t.Errorf("member_id after rerun = %v, want %d unchanged", after.MemberID, memberA)
 	}
+	if !reflect.DeepEqual(after.Panels, []string{"cbc"}) {
+		t.Errorf("panels after rerun = %v, want [cbc]", after.Panels)
+	}
 	items, err = st.ItemsWithReviewStatus(ctx, "rep-a")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(items) != 1 || items[0].ReviewStatus != pipeline.ReviewStatusUnreviewed {
-		t.Errorf("items after rerun = %+v, want 1 unreviewed (重置归档)", items)
+	if len(items) != 2 || items[0].ReviewStatus != pipeline.ReviewStatusUnreviewed || items[0].Panel != "cbc" {
+		t.Errorf("items after rerun = %+v, want 2 unreviewed items with first panel cbc (重置归档)", items)
+	}
+	if items[1].Panel != "other" {
+		t.Errorf("item without panel after rerun = %q, want other(迁移默认同口径)", items[1].Panel)
 	}
 	if len(items[0].OCRLineNumbers) != 2 || items[0].OCRLineNumbers[0] != 3 || items[0].OCRLineNumbers[1] != 4 {
 		t.Errorf("ocr_line_numbers after rerun = %+v, want [3 4]", items[0].OCRLineNumbers)
@@ -221,6 +250,7 @@ func TestReportStoreSmoke(t *testing.T) {
 	}
 	if err := st.WriteReport(ctx, "rep-b", ocrB, contract.Report{
 		ReportType: "影像", ReportDate: strPtr("2024-09-15"), Status: contract.StatusFailed,
+		Panels:   []string{"other"},
 		Sections: sections,
 	}, nil); err != nil {
 		t.Fatalf("WriteReport sections: %v", err)
@@ -307,7 +337,8 @@ func TestReportStoreSmoke(t *testing.T) {
 	v2 := "10.5"
 	if err := st.WriteReport(ctx, "rep-c", reOcrID, contract.Report{
 		ReportType: "尿常规", ReportDate: strPtr("2026-10-01"), Status: contract.StatusSuccess,
-		Items: []contract.ReportItem{{Name: "尿蛋白", Value: &v2, Flag: "high", RawText: "尿蛋白  10.5"}},
+		Panels: []string{"urinalysis"},
+		Items:  []contract.ReportItem{{Name: "尿蛋白", Panel: "urinalysis", Value: &v2, Flag: "high", RawText: "尿蛋白  10.5"}},
 	}, nil); err != nil {
 		t.Fatalf("re-archive rep-c: %v", err)
 	}

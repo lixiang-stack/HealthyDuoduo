@@ -22,6 +22,7 @@ function item(overrides: Partial<ReportItem> = {}): ReportItem {
   return {
     item_id: 7,
     name: '单核细胞比率',
+    panel: 'cbc',
     value: '10.8',
     unit: '%',
     ref_range: '3-10',
@@ -45,6 +46,7 @@ function report(overrides: Partial<ReportDetail> = {}): ReportDetail {
     status: 'partial',
     fail_reason: null,
     flag_counts: { high: 1, low: 0, abnormal: 0, unknown: 0 },
+    panels: ['cbc'],
     not_tested_count: 0,
     unreviewed_low_confidence_count: 1,
     items: [item()],

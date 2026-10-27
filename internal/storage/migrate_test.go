@@ -1,6 +1,6 @@
 package storage
 
-// 迁移冒烟:goose 链(0001..0010)应用后 schema 形状符合 M0 契约(票 02)。
+// 迁移冒烟:goose 链(0001..0011)应用后 schema 形状符合 M0 契约(票 02)。
 // 需要真库:设 HDD_TEST_DSN(如 postgres://postgres:smoke@127.0.0.1:55432/postgres)后运行;
 // 未设则整体 Skip——CI 门禁跑 go test ./... 时默认跳过,共享栈验证走 e2e 外环
 // (docs/agents/e2e.md「schemas/迁移」行)。冒烟姿势:一次性 PG 容器 + 本测试。
@@ -31,13 +31,13 @@ func TestMigrationSmokeM0Contract(t *testing.T) {
 		t.Fatalf("migrate: %v", err)
 	}
 
-	// goose 已升到 0010 且幂等(Open 内重复 Migrate 不报错)。
+	// goose 已升到 0011 且幂等(Open 内重复 Migrate 不报错)。
 	var latest int
 	if err := pool.QueryRow(ctx, `SELECT max(version_id) FROM goose_db_version`).Scan(&latest); err != nil {
 		t.Fatalf("read goose version: %v", err)
 	}
-	if latest != 10 {
-		t.Fatalf("goose version = %d, want 10", latest)
+	if latest != 11 {
+		t.Fatalf("goose version = %d, want 11", latest)
 	}
 
 	// reports.sections(0007,ADR-0008):可选报告段落 JSONB,可空(存量/非叙述型 NULL)。
@@ -76,6 +76,42 @@ func TestMigrationSmokeM0Contract(t *testing.T) {
 		}
 		if dataType != "text" || nullable != "YES" {
 			t.Fatalf("flag_reason = %s/%s, want text/YES(非 unknown 为 NULL)", dataType, nullable)
+		}
+	})
+
+	// 0011:项目组列带安全默认(存量行归 other / 空 panels),索引已建。
+	t.Run("report panels columns and indexes", func(t *testing.T) {
+		var itemType, itemNullable, itemDefault string
+		if err := pool.QueryRow(ctx, `SELECT data_type, is_nullable, column_default
+			FROM information_schema.columns
+			WHERE table_name='report_items' AND column_name='panel'`).
+			Scan(&itemType, &itemNullable, &itemDefault); err != nil {
+			t.Fatal(err)
+		}
+		if itemType != "text" || itemNullable != "NO" || itemDefault != "'other'::text" {
+			t.Fatalf("report_items.panel = %s/%s default %q, want text/NO/'other'::text",
+				itemType, itemNullable, itemDefault)
+		}
+		var reportType, reportNullable, reportDefault string
+		if err := pool.QueryRow(ctx, `SELECT data_type, is_nullable, column_default
+			FROM information_schema.columns
+			WHERE table_name='reports' AND column_name='panels'`).
+			Scan(&reportType, &reportNullable, &reportDefault); err != nil {
+			t.Fatal(err)
+		}
+		if reportType != "ARRAY" || reportNullable != "NO" || reportDefault != "'{}'::text[]" {
+			t.Fatalf("reports.panels = %s/%s default %q, want ARRAY/NO/'{}'::text[]",
+				reportType, reportNullable, reportDefault)
+		}
+		for _, index := range []string{"report_items_report_panel_idx", "reports_member_date_idx"} {
+			var n int
+			if err := pool.QueryRow(ctx, `SELECT COUNT(*) FROM pg_indexes
+				WHERE indexname = $1`, index).Scan(&n); err != nil {
+				t.Fatal(err)
+			}
+			if n != 1 {
+				t.Errorf("index %s missing (got %d)", index, n)
+			}
 		}
 	})
 
@@ -276,6 +312,68 @@ func TestMigration0008DeletesImagingItems(t *testing.T) {
 	if reports != 2 || imagingItems != 0 || cbcItems != 1 || pairs != 0 {
 		t.Fatalf("after 0008: reports=%d imaging_items=%d cbc_items=%d pairs=%d, want 2/0/1/0",
 			reports, imagingItems, cbcItems, pairs)
+	}
+}
+
+// TestMigration0011LegacyDefaults 0011 升降版:0001..0010 下种旧行,升到 0011 后
+// 旧行安全默认(report_items.panel=other,reports.panels={}),无需回填即可读。
+func TestMigration0011LegacyDefaults(t *testing.T) {
+	dsn := os.Getenv("HDD_TEST_DSN")
+	if dsn == "" {
+		t.Skip("HDD_TEST_DSN not set: migration smoke runs against a disposable PG container")
+	}
+	ctx := context.Background()
+	db, err := sql.Open("pgx", dsn)
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	defer db.Close()
+	goose.SetBaseFS(migrationsFS)
+	if err := goose.SetDialect("postgres"); err != nil {
+		t.Fatalf("goose dialect: %v", err)
+	}
+	if err := goose.UpContext(ctx, db, migrationsDir); err != nil {
+		t.Fatalf("up to latest: %v", err)
+	}
+	if err := goose.DownToContext(ctx, db, migrationsDir, 10); err != nil {
+		t.Fatalf("down to 0010: %v", err)
+	}
+	defer func() {
+		if _, err := db.ExecContext(context.Background(), `
+			DELETE FROM reports WHERE image_sha256 = 'img-pre-0011';
+			DELETE FROM ocr_results WHERE image_sha256 = 'img-pre-0011';
+			DELETE FROM images WHERE sha256 = 'img-pre-0011';`); err != nil {
+			t.Logf("cleanup seeded rows: %v", err)
+		}
+	}()
+	if _, err := db.ExecContext(ctx, `
+		INSERT INTO images (sha256, original_filename) VALUES ('img-pre-0011', 'old.jpg');
+		INSERT INTO ocr_results (image_sha256, engine_output) VALUES ('img-pre-0011', '{}');
+		INSERT INTO reports (image_sha256, ocr_result_id, report_type, status)
+		VALUES ('img-pre-0011', (SELECT id FROM ocr_results WHERE image_sha256='img-pre-0011'),
+		        '血常规', 'success');
+		INSERT INTO report_items (report_sha256, name, flag, raw_text, low_confidence)
+		VALUES ('img-pre-0011', '血红蛋白', 'normal', '血红蛋白 128 g/L', false);`); err != nil {
+		t.Fatalf("seed pre-0011 rows: %v", err)
+	}
+	if err := goose.UpContext(ctx, db, migrationsDir); err != nil {
+		t.Fatalf("up 0011: %v", err)
+	}
+	var panelCount int
+	if err := db.QueryRowContext(ctx, `SELECT COALESCE(array_length(panels, 1), 0)
+		FROM reports WHERE image_sha256='img-pre-0011'`).Scan(&panelCount); err != nil {
+		t.Fatal(err)
+	}
+	if panelCount != 0 {
+		t.Fatalf("legacy reports.panels has %d entries, want empty(未回填时 App 回退 report_type)", panelCount)
+	}
+	var panel string
+	if err := db.QueryRowContext(ctx, `SELECT panel FROM report_items WHERE report_sha256='img-pre-0011'`).
+		Scan(&panel); err != nil {
+		t.Fatal(err)
+	}
+	if panel != "other" {
+		t.Fatalf("legacy report_items.panel = %q, want other", panel)
 	}
 }
 

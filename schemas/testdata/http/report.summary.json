@@ -11,6 +11,7 @@
     "abnormal": 0,
     "unknown": 1
   },
+  "panels": ["cbc"],
   "not_tested_count": 0,
   "unreviewed_low_confidence_count": 1
 }

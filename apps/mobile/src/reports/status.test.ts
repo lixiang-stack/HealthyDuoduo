@@ -22,6 +22,7 @@ const report: ReportDetail = {
   status: 'success',
   fail_reason: null,
   flag_counts: { high: 0, low: 0, abnormal: 0, unknown: 0 },
+  panels: ['cbc'],
   not_tested_count: 0,
   unreviewed_low_confidence_count: 0,
   items: [],
@@ -196,6 +197,7 @@ describe('uploadResultText', () => {
         {
           item_id: 1,
           name: '红细胞计数',
+          panel: 'cbc' as const,
           value: '3.78',
           unit: null,
           ref_range: '80~5.10',
@@ -224,6 +226,7 @@ describe('uploadResultText', () => {
         {
           item_id: 1,
           name: '单核细胞比率',
+          panel: 'cbc' as const,
           value: '10.8',
           unit: '%',
           ref_range: '3-10',

@@ -6,6 +6,7 @@ import { sharedStyles } from '../../components/styles';
 import { colors } from '../../components/theme';
 import { isImagingReport } from '../../reports/category';
 import { ReportCard, ReportManageCard, ReportSectionCard } from '../../reports/components';
+import { abnormalItemCount, reportItemGroups } from '../../reports/panelOverview';
 import { pendingItems } from '../../review/items';
 import { ReviewItemCard } from '../../review/components';
 import { examNameText, reportSectionCards } from '../../reports/sections';
@@ -30,6 +31,7 @@ export default function ReportDetailScreen() {
   // 影像单是叙述文档:主体为段落 + 原图,不呈现检验单式指标项与核对入口(票 03)。
   const imaging = report !== undefined && isImagingReport(report);
   const pending = report && !imaging ? pendingItems(report.items) : [];
+  const itemGroups = report && !imaging ? reportItemGroups(report) : [];
   const examName = examNameText(report?.sections);
   const sectionCards = reportSectionCards(report?.sections);
   const imageVisible =
@@ -105,18 +107,30 @@ export default function ReportDetailScreen() {
               指标项({report.items.length})
             </Text>
           ) : null}
-          {!imaging
-            ? report.items.map((item) => (
-                <ReviewItemCard
-                  key={item.item_id}
-                  item={item}
-                  reportId={report.report_id}
-                  client={state.client}
-                  imageUrl={state.imageUrl}
-                  onUpdated={applyReview}
-                />
-              ))
-            : null}
+          {itemGroups.map((group) => {
+            const abnormal = abnormalItemCount(group.items);
+            const groupKey = group.panel ?? 'fallback';
+            return (
+              <View key={groupKey} style={styles.itemGroup}>
+                <View testID={`report-panel-group-${groupKey}`} style={styles.groupHeader}>
+                  <Text style={styles.groupName}>{group.label}</Text>
+                  <Text style={sharedStyles.muted}>
+                    {group.items.length} 项 · {abnormal} 项异常
+                  </Text>
+                </View>
+                {group.items.map((item) => (
+                  <ReviewItemCard
+                    key={item.item_id}
+                    item={item}
+                    reportId={report.report_id}
+                    client={state.client}
+                    imageUrl={state.imageUrl}
+                    onUpdated={applyReview}
+                  />
+                ))}
+              </View>
+            );
+          })}
 
           <Pressable testID="report-image-toggle" onPress={() => setImageOverride(!imageVisible)}>
             <Text style={styles.link}>{imageVisible ? '收起检查单原图' : '查看检查单原图'}</Text>
@@ -149,6 +163,15 @@ const styles = StyleSheet.create({
   stack: { gap: 12 },
   card: { borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, gap: 4 },
   sectionTitle: { fontSize: 13, color: colors.muted },
+  itemGroup: { gap: 8 },
+  groupHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    gap: 8,
+    marginTop: 4,
+  },
+  groupName: { fontSize: 15, color: colors.text, fontWeight: '600' },
   shortId: { fontSize: 12, color: colors.muted },
   fail: { fontSize: 13, color: colors.fail, lineHeight: 20 },
   link: { color: colors.accent, fontSize: 15 },

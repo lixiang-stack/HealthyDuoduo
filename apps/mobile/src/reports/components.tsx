@@ -1,5 +1,6 @@
-// 报告展示组件:时间线卡片(票 06)与报告级徽标(票 07 起时间线与详情头部共用)。
-// 时间线卡片含类别、日期、状态文案、异常徽标与「待核对 N 项」;failed 展示失败原因。
+// 报告展示组件:时间线卡片(票 06;panel-browse 票 02 起主标签为项目组)与报告级
+// 徽标(票 07 起时间线与详情头部共用)。时间线卡片含项目组、日期、状态文案、异常
+// 徽标与「待核对 N 项」;failed 展示失败原因与 report_type 回退。
 // 指标项卡(条带/原文/核对动作)在 review/components(票 09 起,详情与核对页共用)。
 // 自愈操作卡 ReportManageCard(票 10):改归属(选中目标成员即刻生效,时间线移位)
 // 与删除(确认步骤防误触);成败经回调上抛页面(状态合并与导航在页面)。
@@ -20,6 +21,7 @@ import { colors } from '../components/theme';
 import { MemberChips } from '../members/components';
 import { sortMembers } from '../members/order';
 import { needsReassign, reassignConfirmText } from './manage';
+import { reportPanelLabels, reportTypeNote } from './panelOverview';
 import { EXAM_NAME_KIND, SECTION_LABELS } from './sections';
 import { reportBadgeLabels, reportDateLabel, reportStatusKind, reportStatusLabel } from './status';
 
@@ -74,10 +76,12 @@ export function ReportCard({
   const failed = report.status === 'failed';
   const status = reportStatusLabel(report);
   const statusKind = reportStatusKind(report);
+  const panelText = reportPanelLabels(report);
+  const typeNote = reportTypeNote(report);
   return (
     <View testID={`${testIDPrefix}-${report.report_id}`} style={styles.card}>
       <View style={styles.headerRow}>
-        <Text style={styles.type}>{report.report_type}</Text>
+        <Text style={styles.type}>{panelText}</Text>
         {status ? (
           <Text style={[styles.status, { color: STATUS_COLORS[statusKind] }]}>{status}</Text>
         ) : null}
@@ -87,7 +91,10 @@ export function ReportCard({
           {SECTION_LABELS[EXAM_NAME_KIND]}:{examName}
         </Text>
       ) : null}
-      <Text style={styles.date}>{reportDateLabel(report)}</Text>
+      <Text style={styles.date}>
+        {reportDateLabel(report)}
+        {typeNote ? ` · ${typeNote}` : ''}
+      </Text>
       {failed && report.fail_reason ? <Text style={styles.fail}>{report.fail_reason}</Text> : null}
       <ReportBadges report={report} />
     </View>

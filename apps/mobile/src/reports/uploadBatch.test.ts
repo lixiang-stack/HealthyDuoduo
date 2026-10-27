@@ -25,6 +25,7 @@ const report = (overrides: Partial<ReportDetail> = {}): ReportDetail => ({
   status: 'success',
   fail_reason: null,
   flag_counts: { high: 0, low: 0, abnormal: 0, unknown: 0 },
+  panels: ['cbc'],
   ...notTestedCount,
   unreviewed_low_confidence_count: 0,
   items: [],
@@ -34,6 +35,7 @@ const report = (overrides: Partial<ReportDetail> = {}): ReportDetail => ({
 const lowConfidenceItem: ReportItem = {
   item_id: 1,
   name: '白细胞计数',
+  panel: 'cbc',
   value: '6.1',
   unit: '10^9/L',
   ref_range: '3.5-9.5',

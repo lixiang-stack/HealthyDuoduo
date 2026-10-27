@@ -24,6 +24,7 @@ import {
 // 只补 HTTP 侧字段(report_id / item_id / review_status 等)。
 type GoldenItem = {
   name: string;
+  panel: ReportItem['panel'];
   value: string | null;
   unit: string | null;
   ref_range: string | null;
@@ -38,6 +39,7 @@ type GoldenReport = {
   report_type: string;
   report_date: string | null;
   status: ReportSummary['status'];
+  panels: ReportSummary['panels'];
   items: GoldenItem[];
 };
 
@@ -78,6 +80,7 @@ function summaryOf(
     status: file.status,
     fail_reason: null,
     flag_counts: countsOf(file),
+    panels: file.panels,
     not_tested_count: 0,
     unreviewed_low_confidence_count: 0,
     ...overrides,
@@ -88,6 +91,7 @@ function toReportItem(item: GoldenItem, itemId: number): ReportItem {
   return {
     item_id: itemId,
     name: item.name,
+    panel: item.panel,
     value: item.value,
     unit: item.unit,
     ref_range: item.ref_range,
@@ -122,6 +126,7 @@ function detailOf(
     status: file.status,
     fail_reason: null,
     flag_counts: countsOf(file),
+    panels: file.panels,
     not_tested_count: 0,
     unreviewed_low_confidence_count: 0,
     items: file.items.map((item, index) => toReportItem(item, index + 1)),
