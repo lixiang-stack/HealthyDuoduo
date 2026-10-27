@@ -21,7 +21,7 @@ import yaml
 
 from recognizer import paths
 from recognizer import postprocess as _postprocess
-from recognizer.contract import OCRResult
+from recognizer.contract import OCRResult, Panel
 from recognizer.golden import date_hint_for, image_bytes_for
 from recognizer.postprocess import _build_dict, run_postprocess
 
@@ -105,6 +105,8 @@ def test_basic_row_to_item() -> None:
     assert it.flag == "normal"
     assert it.low_confidence is False
     assert "血红蛋白" in it.raw_text
+    assert it.panel == "cbc"
+    assert r.panels == ["cbc"]
 
 
 def test_alias_and_serial_strip() -> None:
@@ -483,6 +485,7 @@ def test_category_fail_failed_status() -> None:
     assert r.status == "failed"
     assert r.items == []
     assert r.report_type != ""  # 仍留痕落库,类型给占位名
+    assert r.panels == ["other"]
 
 
 def test_empty_ocr_failed() -> None:
@@ -631,6 +634,74 @@ def test_registry_tie_follows_registry_order(monkeypatch, tmp_path) -> None:
     assert r.report_type == "尿常规"
 
 
+# ---------- 项目组(panel):逐项归属与报告级聚合(spec §5/§6) ----------
+
+
+def test_mixed_chemistry_panels_sorted_by_count_then_priority() -> None:
+    """混合生化报告保留全部项目组,按命中项数降序、同数按固定优先级。"""
+    cells = [{"x": 100, "y": -60, "text": "某院肝肾功能报告单"}] + _bare_roles()
+    cells += row(30, "丙氨酸转氨酶", "20", unit="U/L", ref="7-40")
+    cells += row(55, "天冬氨酸转氨酶", "18", unit="U/L", ref="13-35")
+    cells += row(80, "肌酐", "51", unit="μmol/L", ref="20-70")
+    cells += row(105, "尿酸", "246", unit="μmol/L", ref="150-420")
+    cells += row(130, "总胆固醇", "4.2", unit="mmol/L", ref="3-5.2")
+    r = run_postprocess(mk_ocr(cells))
+    assert r.report_type == "生化"
+    assert [i.panel for i in r.items] == ["liver", "liver", "kidney", "uric_acid", "lipid"]
+    assert r.panels == ["liver", "kidney", "lipid", "uric_acid"]
+
+
+def test_urine_glucose_and_bilirubin_stay_in_urinalysis() -> None:
+    """同名的葡萄糖 / 胆红素靠 report_type=临检 归尿常规,不跨到血糖 / 肝功。"""
+    cells = [{"x": 100, "y": -60, "text": "某院尿常规报告单"}] + _bare_roles()
+    for idx, name in enumerate(["葡萄糖", "胆红素", "潜血", "蛋白质", "白细胞酯酶"]):
+        cells += row(30 + idx * 25, name, "阴性", ref="阴性")
+    r = run_postprocess(mk_ocr(cells))
+    assert r.report_type == "临检"
+    assert {i.panel for i in r.items} == {"urinalysis"}
+    assert r.panels == ["urinalysis"]
+
+
+def test_biochemistry_glucose_and_bilirubin_are_liver_and_glucose() -> None:
+    """同名指标在生化词典里分别归血糖 / 肝功;此处肝脏命中 2 项,排主标签。"""
+    cells = [{"x": 100, "y": -60, "text": "某院葡萄糖测定报告单"}] + _bare_roles()
+    cells += row(30, "葡萄糖", "5.2", unit="mmol/L", ref="3.9-6.1")
+    cells += row(55, "总胆红素", "12.1", unit="μmol/L", ref="5-21")
+    cells += row(80, "直接胆红素", "4.0", unit="μmol/L", ref="0-7")
+    r = run_postprocess(mk_ocr(cells))
+    assert r.report_type == "生化"
+    assert item_of(r, "葡萄糖").panel == "glucose"
+    assert item_of(r, "总胆红素").panel == "liver"
+    assert r.panels == ["liver", "glucose"]
+
+
+def test_imaging_success_panels_imaging() -> None:
+    cells = [
+        {"x": 100, "y": -40, "text": "本院超声检查报告单"},
+        {"x": 100, "y": 0, "text": "超声提示：宫内单活胎。"},
+    ]
+    r = run_postprocess(mk_ocr(cells))
+    assert r.items == []
+    assert r.panels == ["imaging"]
+
+
+def test_classify_rejects_parent_child_violation(monkeypatch) -> None:
+    """词典配置越界时 /classify 明确拒绝,不返回非法 panel。"""
+    bad_item = _postprocess.DictItem(
+        name="坏项", aliases=("坏项",), units=frozenset(), panel=Panel.THYROID
+    )
+    bad = _postprocess.LabDict(
+        report_type="临检",
+        title_keywords=(),
+        min_matched_items=1,
+        items=(bad_item,),
+        alias_map={"坏项": bad_item},
+    )
+    monkeypatch.setattr(_postprocess, "load_dicts", lambda: (bad,))
+    with pytest.raises(ValueError, match="not allowed"):
+        _postprocess.classify_items("临检", ["坏项"])
+
+
 # ---------- 叙述型报告(影像;票 04:段落主体,不抽取指标项) ----------
 
 
@@ -700,6 +771,7 @@ def test_imaging_title_fallback_without_body_keeps_type_but_failed() -> None:
     assert r.report_type == "影像"
     assert r.status == "failed"
     assert r.items == []
+    assert r.panels == ["other"]
 
 
 # ---------- 报告级段落(影像单;锚表在词典 category.section_anchors) ----------
@@ -920,3 +992,36 @@ def test_report_matches_golden(sample_id: str) -> None:
     )
     golden = json.loads((EXPECTED_REPORT / f"{sample_id}.json").read_text(encoding="utf-8"))
     assert json.loads(report.model_dump_json()) == golden
+
+
+@pytest.mark.parametrize(
+    ("sample_id", "want"),
+    [
+        ("lft_02", ["liver", "kidney", "uric_acid"]),
+        ("lft_06", ["liver", "lipid"]),
+        ("lft_08", ["liver", "kidney", "uric_acid", "electrolyte"]),
+        ("lft_09", ["liver", "kidney"]),
+        ("glu_01", ["glucose"]),
+        ("tft_01", ["thyroid"]),
+        ("proghcg_01", ["sex_hormone"]),
+        ("vitanemia_01", ["vitanemia"]),
+        ("cbc_04", ["cbc"]),
+        ("ua_05", ["urinalysis"]),
+        ("coag_01", ["coag"]),
+        ("bloodtype_01", ["other"]),
+        ("fibrosis_01", ["other"]),
+        ("unknown_01", ["other"]),
+        ("us_01", ["imaging"]),
+        ("infectious_01", ["infection"]),
+        ("ana_01", ["autoimmune"]),
+    ],
+)
+def test_golden_panel_expectations(sample_id: str, want: list[str]) -> None:
+    """spec §6.5 的样本主标签/项目组集合回归。"""
+    ocr_data = json.loads((EXPECTED_OCR / f"{sample_id}.json").read_text(encoding="utf-8"))
+    report = run_postprocess(
+        OCRResult.model_validate(ocr_data),
+        date_hint=date_hint_for(sample_id),
+        image=image_bytes_for(sample_id),
+    )
+    assert report.panels == want

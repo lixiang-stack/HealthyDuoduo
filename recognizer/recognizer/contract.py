@@ -4,6 +4,8 @@
 schema/ 下 JSON 文件是双语共用的源头,本文件与其保持字段一一对应。
 """
 
+from collections import Counter
+from collections.abc import Iterable
 from enum import Enum
 from typing import Literal
 
@@ -50,6 +52,114 @@ class FlagReason(_Vocabulary):
     SCALAR_REF = "scalar_ref"
     OTHER = "other"
 
+class Panel(_Vocabulary):
+    """项目组(panel):指标项所属的检查项目组(spec §5)。
+
+    每个指标项恰好属于一个 panel;报告级 panels 是指标项 panel 的排序聚合。
+    """
+    CBC = "cbc"
+    URINALYSIS = "urinalysis"
+    LIVER = "liver"
+    KIDNEY = "kidney"
+    LIPID = "lipid"
+    GLUCOSE = "glucose"
+    THYROID = "thyroid"
+    SEX_HORMONE = "sex_hormone"
+    URIC_ACID = "uric_acid"
+    ELECTROLYTE = "electrolyte"
+    VITANEMIA = "vitanemia"
+    INFECTION = "infection"
+    AUTOIMMUNE = "autoimmune"
+    COAG = "coag"
+    IMAGING = "imaging"
+    OTHER = "other"
+
+
+# 报告级 panels 的固定排序:命中项数降序;同数按此序,数值小优先(spec §5.3)。
+PANEL_ORDER: tuple[Panel, ...] = (
+    Panel.LIVER,
+    Panel.KIDNEY,
+    Panel.LIPID,
+    Panel.GLUCOSE,
+    Panel.URIC_ACID,
+    Panel.ELECTROLYTE,
+    Panel.VITANEMIA,
+    Panel.THYROID,
+    Panel.SEX_HORMONE,
+    Panel.INFECTION,
+    Panel.AUTOIMMUNE,
+    Panel.COAG,
+    Panel.CBC,
+    Panel.URINALYSIS,
+    Panel.IMAGING,
+    Panel.OTHER,
+)
+
+# UI 标签(spec §5.2);识别端不展示,契约测试锁定每个 code 都有标签。
+PANEL_LABELS: dict[Panel, str] = {
+    Panel.CBC: "血常规",
+    Panel.URINALYSIS: "尿常规",
+    Panel.LIVER: "肝功",
+    Panel.KIDNEY: "肾功",
+    Panel.LIPID: "血脂",
+    Panel.GLUCOSE: "血糖",
+    Panel.THYROID: "甲状腺",
+    Panel.SEX_HORMONE: "性激素",
+    Panel.URIC_ACID: "尿酸",
+    Panel.ELECTROLYTE: "电解质",
+    Panel.VITANEMIA: "维生素/贫血",
+    Panel.INFECTION: "感染筛查",
+    Panel.AUTOIMMUNE: "自身抗体",
+    Panel.COAG: "凝血",
+    Panel.IMAGING: "影像",
+    Panel.OTHER: "其他",
+}
+
+# 影像报告无指标项,报告级面板取该类别值(spec §5.1/§6.3)。
+IMAGING_REPORT_TYPE = "影像"
+
+# 指标项 panel 的父类约束(spec §5.1);other 是唯一跨类别兜底。
+PANEL_ALLOWED_BY_REPORT_TYPE: dict[str, frozenset[Panel]] = {
+    "临检": frozenset({Panel.CBC, Panel.URINALYSIS, Panel.COAG, Panel.OTHER}),
+    "生化": frozenset({
+        Panel.LIVER, Panel.KIDNEY, Panel.LIPID, Panel.GLUCOSE,
+        Panel.URIC_ACID, Panel.ELECTROLYTE, Panel.VITANEMIA, Panel.OTHER,
+    }),
+    "激素": frozenset({Panel.THYROID, Panel.SEX_HORMONE, Panel.OTHER}),
+    "免疫": frozenset({Panel.INFECTION, Panel.AUTOIMMUNE, Panel.OTHER}),
+    IMAGING_REPORT_TYPE: frozenset({Panel.IMAGING, Panel.OTHER}),
+    "其他专项": frozenset({Panel.OTHER}),
+}
+
+
+def allowed_panels(report_type: str) -> frozenset[Panel]:
+    """该报告类别允许的指标项项目组;未知报告类别只允许 other。"""
+    return PANEL_ALLOWED_BY_REPORT_TYPE.get(report_type, frozenset({Panel.OTHER}))
+
+
+def aggregate_panels(panels: Iterable[Panel]) -> list[Panel]:
+    """项目组去重排序:命中项数降序,同数按 PANEL_ORDER(spec §5.3)。"""
+    counts = Counter(panels)
+    return sorted(counts, key=lambda p: (-counts[p], PANEL_ORDER.index(p)))
+
+
+def report_panels(
+    report_type: str, status: Status, item_panels: Iterable[Panel]
+) -> list[Panel]:
+    """报告级项目组:失败 → other;有指标项 → 排序聚合;无指标项 → 影像 / other。
+
+    postprocess 与 /classify 共用这一条规则,避免两套 fallback 漂移(spec §6.3/§6.4)。
+    """
+    panels = list(item_panels)
+    if status is Status.FAILED:
+        return [Panel.OTHER]
+    if panels:
+        return aggregate_panels(panels)
+    if report_type == IMAGING_REPORT_TYPE:
+        return [Panel.IMAGING]
+    return [Panel.OTHER]
+
+
 # Vertex coordinate [x, y]; a text line box is a quadrilateral of four points.
 type Point = tuple[float, float]
 
@@ -93,6 +203,9 @@ class ReportItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str = Field(min_length=1, description="canonical item name (after dictionary mapping)")
+    panel: Panel = Field(
+        description="项目组 code;必须属于 report_type 的允许集合(spec §5.1)"
+    )
     value: str | None = Field(
         None,
         description="value as printed (e.g. '128', '0.43', '<2.00'); None when the cell has no value-like content",
@@ -146,6 +259,10 @@ class Report(BaseModel):
     report_type: str = Field(min_length=1)
     report_date: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
     status: Status
+    panels: list[Panel] = Field(
+        min_length=1,
+        description="报告级项目组:命中项数降序、同数按固定优先级;panels[0] 为卡片主标签",
+    )
     items: list[ReportItem]
     sections: list[ReportSection] | None = Field(
         default=None,
@@ -160,6 +277,26 @@ class Report(BaseModel):
         if not self.items and not self.sections and self.status is not Status.FAILED:
             raise ValueError(
                 "report with no items and no sections must have status=failed (empty-items invariant)"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_panels(self) -> "Report":
+        # 父子约束是逐指标项的(spec §5.1);failed 只约束报告级 panels 为 other。
+        allowed = allowed_panels(self.report_type)
+        for item in self.items:
+            if item.panel not in allowed:
+                raise ValueError(
+                    f"item {item.name!r} panel {item.panel.value!r} is not allowed "
+                    f"for report_type {self.report_type!r}"
+                )
+        expected = report_panels(
+            self.report_type, self.status, (item.panel for item in self.items)
+        )
+        if self.panels != expected:
+            raise ValueError(
+                f"panels {[p.value for p in self.panels]} do not match "
+                f"item aggregate {[p.value for p in expected]}"
             )
         return self
 
@@ -195,3 +332,30 @@ class ReparseRequest(BaseModel):
 
     ocr_result: OCRResult
     date: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
+
+
+class ClassifyItem(BaseModel):
+    """POST /classify 请求里的一个指标项(当前指标名 + 单位)。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1)
+    unit: str | None = None
+
+
+class ClassifyRequest(BaseModel):
+    """POST /classify 请求体:按 report_type + 当前指标名重算项目组。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    report_type: str = Field(min_length=1)
+    items: list[ClassifyItem]
+
+
+class ClassifyResponse(BaseModel):
+    """POST /classify 响应:item_panels 与请求 items 等长同序。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    panels: list[Panel] = Field(min_length=1)
+    item_panels: list[Panel]

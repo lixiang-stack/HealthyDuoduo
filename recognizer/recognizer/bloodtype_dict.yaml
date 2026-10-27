@@ -4,6 +4,9 @@ report_type: 临检
 category:
   title_keywords: ["血型"]
   min_matched_items: 2
+  # 依据: 2013 医疗机构临床检验项目目录(ABO/RH 血型、抗体筛查);
+  #       首版归其他(一次性事实,不设独立项目组)
+  panel: other
 items:
   - name: ABO血型
     aliases: [ABO血型鉴定(ABO血型)]

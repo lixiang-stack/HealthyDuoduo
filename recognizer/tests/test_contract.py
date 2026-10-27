@@ -8,7 +8,14 @@ from jsonschema import Draft202012Validator
 from pydantic import ValidationError
 
 from recognizer import paths
-from recognizer.contract import OCRResult, Report
+from recognizer.contract import (
+    PANEL_ALLOWED_BY_REPORT_TYPE,
+    PANEL_LABELS,
+    PANEL_ORDER,
+    OCRResult,
+    Panel,
+    Report,
+)
 
 SCHEMA_DIR = paths.SCHEMAS
 TESTDATA = paths.CONTRACT_TESTDATA
@@ -75,8 +82,40 @@ def test_invalid_report_rejected() -> None:
     assert Draft202012Validator(_load(SCHEMA_DIR / "report.schema.json")).is_valid(instance) is False
 
 
-def _report(status: str, items: list[dict]) -> dict:
-    return {"report_type": "血常规", "report_date": "2026-10-01", "status": status, "items": items}
+def test_schema_requires_panel_and_panels() -> None:
+    """reportItem.panel / report.panels 是必填字段(spec §6.2)。"""
+    schema = Draft202012Validator(_load(SCHEMA_DIR / "report.schema.json"))
+    example = _load(TESTDATA / "report.example.json")
+    assert schema.is_valid(example)
+    without_item_panel = {**example, "items": [{k: v for k, v in example["items"][0].items() if k != "panel"}]}
+    without_panels = {k: v for k, v in example.items() if k != "panels"}
+    for broken in (without_item_panel, without_panels):
+        assert not schema.is_valid(broken)
+        with pytest.raises(ValidationError):
+            Report.model_validate(broken)
+
+
+def _item(name: str = "血红蛋白", panel: str = "cbc") -> dict:
+    return {"name": name, "panel": panel, "value": "128", "unit": "g/L",
+            "ref_range": "115-150", "flag": "normal", "low_confidence": False,
+            "raw_text": "血红蛋白 128 g/L 115-150", "ocr_line_numbers": [0, 1, 2]}
+
+
+def _report(
+    status: str,
+    items: list[dict],
+    panels: list[str] | None = None,
+    report_type: str = "临检",
+) -> dict:
+    if panels is None:
+        panels = ["other"] if status == "failed" or not items else ["cbc"]
+    return {
+        "report_type": report_type,
+        "report_date": "2026-10-01",
+        "status": status,
+        "panels": panels,
+        "items": items,
+    }
 
 
 def test_report_empty_items_must_be_failed_or_narrative() -> None:
@@ -86,7 +125,8 @@ def test_report_empty_items_must_be_failed_or_narrative() -> None:
         with pytest.raises(ValidationError, match="no items"):
             Report.model_validate(_report(status, []))
     narrative = {
-        **_report("success", []),
+        **_report("success", [], ["imaging"]),
+        "report_type": "影像",
         "sections": [{"kind": "findings", "text": "宫内单活胎。", "ocr_line_numbers": [3]}],
     }
     assert Report.model_validate(narrative) is not None
@@ -94,11 +134,51 @@ def test_report_empty_items_must_be_failed_or_narrative() -> None:
 
 def test_report_with_items_accepts_every_status() -> None:
     """非空 items 与三种 status 的组合全部合法(不变量只约束空 items 一侧)。"""
-    item = {"name": "血红蛋白", "value": "128", "unit": "g/L", "ref_range": "115-150",
-            "flag": "normal", "low_confidence": False, "raw_text": "血红蛋白 128 g/L 115-150",
-            "ocr_line_numbers": [0, 1, 2]}
     for status in ("success", "partial", "failed"):
-        assert Report.model_validate(_report(status, [item])) is not None
+        assert Report.model_validate(_report(status, [_item()])) is not None
+
+
+def test_report_panels_must_match_item_aggregate() -> None:
+    """panels 必须等于指标项面板去重后的排序聚合,不允许两份真相。"""
+    with pytest.raises(ValidationError, match="do not match"):
+        Report.model_validate(_report("success", [_item()], ["cbc", "liver"]))
+    with pytest.raises(ValidationError, match="do not match"):
+        Report.model_validate(_report("success", [_item()], ["other"]))
+
+
+def test_report_panels_sorted_by_count_then_fixed_order() -> None:
+    """命中项数降序;同数按 §5.3 固定优先级。"""
+    items = [
+        _item("尿酸", "uric_acid"),
+        _item("总胆固醇", "lipid"),
+        _item("二氧化碳", "electrolyte"),
+        _item("肌酐", "kidney"),
+        _item("尿素", "kidney"),
+    ]
+    report = Report.model_validate(
+        _report("success", items, ["kidney", "lipid", "uric_acid", "electrolyte"], "生化")
+    )
+    assert report.panels == ["kidney", "lipid", "uric_acid", "electrolyte"]
+
+
+def test_report_rejects_panel_outside_parent() -> None:
+    """父子约束:临检不允许甲状腺,other 是唯一跨类别兜底。"""
+    with pytest.raises(ValidationError, match="not allowed"):
+        Report.model_validate(_report("success", [_item("促甲状腺素", "thyroid")], ["thyroid"]))
+    assert Report.model_validate(_report("success", [_item("未知项目", "other")], ["other"])) is not None
+
+
+def test_every_panel_has_label_and_parent() -> None:
+    """16 个 code 都有 UI 标签,且至少出现在一个父类的允许集合中。"""
+    assert set(PANEL_LABELS) == set(Panel)
+    parents = {p for allowed in PANEL_ALLOWED_BY_REPORT_TYPE.values() for p in allowed}
+    assert set(Panel) == parents
+    assert PANEL_ORDER == (
+        Panel.LIVER, Panel.KIDNEY, Panel.LIPID, Panel.GLUCOSE, Panel.URIC_ACID,
+        Panel.ELECTROLYTE, Panel.VITANEMIA, Panel.THYROID, Panel.SEX_HORMONE,
+        Panel.INFECTION, Panel.AUTOIMMUNE, Panel.COAG, Panel.CBC, Panel.URINALYSIS,
+        Panel.IMAGING, Panel.OTHER,
+    )
 
 
 def test_report_sections_optional_and_validated() -> None:

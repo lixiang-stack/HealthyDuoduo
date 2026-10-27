@@ -5,7 +5,7 @@
   "description": "系统对一张图像处理后产出的结构化报告(实施计划 4.2;report_id / image_id 等由 Go 落库时赋予,不在契约内)",
   "type": "object",
   "additionalProperties": false,
-  "required": ["report_type", "report_date", "status", "items"],
+  "required": ["report_type", "report_date", "status", "panels", "items"],
   "properties": {
     "report_type": {
       "type": "string",
@@ -20,6 +20,13 @@
     "status": {
       "enum": ["success", "partial", "failed"],
       "description": "success=类别与报告主体(指标项或段落)解析成功;partial=有指标项产出但有缺失/低置信/日期未解析;failed=无法产出结构化结果(仍留痕落库)"
+    },
+    "panels": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/panel"},
+      "description": "报告级项目组:按命中指标项数降序、同数按固定优先级;panels[0] 为卡片主标签"
     },
     "items": {
       "type": "array",
@@ -57,15 +64,24 @@
         }
       }
     },
+    "panel": {
+      "enum": ["cbc", "urinalysis", "liver", "kidney", "lipid", "glucose",
+               "thyroid", "sex_hormone", "uric_acid", "electrolyte", "vitanemia",
+               "infection", "autoimmune", "coag", "imaging", "other"],
+      "description": "项目组 code;指标项必须属于其 report_type 的允许集合,other 是唯一跨类别兜底"
+    },
     "reportItem": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "value", "unit", "ref_range", "flag", "low_confidence", "raw_text", "ocr_line_numbers"],
+      "required": ["name", "panel", "value", "unit", "ref_range", "flag", "low_confidence", "raw_text", "ocr_line_numbers"],
       "properties": {
         "name": {
           "type": "string",
           "minLength": 1,
           "description": "规范名(词典映射后)"
+        },
+        "panel": {
+          "$ref": "#/$defs/panel"
         },
         "value": {
           "type": ["string", "null"],

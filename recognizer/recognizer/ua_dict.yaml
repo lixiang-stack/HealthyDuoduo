@@ -11,6 +11,10 @@ category:
   - 尿液
   - 尿常规
   min_matched_items: 5
+  # 依据: 2025 成人健康体检指引;2022 健康体检基本项目专家共识;
+  #       2013 医疗机构临床检验项目目录;LOINC 24357-6;
+  #       尿糖 / 尿胆红素按 report_type=临检 归尿常规(spec §5.4)
+  panel: urinalysis
 items:
 - name: 潜血
   aliases:

@@ -46,10 +46,13 @@ from .contract import (
     Flag,
     FlagReason,
     OCRResult,
+    Panel,
     Report,
     ReportItem,
     ReportSection,
     Status,
+    allowed_panels,
+    report_panels,
 )
 from .dash_recovery import recover_dash_fields
 
@@ -202,6 +205,7 @@ class DictItem:
     name: str
     aliases: tuple[str, ...]
     units: frozenset[str]
+    panel: Panel
 
 
 @dataclass
@@ -231,11 +235,16 @@ def load_dicts() -> tuple[LabDict, ...]:
 
 def _build_dict(path: Path) -> LabDict:
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    category = raw["category"]
+    # 解析规则(item.panel ?? category.panel ?? other):混合词典逐项覆盖,
+    # 单一项目组词典只写类别默认(spec §5.5.1)。
+    default_panel = Panel(category.get("panel", Panel.OTHER))
     items = tuple(
         DictItem(
             name=it["name"],
             aliases=tuple(it.get("aliases", [])) + (it["name"],),
             units=frozenset(u.lower() for u in it.get("units", [])),
+            panel=Panel(it.get("panel", default_panel)),
         )
         for it in raw.get("items") or []
     )
@@ -1325,7 +1334,13 @@ def run_postprocess(
 
     selected = _select_category(cells, header_bands, ocr.txts)
     if selected is None:
-        return Report(report_type=UNKNOWN_REPORT_TYPE, report_date=date, status=Status.FAILED, items=[])
+        return Report(
+            report_type=UNKNOWN_REPORT_TYPE,
+            report_date=date,
+            status=Status.FAILED,
+            panels=[Panel.OTHER],
+            items=[],
+        )
     d, pairs = selected
     sections = _extract_sections(ocr.txts, d.section_anchors)
 
@@ -1342,6 +1357,7 @@ def run_postprocess(
         items.append(
             ReportItem(
                 name=it.name,
+                panel=it.panel,
                 value=piece.value,
                 unit=_normalize_unit(piece.unit, piece.item),
                 ref_range=piece.ref,
@@ -1384,13 +1400,46 @@ def run_postprocess(
             status = Status.PARTIAL
         else:
             status = Status.SUCCESS
+    panels = report_panels(d.report_type, status, (item.panel for item in items))
     return Report(
         report_type=d.report_type,
         report_date=date,
         status=status,
+        panels=panels,
         items=items,
         sections=sections or None,
     )
+
+
+def classify_items(
+    report_type: str, names: list[str]
+) -> tuple[list[Panel], list[Panel]]:
+    """按 report_type + 当前指标名重算项目组(/classify 与存量回填共用;spec §6.4)。
+
+    只查同一 report_type 下的词典(歧义项靠父类区分,如临检葡萄糖 → 尿常规),
+    未命中 → other。空 items:影像 → [imaging],其余 → [other]。
+    """
+    dicts = load_dicts()
+    if report_type not in {d.report_type for d in dicts} | {UNKNOWN_REPORT_TYPE}:
+        raise ValueError(f"unknown report_type: {report_type}")
+    allowed = allowed_panels(report_type)
+    item_panels: list[Panel] = []
+    for name in names:
+        panel = Panel.OTHER
+        for d in dicts:
+            if d.report_type != report_type:
+                continue
+            item, _ = _match_name(name, d)
+            if item is not None:
+                panel = item.panel
+                break
+        if panel not in allowed:
+            raise ValueError(
+                f"item {name!r} panel {panel.value!r} is not allowed "
+                f"for report_type {report_type!r}"
+            )
+        item_panels.append(panel)
+    return report_panels(report_type, Status.SUCCESS, item_panels), item_panels
 
 
 def _title_region_cells(

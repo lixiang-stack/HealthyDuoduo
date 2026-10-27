@@ -51,7 +51,7 @@ func TestUnmarshalReportFixture(t *testing.T) {
 	if err := json.Unmarshal(fixture(t, "report.example.json"), &got); err != nil {
 		t.Fatalf("unmarshal report: %v", err)
 	}
-	if got.ReportType != "血常规" || got.ReportDate == nil || *got.ReportDate != "2026-10-01" || got.Status != "success" {
+	if got.ReportType != "临检" || got.ReportDate == nil || *got.ReportDate != "2026-10-01" || got.Status != "success" {
 		t.Errorf("Report header = %+v", got)
 	}
 	if len(got.Items) != 1 {
