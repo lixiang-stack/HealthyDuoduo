@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>HealthyDuoduo · 方案对比</title>
+<style>
+  body { margin: 0; padding: 28px; background: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; color: #111827; }
+  h1 { font-size: 22px; margin: 0 0 6px; }
+  .sub { color: #6b7280; font-size: 13px; margin-bottom: 22px; }
+  .row { display: flex; gap: 18px; align-items: flex-start; margin-bottom: 22px; }
+  .item { background: #fff; border: 1px solid #d1d5db; border-radius: 12px; padding: 10px 10px 12px; }
+  .item.wide { flex: 1; }
+  .label { font-size: 13px; font-weight: 650; margin: 0 0 8px 4px; }
+  .label span { font-weight: 400; color: #6b7280; }
+  img { width: 300px; display: block; border-radius: 8px; }
+  .row.three img { width: 300px; }
+  .note { font-size: 12px; color: #6b7280; margin-top: 6px; line-height: 18px; }
+</style>
+</head>
+<body>
+  <h1>HealthyDuoduo · 按项目浏览方案对比</h1>
+  <div class="sub">任务：小虎（8 岁）最近一次是「肝功 + 肾功 + 尿酸」混合生化单；家长想找「肾功最近怎么样」。样本数据来自仓库 golden。</div>
+
+  <div class="row">
+    <div class="item"><div class="label">家庭 A <span>· 最近一份报告口径</span></div><img src="shots/01-home-a.png" /><div class="note">只看到最近一份肝功报告的偏高；甲状腺 2 项异常被盖住。</div></div>
+    <div class="item"><div class="label">家庭 B <span>· 项目口径（推荐）</span></div><img src="shots/02-home-b.png" /><div class="note">「异常项目」按每个项目最近一次结果汇总；小虎的肝功 + 甲状腺都可见。</div></div>
+  </div>
+
+  <div class="row">
+    <div class="item"><div class="label">档案 · 按时间 <span>· 保留现有时间线</span></div><img src="shots/03-archive-time.png" /><div class="note">卡片首位改成项目名；report_type 降为日期行小字。</div></div>
+    <div class="item"><div class="label">档案 · 按项目 <span>· 新入口</span></div><img src="shots/04-archive-panel.png" /><div class="note">每个项目一行；没有报告的项目不出现。肾功/血脂/尿酸/电解质都在。</div></div>
+  </div>
+
+  <div class="row three">
+    <div class="item"><div class="label">项目详情 A <span>· 指标优先</span></div><img src="shots/05-panel-kidney-items-top.png" /><div class="note">每个指标一行 + 跨报告迷你趋势；不点报告就能回答「最近怎么样、有没有反复」。</div></div>
+    <div class="item"><div class="label">项目详情 B <span>· 报告优先</span></div><img src="shots/06-panel-kidney-reports-top.png" /><div class="note">最新值摘要 + 报告列表；看历史数值要点进每份报告。</div></div>
+    <div class="item"><div class="label">项目详情 C <span>· 混合（推荐）</span></div><img src="shots/07-panel-liver-hybrid-top.png" /><div class="note">异常项内联趋势；正常项只给最新值，点开再看趋势。</div></div>
+  </div>
+
+  <div class="row">
+    <div class="item"><div class="label">单标签对照 <span>· v2.2 已否决</span></div><img src="shots/11-contrast-tags-top.png" /><div class="note">49 份真实样本里，肾功/血脂/尿酸/电解质四个分类是 0 份；项目级方案不会漏。</div></div>
+    <div class="item"><div class="label">异常指标 <span>· 保留 Stack 页</span></div><img src="shots/09-trends-top.png" /><div class="note">分组从 report_type 改成项目；从家庭页和项目列表进入。</div></div>
+    <div class="item"><div class="label">报告详情 <span>· 按项目分组</span></div><img src="shots/10-report-detail-top.png" /><div class="note">展示该报告全部指标；项目是浏览入口，不是指标过滤器。</div></div>
+  </div>
+</body>
+</html>
