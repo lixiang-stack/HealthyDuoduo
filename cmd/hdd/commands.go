@@ -22,15 +22,18 @@ import (
 )
 
 // deps 编排层依赖(接口在 internal/pipeline,实现在 internal/storage、internal/recognizer)。
-// store/members/reports/trends 为同一 *storage.Store 注入的四个窄端口(ISP:CLI 侧报告持久化、
-// 成员域、serve 报告域、serve 趋势域各持所需方法,既有 fake 零膨胀)。
+// store/members/reports/trends/backfill 为同一 *storage.Store 注入的窄端口(ISP:CLI 侧报告持久化、
+// 成员域、serve 报告域、serve 趋势域、存量回填各持所需方法,既有 fake 零膨胀);
+// classifier/rec 为同一识别服务客户端的两个消费面。
 type deps struct {
-	store   pipeline.Store
-	members pipeline.MemberStore
-	reports pipeline.ReportStore
-	trends  pipeline.TrendStore
-	rec     pipeline.Recognizer
-	obj     pipeline.ObjectStore
+	store      pipeline.Store
+	members    pipeline.MemberStore
+	reports    pipeline.ReportStore
+	trends     pipeline.TrendStore
+	backfill   pipeline.BackfillStore
+	classifier pipeline.PanelClassifier
+	rec        pipeline.Recognizer
+	obj        pipeline.ObjectStore
 }
 
 // typeDisplay 已知报告类别 → CLI 显示缩写(域数据 storage 中原样保留)。

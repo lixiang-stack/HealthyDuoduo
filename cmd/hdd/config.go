@@ -65,13 +65,16 @@ func openDeps(c config) (*deps, func(), error) {
 	}
 	st := storage.NewStore(pool)
 	st.SetFlagPolicy(policy)
+	rec := recognizer.New(c.recognizerURL)
 	d := &deps{
-		store:   st,
-		members: st,
-		reports: st,
-		trends:  st,
-		rec:     recognizer.New(c.recognizerURL),
-		obj:     obj,
+		store:      st,
+		members:    st,
+		reports:    st,
+		trends:     st,
+		backfill:   st,
+		classifier: rec,
+		rec:        rec,
+		obj:        obj,
 	}
 	return d, func() { pool.Close() }, nil
 }

@@ -5,11 +5,14 @@ package recognizer
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"sync"
 	"testing"
 	"time"
+
+	"healthyduoduo/internal/pipeline"
 )
 
 // /report 端点返回 ocr_result包裹的 bundle;最小合法报文(恢复分支断言 Status)。
@@ -75,5 +78,79 @@ func TestReport_NoRetryOn4xx(t *testing.T) {
 	defer mu.Unlock()
 	if calls != 1 {
 		t.Errorf("server calls = %d, want 1 (4xx 不重试)", calls)
+	}
+}
+
+// 识别服务不可达 / 端点缺失 / 5xx = 整体不可用:分类命令据此停止并提示部署顺序;
+// 422 等单份数据错误仍逐份继续。
+func TestClassify_TransportErrorMarksUnavailable(t *testing.T) {
+	useFastRetry(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	base := srv.URL
+	srv.Close()
+
+	_, _, err := New(base).Classify(context.Background(), "生化", nil)
+	if !errors.Is(err, pipeline.ErrClassifierUnavailable) {
+		t.Fatalf("err = %v, want ErrClassifierUnavailable", err)
+	}
+}
+
+func TestClassify_MissingEndpointMarksUnavailable(t *testing.T) {
+	useFastRetry(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.NotFound(w, nil)
+	}))
+	defer srv.Close()
+
+	_, _, err := New(srv.URL).Classify(context.Background(), "生化", nil)
+	if !errors.Is(err, pipeline.ErrClassifierUnavailable) {
+		t.Fatalf("err = %v, want ErrClassifierUnavailable for older recognizer without /classify", err)
+	}
+}
+
+func TestClassify_ServerErrorMarksUnavailable(t *testing.T) {
+	useFastRetry(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "boom", http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	_, _, err := New(srv.URL).Classify(context.Background(), "生化", nil)
+	if !errors.Is(err, pipeline.ErrClassifierUnavailable) {
+		t.Fatalf("err = %v, want ErrClassifierUnavailable for 5xx", err)
+	}
+}
+
+func TestClassify_ContextCancellationIsPerReportFailure(t *testing.T) {
+	useFastRetry(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "unexpected call", http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, _, err := New(srv.URL).Classify(ctx, "生化", nil)
+	if err == nil {
+		t.Fatal("expected error on canceled context")
+	}
+	if errors.Is(err, pipeline.ErrClassifierUnavailable) {
+		t.Errorf("context cancellation classified as unavailable, want per-report failure: %v", err)
+	}
+}
+
+func TestClassify_HTTPErrorIsPerReportFailure(t *testing.T) {
+	useFastRetry(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "parent-child violation", http.StatusUnprocessableEntity)
+	}))
+	defer srv.Close()
+
+	_, _, err := New(srv.URL).Classify(context.Background(), "生化", nil)
+	if err == nil {
+		t.Fatal("expected error on 422")
+	}
+	if errors.Is(err, pipeline.ErrClassifierUnavailable) {
+		t.Errorf("422 classified as unavailable, want per-report failure: %v", err)
 	}
 }

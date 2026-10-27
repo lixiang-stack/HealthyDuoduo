@@ -135,6 +135,29 @@ const (
 	// 硬删报告行(票 10;级联 report_items 与 correction_pairs,images/ocr_results 留痕)。
 	sqlReportDelete = `DELETE FROM reports WHERE image_sha256 = $1`
 
+	// 存量项目组回填(票 05):按报告日期降序取报告,limit > 0 时只取前 N 份
+	// (CASE 无匹配时返回 NULL,PostgreSQL 的 LIMIT NULL 等价于不限制);
+	// LEFT JOIN 保留零指标项的影像 / 失败报告,指标项按 id 升序。
+	sqlReportsForBackfill = `WITH picked AS (
+		   SELECT image_sha256, report_type, report_date, status, panels
+		   FROM reports
+		   ORDER BY report_date DESC NULLS LAST, image_sha256 ASC
+		   LIMIT CASE WHEN $1::int > 0 THEN $1::int END
+		 )
+		 SELECT p.image_sha256, p.report_type, p.status, p.panels, i.id, i.name, i.unit, i.panel
+		 FROM picked p
+		 LEFT JOIN report_items i ON i.report_sha256 = p.image_sha256
+		 ORDER BY p.report_date DESC NULLS LAST, p.image_sha256 ASC, i.id ASC`
+
+	// 回填只写项目组列:指标项按 id + 报告归属更新 panel,不碰核对状态 /
+	// 修正对 / value / unit / ref_range / method / flag。
+	sqlBackfillItemPanels = `UPDATE report_items AS i
+		 SET panel = v.panel
+		 FROM unnest($2::bigint[], $3::text[]) AS v(id, panel)
+		 WHERE i.id = v.id AND i.report_sha256 = $1`
+
+	sqlBackfillReportPanels = `UPDATE reports SET panels = $2 WHERE image_sha256 = $1`
+
 	// 核对落库(票 09;单报告核对事务):报告行锁串行化该报告的并发核对,
 	// 保证状态派生翻转看到的是最新已提交状态。
 	sqlReportLock = `SELECT image_sha256 FROM reports WHERE image_sha256 = $1 FOR UPDATE`
@@ -343,6 +366,83 @@ func (s *Store) ItemsByImage(ctx context.Context, reportSha string) ([]contract.
 		items = append(items, it)
 	}
 	return items, rows.Err()
+}
+
+// AllReportsForBackfill 存量回填扫描(票 05):报告按日期降序、dateless 沉底、sha 升序;
+// limit > 0 按报告数取前 N 份(零指标项报告同样保留);指标项含回写所需的 id / name / unit / 当前 panel。
+func (s *Store) AllReportsForBackfill(ctx context.Context, limit int) ([]pipeline.BackfillReport, error) {
+	rows, err := s.pool.Query(ctx, sqlReportsForBackfill, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []pipeline.BackfillReport
+	for rows.Next() {
+		var (
+			report    pipeline.BackfillReport
+			itemID    *int64
+			itemName  *string
+			itemUnit  *string
+			itemPanel *string
+		)
+		if err := rows.Scan(&report.Sha256, &report.ReportType, &report.Status, &report.Panels,
+			&itemID, &itemName, &itemUnit, &itemPanel); err != nil {
+			return nil, err
+		}
+		if len(out) == 0 || out[len(out)-1].Sha256 != report.Sha256 {
+			out = append(out, report)
+		}
+		if itemID != nil {
+			item := pipeline.BackfillItem{ID: *itemID, Name: derefString(itemName), Unit: itemUnit, Panel: derefString(itemPanel)}
+			out[len(out)-1].Items = append(out[len(out)-1].Items, item)
+		}
+	}
+	return out, rows.Err()
+}
+
+// UpdateReportPanels 单事务只写项目组列(票 05):按 item id 更新 report_items.panel,
+// 再写 reports.panels;报告或指标项不存在即回滚,不发生部分写入。
+func (s *Store) UpdateReportPanels(ctx context.Context, reportSha string, panels []string, itemPanels map[int64]string) error {
+	if panels == nil {
+		panels = []string{} // text[] NOT NULL
+	}
+	ids := make([]int64, 0, len(itemPanels))
+	codes := make([]string, 0, len(itemPanels))
+	for id, panel := range itemPanels {
+		ids = append(ids, id)
+		codes = append(codes, panel)
+	}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	if len(ids) > 0 {
+		tag, err := tx.Exec(ctx, sqlBackfillItemPanels, reportSha, ids, codes)
+		if err != nil {
+			return fmt.Errorf("update report item panels: %w", err)
+		}
+		if got := tag.RowsAffected(); got != int64(len(ids)) {
+			return fmt.Errorf("update report item panels: %d of %d items matched report %s", got, len(ids), reportSha)
+		}
+	}
+	tag, err := tx.Exec(ctx, sqlBackfillReportPanels, reportSha, panels)
+	if err != nil {
+		return fmt.Errorf("update report panels: %w", err)
+	}
+	if tag.RowsAffected() != 1 {
+		return fmt.Errorf("update report panels: report %s not found", reportSha)
+	}
+	// 不刷 updated_at:回填只改项目组列,不伪装成报告内容重新识别。
+	return tx.Commit(ctx)
+}
+
+func derefString(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }
 
 func (s *Store) OCRResultJSON(ctx context.Context, ocrID int64) ([]byte, error) {

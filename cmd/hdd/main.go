@@ -14,6 +14,7 @@ import (
 
 const usage = `usage: hdd ingest <image...> [--date YYYY-MM-DD] [--force]
        hdd reparse <sha256...> [--date YYYY-MM-DD]
+       hdd backfill-panels [--limit N] [--dry-run]
        hdd list [--type <report-type>] [--date YYYY|YYYY-MM|YYYY-MM-DD]
        hdd show <sha256...>
        hdd trend <item-name> [--type <report-type>] [--all]
@@ -54,6 +55,8 @@ func run(out, errOut io.Writer, d *deps, args []string) int {
 		return runIngest(out, errOut, d, rest)
 	case "reparse":
 		return runReparse(out, errOut, d, rest)
+	case "backfill-panels":
+		return runBackfillPanels(out, errOut, d, rest)
 	case "list":
 		return runList(out, errOut, d, rest)
 	case "show":

@@ -26,6 +26,7 @@
 - `report_items` 增加 `panel`，`reports` 增加有序 `panels text[]`；迁移 `0011`。不存 `primary_panel`，`panels[0]` 即主标签，避免两份真相。
 - 报告摘要 / 详情暴露 `panels`；项目列表 / 详情新增两条成员维度端点；App 增加「按项目」视图。
 - 识别服务新增内部 `POST /classify`；`hdd backfill-panels` 只更新 panel 列，保留 `review_status`、修正对与最终值。部署顺序：识别服务 → 迁移 → 回填 → App。
+- `hdd backfill-panels` 跳过 failed 报告（无指标项、不进项目视图）：存量 `panels` 保持 `[]`，App 按 spec §7.3 回退 `report_type`；其余报告仅在项目组有差异时写库。
 - 家长修正指标名后首版不自动重算 `panel`；`/classify` 已具备能力，但核对路径不调用。修正名不在词典时回填为 `other`。
 - `other` 保留为唯一跨类别兜底；血型 / 肝纤维化 / 产前筛查 / 未归类进「其他」，UI 一行，行内显示来源报告类别。
 - 混合报告在多个项目下出现；项目详情展示该项目全部指标，报告详情展示报告全部指标；不按项目过滤报告详情。
