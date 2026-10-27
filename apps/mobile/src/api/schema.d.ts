@@ -248,6 +248,12 @@ export interface components {
          * @enum {string}
          */
         ReportStatus: "success" | "partial" | "failed";
+        /**
+         * @description 项目组 code(与识别端 report.schema.json 的 panel 枚举同源):指标项必须属于其
+         *     report_type 的允许集合,other 是唯一跨类别兜底。项目组是浏览入口,不是指标过滤器。
+         * @enum {string}
+         */
+        PanelCode: "cbc" | "urinalysis" | "liver" | "kidney" | "lipid" | "glucose" | "thyroid" | "sex_hormone" | "uric_acid" | "electrolyte" | "vitanemia" | "infection" | "autoimmune" | "coag" | "imaging" | "other";
         /** @description 按 flag 异常计数徽标口径(时间线卡片);缺档即 0。unknown 只统计可操作/抽取失败原因,no_reference/信息项/叙述体不计数。 */
         FlagCounts: {
             high: number;
@@ -272,6 +278,11 @@ export interface components {
             /** @description 识别失败原因(pipeline 产出;仅 failed 报告有值) */
             fail_reason: string | null;
             flag_counts: components["schemas"]["FlagCounts"];
+            /**
+             * @description 报告级项目组,有序(命中项数降序、同数按固定优先级);panels[0] 为卡片主标签。
+             *     未回填存量为空数组,App 回退 report_type;failed 报告新识别为 [other]。
+             */
+            panels: components["schemas"]["PanelCode"][];
             /** @description 本次检查未做该项(flag=not_tested)的指标项数;信息徽标,不进入待处理/异常计数。 */
             not_tested_count: number;
             /**
@@ -291,6 +302,8 @@ export interface components {
             status: components["schemas"]["ReportStatus"];
             fail_reason: string | null;
             flag_counts: components["schemas"]["FlagCounts"];
+            /** @description 报告级项目组(有序;空数组 = 未回填存量,详情按 report_type 单组回退) */
+            panels: components["schemas"]["PanelCode"][];
             not_tested_count: number;
             unreviewed_low_confidence_count: number;
             /** @description 报告级叙述段落(影像等叙述型报告);缺省或 null 表示无段落,数组顺序即展示顺序 */
@@ -336,6 +349,8 @@ export interface components {
             item_id: components["schemas"]["ItemIDHandle"];
             /** @description 规范名(词典映射后) */
             name: string;
+            /** @description 指标项项目组 code(详情按报告 panels 分组;不属于 panels 的项归末组「其他」) */
+            panel: components["schemas"]["PanelCode"];
             /** @description 印刷原样数值字符串(如 '18.40'、'<2.00'、'70-80');无结果或解析失败为 null */
             value: string | null;
             /** @description 单位,如 g/L */

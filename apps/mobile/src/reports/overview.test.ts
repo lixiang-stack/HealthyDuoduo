@@ -17,6 +17,7 @@ function report(overrides: Partial<ReportSummary> = {}): ReportSummary {
     status: 'success',
     fail_reason: null,
     flag_counts: { high: 0, low: 0, abnormal: 0, unknown: 0 },
+    panels: ['cbc'],
     not_tested_count: 0,
     unreviewed_low_confidence_count: 0,
     ...overrides,

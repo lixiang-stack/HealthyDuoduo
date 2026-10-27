@@ -218,6 +218,59 @@ func TestOpenAPIMirrorsRecognitionSection(t *testing.T) {
 	}
 }
 
+// TestOpenAPIPanelEnumMirrorsRecognition 项目组枚举双端同源:OpenAPI PanelCode 与
+// 识别端 report.schema.json 的 panel 枚举逐值一致;报告摘要 / 详情 / 指标项以必填
+// 字段 + $ref 暴露,防止字段漂移。
+func TestOpenAPIPanelEnumMirrorsRecognition(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "schemas", "report.schema.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var schema map[string]any
+	if err := json.Unmarshal(raw, &schema); err != nil {
+		t.Fatal(err)
+	}
+	recPanel := schema["$defs"].(map[string]any)["panel"].(map[string]any)
+
+	doc := getOpenAPI(t)
+	openPanel := componentSchema(t, doc, "PanelCode")
+	if rec, open := jsonCompact(recPanel["enum"]), jsonCompact(openPanel["enum"]); rec != open {
+		t.Errorf("PanelCode enum drifted:\n  recognition: %s\n  openapi:     %s", rec, open)
+	}
+
+	panelRef := "#/components/schemas/PanelCode"
+	itemProps := componentSchema(t, doc, "ReportItem")["properties"].(map[string]any)
+	if ref := itemProps["panel"].(map[string]any)["$ref"]; ref != panelRef {
+		t.Errorf("ReportItem.panel $ref = %v, want %s", ref, panelRef)
+	}
+	for _, component := range []string{"ReportSummary", "ReportDetail"} {
+		entry := componentSchema(t, doc, component)
+		panels, ok := entry["properties"].(map[string]any)["panels"].(map[string]any)
+		if !ok {
+			t.Fatalf("%s.panels missing", component)
+		}
+		if ref := panels["items"].(map[string]any)["$ref"]; ref != panelRef {
+			t.Errorf("%s.panels items $ref = %v, want %s", component, ref, panelRef)
+		}
+		if !requiredField(entry, "panels") {
+			t.Errorf("%s.panels must be required", component)
+		}
+	}
+	if !requiredField(componentSchema(t, doc, "ReportItem"), "panel") {
+		t.Error("ReportItem.panel must be required")
+	}
+}
+
+func requiredField(schema map[string]any, field string) bool {
+	required, _ := schema["required"].([]any)
+	for _, name := range required {
+		if name == field {
+			return true
+		}
+	}
+	return false
+}
+
 // fixtureCase 一张表同时供「对 schema 校验」与「对 Go 镜像回转」两个方向使用,
 // 免去两处清单各自漂移。
 type fixtureCase struct {

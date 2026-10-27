@@ -74,7 +74,7 @@ const (
 		 WHERE r.report_type = $1 AND date_trunc('year', r.report_date) = date_trunc('year', $2::date)
 		 ORDER BY r.report_date DESC NULLS LAST, r.image_sha256 ASC`
 
-	sqlItemsByReport = `SELECT name, value, unit, ref_range, method, flag, flag_reason, low_confidence, raw_text
+	sqlItemsByReport = `SELECT name, panel, value, unit, ref_range, method, flag, flag_reason, low_confidence, raw_text
 		 FROM report_items WHERE report_sha256 = $1 ORDER BY id`
 
 	// trend:同一指标项名(report_items.name = 词典规范名)的跨报告时序点,升序;
@@ -116,7 +116,7 @@ const (
 
 	// 指标项含外部句柄与核对状态(上传响应回读;行序 = id 升序与写入序一致)。
 	// ocr_line_numbers 存量行可为 NULL(0005 前入库),COALESCE 归空数组。
-	sqlItemsWithReviewStatus = `SELECT id, name, value, unit, ref_range, method, flag, flag_reason, low_confidence, raw_text, review_status,
+	sqlItemsWithReviewStatus = `SELECT id, name, panel, value, unit, ref_range, method, flag, flag_reason, low_confidence, raw_text, review_status,
 		   COALESCE(ocr_line_numbers, '{}')
 		 FROM report_items WHERE report_sha256 = $1 ORDER BY id`
 
@@ -140,7 +140,7 @@ const (
 	sqlReportLock = `SELECT image_sha256 FROM reports WHERE image_sha256 = $1 FOR UPDATE`
 
 	// 单指标项按报告内身份取行(核对动作前读;id 与报告不匹配即不存在)。
-	sqlItemForReview = `SELECT id, name, value, unit, ref_range, method, flag, flag_reason, low_confidence, raw_text, review_status,
+	sqlItemForReview = `SELECT id, name, panel, value, unit, ref_range, method, flag, flag_reason, low_confidence, raw_text, review_status,
 		   COALESCE(ocr_line_numbers, '{}')
 		 FROM report_items WHERE report_sha256 = $1 AND id = $2`
 
@@ -179,9 +179,10 @@ const (
 
 	// 报告行 upsert:测定 identity = 图像 sha256(每图一行);冲突即原位更新(--force 重跑)。
 	// fail_reason 全量更新(pipeline 产出,非 failed 一律 NULL:重算复原时旧原因清除);
-	// sections 全量覆盖(非叙述型报告写 NULL,重算复原时旧段落一并清除)。
-	sqlReportUpsert = `INSERT INTO reports (image_sha256, ocr_result_id, report_type, report_date, status, fail_reason, sections)
-		 VALUES ($1,$2,$3,$4::date,$5,$6,$7::jsonb)
+	// sections 全量覆盖(非叙述型报告写 NULL,重算复原时旧段落一并清除);
+	// panels 全量覆盖(识别端有序聚合;nil 归一为空数组,存量未回填口径)。
+	sqlReportUpsert = `INSERT INTO reports (image_sha256, ocr_result_id, report_type, report_date, status, fail_reason, sections, panels)
+		 VALUES ($1,$2,$3,$4::date,$5,$6,$7::jsonb,$8)
 		 ON CONFLICT (image_sha256) DO UPDATE SET
 		     ocr_result_id = excluded.ocr_result_id,
 		     report_type   = excluded.report_type,
@@ -189,13 +190,14 @@ const (
 		     status        = excluded.status,
 		     fail_reason   = excluded.fail_reason,
 		     sections      = excluded.sections,
+		     panels        = excluded.panels,
 		     updated_at    = now()`
 
 	sqlItemsDeleteByReport = `DELETE FROM report_items WHERE report_sha256 = $1`
 
 	sqlItemInsert = `INSERT INTO report_items
-		 (report_sha256, name, value, unit, ref_range, method, flag, flag_reason, low_confidence, raw_text, ocr_line_numbers)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`
+		 (report_sha256, name, panel, value, unit, ref_range, method, flag, flag_reason, low_confidence, raw_text, ocr_line_numbers)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`
 
 	// 成员(迁移 0004;显示名 + 是否孩子两档,无删除):列表按 id 升序 = 创建序返回,
 	// 孩子优先由客户端做;改动用 COALESCE 只覆盖传入字段(nil = 保持不变)。
@@ -211,15 +213,17 @@ const (
 )
 
 // reportColumnsSQL 报告行到业务视图(ReportRow)的标准投影;
-// report_date 序列化为 YYYY-MM-DD(缺失为空串),items 计数内联聚合。
+// report_date 序列化为 YYYY-MM-DD(缺失为空串),items 计数内联聚合,panels 有序数组。
 const reportColumnsSQL = `r.image_sha256, r.ocr_result_id, r.report_type,
 	   COALESCE(to_char(r.report_date, 'YYYY-MM-DD'), ''), r.status,
-	   COALESCE((SELECT COUNT(*) FROM report_items i WHERE i.report_sha256 = r.image_sha256), 0)`
+	   COALESCE((SELECT COUNT(*) FROM report_items i WHERE i.report_sha256 = r.image_sha256), 0),
+	   r.panels`
 
 // reportSummaryColumnsSQL 报告摘要(ReportSummary)投影:头部 + 聚合列(见 reportAggregateSQL)。
 const reportSummaryColumnsSQL = `r.image_sha256, r.member_id, r.report_type,
 	   COALESCE(to_char(r.report_date, 'YYYY-MM-DD'), ''), r.status, r.fail_reason,
-	   agg.high, agg.low, agg.abnormal, agg.unknown, agg.not_tested, agg.unreviewed_low`
+	   agg.high, agg.low, agg.abnormal, agg.unknown, agg.not_tested, agg.unreviewed_low,
+	   r.panels`
 
 // reportAggregateSQL 单报告的 flag 聚合与未核对低置信计数(横向子查询,逐报告就地聚合)。
 // unreviewed_low 统计所有报告的未核对低置信项(success 也可能有少量低置信项;failed 无项
@@ -274,7 +278,7 @@ func (s *Store) queryReports(ctx context.Context, query string, args ...any) ([]
 	for rows.Next() {
 		var r pipeline.ReportRow
 		var date string
-		if err := rows.Scan(&r.Sha256, &r.OCRResultID, &r.ReportType, &date, &r.Status, &r.ItemsCount); err != nil {
+		if err := rows.Scan(&r.Sha256, &r.OCRResultID, &r.ReportType, &date, &r.Status, &r.ItemsCount, &r.Panels); err != nil {
 			return nil, err
 		}
 		if date != "" {
@@ -333,7 +337,7 @@ func (s *Store) ItemsByImage(ctx context.Context, reportSha string) ([]contract.
 	var items []contract.ReportItem
 	for rows.Next() {
 		var it contract.ReportItem
-		if err := rows.Scan(&it.Name, &it.Value, &it.Unit, &it.RefRange, &it.Method, &it.Flag, &it.FlagReason, &it.LowConfidence, &it.RawText); err != nil {
+		if err := rows.Scan(&it.Name, &it.Panel, &it.Value, &it.Unit, &it.RefRange, &it.Method, &it.Flag, &it.FlagReason, &it.LowConfidence, &it.RawText); err != nil {
 			return nil, err
 		}
 		items = append(items, it)
@@ -431,7 +435,7 @@ func (s *Store) querySummaries(ctx context.Context, query string, args ...any) (
 		var date string
 		if err := rows.Scan(&r.Sha256, &r.MemberID, &r.ReportType, &date, &r.Status, &r.FailReason,
 			&r.FlagCounts.High, &r.FlagCounts.Low, &r.FlagCounts.Abnormal, &r.FlagCounts.Unknown,
-			&r.NotTestedCount, &r.UnreviewedLowConfidenceCount); err != nil {
+			&r.NotTestedCount, &r.UnreviewedLowConfidenceCount, &r.Panels); err != nil {
 			return nil, err
 		}
 		if date != "" {
@@ -452,7 +456,7 @@ func (s *Store) ItemsWithReviewStatus(ctx context.Context, reportSha string) ([]
 	var out []pipeline.ReportItemRow
 	for rows.Next() {
 		var it pipeline.ReportItemRow
-		if err := rows.Scan(&it.ItemID, &it.Name, &it.Value, &it.Unit, &it.RefRange, &it.Method,
+		if err := rows.Scan(&it.ItemID, &it.Name, &it.Panel, &it.Value, &it.Unit, &it.RefRange, &it.Method,
 			&it.Flag, &it.FlagReason, &it.LowConfidence, &it.RawText, &it.ReviewStatus, &it.OCRLineNumbers); err != nil {
 			return nil, err
 		}
@@ -540,7 +544,7 @@ func (s *Store) ReviewItem(ctx context.Context, reportSha string, itemID int64, 
 
 	var current pipeline.ReportItemRow
 	err = tx.QueryRow(ctx, sqlItemForReview, reportSha, itemID).Scan(
-		&current.ItemID, &current.Name, &current.Value, &current.Unit, &current.RefRange, &current.Method,
+		&current.ItemID, &current.Name, &current.Panel, &current.Value, &current.Unit, &current.RefRange, &current.Method,
 		&current.Flag, &current.FlagReason, &current.LowConfidence, &current.RawText, &current.ReviewStatus, &current.OCRLineNumbers)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil // 指标项不存在或不属于该报告
@@ -629,16 +633,24 @@ func (s *Store) WriteReport(ctx context.Context, reportSha string, ocrID int64, 
 		}
 		sectionsArg = string(raw)
 	}
+	panels := report.Panels
+	if panels == nil {
+		panels = []string{} // text[] NOT NULL:未回填/失败报告的合法空数组
+	}
 	if _, err := tx.Exec(ctx, sqlReportUpsert,
-		reportSha, ocrID, report.ReportType, report.ReportDate, report.Status, failReason, sectionsArg); err != nil {
+		reportSha, ocrID, report.ReportType, report.ReportDate, report.Status, failReason, sectionsArg, panels); err != nil {
 		return fmt.Errorf("upsert report: %w", err)
 	}
 	if _, err := tx.Exec(ctx, sqlItemsDeleteByReport, reportSha); err != nil {
 		return err
 	}
 	for _, it := range report.Items {
+		panel := it.Panel
+		if panel == "" {
+			panel = "other" // 与迁移默认一致:识别端缺失时不留空 code
+		}
 		if _, err := tx.Exec(ctx, sqlItemInsert,
-			reportSha, it.Name, it.Value, it.Unit, it.RefRange, it.Method, it.Flag, it.FlagReason,
+			reportSha, it.Name, panel, it.Value, it.Unit, it.RefRange, it.Method, it.Flag, it.FlagReason,
 			it.LowConfidence, it.RawText, it.OCRLineNumbers); err != nil {
 			return fmt.Errorf("write report item %q: %w", it.Name, err)
 		}

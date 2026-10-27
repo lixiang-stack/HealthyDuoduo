@@ -408,6 +408,14 @@ components:
         与识别端 report.schema.json 同一枚举。状态由后端按核对进度派生(派生单调):
         failed / success 恒定;partial → success 当且仅当未核对低置信计数 = 0,
         单向永不回退;无「撤销回未核对」。唯显式 override 重跑重置归档例外(见 POST /reports)。
+    PanelCode:
+      type: string
+      enum: [cbc, urinalysis, liver, kidney, lipid, glucose,
+             thyroid, sex_hormone, uric_acid, electrolyte, vitanemia,
+             infection, autoimmune, coag, imaging, other]
+      description: |
+        项目组 code(与识别端 report.schema.json 的 panel 枚举同源):指标项必须属于其
+        report_type 的允许集合,other 是唯一跨类别兜底。项目组是浏览入口,不是指标过滤器。
     FlagCounts:
       type: object
       additionalProperties: false
@@ -424,7 +432,7 @@ components:
       additionalProperties: false
       required:
         [report_id, member_id, report_type, report_date, status, fail_reason,
-         flag_counts, not_tested_count, unreviewed_low_confidence_count]
+         flag_counts, panels, not_tested_count, unreviewed_low_confidence_count]
       properties:
         report_id:
           type: string
@@ -449,6 +457,12 @@ components:
           description: 识别失败原因(pipeline 产出;仅 failed 报告有值)
         flag_counts:
           $ref: "#/components/schemas/FlagCounts"
+        panels:
+          type: array
+          items: { $ref: "#/components/schemas/PanelCode" }
+          description: |
+            报告级项目组,有序(命中项数降序、同数按固定优先级);panels[0] 为卡片主标签。
+            未回填存量为空数组,App 回退 report_type;failed 报告新识别为 [other]。
         not_tested_count:
           type: integer
           minimum: 0
@@ -465,7 +479,7 @@ components:
       type: object
       additionalProperties: false
       required: [report_id, member_id, report_type, report_date, status, fail_reason,
-        flag_counts, not_tested_count, unreviewed_low_confidence_count, items]
+        flag_counts, panels, not_tested_count, unreviewed_low_confidence_count, items]
       properties:
         report_id:
           type: string
@@ -485,6 +499,10 @@ components:
           type: [string, "null"]
         flag_counts:
           $ref: "#/components/schemas/FlagCounts"
+        panels:
+          type: array
+          items: { $ref: "#/components/schemas/PanelCode" }
+          description: 报告级项目组(有序;空数组 = 未回填存量,详情按 report_type 单组回退)
         not_tested_count:
           type: integer
           minimum: 0
@@ -558,7 +576,7 @@ components:
         (item_id / review_status / ocr_lines / prev)。
       type: object
       additionalProperties: false
-      required: [item_id, name, value, unit, ref_range, method, flag,
+      required: [item_id, name, panel, value, unit, ref_range, method, flag,
         low_confidence, raw_text, review_status, ocr_lines, prev]
       properties:
         item_id:
@@ -567,6 +585,9 @@ components:
           type: string
           minLength: 1
           description: 规范名(词典映射后)
+        panel:
+          $ref: "#/components/schemas/PanelCode"
+          description: 指标项项目组 code(详情按报告 panels 分组;不属于 panels 的项归末组「其他」)
         value:
           type: [string, "null"]
           description: "印刷原样数值字符串(如 '18.40'、'<2.00'、'70-80');无结果或解析失败为 null"

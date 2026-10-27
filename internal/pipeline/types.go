@@ -123,9 +123,11 @@ type FlagCounts struct {
 // UnreviewedLowConfidenceCount 统计未核对低置信项(success 报告也如实计数;
 // failed 无项自然为 0;not_tested 不计入)。
 type ReportSummary struct {
-	Sha256                       string
-	MemberID                     *int64
-	ReportType                   string
+	Sha256     string
+	MemberID   *int64
+	ReportType string
+	// Panels 报告级项目组(有序;空 = 未回填存量,App 回退 report_type)。
+	Panels                       []string
 	ReportDate                   *string
 	Status                       string
 	FailReason                   *string
@@ -164,6 +166,7 @@ type ReportRow struct {
 	ReportDate  *string
 	Status      string // success | partial | failed(4.2)
 	ItemsCount  int64  // 仅 ListReports 填充
+	Panels      []string
 	Items       []contract.ReportItem
 }
 

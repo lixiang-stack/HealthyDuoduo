@@ -19,7 +19,7 @@ import (
 )
 
 func invariantItem() contract.ReportItem {
-	return contract.ReportItem{Name: "血红蛋白", Flag: "normal", RawText: "血红蛋白 128 g/L"}
+	return contract.ReportItem{Name: "血红蛋白", Panel: "cbc", Flag: "normal", RawText: "血红蛋白 128 g/L"}
 }
 
 func invariantStatusAndReason(t *testing.T, pool *pgxpool.Pool, sha string) (string, *string) {
@@ -77,6 +77,7 @@ func TestWriteReportEmptyItemsInvariantSmoke(t *testing.T) {
 	narrative := contract.Report{
 		ReportType: contract.ReportTypeImaging,
 		Status:     contract.StatusSuccess,
+		Panels:     []string{"imaging"},
 		Sections: []contract.ReportSection{
 			{Kind: contract.SectionKindFindings, Text: "宫内单活胎。", OCRLineNumbers: []int32{0}},
 		},
@@ -101,7 +102,7 @@ func TestWriteReportEmptyItemsInvariantSmoke(t *testing.T) {
 	}
 
 	// 规则迭代复原(有产出)→ 原因清除,fail_reason 回 NULL。
-	recovered := contract.Report{ReportType: "血常规", Status: contract.StatusSuccess,
+	recovered := contract.Report{ReportType: "血常规", Status: contract.StatusSuccess, Panels: []string{"cbc"},
 		Items: []contract.ReportItem{invariantItem()}}
 	if err := st.WriteReport(ctx, "inv-a", 1, recovered, nil); err != nil {
 		t.Fatalf("recovered write: %v", err)

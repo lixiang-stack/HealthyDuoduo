@@ -52,6 +52,8 @@ type ReportHeader struct {
 	Status     string     `json:"status"`
 	FailReason *string    `json:"fail_reason"`
 	FlagCounts FlagCounts `json:"flag_counts"`
+	// Panels 报告级项目组(有序,panels[0] 为卡片主标签;空数组 = 未回填存量,App 回退 report_type)。
+	Panels []string `json:"panels"`
 	// NotTestedCount 本次未检测项数(flag=not_tested;信息徽标,不进入待处理/异常计数)。
 	NotTestedCount int `json:"not_tested_count"`
 	// UnreviewedLowConfidenceCount 响应派生值(不落列,ADR-0005):统计报告内
@@ -92,6 +94,7 @@ type PrevValue struct {
 type ReportItem struct {
 	ItemID        int64         `json:"item_id"` // BIGSERIAL 不透明句柄:重跑识别后全换,非持久主键
 	Name          string        `json:"name"`
+	Panel         string        `json:"panel"` // 项目组 code(按 report_type 允许集合;other 兜底)
 	Value         *string       `json:"value"`
 	Unit          *string       `json:"unit"`
 	RefRange      *string       `json:"ref_range"`

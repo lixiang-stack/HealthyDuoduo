@@ -407,6 +407,10 @@ func hasReviewDecisions(items []pipeline.ReportItemRow) bool {
 
 // toAPIReportHeader 业务摘要 → 契约报告头部(时间线卡片与上传响应同一投影)。
 func toAPIReportHeader(sum pipeline.ReportSummary) httpapi.ReportHeader {
+	panels := sum.Panels
+	if panels == nil {
+		panels = []string{} // 契约必填数组:未回填存量/失败报告返回 [] 而非 null
+	}
 	return httpapi.ReportHeader{
 		ReportID:   sum.Sha256,
 		MemberID:   sum.MemberID,
@@ -420,6 +424,7 @@ func toAPIReportHeader(sum pipeline.ReportSummary) httpapi.ReportHeader {
 			Abnormal: sum.FlagCounts.Abnormal,
 			Unknown:  sum.FlagCounts.Unknown,
 		},
+		Panels:                       panels,
 		NotTestedCount:               sum.NotTestedCount,
 		UnreviewedLowConfidenceCount: sum.UnreviewedLowConfidenceCount,
 	}
@@ -473,6 +478,7 @@ func toAPIItem(it pipeline.ReportItemRow, ocr *contract.OCRResult) httpapi.Repor
 	return httpapi.ReportItem{
 		ItemID:        it.ItemID,
 		Name:          it.Name,
+		Panel:         it.Panel,
 		Value:         it.Value,
 		Unit:          it.Unit,
 		RefRange:      it.RefRange,

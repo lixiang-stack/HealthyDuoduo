@@ -125,6 +125,7 @@ func (f *fakeServeStore) ReportByImage(ctx context.Context, imageSha string) (*p
 	return &pipeline.ReportRow{
 		Sha256: r.summary.Sha256, OCRResultID: 1, ReportType: r.summary.ReportType,
 		ReportDate: r.summary.ReportDate, Status: r.summary.Status, ItemsCount: int64(len(r.items)),
+		Panels: append([]string(nil), r.summary.Panels...),
 	}, true, nil
 }
 
@@ -169,6 +170,7 @@ func (f *fakeServeStore) WriteReport(ctx context.Context, reportSha string, ocrI
 	r.summary.ReportDate = report.ReportDate
 	r.summary.Status = report.Status
 	r.summary.FailReason = failReason
+	r.summary.Panels = append([]string(nil), report.Panels...)
 	r.sections = append([]contract.ReportSection(nil), report.Sections...)
 	f.reportOCR[reportSha] = ocrID
 	r.items = nil
@@ -292,6 +294,7 @@ func (f *fakeServeStore) seedReport(sha string, memberID *int64, report contract
 		summary: pipeline.ReportSummary{
 			Sha256: sha, MemberID: memberID, ReportType: report.ReportType,
 			ReportDate: report.ReportDate, Status: report.Status, FailReason: failReason,
+			Panels: append([]string(nil), report.Panels...),
 		},
 		sections: append([]contract.ReportSection(nil), report.Sections...),
 	}
@@ -374,10 +377,11 @@ func sampleUploadReport() *contract.Report {
 		ReportType: "血常规",
 		ReportDate: str("2026-10-01"),
 		Status:     contract.StatusPartial,
+		Panels:     []string{"cbc"},
 		Items: []contract.ReportItem{
-			{Name: "单核细胞比率", Value: &v1, Unit: &u1, RefRange: &r1, Flag: "high", LowConfidence: true,
+			{Name: "单核细胞比率", Panel: "cbc", Value: &v1, Unit: &u1, RefRange: &r1, Flag: "high", LowConfidence: true,
 				RawText: "单核细胞百分比  10.8  ↑ %  3-10", OCRLineNumbers: []int32{1, 2, 3, 4}},
-			{Name: "血红蛋白", Value: &v2, Unit: &u2, RefRange: &r2, Flag: "normal",
+			{Name: "血红蛋白", Panel: "cbc", Value: &v2, Unit: &u2, RefRange: &r2, Flag: "normal",
 				RawText: "血红蛋白  128  g/L  115-150", OCRLineNumbers: []int32{9, 10, 11, 12}},
 		},
 	}
@@ -554,6 +558,12 @@ func TestServeUploadNewReport(t *testing.T) {
 	if got.Report.Status != contract.StatusPartial {
 		t.Errorf("status = %q, want partial", got.Report.Status)
 	}
+	if len(got.Report.Panels) != 1 || got.Report.Panels[0] != "cbc" {
+		t.Errorf("panels = %v, want [cbc]", got.Report.Panels)
+	}
+	if got.Report.Items[0].Panel != "cbc" {
+		t.Errorf("item panel = %q, want cbc", got.Report.Items[0].Panel)
+	}
 	if got.Report.FailReason != nil {
 		t.Errorf("fail_reason = %v, want null for non-failed report", got.Report.FailReason)
 	}
@@ -652,7 +662,7 @@ func TestServeUploadDuplicate(t *testing.T) {
 func TestServeUploadFailedReport(t *testing.T) {
 	srv, _, rec, _ := newReportsTestServer(t)
 	createOne(t, srv, `{"name":"小虎","is_child":true}`)
-	rec.report = &contract.Report{ReportType: "其他专项", Status: contract.StatusFailed}
+	rec.report = &contract.Report{ReportType: "其他专项", Status: contract.StatusFailed, Panels: []string{"other"}}
 
 	image := []byte("blank-or-blurry-photo")
 	status, raw := doUpload(t, srv, image, map[string]string{formMemberID: "1"})
@@ -662,6 +672,9 @@ func TestServeUploadFailedReport(t *testing.T) {
 	}
 	if got.Report.FailReason == nil || *got.Report.FailReason != "no metric items recognized" {
 		t.Errorf("fail_reason = %v, want pipeline 产出的失败原因", got.Report.FailReason)
+	}
+	if len(got.Report.Panels) != 1 || got.Report.Panels[0] != "other" {
+		t.Errorf("failed panels = %v, want [other]", got.Report.Panels)
 	}
 	if got.Report.FlagCounts != (httpapi.FlagCounts{}) || got.Report.UnreviewedLowConfidenceCount != 0 {
 		t.Errorf("counts = %+v/%d, want 全 0(failed 不计入待核对)", got.Report.FlagCounts, got.Report.UnreviewedLowConfidenceCount)
@@ -876,18 +889,18 @@ func TestServeListReportsFilterAndCounts(t *testing.T) {
 	v2 := "128"
 	failReason := "no metric items recognized"
 	// 成员 A:partial(high 低置信 + low 低置信未核对)、failed 无日期。
-	st.seedReport("aaa", &a, contract.Report{ReportType: "血常规", ReportDate: str("2026-10-02"), Status: contract.StatusPartial, Items: []contract.ReportItem{
-		{Name: "单核细胞比率", Value: &v1, RefRange: str("3-10"), Flag: "high", LowConfidence: low, RawText: "单核细胞百分比  10.8  ↑ %  3-10"},
-		{Name: "平均血红蛋白浓度", Value: &v2, Flag: "low", LowConfidence: low, RawText: "平均血红蛋白浓度  300  g/L  316-354"},
+	st.seedReport("aaa", &a, contract.Report{ReportType: "血常规", ReportDate: str("2026-10-02"), Status: contract.StatusPartial, Panels: []string{"cbc"}, Items: []contract.ReportItem{
+		{Name: "单核细胞比率", Panel: "cbc", Value: &v1, RefRange: str("3-10"), Flag: "high", LowConfidence: low, RawText: "单核细胞百分比  10.8  ↑ %  3-10"},
+		{Name: "平均血红蛋白浓度", Panel: "cbc", Value: &v2, Flag: "low", LowConfidence: low, RawText: "平均血红蛋白浓度  300  g/L  316-354"},
 	}}, nil)
-	st.seedReport("bbb", &a, contract.Report{ReportType: "其他专项", Status: contract.StatusFailed}, &failReason)
+	st.seedReport("bbb", &a, contract.Report{ReportType: "其他专项", Status: contract.StatusFailed, Panels: []string{"other"}}, &failReason)
 	// 成员 B:success 但含一条低置信未核对项(计数如实为 1)。
-	st.seedReport("ccc", &b, contract.Report{ReportType: "尿常规", ReportDate: str("2026-10-01"), Status: contract.StatusSuccess, Items: []contract.ReportItem{
-		{Name: "尿蛋白", Value: &v1, Flag: "unknown", LowConfidence: low, RawText: "尿蛋白  10.8"},
+	st.seedReport("ccc", &b, contract.Report{ReportType: "尿常规", ReportDate: str("2026-10-01"), Status: contract.StatusSuccess, Panels: []string{"urinalysis"}, Items: []contract.ReportItem{
+		{Name: "尿蛋白", Panel: "urinalysis", Value: &v1, Flag: "unknown", LowConfidence: low, RawText: "尿蛋白  10.8"},
 	}}, nil)
-	// 无主存量报告(CLI 时代)。
+	// 无主存量报告(CLI 时代):panels 未回填为空数组。
 	st.seedReport("ddd", nil, contract.Report{ReportType: "血糖", ReportDate: str("2026-09-30"), Status: contract.StatusSuccess, Items: []contract.ReportItem{
-		{Name: "葡萄糖", Value: &v2, Flag: "normal", RawText: "葡萄糖  128"},
+		{Name: "葡萄糖", Panel: "glucose", Value: &v2, Flag: "normal", RawText: "葡萄糖  128"},
 	}}, nil)
 
 	// 成员 A:两份(failed 的失败原因可见、无日期不崩)。
@@ -909,9 +922,15 @@ func TestServeListReportsFilterAndCounts(t *testing.T) {
 	if partial.FlagCounts != (httpapi.FlagCounts{High: 1, Low: 1}) || partial.UnreviewedLowConfidenceCount != 2 {
 		t.Errorf("partial card counts = %+v/%d, want high=1 low=1 / 2 待核对", partial.FlagCounts, partial.UnreviewedLowConfidenceCount)
 	}
+	if len(partial.Panels) != 1 || partial.Panels[0] != "cbc" {
+		t.Errorf("partial card panels = %v, want [cbc]", partial.Panels)
+	}
 	failed := list.Reports[1]
 	if failed.Status != contract.StatusFailed || failed.FailReason == nil || *failed.FailReason != failReason {
 		t.Errorf("failed card = %+v, want fail_reason 可见", failed)
+	}
+	if len(failed.Panels) != 1 || failed.Panels[0] != "other" {
+		t.Errorf("failed card panels = %v, want [other]", failed.Panels)
 	}
 	if failed.ReportDate != nil || failed.UnreviewedLowConfidenceCount != 0 {
 		t.Errorf("failed card date/count = %v/%d, want null/0", failed.ReportDate, failed.UnreviewedLowConfidenceCount)
@@ -945,6 +964,9 @@ func TestServeListReportsFilterAndCounts(t *testing.T) {
 	}
 	if list.Reports[3].MemberID != nil {
 		t.Errorf("legacy member_id = %v, want null", list.Reports[3].MemberID)
+	}
+	if list.Reports[3].Panels == nil || len(list.Reports[3].Panels) != 0 {
+		t.Errorf("legacy panels = %v, want [] (未回填;不能是 null)", list.Reports[3].Panels)
 	}
 
 	// 未知成员 → 200 空信封;非法 member_id → 400。
@@ -987,6 +1009,9 @@ func TestServeGetReportDetail(t *testing.T) {
 	if detail.MemberID == nil || *detail.MemberID != 1 {
 		t.Errorf("member_id = %v, want 1", detail.MemberID)
 	}
+	if len(detail.Panels) != 1 || detail.Panels[0] != "cbc" {
+		t.Errorf("detail panels = %v, want [cbc]", detail.Panels)
+	}
 	if detail.FlagCounts != (httpapi.FlagCounts{High: 1}) || detail.UnreviewedLowConfidenceCount != 1 {
 		t.Errorf("counts = %+v/%d, want high=1 / 1 待核对", detail.FlagCounts, detail.UnreviewedLowConfidenceCount)
 	}
@@ -999,6 +1024,9 @@ func TestServeGetReportDetail(t *testing.T) {
 	first := detail.Items[0]
 	if first.ItemID == 0 || first.ReviewStatus != pipeline.ReviewStatusUnreviewed {
 		t.Errorf("first item handle/status = %+v, want 外部句柄 + unreviewed", first)
+	}
+	if first.Panel != "cbc" {
+		t.Errorf("first item panel = %q, want cbc", first.Panel)
 	}
 	if len(first.OcrLines) != 4 || first.OcrLines[2].Line != 3 || first.OcrLines[2].Box != apiBox(313, 74) {
 		t.Errorf("first item ocr_lines = %+v, want 识别端下标直映的行链接", first.OcrLines)
