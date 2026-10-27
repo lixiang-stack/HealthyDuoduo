@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HealthyDuoduo · 按项目浏览原型</title>
+<style>
+  :root {
+    --text: #111827;
+    --muted: #6b7280;
+    --accent: #2563eb;
+    --ok: #15803d;
+    --fail: #b91c1c;
+    --low: #1d4ed8;
+    --border: #d1d5db;
+    --soft: #f8fafc;
+    --chip: #f3f4f6;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: #e5e7eb;
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .stage { display: flex; flex-direction: column; align-items: center; padding: 22px 0 150px; }
+  .caption {
+    width: 390px; margin-bottom: 14px; font-size: 13px; line-height: 20px; color: #374151;
+  }
+  .caption b { color: #111827; }
+  .device {
+    width: 390px; height: 844px; position: relative; overflow: hidden;
+    background: #fff; border: 10px solid #111827; border-radius: 46px;
+    box-shadow: 0 24px 60px rgba(0,0,0,.28);
+  }
+  .notch {
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+    width: 118px; height: 25px; border-radius: 16px; background: #111827; z-index: 20;
+  }
+  .screen { position: absolute; inset: 0; display: flex; flex-direction: column; background: #fff; }
+
+  .statusbar {
+    flex: 0 0 44px; height: 44px; padding: 0 22px 6px;
+    display: flex; align-items: flex-end; justify-content: space-between;
+    font-size: 12px; font-weight: 650; color: var(--text);
+  }
+  .appbar {
+    flex: 0 0 52px; height: 52px; padding: 0 16px; display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid #f1f5f9; background: #fff;
+  }
+  .appbar .back { width: 22px; font-size: 30px; line-height: 1; color: var(--text); }
+  .appbar .title { flex: 1; font-size: 17px; font-weight: 650; letter-spacing: .1px; }
+  .appbar .right { color: var(--accent); font-size: 14px; }
+  .content {
+    flex: 1; overflow-y: auto; padding: 16px 16px 98px; scrollbar-width: none;
+  }
+  .content::-webkit-scrollbar { display: none; }
+  .content.stack { padding-bottom: 26px; }
+
+  .tabbar {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 64px;
+    display: flex; border-top: 1px solid #e5e7eb; background: #fff; z-index: 8;
+  }
+  .tab { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 11px; color: var(--muted); }
+  .tab.active { color: var(--accent); }
+  .tab .ticon { font-size: 19px; line-height: 18px; }
+  .fab {
+    position: absolute; right: 16px; bottom: 80px; width: 56px; height: 56px; border-radius: 28px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--accent); color: #fff; font-size: 28px; font-weight: 300;
+    box-shadow: 0 8px 18px rgba(37,99,235,.35); z-index: 9;
+  }
+
+  .card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 12px;
+    margin-bottom: 10px; background: #fff;
+  }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .row-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .muted { color: var(--muted); font-size: 13px; line-height: 20px; }
+  .small { font-size: 12px; line-height: 18px; }
+  .chev { color: #9ca3af; font-size: 22px; line-height: 1; }
+  .link { color: var(--accent); font-size: 13px; text-decoration: none; }
+
+  .home-sub { margin: 0 0 12px 2px; }
+  .member-card { padding: 14px; }
+  .member-name { font-size: 18px; font-weight: 650; }
+  .child-badge {
+    font-size: 11px; color: var(--accent); border: 1px solid #bfdbfe;
+    background: #eff6ff; border-radius: 9px; padding: 1px 7px;
+  }
+  .member-pending { margin-top: 8px; font-size: 15px; font-weight: 600; color: var(--accent); }
+  .member-pending.zero { color: var(--muted); font-weight: 500; }
+  .member-stats { margin-top: 6px; font-size: 13px; color: var(--text); }
+  .abnormal-line { margin-top: 5px; font-size: 13px; color: var(--fail); }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  .chip { border: 1px solid var(--border); border-radius: 16px; padding: 6px 14px; font-size: 14px; color: var(--text); }
+  .chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .segmented { display: flex; background: var(--chip); border-radius: 10px; padding: 3px; margin-bottom: 12px; }
+  .seg { flex: 1; text-align: center; padding: 8px 0; border-radius: 8px; font-size: 14px; color: var(--muted); }
+  .seg.active { background: #fff; color: var(--text); font-weight: 650; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+
+  .pending-card { border: 1px solid #bfdbfe; background: #f8fbff; border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; }
+  .pending-card .row + .row { margin-top: 8px; padding-top: 8px; border-top: 1px solid #e5efff; }
+  .pending-label { color: var(--muted); font-size: 13px; }
+  .pending-count { flex: 1; text-align: right; color: var(--accent); font-size: 14px; font-weight: 650; }
+
+  .report-card { padding: 12px 12px 10px; }
+  .report-panels { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; min-width: 0; }
+  .panel-label { font-size: 16px; font-weight: 650; color: var(--text); }
+  .dot { color: #9ca3af; font-size: 13px; }
+  .status { font-size: 12px; white-space: nowrap; }
+  .status.ok { color: var(--ok); }
+  .status.accent { color: var(--accent); }
+  .status.fail { color: var(--fail); }
+  .fail-text { margin-top: 4px; color: var(--fail); font-size: 13px; line-height: 19px; }
+  .badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .badge {
+    display: inline-flex; align-items: center; border: 1px solid var(--border); border-radius: 10px;
+    padding: 2px 8px; font-size: 12px; color: var(--text); white-space: nowrap;
+  }
+  .badge.high { color: var(--fail); border-color: #fecaca; background: #fef2f2; }
+  .badge.low { color: var(--low); border-color: #bfdbfe; background: #eff6ff; }
+  .badge.accent { color: var(--accent); border-color: #bfdbfe; background: #eff6ff; }
+  .badge.ok { color: var(--ok); border-color: #bbf7d0; background: #f0fdf4; }
+
+  .list-header { margin: 2px 2px 8px; }
+  .panel-row { padding: 12px 14px; }
+  .panel-name { font-size: 16px; font-weight: 650; }
+  .panel-sub { font-size: 12px; color: var(--muted); }
+  .flag-high { color: var(--fail); }
+  .flag-low { color: var(--low); }
+  .flag-normal { color: var(--ok); }
+  .flag-unknown { color: var(--muted); }
+
+  .detail-head { padding: 14px; }
+  .detail-title { font-size: 20px; font-weight: 700; letter-spacing: .2px; }
+  .big-flag { font-size: 13px; font-weight: 650; }
+  .section-label {
+    margin: 14px 2px 8px; font-size: 12px; color: var(--muted); font-weight: 600; letter-spacing: .3px;
+  }
+  .section-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin: 16px 2px 8px; padding-top: 12px; border-top: 1px solid #f1f5f9;
+  }
+  .item-row { padding: 12px 14px; }
+  .item-name { font-size: 15px; font-weight: 600; }
+  .flag { font-size: 12px; }
+  .value-row { margin-top: 3px; align-items: baseline; }
+  .value { font-size: 21px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .value .unit { font-size: 12px; font-weight: 400; color: var(--muted); }
+  .spark-wrap { margin-top: 6px; }
+  .spark { width: 100%; height: 38px; display: block; }
+  .spark .line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .spark .dot { fill: #fff; stroke: var(--accent); stroke-width: 2; }
+  .spark .dot.solid { fill: var(--accent); }
+  .compact-row {
+    display: flex; align-items: baseline; gap: 10px;
+    padding: 9px 2px; border-bottom: 1px solid #f1f5f9;
+  }
+  .compact-row:last-child { border-bottom: 0; }
+  .compact-main { flex: 1; min-width: 0; }
+  .compact-name { font-size: 14px; color: var(--text); }
+  .compact-value { font-size: 14px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .compact-ref { margin-left: 6px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .link-row { margin: 12px 2px 0; color: var(--accent); font-size: 13px; }
+
+  .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; padding: 0; overflow: hidden; }
+  .summary-cell { padding: 12px 14px; border-right: 1px solid #f1f5f9; border-bottom: 1px solid #f1f5f9; }
+  .summary-cell:nth-child(2n) { border-right: 0; }
+  .summary-cell:nth-last-child(-n+2) { border-bottom: 0; }
+  .summary-name { font-size: 12px; color: var(--muted); }
+  .summary-value { margin-top: 3px; font-size: 18px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .summary-value .unit { font-size: 11px; font-weight: 400; color: var(--muted); }
+
+  .report-link { padding: 12px 14px; }
+  .report-link .date { font-size: 15px; font-weight: 600; }
+  .callout {
+    border: 1px solid #fecaca; background: #fef2f2; color: #7f1d1d;
+    border-radius: 10px; padding: 12px; font-size: 13px; line-height: 20px; margin: 10px 0;
+  }
+  .proto-note {
+    margin: 14px 2px 4px; padding: 10px 12px; border-radius: 8px; background: #f3f4f6;
+    color: #4b5563; font-size: 12px; line-height: 18px;
+  }
+  .dim { opacity: .55; }
+  .zero { color: var(--fail); font-weight: 650; }
+
+  .switcher {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 100;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    padding: 10px 16px; background: #111827; color: #fff;
+    font-size: 12px;
+  }
+  .switcher .group { display: flex; align-items: center; gap: 6px; margin-right: 8px; }
+  .switcher .label { color: #9ca3af; font-size: 11px; }
+  .switcher button {
+    border: 0; border-radius: 6px; padding: 6px 10px; background: #374151; color: #fff;
+    font-size: 12px; cursor: pointer; font-family: inherit;
+  }
+  .switcher button.active { background: var(--accent); }
+  body.shot { background: #fff; }
+  body.shot .switcher, body.shot .caption { display: none; }
+  body.shot .stage { padding: 0; }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <div class="caption">
+      <b>任务：</b>小虎（8 岁）最近一次体检报告是「肝功 + 肾功 + 尿酸」的混合生化单。<br />
+      家长想找「肾功最近怎么样」。对比：家庭首页 A/B、项目详情 A/B/C、单标签对照。
+    </div>
+    <div class="device" id="device">
+      <div class="notch"></div>
+      <div class="screen" id="screen"></div>
+    </div>
+  </div>
+
+  <div class="switcher" id="switcher">
+    <div class="group"><span class="label">家庭</span><button data-screen="home-a">A 最近报告</button><button data-screen="home-b">B 项目口径</button></div>
+    <div class="group"><span class="label">档案</span><button data-screen="archive-time">按时间</button><button data-screen="archive-panel">按项目</button></div>
+    <div class="group"><span class="label">项目详情</span><button data-screen="panel-kidney-items">A 指标优先</button><button data-screen="panel-kidney-reports">B 报告优先</button><button data-screen="panel-liver-hybrid">C 混合</button><button data-screen="panel-thyroid">甲状腺</button></div>
+    <div class="group"><span class="label">其他</span><button data-screen="trends">异常指标</button><button data-screen="report-detail">报告详情</button><button data-screen="contrast-tags">单标签对照</button></div>
+  </div>
+
+<script>
+  const members = [
+    { name: '小虎', child: true, pending: '2 份 · 5 项', pendingShort: '2 份', latest: '肝功', date: '2026-09-12', ago: '6 周前', high: 4, low: 0, total: 17, failed: 1, abnormal: '肝功 4 项 · 甲状腺 2 项' },
+    { name: '妈妈', child: false, pending: '1 份 · 1 项', pendingShort: '1 份', latest: '甲状腺', date: '2026-09-20', ago: '5 周前', high: 2, low: 0, total: 9, failed: 0, abnormal: '血脂 2 项 · 血糖 2 项' },
+    { name: '爸爸', child: false, pending: '没有待核对', pendingShort: '0 份', latest: '肝功', date: '2026-04-10', ago: '6 个月前', high: 4, low: 0, total: 6, failed: 0, abnormal: '肝功 4 项 · 血脂 3 项 · 尿酸 1 项' },
+  ];
+
+  const reports = [
+    { date: '2026-09-12', type: '生化', panels: ['肝功', '肾功', '尿酸'], status: '待核对', badges: [['偏高 4', 'high'], ['待核对 3 项', 'accent']] },
+    { date: '2026-06-08', type: '激素', panels: ['甲状腺'], status: '识别完成', badges: [['偏高 2', 'high']] },
+    { date: '2026-03-15', type: '临检', panels: ['血常规'], status: '识别完成', badges: [['偏高 1', 'high'], ['偏低 1', 'low']] },
+    { date: '2026-02-10', type: '影像', panels: ['影像'], status: '识别失败', reason: '未识别出检查所见（可重新拍照，原记录保留）', badges: [] },
+    { date: '2026-01-20', type: '临检', panels: ['尿常规'], status: '待核对', badges: [['待核对 2 项', 'accent']] },
+    { date: '2025-12-01', type: '影像', panels: ['影像'], status: '识别完成', badges: [] },
+    { date: '2025-11-10', type: '生化', panels: ['肝功', '肾功', '尿酸'], status: '识别完成', badges: [] },
+    { date: '2025-09-01', type: '激素', panels: ['甲状腺'], status: '识别完成', badges: [] },
+    { date: '2025-08-20', type: '生化', panels: ['肝功', '血脂'], status: '识别完成', badges: [] },
+    { date: '2025-07-01', type: '临检', panels: ['血常规'], status: '识别完成', badges: [] },
+    { date: '2025-05-10', type: '免疫', panels: ['感染筛查'], status: '识别完成', badges: [] },
+    { date: '2025-03-01', type: '生化', panels: ['血糖'], status: '识别完成', badges: [['偏高 2', 'high']] },
+    { date: '2025-01-15', type: '临检', panels: ['血常规'], status: '识别完成', badges: [] },
+    { date: '2024-12-15', type: '生化', panels: ['肝功', '肾功', '尿酸', '电解质'], status: '识别完成', badges: [['偏低 1', 'low']] },
+    { date: '2024-09-01', type: '临检', panels: ['凝血'], status: '识别完成', badges: [] },
+    { date: '2024-06-01', type: '免疫', panels: ['其他'], status: '识别完成', badges: [['偏高 1', 'high']] },
+    { date: '2024-03-01', type: '临检', panels: ['其他'], status: '识别完成', badges: [] },
+  ];
+
+  const panels = [
+    { name: '肝功', latest: '2026-09-12', reports: 4, abnormal: 4, items: 10 },
+    { name: '肾功', latest: '2026-09-12', reports: 3, abnormal: 0, items: 4 },
+    { name: '尿酸', latest: '2026-09-12', reports: 3, abnormal: 0, items: 1 },
+    { name: '甲状腺', latest: '2026-06-08', reports: 2, abnormal: 2, items: 8 },
+    { name: '血常规', latest: '2026-03-15', reports: 3, abnormal: 2, items: 25 },
+    { name: '尿常规', latest: '2026-01-20', reports: 2, abnormal: 0, items: 22 },
+    { name: '影像', latest: '2025-12-01', reports: 1, abnormal: 0, items: 0 },
+    { name: '血脂', latest: '2025-08-20', reports: 1, abnormal: 0, items: 4 },
+    { name: '感染筛查', latest: '2025-05-10', reports: 1, abnormal: 0, items: 8 },
+    { name: '血糖', latest: '2025-03-01', reports: 1, abnormal: 2, items: 5 },
+    { name: '电解质', latest: '2024-12-15', reports: 1, abnormal: 0, items: 1 },
+    { name: '凝血', latest: '2024-09-01', reports: 1, abnormal: 0, items: 9 },
+    { name: '其他', latest: '2024-06-01', reports: 2, abnormal: 1, items: 7, sub: '肝纤维化、血型' },
+  ];
+
+  const kidneyItems = [
+    { name: '肌酐', value: '48', unit: 'μmol/L', ref: '41–73', flag: '正常', points: [43, 45, 48], meta: '3 份报告 · 2024-12 → 2026-09' },
+    { name: '尿素', value: '5.2', unit: 'mmol/L', ref: '2.6–7.5', flag: '正常', points: [4.8, 5.0, 5.2], meta: '3 份报告 · 2024-12 → 2026-09' },
+    { name: 'eGFR', value: '112', unit: 'ml/min', ref: '≥90', flag: '正常', points: [110, 111, 112], meta: '3 份报告 · 2024-12 → 2026-09' },
+    { name: '血清胱抑素C', value: '0.75', unit: 'mg/L', ref: '0.59–1.03', flag: '正常', points: [0.72, 0.74, 0.75], meta: '3 份报告 · 2024-12 → 2026-09' },
+  ];
+
+  const liverAbnormal = [
+    { name: '丙氨酸转氨酶（ALT）', value: '56', unit: 'U/L', ref: '7–40', flag: '偏高', points: [29, 31, 22, 56], meta: '4 份报告 · 2024-12 → 2026-09' },
+    { name: '天冬氨酸转氨酶（AST）', value: '42', unit: 'U/L', ref: '13–35', flag: '偏高', points: [30, 28, 25, 42], meta: '4 份报告 · 2024-12 → 2026-09' },
+    { name: '谷氨酰转肽酶（GGT）', value: '68', unit: 'U/L', ref: '7–45', flag: '偏高', points: [22, 24, 20, 68], meta: '4 份报告 · 2024-12 → 2026-09' },
+    { name: '总胆汁酸', value: '12', unit: 'μmol/L', ref: '≤10', flag: '偏高', points: [8.2, 9.0, 12], meta: '4 份报告 · 2024-12 → 2026-09' },
+  ];
+
+  const liverNormal = [
+    { name: '总胆红素', value: '12.4', unit: 'μmol/L', ref: '≤21', flag: '正常' },
+    { name: '总蛋白', value: '72', unit: 'g/L', ref: '65–85', flag: '正常' },
+    { name: '白蛋白', value: '44', unit: 'g/L', ref: '40–55', flag: '正常' },
+    { name: '球蛋白', value: '28', unit: 'g/L', ref: '20–40', flag: '正常' },
+    { name: '白蛋白/球蛋白', value: '1.57', unit: '', ref: '1.20–2.40', flag: '正常' },
+    { name: '碱性磷酸酶', value: '198', unit: 'U/L', ref: '50–240', flag: '正常' },
+  ];
+
+  const thyroidItems = [
+    { name: '促甲状腺素（TSH）', value: '4.82', unit: 'mIU/L', ref: '0.51–4.30', flag: '偏高', points: [2.8, 4.82], meta: '2 份报告 · 2025-09 → 2026-06' },
+    { name: '抗甲状腺过氧化物酶抗体（TPOAb）', value: '12.3', unit: 'IU/mL', ref: '<9.0', flag: '偏高', points: [8.2, 12.3], meta: '2 份报告 · 2025-09 → 2026-06' },
+    { name: '游离甲状腺素（FT4）', value: '15.2', unit: 'pmol/L', ref: '7.64–16.03', flag: '正常', points: [14.8, 15.2], meta: '2 份报告 · 2025-09 → 2026-06' },
+    { name: '游离三碘甲状腺原氨酸（FT3）', value: '5.1', unit: 'pmol/L', ref: '3.28–6.47', flag: '正常', points: [4.9, 5.1], meta: '2 份报告' },
+    { name: '甲状腺球蛋白', value: '1.67', unit: 'ng/mL', ref: '1.15–131', flag: '正常' },
+    { name: '抗甲状腺球蛋白抗体', value: '0.8', unit: 'IU/mL', ref: '<4.0', flag: '正常' },
+    { name: '总T3', value: '2.04', unit: 'nmol/L', ref: '1.01–2.48', flag: '正常' },
+    { name: '总T4', value: '120.2', unit: 'nmol/L', ref: '69.97–152.52', flag: '正常' },
+  ];
+
+  const trendGroups = [
+    { name: '肝功', items: liverAbnormal },
+    { name: '甲状腺', items: thyroidItems.slice(0, 2) },
+    { name: '血常规', items: [
+      { name: '白细胞计数（WBC）', value: '11.2', unit: '10^9/L', ref: '4.0–10.0', flag: '偏高', points: [8.5, 11.2], meta: '2 份报告 · 2025-01 → 2026-03' },
+      { name: '淋巴细胞比率', value: '58.2', unit: '%', ref: '20–40', flag: '偏高', points: [35.0, 58.2], meta: '2 份报告 · 2025-01 → 2026-03' },
+    ] },
+  ];
+
+  const reportGroups = [
+    { name: '肝功', abnormal: 4, items: [
+      ...liverAbnormal,
+      ...liverNormal,
+    ] },
+    { name: '肾功', abnormal: 0, items: kidneyItems },
+    { name: '尿酸', abnormal: 0, items: [
+      { name: '尿酸', value: '0.31', unit: 'mmol/L', ref: '0.10–0.42', flag: '正常' },
+    ] },
+  ];
+
+  const contrastRows = [
+    { name: '肝功', count: 9 },
+    { name: '甲状腺', count: 5 },
+    { name: '血常规', count: 9 },
+    { name: '尿常规', count: 5 },
+    { name: '血糖', count: 4 },
+    { name: '自身抗体', count: 5 },
+    { name: '感染筛查', count: 2 },
+    { name: '影像', count: 3 },
+    { name: '其他', count: 7 },
+    { name: '肾功', count: 0 },
+    { name: '血脂', count: 0 },
+    { name: '尿酸', count: 0 },
+    { name: '电解质', count: 0 },
+  ];
+
+  function statusbar() {
+    return `<div class="statusbar"><span>9:41</span><span>5G &nbsp;▮▮▮</span></div>`;
+  }
+
+  function appbar(title, { back = false, right = '' } = {}) {
+    return `<div class="appbar">${back ? '<span class="back">‹</span>' : ''}<span class="title">${title}</span>${right ? `<span class="right">${right}</span>` : ''}</div>`;
+  }
+
+  function tabbar(active) {
+    return `<div class="tabbar">
+      <div class="tab ${active === 'home' ? 'active' : ''}"><span class="ticon">⌂</span><span>家庭</span></div>
+      <div class="tab ${active === 'archive' ? 'active' : ''}"><span class="ticon">☰</span><span>档案</span></div>
+    </div>`;
+  }
+
+  function phone({ title, back = false, right = '', content, tab = '', fab = false, stack = false }) {
+    return `${statusbar()}${appbar(title, { back, right })}<div class="content ${stack ? 'stack' : ''}">${content}</div>${tab ? tabbar(tab) : ''}${fab ? '<div class="fab">＋</div>' : ''}`;
+  }
+
+  function memberCard(m, variant) {
+    return `<div class="card member-card">
+      <div class="row"><div class="row-left"><span class="member-name">${m.name}</span>${m.child ? '<span class="child-badge">孩子</span>' : ''}</div><span class="chev">›</span></div>
+      <div class="member-pending ${m.pendingShort === '0 份' && !m.failed ? 'zero' : ''}">${m.pendingShort === '0 份' && !m.failed ? '没有待核对' : `待核对 ${m.pending}${m.failed ? ` · 识别失败 ${m.failed} 份` : ''}`}</div>
+      <div class="muted">最近 ${m.latest} · ${m.date}（${m.ago}）</div>
+      ${variant === 'b' ? `<div class="abnormal-line">异常项目 ${m.abnormal}</div>` : ''}
+      <div class="member-stats">${variant === 'b' ? '最近报告 ' : ''}偏高 ${m.high} · 偏低 ${m.low} · 报告 ${m.total} 份</div>
+    </div>`;
+  }
+
+  function homeContent(variant) {
+    return `<div class="muted home-sub">3 位成员 · 小虎、妈妈、爸爸</div>
+      ${members.map((m) => memberCard(m, variant)).join('')}
+      <div class="proto-note">${variant === 'a'
+        ? 'A：最近一份报告口径。「偏高/偏低」只数最近一份报告；甲状腺的 2 项异常会被肝功报告的 4 项偏高盖住。'
+        : 'B：项目口径。「异常项目」按每个项目最近一次结果汇总；家长能看到小虎不只肝功异常，甲状腺也有 2 项。'}</div>`;
+  }
+
+  function chips() {
+    return `<div class="chips">${members.map((m, i) => `<span class="chip ${i === 0 ? 'active' : ''}">${m.name}</span>`).join('')}</div>`;
+  }
+
+  function segmented(active) {
+    return `<div class="segmented"><div class="seg ${active === 'time' ? 'active' : ''}">按时间</div><div class="seg ${active === 'panel' ? 'active' : ''}">按项目</div></div>`;
+  }
+
+  function reportCard(r) {
+    const statusClass = r.status === '识别失败' ? 'fail' : r.status === '待核对' ? 'accent' : 'ok';
+    return `<div class="card report-card">
+      <div class="row"><div class="report-panels">${r.panels.map((p) => `<span class="panel-label">${p}</span>`).join('<span class="dot">·</span>')}</div><span class="status ${statusClass}">${r.status}</span></div>
+      <div class="muted">${r.date} · ${r.type}</div>
+      ${r.reason ? `<div class="fail-text">${r.reason}</div>` : ''}
+      <div class="badges">${r.badges.map(([label, kind]) => `<span class="badge ${kind}">${label}</span>`).join('')}</div>
+    </div>`;
+  }
+
+  function panelRow(p) {
+    return `<div class="card panel-row">
+      <div class="row"><div class="row-left"><span class="panel-name">${p.name}</span>${p.sub ? `<span class="panel-sub">${p.sub}</span>` : ''}</div><span class="chev">›</span></div>
+      <div class="row"><span class="muted">最近 ${p.latest} · ${p.reports} 份报告</span><span class="${p.abnormal ? 'flag-high' : 'muted'}">${p.abnormal ? `${p.abnormal} 项异常` : '无异常'}</span></div>
+      <div class="muted small">${p.items ? `${p.items} 项指标` : '叙述型报告'}</div>
+    </div>`;
+  }
+
+  function archiveContent(view) {
+    if (view === 'time') {
+      return `${chips()}${segmented('time')}
+        <div class="pending-card">
+          <div class="row"><span class="pending-label">待核对</span><span class="pending-count">2 份 · 5 项</span><span class="chev">›</span></div>
+          <div class="row"><span class="pending-label">识别失败</span><span class="pending-count">1 份</span><span class="chev">›</span></div>
+        </div>
+        ${reports.map(reportCard).join('')}
+        <div class="proto-note">按时间：保留现有时间线；卡片首位改成项目名，report_type 降到日期行的小字。</div>`;
+    }
+    return `${chips()}${segmented('panel')}
+      <div class="row list-header"><span class="muted">按最近一次报告排序</span><a class="link">全部异常 8 项 ›</a></div>
+      ${panels.map(panelRow).join('')}
+      <div class="proto-note">按项目：每个项目一行；点进项目详情看该项目全部指标的历史。没有报告的项不出现。</div>`;
+  }
+
+  function panelHeader(name, member, latest, reportsCount, abnormal, items) {
+    return `<div class="card detail-head">
+      <div class="row"><div><div class="detail-title">${name}</div><div class="muted">${member}</div></div><span class="big-flag ${abnormal ? 'flag-high' : 'flag-normal'}">${abnormal ? `${abnormal} 项异常` : '无异常'}</span></div>
+      <div class="muted">最近 ${latest} · ${reportsCount} 份报告 · ${items} 项指标</div>
+    </div>`;
+  }
+
+  function spark(points) {
+    const w = 320, h = 38, pad = 4;
+    const min = Math.min(...points), max = Math.max(...points);
+    const span = max - min || 1;
+    const xs = points.map((_, i) => pad + (i * (w - pad * 2)) / Math.max(points.length - 1, 1));
+    const ys = points.map((p) => h - pad - ((p - min) / span) * (h - pad * 2));
+    const d = xs.map((x, i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${ys[i].toFixed(1)}`).join(' ');
+    const dots = xs.map((x, i) => `<circle class="dot solid" cx="${x.toFixed(1)}" cy="${ys[i].toFixed(1)}" r="3.2"></circle>`).join('');
+    return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true"><path class="line" d="${d}"></path>${dots}</svg>`;
+  }
+
+  function flagClass(flag) {
+    return flag === '偏高' || flag === '异常' ? 'flag-high' : flag === '偏低' ? 'flag-low' : flag === '正常' ? 'flag-normal' : 'flag-unknown';
+  }
+
+  function itemRow(item, { link = false, sparkline = true } = {}) {
+    return `<div class="card item-row">
+      <div class="row"><span class="item-name">${item.name}</span><span class="flag ${flagClass(item.flag)}">${item.flag}</span></div>
+      <div class="row value-row"><span class="value ${flagClass(item.flag)}">${item.value}${item.unit ? ` <span class="unit">${item.unit}</span>` : ''}</span><span class="muted">参考 ${item.ref}</span></div>
+      ${sparkline && item.points ? `<div class="spark-wrap">${spark(item.points)}</div>` : ''}
+      ${item.meta ? `<div class="muted small">${item.meta}</div>` : ''}
+      ${link ? '<div class="link-row" style="margin-top:6px">查看趋势 ›</div>' : ''}
+    </div>`;
+  }
+
+  function compactItemRow(item) {
+    return `<div class="compact-row">
+      <div class="compact-main"><span class="compact-name">${item.name}</span><span class="compact-ref">${item.ref ? `参考 ${item.ref}` : ''}</span></div>
+      <span class="compact-value ${flagClass(item.flag)}">${item.value}${item.unit ? ` ${item.unit}` : ''}</span>
+      <span class="flag ${flagClass(item.flag)}">${item.flag}</span>
+    </div>`;
+  }
+
+  function kidneyItemsContent() {
+    return `${panelHeader('肾功', '小虎', '2026-09-12', 3, 0, 4)}
+      <div class="section-label">全部指标（4）</div>
+      ${kidneyItems.map((item) => itemRow(item)).join('')}
+      <div class="link-row">查看包含肾功的报告（3 份）›</div>
+      <div class="proto-note">A 指标优先：每个指标一行，最新值 + 跨报告迷你趋势。家长不用点开报告，就能回答「肾功最近怎么样、有没有反复」。</div>`;
+  }
+
+  function kidneyReportsContent() {
+    return `${panelHeader('肾功', '小虎', '2026-09-12', 3, 0, 4)}
+      <div class="section-label">最新一次</div>
+      <div class="card summary-grid">
+        ${kidneyItems.map((item) => `<div class="summary-cell"><div class="summary-name">${item.name}</div><div class="summary-value">${item.value}${item.unit ? ` <span class="unit">${item.unit}</span>` : ''}</div></div>`).join('')}
+      </div>
+      <div class="section-label">报告（3 份）</div>
+      ${[
+        { date: '2026-09-12', type: '生化', n: 4, abnormal: 0 },
+        { date: '2025-11-10', type: '生化', n: 4, abnormal: 0 },
+        { date: '2024-12-15', type: '生化', n: 4, abnormal: 0 },
+      ].map((r) => `<div class="card report-link"><div class="row"><div><div class="date">${r.date}</div><div class="muted">${r.type} · 肾功 ${r.n} 项 · ${r.abnormal ? `${r.abnormal} 项异常` : '无异常'}</div></div><span class="chev">›</span></div></div>`).join('')}
+      <div class="proto-note">B 报告优先：先给最新值摘要，再列包含该项目的报告；看历史数值要点进报告。适合「先看这一次，再翻历史」。</div>`;
+  }
+
+  function liverHybridContent() {
+    return `${panelHeader('肝功', '小虎', '2026-09-12', 4, 4, 10)}
+      <div class="section-label">异常 4 项</div>
+      ${liverAbnormal.map((item) => itemRow(item)).join('')}
+      <div class="section-label">其余 6 项（正常）</div>
+      <div class="card" style="padding:2px 14px">${liverNormal.map(compactItemRow).join('')}</div>
+      <div class="link-row">查看全部 10 项 ›</div>
+      <div class="link-row">查看包含肝功的报告（4 份）›</div>
+      <div class="proto-note">C 混合：异常项内联趋势，正常项只给最新值；正常项点开再看趋势。首屏信息量介于 A/B 之间。</div>`;
+  }
+
+  function thyroidContent() {
+    return `${panelHeader('甲状腺', '小虎', '2026-06-08', 2, 2, 8)}
+      <div class="section-label">异常 2 项</div>
+      ${thyroidItems.slice(0, 2).map((item) => itemRow(item)).join('')}
+      <div class="section-label">其余 6 项（正常）</div>
+      <div class="card" style="padding:2px 14px">${thyroidItems.slice(2).map(compactItemRow).join('')}</div>
+      <div class="link-row">查看包含甲状腺的报告（2 份）›</div>
+      <div class="proto-note">同一套项目详情也能回答「甲状腺最近怎么样」：TSH、TPOAb 的两次结果和趋势一眼可见。</div>`;
+  }
+
+  function trendsContent() {
+    return `<div class="card detail-head">
+        <div class="row"><div><div class="detail-title">异常指标</div><div class="muted">小虎 · 8 项异常 · 最近 2026-09-12</div></div><span class="big-flag flag-high">8 项</span></div>
+      </div>
+      ${trendGroups.map((g) => `<div class="section-label">${g.name} · ${g.items.length} 项</div>${g.items.map((item) => itemRow(item, { link: true })).join('')}`).join('')}
+      <div class="proto-note">保留现有「异常指标」页，但分组从 report_type 改成项目；从家庭页和项目列表的「全部异常」进入。</div>`;
+  }
+
+  function reportDetailContent() {
+    return `<div class="card detail-head">
+        <div class="row"><div><div class="detail-title">2026-09-12 · 生化</div><div class="muted">小虎</div></div><span class="status accent">待核对</span></div>
+        <div class="badges"><span class="badge high">偏高 4</span><span class="badge accent">待核对 3 项</span></div>
+      </div>
+      <div class="link-row">逐项核对 3 项 ›</div>
+      ${reportGroups.map((g) => `<div class="section-head"><span class="panel-name">${g.name}</span><span class="muted">${g.items.length} 项 · ${g.abnormal ? `${g.abnormal} 项异常` : '无异常'}</span></div><div class="card" style="padding:2px 14px">${g.items.map(compactItemRow).join('')}</div>`).join('')}
+      <div class="proto-note">报告详情按项目分组，但展示该报告全部指标；标签是浏览入口，不是指标过滤器。</div>`;
+  }
+
+  function contrastContent() {
+    return `<div class="card detail-head">
+        <div class="detail-title">按标签（v2.2 对照）</div>
+        <div class="muted">样本语料 49 份 · 单标签模拟 · 只列当前成员出现过的标签</div>
+      </div>
+      <div class="callout">lft_02 含肌酐、尿素、尿酸，但按「命中指标项数最多」主标签是肝功；家长点肾功看不到它。</div>
+      ${contrastRows.map((r) => `<div class="card panel-row ${r.count === 0 ? 'dim' : ''}" style="margin-bottom:8px"><div class="row"><span class="panel-name">${r.name}</span><span class="${r.count === 0 ? 'zero' : 'muted'}">${r.count} 份</span></div></div>`).join('')}
+      <div class="proto-note">对照：报告级单标签下，肾功/血脂/尿酸/电解质四个分类在 49 份真实样本里是 0 份。项目级方案不会出现空分类，也不会漏掉混合报告里的次要项目。</div>`;
+  }
+
+  const SCREENS = {
+    'home-a': () => phone({ title: '家庭', right: '设置', content: homeContent('a'), tab: 'home' }),
+    'home-b': () => phone({ title: '家庭', right: '设置', content: homeContent('b'), tab: 'home' }),
+    'archive-time': () => phone({ title: '档案', right: '设置', content: archiveContent('time'), tab: 'archive', fab: true }),
+    'archive-panel': () => phone({ title: '档案', right: '设置', content: archiveContent('panel'), tab: 'archive', fab: true }),
+    'panel-kidney-items': () => phone({ title: '肾功', back: true, content: kidneyItemsContent(), stack: true }),
+    'panel-kidney-reports': () => phone({ title: '肾功', back: true, content: kidneyReportsContent(), stack: true }),
+    'panel-liver-hybrid': () => phone({ title: '肝功', back: true, content: liverHybridContent(), stack: true }),
+    'panel-thyroid': () => phone({ title: '甲状腺', back: true, content: thyroidContent(), stack: true }),
+    trends: () => phone({ title: '异常指标', back: true, content: trendsContent(), stack: true }),
+    'report-detail': () => phone({ title: '报告详情', back: true, content: reportDetailContent(), stack: true }),
+    'contrast-tags': () => phone({ title: '按标签（对照）', back: true, content: contrastContent(), stack: true }),
+  };
+
+  function showScreen(id) {
+    const render = SCREENS[id] || SCREENS['home-b'];
+    document.getElementById('screen').innerHTML = render();
+    document.querySelectorAll('.switcher button').forEach((button) => {
+      button.classList.toggle('active', button.dataset.screen === id);
+    });
+  }
+
+  document.querySelectorAll('.switcher button').forEach((button) => {
+    button.addEventListener('click', () => showScreen(button.dataset.screen));
+  });
+
+  const params = new URLSearchParams(location.search);
+  if (params.get('shot') === '1') {
+    document.body.classList.add('shot');
+  }
+  showScreen(params.get('screen') || 'home-b');
+</script>
+</body>
+</html>
