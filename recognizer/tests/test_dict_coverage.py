@@ -16,6 +16,7 @@ import pytest
 import yaml
 
 from recognizer import paths
+from recognizer.contract import PANEL_ALLOWED_BY_REPORT_TYPE, Panel
 from recognizer.postprocess import DICT_DIR, DICT_GLOB, _name_forms
 
 # 词典注册表:每个 *_dict.yaml 一个报告类别(测试在收集期读取文件列表)
@@ -91,6 +92,52 @@ def test_every_alias_has_corpus_evidence(dict_path) -> None:
             if not ids:
                 problems.append(f"{it['name']}: alias {a!r} 无任何样本证据")
     assert not problems, "词典别名与真实样本脱钩:\n" + "\n".join(problems)
+
+
+@pytest.mark.skipif(not _DICTS, reason="no *_dict.yaml in recognizer package")
+@pytest.mark.parametrize("dict_path", _DICTS, ids=lambda p: p.stem)
+def test_panel_declarations_are_legal(dict_path) -> None:
+    """category.panel 必填;每个 item 解析后的 panel 属于父类允许集合(spec §5.1)。"""
+    d = yaml.safe_load(dict_path.read_text(encoding="utf-8"))
+    report_type = d["report_type"]
+    category_panel = d["category"].get("panel")
+    assert category_panel in {p.value for p in Panel}, f"{dict_path}: invalid category.panel {category_panel!r}"
+    allowed = PANEL_ALLOWED_BY_REPORT_TYPE.get(report_type, frozenset({Panel.OTHER}))
+    problems = []
+    for it in d.get("items") or []:
+        panel = Panel(it.get("panel", category_panel))
+        if panel not in allowed:
+            problems.append(f"{it['name']}: {panel.value} 不属于 {report_type} 的允许集合")
+    assert not problems, "词典 panel 越界:\n" + "\n".join(problems)
+
+
+@pytest.mark.skipif(not _DICTS, reason="no *_dict.yaml in recognizer package")
+@pytest.mark.parametrize("dict_path", _DICTS, ids=lambda p: p.stem)
+def test_panel_basis_comments(dict_path) -> None:
+    """9 个词典都有依据注释;混合词典顶部 block 覆盖其全部 item.panel(spec §5.5.5)。"""
+    text = dict_path.read_text(encoding="utf-8")
+    d = yaml.safe_load(text)
+    lines = text.splitlines()
+    item_panels = {it["panel"] for it in d.get("items") or [] if "panel" in it}
+    if item_panels:
+        top: list[str] = []
+        for line in lines:
+            if line.startswith("#"):
+                top.append(line)
+            elif line.strip():
+                break
+        block = "\n".join(top)
+        assert "# panel 依据" in block, f"{dict_path}: missing top '# panel 依据' block"
+        for panel in sorted(item_panels):
+            assert re.search(rf"\b{re.escape(panel)}\b", block), (
+                f"{dict_path}: top block does not cover item panel {panel}"
+            )
+    else:
+        panel_idx = next(
+            i for i, line in enumerate(lines) if line.strip().startswith("panel: ")
+        )
+        basis = [i for i, line in enumerate(lines[:panel_idx]) if line.strip().startswith("# 依据:")]
+        assert basis, f"{dict_path}: missing '# 依据:' above category.panel"
 
 
 @pytest.mark.skipif(not _DICTS, reason="no *_dict.yaml in recognizer package")

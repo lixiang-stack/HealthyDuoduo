@@ -2,147 +2,203 @@
 # 临检组为 logical merge、不适用本文件。report_type 输出为 生化
 # (原 肝肾功能/血糖/维生素与贫血);min_matched_items 取各源最小值。
 # 条目体逐字来自源文件,条目注释与决策 #8 头注释随之搬运,分节 banner 留来源元信息。
+#
+# panel 依据(逐项见 item.panel;依据 spec §5.5.3;不重排既有条目):
+#   liver: 2025 成人健康体检指引;2022 健康体检基本项目专家共识;WS/T 404.1/2/4;
+#          WS/T 780—2021(儿童);WS/T 645.2—2026(AFP 随报告归肝功,产品偏离)
+#   kidney: 2025 成人健康体检指引;2022 共识;WS/T 404.5;WS/T 780—2021(儿童)
+#   lipid: 2025 成人健康体检指引;2022 共识;中国血脂管理指南(2023年);LOINC 57698-3
+#   glucose: 2025 成人健康体检指引;2022 共识;中国2型糖尿病防治指南(2020年版);WS/T 461—2024
+#   uric_acid: 2025 成人健康体检指引(血尿酸单列);2022 共识;2013 医疗机构临床检验项目目录
+#   electrolyte: WS/T 404.3/404.6;WS/T 780—2021(儿童);2013 目录
+#   vitanemia: 儿童铁缺乏和缺铁性贫血防治专家共识(2023);WS/T 478—2024;2013 目录
+#   other: 无明确依据的兜底(本词典未使用)
 
 report_type: 生化
 category:
   title_keywords: [肝功, 肾功能, 铜蓝蛋白, 葡萄糖测定, 葡萄糖耐量, 糖耐量, 糖化血红蛋白, 维生素D, 贫血]
   min_matched_items: 2
+  panel: other
 items:
 
 # ==== lft_dict.yaml(原 肝肾功能;min=4;titles=['肝功', '肾功能', '铜蓝蛋白']) ====
   - name: 丙氨酸转氨酶
+    panel: liver
     aliases: [谷丙转氨酶, "丙氨酸转氨酶(ALT)", "【互】谷丙转氨酶[ALT]", 丙氨酸氨基转移酶]
     units: [U/L]
   - name: 天冬氨酸转氨酶
+    panel: liver
     aliases: ["天冬氨酸转氨酶(AST)", 天冬氨酸氨基转移, 天门冬氨酸氨基转移酶, "【互】谷草转氨酶[AST]", 谷草转氨酮, 谷草转氨酶]
     units: [U/L]
   - name: 谷氨酰转肽酶
+    panel: liver
     aliases: ["r-谷氨酰转移酶(GGT)", "【互】γ一谷氨酰转肽酶[γ-GT]", "*Y谷氨酰转肽酶", 谷酰转肽酶, γ-谷氨酰基转移酶]
     units: [U/L]
   - name: 谷草/谷丙比值
+    panel: liver
     aliases: ["谷草/谷丙比值[AST/ALT]", "AST/ALT"]
     units: []
   - name: 碱性磷酸酶
+    panel: liver
     aliases: ["碱性磷酸酶(ALP)", 碱性硫酸酶, "碱性磷酸酶[ALP]", "*碱性磷酸酶"]
     units: [U/L]
   - name: 总蛋白
+    panel: liver
     aliases: ["总蛋白(TP)", "总蛋白[TP]", "【互】总蛋白[TP]", "*总蛋白"]
     units: [g/L]
   - name: 白蛋白
+    panel: liver
     aliases: ["白蛋白(ALB)", "白蛋白[ALB]", "【互】白蛋白[ALB]", "*白蛋白"]
     units: [g/L]
   - name: 球蛋白
+    panel: liver
     aliases: ["球蛋白(GLO)", "球蛋白[GLB]"]
     units: [g/L]
   - name: 白蛋白/球蛋白
+    panel: liver
     aliases: [白球比例, "白球比例(A/G)", "白蛋白/球蛋白", "白蛋白/球蛋白[A/G]", "A/G", 白/球比值]
     units: []
   - name: 总胆红素
+    panel: liver
     aliases: ["总胆红素(TBIL)", "总胆红素[TBIL]", "【互】总胆红素[T-Bi1]", "*总胆红素"]
     units: ["μmol/L", μmo1/L, "μ mol/L"]
   - name: 直接胆红素
+    panel: liver
     aliases: ["直接胆红素(DBIL)", "直接胆红素[DBIL]", "【互】直接胆红素[D-Bi1]"]
     units: ["μmol/L", μmo1/L]
   - name: 间接胆红素
+    panel: liver
     aliases: ["间接胆红素[IBIL]", "问接胆红素[1-Bi1]"]
     units: ["μmol/L", μmo1/L, μnol/L, μno1/L]
   - name: 总胆汁酸
+    panel: liver
     aliases: ["总胆汁酸(TBA)"]
     units: ["μmol/L", μmo1/L]
   - name: 尿素
+    panel: kidney
     aliases: ["尿素(BUN)", Urea]
     units: [mmol/L]
   - name: 肌酐
+    panel: kidney
     aliases: ["肌酐(CRE)", Cr]
     units: ["μmol/L", umol/L]
   - name: 尿酸
+    panel: uric_acid
     aliases: ["尿酸(UA)", UA]
     units: [mmol/L]
   - name: 二氧化碳
+    panel: electrolyte
     aliases: [Co2CP]
     units: [mmol/L]
   - name: 总胆固醇
+    panel: lipid
     aliases: []
     units: [mmol/L]
   - name: 甘油三酯
+    panel: lipid
     aliases: []
     units: [mmol/L]
   - name: 高密度脂蛋白胆固醇
+    panel: lipid
     aliases: [高密度脂蛋白]
     units: [mmol/L]
   - name: 低密度脂蛋白胆固醇
+    panel: lipid
     aliases: [低密度脂蛋白]
     units: [mmol/L]
   - name: 葡萄糖
+    panel: glucose
     aliases: ["葡萄糖[GLU]"]
     units: [mmol/L]
   - name: eGFR
+    panel: kidney
     aliases: ["eGFR(EPI公式计算)(eGFR)"]
     units: [ml/min]
   - name: 血清胱抑素C
+    panel: kidney
     aliases: ["血清胱抑素C(CysC)"]
     units: [mg/L]
   - name: 胆碱酯酶
+    panel: liver
     aliases: [胆碱脂酶, CHE]
     units: [U/L]
   - name: 前白蛋白
+    panel: liver
     aliases: ["前白蛋白(PA)"]
     units: [mg/L]
   - name: 岩藻糖苷酶
+    panel: liver
     aliases: [a-L-岩藻糖苷酶]
     units: [U/L]
   - name: 甲胎蛋白
+    panel: liver
     aliases: ["甲胎蛋白(筛查)", AFP]
     units: [ug/L]
   - name: 亮氨酸氨基肽酶
+    panel: liver
     aliases: [LAP]
     units: [IU/L]
   - name: 游离脂肪酸
+    panel: lipid
     aliases: [FFA]
     units: [mmol/L]
   - name: 单胺氧化酶
+    panel: liver
     aliases: [单氨氧化酶, MAO]
     units: [IU/L]
   - name: 铜蓝蛋白
+    panel: liver
     aliases: [铜蓝蛋白(CER)]
     units: [g/L]
 
 # ==== glu_dict.yaml(原 血糖;min=2;titles=['葡萄糖测定', '葡萄糖耐量', '糖耐量', '糖化血红蛋白']) ====
   - name: 空腹葡萄糖
+    panel: glucose
     aliases: [GLUO, HR葡萄糖, 糖耐量-空腹血糖, FPG]
     units: [mmol/L, unol/1, mnol/L, mmo1/L, mol/L]
   - name: 餐后半小时葡萄糖
+    panel: glucose
     aliases: [GLU1/2]
     units: [mmol/L, mnol/L, mmo1/L, mol/L]
   - name: 餐后一小时葡萄糖
+    panel: glucose
     aliases: [GLUI, 1hPG]
     units: [mmol/L, mnol/L, mmo1/L, mol/L]
   - name: 餐后二小时葡萄糖
+    panel: glucose
     aliases: [GLU2, 餐后2h血糖, GLU2h, 2hPG]
     units: [mmol/L, mmo1/L]
   - name: 餐后三小时葡萄糖
+    panel: glucose
     aliases: [GLU3]
     units: [mmol/L, mol/L]
   - name: 糖化血红蛋白
+    panel: glucose
     aliases: [糖化血红蛋白HbA1C, HbA1C, GHB]
     units: ["%"]
   - name: C肽
+    panel: glucose
     aliases: [C_P, C_肽]
     units: [ng/mL]
   - name: 胰岛素
+    panel: glucose
     aliases: [IRI]
     units: [uIU/mL]
 
 # ==== vitanemia_dict.yaml(原 维生素与贫血;min=2;titles=['维生素D', '贫血']) ====
   - name: 总25羟基维生素D
+    panel: vitanemia
     aliases: ["25(0H) D", "25(OH)D"]
     units: [ng/ml]
   - name: 铁蛋白
+    panel: vitanemia
     aliases: []
     units: [ng/ml]
   - name: 叶酸
+    panel: vitanemia
     aliases: [叶酸测定]
     units: [ng/ml]
   - name: 维生素B12
+    panel: vitanemia
     aliases: [维生素B12测定]
     units: [pg/mL]

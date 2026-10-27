@@ -9,6 +9,9 @@ category:
   mode: narrative
   title_keywords: ["产前筛查", "产前诊断", "唐氏筛查"]
   min_matched_items: 3
+  # 依据: 产前筛查项目见 2013 医疗机构临床检验项目目录;
+  #       首版归其他(不设独立项目组)
+  panel: other
 items:
   - name: 母龄风险
     aliases: []

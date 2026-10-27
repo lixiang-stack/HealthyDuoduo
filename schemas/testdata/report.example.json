@@ -1,10 +1,12 @@
 {
-  "report_type": "血常规",
+  "report_type": "临检",
   "report_date": "2026-10-01",
   "status": "success",
+  "panels": ["cbc"],
   "items": [
     {
       "name": "血红蛋白",
+      "panel": "cbc",
       "value": "128",
       "unit": "g/L",
       "ref_range": "115-150",

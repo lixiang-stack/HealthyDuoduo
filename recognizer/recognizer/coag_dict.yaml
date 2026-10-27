@@ -4,6 +4,9 @@ report_type: 临检
 category:
   title_keywords: ["凝血"]
   min_matched_items: 2
+  # 依据: WS/T 406—2024(凝血初筛 PT/APTT/TT/FIB);WS/T 477—2026(D-二聚体);
+  #       2013 医疗机构临床检验项目目录
+  panel: coag
 items:
   - name: 凝血酶原时间
     aliases: []

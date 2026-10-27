@@ -25,6 +25,10 @@ report_type: 临检
 category:
   title_keywords: ["血常规", "血细胞分析", "血液细胞"]
   min_matched_items: 10
+  # 依据: 2025 成人健康体检指引;2022 健康体检基本项目专家共识;WS/T 405—2012;
+  #       WS/T 779—2021(儿童);WS/T 406—2024;LOINC 57021-8;
+  #       血沉 / CRP / 超敏CRP / SAA 为炎症标志物,随本词典归血常规(产品决定)
+  panel: cbc
 items:
   - name: 白细胞计数
     aliases: [白细胞, WBC, 白细胞数目, 白细胞总数]

@@ -8,6 +8,8 @@ category:
   title_keywords: [超声, 彩超]
   min_section_hits: 1
   mode: narrative
+  # 依据: CONTEXT.md 报告段落;ADR-0009 叙述型报告无指标项;viz spec
+  panel: imaging
   section_anchors:
     exam_name: [检查项目, 检查部位, 检查内容]
     findings: [超声描述, 检查所见, 超声所见]

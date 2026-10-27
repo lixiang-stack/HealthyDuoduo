@@ -1,8 +1,9 @@
 {
-  "report_type": "血常规",
+  "report_type": "临检",
   "report_date": "2026/10/01",
   "status": "ok",
+  "panels": ["cbc"],
   "items": [
-    {"name": "", "value": "128", "unit": null, "ref_range": null, "flag": "none", "low_confidence": false, "raw_text": ""}
+    {"name": "", "panel": "cbc", "value": "128", "unit": null, "ref_range": null, "flag": "none", "low_confidence": false, "raw_text": ""}
   ]
 }

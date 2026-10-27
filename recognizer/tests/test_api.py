@@ -129,3 +129,78 @@ def test_reparse_rejects_bad_contract() -> None:
     with TestClient(app) as client:
         response = client.post("/reparse", json={"ocr_result": {"txts": ["x"]}})
     assert response.status_code == 422
+
+
+def _classify(client: TestClient, report_type: str, names: list[str]) -> dict:
+    response = client.post(
+        "/classify",
+        json={
+            "report_type": report_type,
+            "items": [{"name": name, "unit": None} for name in names],
+        },
+    )
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+def test_classify_mixed_chemistry_items() -> None:
+    """/classify 复用同一词典映射:逐项 panel + 报告级排序聚合(spec §6.4)。"""
+    with TestClient(app) as client:
+        body = _classify(client, "生化", ["丙氨酸转氨酶", "肌酐", "尿酸", "总胆固醇", "维生素B12"])
+    assert body["item_panels"] == ["liver", "kidney", "uric_acid", "lipid", "vitanemia"]
+    assert body["panels"] == ["liver", "kidney", "lipid", "uric_acid", "vitanemia"]
+
+
+def test_classify_tie_uses_fixed_priority() -> None:
+    with TestClient(app) as client:
+        body = _classify(client, "生化", ["尿酸", "总胆固醇", "二氧化碳"])
+    assert body["panels"] == ["lipid", "uric_acid", "electrolyte"]
+
+
+def test_classify_urine_and_biochemistry_ambiguity() -> None:
+    """临检葡萄糖 / 胆红素 → 尿常规;生化同名项 → 血糖 / 肝功。"""
+    with TestClient(app) as client:
+        urine = _classify(client, "临检", ["葡萄糖", "胆红素"])
+        blood = _classify(client, "生化", ["葡萄糖", "总胆红素"])
+    assert urine["item_panels"] == ["urinalysis", "urinalysis"]
+    assert urine["panels"] == ["urinalysis"]
+    assert blood["item_panels"] == ["glucose", "liver"]
+    assert blood["panels"] == ["liver", "glucose"]
+
+
+def test_classify_urine_and_cbc_canonical_names() -> None:
+    """临检同名指标靠规范名区分:数据库存的是规范名,回填按 name 精确命中。"""
+    with TestClient(app) as client:
+        body = _classify(
+            client,
+            "临检",
+            ["白细胞计数", "尿白细胞计数", "红细胞计数", "尿红细胞计数"],
+        )
+    assert body["item_panels"] == ["cbc", "urinalysis", "cbc", "urinalysis"]
+    assert body["panels"] == ["cbc", "urinalysis"]
+
+
+def test_classify_empty_items() -> None:
+    with TestClient(app) as client:
+        imaging = _classify(client, "影像", [])
+        other = _classify(client, "生化", [])
+        unknown = _classify(client, "unknown", [])
+    assert imaging == {"panels": ["imaging"], "item_panels": []}
+    assert other == {"panels": ["other"], "item_panels": []}
+    assert unknown == {"panels": ["other"], "item_panels": []}
+
+
+def test_classify_unknown_item_is_other() -> None:
+    with TestClient(app) as client:
+        body = _classify(client, "生化", ["人工修正后的未知项目"])
+    assert body == {"panels": ["other"], "item_panels": ["other"]}
+
+
+def test_classify_rejects_unknown_report_type() -> None:
+    with TestClient(app) as client:
+        response = client.post(
+            "/classify",
+            json={"report_type": "不存在的类别", "items": [{"name": "血红蛋白"}]},
+        )
+    assert response.status_code == 422
+    assert "unknown report_type" in response.json()["detail"]
