@@ -110,7 +110,7 @@ export default function PanelDetailScreen() {
                     .join(' · ')}
                 </Text>
                 {panelSourceLabel(detail.panel, detail.report_types) ? (
-                  <Text style={sharedStyles.muted}>
+                  <Text testID="panel-source-label" style={sharedStyles.muted}>
                     {panelSourceLabel(detail.panel, detail.report_types)}
                   </Text>
                 ) : null}

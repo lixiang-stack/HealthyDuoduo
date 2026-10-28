@@ -10,6 +10,7 @@ from recognizer.contract import OCRResult, Report
 from recognizer.replay import Replay
 
 ENV = "RECOGNIZER_REPLAY_SAMPLES"
+ENV_IMAGES = "RECOGNIZER_REPLAY_IMAGES"
 
 
 def _sample(name: str) -> bytes:
@@ -36,6 +37,32 @@ def test_lookup_misses_unknown_image() -> None:
 def test_missing_sample_fails_loudly() -> None:
     with pytest.raises(FileNotFoundError, match="missing-sample"):
         Replay(["missing-sample"])
+
+
+def test_extra_image_dir_replays_masked_sample() -> None:
+    """掩码语料无原图:E2E 替身图目录按样本 id 提供图片,仍回放同一份 golden。"""
+    image_dir = paths.REPO_ROOT / "apps/mobile/e2e/replay"
+    image = image_dir / "bloodtype_01.png"
+
+    replay = Replay(["bloodtype_01"], [image_dir])
+
+    fixture = replay.lookup(image.read_bytes())
+    assert fixture is not None
+    assert fixture.report == Report.model_validate(
+        json.loads((paths.EXPECTED_REPORT / "bloodtype_01.json").read_text(encoding="utf-8"))
+    )
+
+
+def test_from_env_uses_extra_image_dir(monkeypatch: pytest.MonkeyPatch) -> None:
+    image_dir = paths.REPO_ROOT / "apps/mobile/e2e/replay"
+    image = image_dir / "bloodtype_01.png"
+    monkeypatch.setenv(ENV, "bloodtype_01")
+    monkeypatch.setenv(ENV_IMAGES, str(image_dir))
+
+    replay = Replay.from_env()
+
+    assert replay is not None
+    assert replay.lookup(image.read_bytes()) is not None
 
 
 def test_from_env_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
