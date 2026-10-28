@@ -19,19 +19,14 @@ function usesReportTypeFallback(
   return report.status === 'failed' || report.panels.length === 0;
 }
 
-/** 时间线卡片主标签:前 max 个项目组 + `+N`;失败 / 未回填存量回退 report_type。 */
+/** 时间线卡片主标签:列出报告全部项目组;失败 / 未回填存量回退 report_type。 */
 export function reportPanelLabels(
   report: Pick<ReportSummary, 'panels' | 'report_type' | 'status'>,
-  max = 2,
 ): string {
   if (usesReportTypeFallback(report)) {
     return report.report_type;
   }
-  const labels = report.panels.map(panelLabel);
-  if (labels.length <= max) {
-    return labels.join(' · ');
-  }
-  return `${labels.slice(0, max).join(' · ')} +${labels.length - max}`;
+  return report.panels.map(panelLabel).join(' · ');
 }
 
 /** 卡片次要信息:项目组成为主标签后,report_type 降到日期行;与主标签相同则不重复。 */
@@ -160,11 +155,15 @@ export type AbnormalPanelGroup = {
   items: PanelItem[];
 };
 
+/** 家庭卡异常项目最多展示的项目组数;超出的折叠为「另有 N 个项目共 M 项异常」。 */
+export const FAMILY_ABNORMAL_MAX = 2;
+
 /** 家庭卡异常项目摘要:只列 abnormal_count > 0 的项目,按异常数降序、
- *  同数按 PANEL_ORDER;超过 max 个追加 +N。 */
+ *  同数按 PANEL_ORDER;超过 max 个追加「另有 N 个项目共 M 项异常」
+ *  (N 是隐藏的项目组数,M 是这些项目组里的异常指标总数)。 */
 export function familyAbnormalLabel(
   panels: PanelSummary[],
-  max = 2,
+  max = FAMILY_ABNORMAL_MAX,
 ): string | undefined {
   const abnormal = panels
     .filter((panel) => panel.abnormal_count > 0)
@@ -179,14 +178,22 @@ export function familyAbnormalLabel(
   const labels = abnormal
     .slice(0, max)
     .map((panel) => `${panelLabel(panel.panel)} ${panel.abnormal_count} 项`);
-  return abnormal.length > max
-    ? `${labels.join(' · ')} +${abnormal.length - max}`
-    : labels.join(' · ');
+  if (abnormal.length <= max) {
+    return labels.join(' · ');
+  }
+  const hidden = abnormal.slice(max);
+  const hiddenItems = hidden.reduce((sum, panel) => sum + panel.abnormal_count, 0);
+  return `${labels.join(' · ')} · 另有 ${hidden.length} 个项目共 ${hiddenItems} 项异常`;
 }
 
 /** 全部异常指标数(档案「全部异常 N 项」入口与家庭卡共用口径)。 */
 export function totalAbnormalCount(panels: PanelSummary[]): number {
   return panels.reduce((sum, panel) => sum + panel.abnormal_count, 0);
+}
+
+/** 有异常指标的项目组数(与异常指标总数区分:一个项目可含多项)。 */
+export function abnormalPanelCount(panels: PanelSummary[]): number {
+  return panels.filter((panel) => panel.abnormal_count > 0).length;
 }
 
 /** 异常指标页分组:按传入项目详情顺序(项目列表顺序),只保留 latest 异常的

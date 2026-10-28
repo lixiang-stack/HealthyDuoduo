@@ -43,6 +43,7 @@ describe('按项目浏览', { serial: true, timeout: 300_000 }, () => {
 
     await openConfigured(app, browser, '/timeline', { memberId: seed.thyroid.member_id });
     await screen.getByTestId(testID.archiveViewPanel).tap();
+    await browser.waitForURL(/\/panels$/);
     await expect(screen.getByTestId(testID.panelRow('thyroid'), { visible: true })).toBeVisible();
     await expect(screen.getByTestId(testID.panelRowMeta('thyroid'))).toContainText(
       `${thyroid.report_count} 份 · ${thyroid.abnormal_count} 项异常 · ${thyroid.item_count} 项指标`,
@@ -52,6 +53,14 @@ describe('按项目浏览', { serial: true, timeout: 300_000 }, () => {
 
     await screen.getByTestId(testID.panelRow('thyroid')).tap();
     await browser.waitForURL(/\/panel\/thyroid$/);
+
+    // 浏览器返回应回到「按项目」路由 /panels,不回落按时间。
+    await browser.back();
+    await browser.waitForURL(/\/panels$/);
+    await expect(screen.getByTestId(testID.panelRow('thyroid'), { visible: true })).toBeVisible();
+    await screen.getByTestId(testID.panelRow('thyroid')).tap();
+    await browser.waitForURL(/\/panel\/thyroid$/);
+
     await expect(screen.getByTestId(testID.panelDetailHeading)).toContainText('甲状腺');
     await expect(screen.getByTestId(testID.panelDetailMeta)).toContainText(
       `${detail.report_count} 份报告`,
@@ -63,6 +72,9 @@ describe('按项目浏览', { serial: true, timeout: 300_000 }, () => {
     );
     const first = detail.items[0];
     await expect(screen.getByTestId(testID.panelItem(0))).toContainText(first.name);
+    await expect(screen.getByTestId(testID.panelItemDate(0))).toContainText(
+      first.latest!.report_date!,
+    );
 
     // 正常项点按打开趋势层,使用已加载的 points,不额外请求。
     await screen.getByTestId(testID.panelItem(0)).tap();

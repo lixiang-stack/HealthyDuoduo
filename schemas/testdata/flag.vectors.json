@@ -584,6 +584,22 @@
       "ref": "阴性",
       "flag": "normal",
       "reason": null
+    },
+    {
+      "note": "分级参考取正常档:低于正常档",
+      "name": "总25羟基维生素D",
+      "value": "5.70",
+      "ref": ">20ng/ml正常",
+      "flag": "low",
+      "reason": null
+    },
+    {
+      "note": "分级参考取正常档:正常",
+      "name": "总25羟基维生素D",
+      "value": "39.60",
+      "ref": ">20ng/ml正常",
+      "flag": "normal",
+      "reason": null
     }
   ]
 }

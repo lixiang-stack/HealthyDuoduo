@@ -210,6 +210,9 @@ function PanelGroups({
 
   return (
     <>
+      <Text testID="trends-band-legend" style={sharedStyles.muted}>
+        灰色带 = 参考范围
+      </Text>
       {groups.map((group, groupIndex) => (
         <View key={group.panel} testID={`trend-panel-${groupIndex}`} style={styles.group}>
           <Text style={styles.groupTitle}>

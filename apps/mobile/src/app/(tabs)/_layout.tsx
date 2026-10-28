@@ -21,7 +21,8 @@ function HeaderSettings({ testID }: { testID: string }) {
 }
 
 // 双 Tab(票 06):家庭 / 档案;设置只进 header,内容区不再出现设置链接。
-// URL 保持 `/` 与 `/timeline`;详情 / 核对 / 上传 / 项目 / 异常指标仍走根 Stack。
+// 档案 Tab 承载 `/timeline`(按时间)与 `/panels`(按项目)两个 URL;详情 / 核对 /
+// 上传 / 项目 / 异常指标仍走根 Stack。
 export default function TabsLayout() {
   return (
     <Tabs screenOptions={{ headerRightContainerStyle: styles.headerActionContainer }}>
@@ -34,9 +35,10 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="timeline"
+        name="[archive]"
         options={{
           title: '档案',
+          href: '/timeline',
           tabBarButtonTestID: 'tab-archive',
           headerRight: () => <HeaderSettings testID="header-settings-archive" />,
         }}

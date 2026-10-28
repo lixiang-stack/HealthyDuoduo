@@ -1,46 +1,41 @@
-import { Link, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { Link, router, useLocalSearchParams } from 'expo-router';
 import { useBottomTabBarHeight } from 'expo-router/js-tabs';
-import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { sharedStyles } from '../../components/styles';
-import { colors } from '../../components/theme';
-import { MemberChips } from '../../members/components';
-import { useCurrentMember } from '../../members/CurrentMemberContext';
-import { sortMembers } from '../../members/order';
-import { ReportCard } from '../../reports/components';
-import { sortReports } from '../../reports/order';
-import { filterReports, parseReportFilter, pendingSummary } from '../../reports/overview';
+import { sharedStyles } from '../components/styles';
+import { colors } from '../components/theme';
+import { MemberChips } from '../members/components';
+import { useCurrentMember } from '../members/CurrentMemberContext';
+import { sortMembers } from '../members/order';
+import { ReportCard } from './components';
+import { sortReports } from './order';
+import { filterReports, parseReportFilter, pendingSummary } from './overview';
 import {
+  abnormalPanelCount,
   filterReportsByPanel,
   panelSourceLabel,
   parsePanelParam,
   totalAbnormalCount,
-} from '../../reports/panelOverview';
-import { panelLabel } from '../../reports/panels';
-import { panelDateLabel } from '../../reports/status';
-import { useMemberPanels } from '../../reports/useMemberPanels';
-import { useMemberReports } from '../../reports/useMemberReports';
+} from './panelOverview';
+import { panelLabel } from './panels';
+import { panelDateLabel } from './status';
+import { useMemberPanels } from './useMemberPanels';
+import { useMemberReports } from './useMemberReports';
 
-type ArchiveView = 'time' | 'panel';
+export type ArchiveView = 'time' | 'panel';
 
 // 全部档案页(票 06;panel-browse 票 03 起分「按时间 / 按项目」):
 // 按时间沿用待核对 / 识别失败筛选与 ?panel= 项目筛选;按项目列出当前成员实际
 // 出现过的项目组(影像直接进最新报告详情),点项目进项目详情。
-export default function TimelineScreen() {
+// 两个真实路由 /timeline 与 /panels 共用本组件;分段切换用 replace,避免历史栈
+// 累积,并保证从项目详情返回时仍落在原分段。
+export function ArchiveScreen({ view }: { view: ArchiveView }) {
   const { currentMemberId, selectMember } = useCurrentMember();
   const { state, reload } = useMemberReports(currentMemberId);
   const params = useLocalSearchParams();
   const filter = parseReportFilter(params.filter);
   const panel = parsePanelParam(params.panel);
-  // 分段状态不持久化:回到档案(包括从家庭 Tab 点卡进入)默认按时间。
-  const [view, setView] = useState<ArchiveView>('time');
   const tabBarHeight = useBottomTabBarHeight();
-  useFocusEffect(
-    useCallback(() => {
-      setView('time');
-    }, []),
-  );
 
   const members = state.status === 'ready' ? sortMembers(state.members) : [];
   const selectedMemberId =
@@ -98,7 +93,7 @@ export default function TimelineScreen() {
                   </View>
                 ) : (
                   <View style={styles.stack}>
-                    <ArchiveSegments value={view} onChange={setView} />
+                    <ArchiveSegments value={view} />
                     {view === 'time' ? (
                       <View style={styles.stack}>
                         {pending ? (
@@ -193,7 +188,7 @@ export default function TimelineScreen() {
                       <PanelBrowser
                         key={selectedMemberId}
                         memberId={selectedMemberId}
-                        onShowTime={() => setView('time')}
+                        onShowTime={() => router.replace('/timeline')}
                       />
                     )}
                   </View>
@@ -218,13 +213,12 @@ export default function TimelineScreen() {
   );
 }
 
-function ArchiveSegments({
-  value,
-  onChange,
-}: {
-  value: ArchiveView;
-  onChange: (next: ArchiveView) => void;
-}) {
+const ARCHIVE_VIEW_HREFS: Record<ArchiveView, '/timeline' | '/panels'> = {
+  time: '/timeline',
+  panel: '/panels',
+};
+
+function ArchiveSegments({ value }: { value: ArchiveView }) {
   return (
     <View style={styles.segments}>
       {(
@@ -238,7 +232,11 @@ function ArchiveSegments({
           testID={`archive-view-${key}`}
           accessibilityRole="button"
           accessibilityState={{ selected: value === key }}
-          onPress={() => onChange(key)}
+          onPress={() => {
+            if (value !== key) {
+              router.replace(ARCHIVE_VIEW_HREFS[key]);
+            }
+          }}
           style={[styles.segment, value === key && styles.segmentActive]}
         >
           <Text style={[styles.segmentText, value === key && styles.segmentTextActive]}>
@@ -292,13 +290,16 @@ function PanelBrowser({ memberId, onShowTime }: { memberId: number; onShowTime: 
   }
 
   const abnormalCount = totalAbnormalCount(state.panels);
+  const abnormalPanels = abnormalPanelCount(state.panels);
 
   return (
     <View style={styles.stack}>
       {abnormalCount > 0 ? (
         <Link asChild href="/trends">
           <Pressable testID="archive-all-abnormal">
-            <Text style={styles.link}>全部异常 {abnormalCount} 项 ›</Text>
+            <Text style={styles.link}>
+              全部异常 {abnormalCount} 项 · {abnormalPanels} 个项目 ›
+            </Text>
           </Pressable>
         </Link>
       ) : null}

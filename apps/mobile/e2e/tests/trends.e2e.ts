@@ -43,6 +43,7 @@ describe('异常指标', { serial: true, timeout: 300_000 }, () => {
     await screen.getByTestId(testID.archiveAllAbnormal).tap();
     await browser.waitForURL(/\/trends$/);
 
+    await expect(screen.getByTestId(testID.trendsBandLegend)).toContainText('灰色带 = 参考范围');
     const liverGroup = screen.getByTestId(testID.trendPanel(0), { visible: true });
     await expect(liverGroup).toContainText('肝功 · 2021-08-02 · 6 项异常');
     await expect(screen.getByTestId(testID.trendPanel(1))).toHaveCount(0);
@@ -152,6 +153,7 @@ describe('异常指标', { serial: true, timeout: 300_000 }, () => {
     await expect(screen.getByTestId(testID.panelItem(0))).toContainText('尿素');
     await screen.getByTestId(testID.panelItem(0)).tap();
     await expect(screen.getByTestId(testID.trendDetail)).toBeVisible();
+    await expect(screen.getByTestId(testID.trendBandLegend)).toContainText('灰色带 = 参考范围');
     await screen.getByTestId(testID.trendDetailClose).tap();
 
     await screen.getByTestId(testID.panelReportsLink).tap();
@@ -170,6 +172,7 @@ describe('异常指标', { serial: true, timeout: 300_000 }, () => {
     await expect(screen.getByTestId(testID.panelAbnormalTitle)).toContainText(
       `异常 ${liver.abnormal_count} 项`,
     );
+    await expect(screen.getByTestId(testID.panelBandLegend)).toContainText('灰色带 = 参考范围');
     await expect(screen.getByTestId(testID.panelItemSparkline(0), { visible: true })).toBeVisible();
     await expect(screen.getByTestId(testID.panelReportsLink)).toContainText(
       `${liver.report_count} 份`,

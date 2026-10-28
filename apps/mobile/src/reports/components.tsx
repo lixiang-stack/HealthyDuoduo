@@ -343,7 +343,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
-  type: { fontSize: 16, color: colors.text },
+  type: { flex: 1, fontSize: 16, color: colors.text },
   status: { fontSize: 13 },
   date: { fontSize: 13, color: colors.muted },
   examName: { fontSize: 14, color: colors.text, lineHeight: 20 },

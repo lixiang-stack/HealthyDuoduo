@@ -108,7 +108,9 @@ function FamilyMemberCard({
       {summary.hasReports ? (
         summary.abnormal ? (
           <Text testID={`family-member-abnormal-${member.member_id}`} style={styles.abnormal}>
-            异常项目：{summary.abnormal}
+            {summary.abnormalTotal
+              ? `${summary.abnormalTotal}\n${summary.abnormal}`
+              : `异常项目：${summary.abnormal}`}
           </Text>
         ) : (
           <Text testID={`family-member-abnormal-${member.member_id}`} style={sharedStyles.muted}>
@@ -153,7 +155,7 @@ const styles = StyleSheet.create({
     paddingVertical: 1,
   },
   latest: { fontSize: 14, color: colors.text },
-  abnormal: { fontSize: 14, color: colors.text },
+  abnormal: { fontSize: 14, color: colors.text, lineHeight: 20 },
   fail: { fontSize: 13, color: colors.fail },
   link: { color: colors.accent, fontSize: 15 },
   button: {

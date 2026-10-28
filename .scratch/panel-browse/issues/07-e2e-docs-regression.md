@@ -22,7 +22,7 @@
 - Replay 覆盖：`e2e/compose.yml` 新增 `lft_06` / `lft_08` / `lft_09` / `coag_01` / `fibrosis_01` / `bloodtype_01` / `unknown_01`；另补 `glu_04` / `infectious_01` 覆盖血糖 / 感染筛查项目行。连同既有 `lft_02` / `tft_01` / `ua_05` / `us_01` 与白图 failed 覆盖票内清单。
 - 无原图样本：掩码 OCR 语料没有原图，不能按真实图片回放。`Replay` 构造函数增加显式 `image_dirs`，`from_env` 读取 `RECOGNIZER_REPLAY_IMAGES`；`apps/mobile/e2e/replay/` 放 9 张 64×64 替身图（字节唯一，避免 sha 去重），compose 挂到 `/e2e-replay`。替身图只提供 sha，仍返回 `samples/expected` 同一份 golden，不参与 OCR 质量判断、不进 `samples/`；单测直接校验提交的替身图 + `from_env` 目录。
 - App E2E：`seedPanelData` 新增混合生化 / 其他 / 凝血 / 感染成员；`panels.e2e.ts` 新增矩阵用例，覆盖 lft_08 报告详情四项目分组（组顺序与「N 项 · M 项异常」由 golden 派生）、血糖 / 电解质项目行、`?panel=lipid` 过滤、`other` 多来源字面量断言、凝血 / 感染项目；`report-panel-group-*` / `panel-source-label` testID 进 `support.ts`。
-- 文档：`docs/agents/app-e2e.md` 更新 23 条用例、replay 清单与替身图边界；新增 `docs/2026-10-28-panel-browse-manual-acceptance.md`（家庭首页任务、项目详情四态、家庭卡「谁需要处理」、LAN 首屏、部署 / 回填 / 回滚 runbook、签收表）。
+- 文档：`docs/agents/app-e2e.md` 更新 23 条用例、replay 清单与替身图边界。
 - 验证：`go test ./...` 全绿；`cd recognizer && uv run --frozen pytest` 332 passed / 28 skipped；`npm test` 22 suites / 197 tests；`npm run typecheck`；`npx expo lint`（0 error，仅既有 `review/items.test.ts:212` warning）；`npm run e2e` 7 files / 23 tests 全绿；`python3 scripts/check-docs.py` 88 files OK。
 
 **待人工（本票置 ready-for-human）：**

@@ -4,7 +4,12 @@ import type { PanelSummary, ReportSummary } from '../api/reports';
 
 import { pendingSummary } from './overview';
 import { sortReports } from './order';
-import { familyAbnormalLabel } from './panelOverview';
+import {
+  FAMILY_ABNORMAL_MAX,
+  abnormalPanelCount,
+  familyAbnormalLabel,
+  totalAbnormalCount,
+} from './panelOverview';
 import { panelLabel } from './panels';
 import { relativeDateLabel } from './relativeDate';
 import { reportDateLabel } from './status';
@@ -20,6 +25,8 @@ export type FamilyCardSummary = {
   pending?: string;
   /** 最近项目 / 失败文案;无报告时为「这位成员还没有检查单」。 */
   latest: string;
+  /** 异常指标总数 + 异常项目数;仅在异常项目超过展示上限时给出。 */
+  abnormalTotal?: string;
   /** 异常项目摘要;无异常为 undefined(由页面显示「没有异常项目」)。 */
   abnormal?: string;
   latestFlags?: string;
@@ -62,11 +69,19 @@ export function familyCardSummary(
             : latestReport.report_type
         } · ${reportDateLabel(latestReport)}${relative ? ` · ${relative}` : ''}`;
 
+  const panelCount = abnormalPanelCount(panels);
+  const abnormal = familyAbnormalLabel(panels);
+
   return {
     hasReports,
     pending: pendingText(pendingSummary(reports)),
     latest,
-    abnormal: familyAbnormalLabel(panels),
+    ...(panelCount > FAMILY_ABNORMAL_MAX
+      ? {
+          abnormalTotal: `异常指标 ${totalAbnormalCount(panels)} 项 · ${panelCount} 个项目`,
+        }
+      : {}),
+    abnormal,
     latestFlags:
       latestReport.status === 'failed'
         ? undefined

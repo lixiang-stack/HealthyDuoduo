@@ -15,6 +15,7 @@ import type {
 
 import {
   abnormalItemCount,
+  abnormalPanelCount,
   abnormalPanelGroups,
   familyAbnormalLabel,
   filterReportsByPanel,
@@ -166,9 +167,10 @@ function panelSummaryOf(
 }
 
 describe('reportPanelLabels', () => {
-  it('前 2 个项目组 + +N;单项目不加 +N', () => {
-    expect(reportPanelLabels(summary(lft02.panels))).toBe('肝功 · 肾功 +1');
+  it('列出全部项目组,不折叠', () => {
+    expect(reportPanelLabels(summary(lft02.panels))).toBe('肝功 · 肾功 · 尿酸');
     expect(reportPanelLabels(summary(lft06.panels))).toBe('肝功 · 血脂');
+    expect(reportPanelLabels(summary(lft08.panels))).toBe('肝功 · 肾功 · 尿酸 · 电解质');
     expect(reportPanelLabels(summary(tft01.panels))).toBe('甲状腺');
     expect(reportPanelLabels(summary(ua05.panels))).toBe('尿常规');
   });
@@ -178,10 +180,6 @@ describe('reportPanelLabels', () => {
       reportPanelLabels(summary(['other'], { report_type: '其他专项', status: 'failed' })),
     ).toBe('其他专项');
     expect(reportPanelLabels(summary([], { report_type: '血常规' }))).toBe('血常规');
-  });
-
-  it('max 参数控制展示数量', () => {
-    expect(reportPanelLabels(summary(lft08.panels), 1)).toBe('肝功 +3');
   });
 });
 
@@ -333,7 +331,7 @@ describe('项目列表 / 详情展示口径', () => {
         panelSummaryOf('imaging', 0),
         panelSummaryOf('kidney', 2),
       ]),
-    ).toBe('肝功 4 项 · 肾功 2 项 +1');
+    ).toBe('肝功 4 项 · 肾功 2 项 · 另有 1 个项目共 2 项异常');
     expect(
       familyAbnormalLabel([
         panelSummaryOf('thyroid', 2),
@@ -347,7 +345,7 @@ describe('项目列表 / 详情展示口径', () => {
     expect(familyAbnormalLabel([panelSummaryOf('liver', 0)])).toBeUndefined();
     expect(
       familyAbnormalLabel([panelSummaryOf('liver', 1), panelSummaryOf('thyroid', 1)], 1),
-    ).toBe('肝功 1 项 +1');
+    ).toBe('肝功 1 项 · 另有 1 个项目共 1 项异常');
   });
 
   it('totalAbnormalCount 汇总所有项目异常数', () => {
@@ -359,6 +357,17 @@ describe('项目列表 / 详情展示口径', () => {
         panelSummaryOf('thyroid', 2),
       ]),
     ).toBe(6);
+  });
+
+  it('abnormalPanelCount 只数有异常的项目组,不数异常指标', () => {
+    expect(abnormalPanelCount([])).toBe(0);
+    expect(
+      abnormalPanelCount([
+        panelSummaryOf('liver', 4),
+        panelSummaryOf('kidney', 0),
+        panelSummaryOf('thyroid', 2),
+      ]),
+    ).toBe(2);
   });
 
   it('latestFailedReportAfter 只返回比当前项目最新报告更新的 failed 报告', () => {

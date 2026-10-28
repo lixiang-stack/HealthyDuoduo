@@ -15,7 +15,13 @@ import {
   type PanelTrend,
 } from '../../reports/panelOverview';
 import { panelLabel } from '../../reports/panels';
-import { flagLabel, itemFlagLabel, panelDateLabel, refRangeLabel } from '../../reports/status';
+import {
+  DATE_UNKNOWN_LABEL,
+  flagLabel,
+  itemFlagLabel,
+  panelDateLabel,
+  refRangeLabel,
+} from '../../reports/status';
 import { TrendDetailSheet } from '../../reports/TrendDetailSheet';
 import { TrendSparkline } from '../../reports/TrendChart';
 import {
@@ -138,9 +144,14 @@ export default function PanelDetailScreen() {
                 ) : (
                   <>
                     {groups.abnormal.length > 0 ? (
-                      <Text testID="panel-abnormal-title" style={styles.sectionTitle}>
-                        异常 {groups.abnormal.length} 项
-                      </Text>
+                      <>
+                        <Text testID="panel-abnormal-title" style={styles.sectionTitle}>
+                          异常 {groups.abnormal.length} 项
+                        </Text>
+                        <Text testID="panel-band-legend" style={styles.meta}>
+                          灰色带 = 参考范围
+                        </Text>
+                      </>
                     ) : null}
                     {groups.abnormal.map((item, index) => (
                       <AbnormalItemCard
@@ -313,6 +324,12 @@ function CompactItemRow({
         </View>
         <Text style={styles.ref}>{latest ? refRangeLabel(item.ref_range) : ''}</Text>
       </View>
+      {latest ? (
+        <Text testID={`panel-item-date-${index}`} style={styles.meta}>
+          {latest.report_date ?? DATE_UNKNOWN_LABEL}
+          {item.report_count > 1 ? ` · ${item.report_count} 份报告` : ''}
+        </Text>
+      ) : null}
     </>
   );
 

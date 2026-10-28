@@ -342,7 +342,8 @@ export function chartLayout(
     if (!bounds) {
       return;
     }
-    const x = layoutPoints[index].x;
+    // 单点图的参考带横跨整个绘图区,避免只剩「从点向右」的半截灰条。
+    const x = points.length === 1 ? plot.left : layoutPoints[index].x;
     const nextX = index < points.length - 1 ? layoutPoints[index + 1].x : plot.right;
     const top = yFor(bounds.high);
     const bottom = yFor(bounds.low);

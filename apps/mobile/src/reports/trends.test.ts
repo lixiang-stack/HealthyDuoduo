@@ -279,13 +279,15 @@ describe('chartLayout', () => {
     expect(layout.points[0].latest).toBe(false);
   });
 
-  it('单点居中,不画线', () => {
+  it('单点居中,不画线;参考带横跨绘图区', () => {
     const series = selectSeries([pointOf(lft04, '总胆红素', 'lft_04')], 'μmol/L', 'lft_04');
     const layout = chartLayout(series, 320, 64, { axes: false });
 
     expect(layout.points).toHaveLength(1);
     expect(layout.points[0].x).toBe(160);
     expect(layout.line).toBe('');
+    expect(layout.bands[0].x).toBe(8);
+    expect(layout.bands[0].width).toBe(304);
   });
 
   it('同日期点微偏移,不重叠', () => {

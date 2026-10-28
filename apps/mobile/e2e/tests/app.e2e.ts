@@ -248,6 +248,7 @@ describe('App E2E', { serial: true, timeout: 300_000 }, () => {
   test('按项目:影像行直接进最新报告详情', async ({ app, browser, screen }) => {
     await openConfigured(app, browser, '/timeline', { memberId: seed.xiaoming.member_id });
     await screen.getByTestId(testID.archiveViewPanel).tap();
+    await browser.waitForURL(/\/panels$/);
     await expect(screen.getByTestId(testID.panelRow('cbc'), { visible: true })).toBeVisible();
     const imagingRow = screen.getByTestId(testID.panelRow('imaging'));
     await expect(imagingRow).toContainText('叙述型报告');

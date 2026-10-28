@@ -138,6 +138,10 @@ export function TrendDetailSheet({
               <View style={[styles.dot, styles.dotHollow, styles.legendDot]} />
               <Text style={styles.muted}>空心 = 未核对低置信</Text>
             </View>
+            <View testID="trend-band-legend" style={styles.legendRow}>
+              <View style={styles.legendBand} />
+              <Text style={styles.muted}>灰色带 = 参考范围</Text>
+            </View>
           </View>
           <Text style={styles.muted}>点按任一行切换选中点。</Text>
 
@@ -227,5 +231,6 @@ const styles = StyleSheet.create({
   legendRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   legendDotFilled: { backgroundColor: colors.text, borderColor: colors.text },
   legendDot: { borderColor: colors.text },
+  legendBand: { width: 18, height: 8, borderRadius: 2, backgroundColor: colors.border, opacity: 0.45 },
   meta: { fontSize: 12, color: colors.muted, lineHeight: 18 },
 });

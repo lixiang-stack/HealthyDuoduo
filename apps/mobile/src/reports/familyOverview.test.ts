@@ -91,6 +91,18 @@ describe('familyCardSummary', () => {
     });
   });
 
+  it('异常项目超过展示上限:补异常指标总数 + 项目数,分项仍用圆点', () => {
+    const summary = familyCardSummary(
+      {
+        reports: [reportOf(cbc04, 'cbc_04')],
+        panels: [panelOf('cbc', 9), panelOf('liver', 4), panelOf('thyroid', 2)],
+      },
+      TODAY,
+    );
+    expect(summary.abnormalTotal).toBe('异常指标 15 项 · 3 个项目');
+    expect(summary.abnormal).toBe('血常规 9 项 · 肝功 4 项 · 另有 1 个项目共 2 项异常');
+  });
+
   it('多份报告取最新一份;影像主项目直接显示,异常项目来自项目列表', () => {
     const summary = familyCardSummary(
       {
