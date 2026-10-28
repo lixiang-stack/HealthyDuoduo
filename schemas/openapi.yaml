@@ -296,6 +296,50 @@ paths:
                 $ref: "#/components/schemas/TrendResult"
         "404":
           $ref: "#/components/responses/NotFound"
+  /members/{member_id}/panels:
+    get:
+      operationId: listMemberPanels
+      summary: 项目列表(按成员)
+      description: |
+        当前成员非 failed 报告的项目组聚合;只返回 report_count > 0 的项目,没有
+        可归类报告时返回空数组。排序:最近报告日期降序(dateless 沉底),同日期按
+        固定项目组优先级。failed 报告不参与;未回填存量(panels=[])一律归 other,
+        与 App `?panel=` 筛选回退口径一致。
+      parameters:
+        - $ref: "#/components/parameters/MemberID"
+      responses:
+        "200":
+          description: 项目列表
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PanelsList"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /members/{member_id}/panels/{panel}:
+    get:
+      operationId: getPanelDetail
+      summary: 项目详情(按成员 + 项目组)
+      description: |
+        该项目组下全部指标的最新值与跨报告趋势,按 name+unit 分行(跨单位不合并、
+        不换算)。异常项在前,其余按最新报告内指标顺序;latest 为空且
+        not_tested_count > 0 表示「未检测」;latest_report_not_tested 表示最近一份
+        含该指标的报告中此项未检测,数值是最近一次已知值。narrative=true(影像)
+        时 items=[]。未知成员 404,非法 panel 400。
+      parameters:
+        - $ref: "#/components/parameters/MemberID"
+        - $ref: "#/components/parameters/Panel"
+      responses:
+        "200":
+          description: 项目详情
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PanelDetail"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
 components:
   parameters:
     MemberID:
@@ -321,6 +365,12 @@ components:
       required: true
       description: 指标项名称(通常为词典规范名;修正后以修正值为准),URL 编码
       schema: { type: string, minLength: 1 }
+    Panel:
+      name: panel
+      in: path
+      required: true
+      description: 项目组稳定 code(与 PanelCode 枚举同源;非法 code 返回 400)
+      schema: { $ref: "#/components/schemas/PanelCode" }
   responses:
     BadRequest:
       description: 请求体或参数不合法(message 说明原因)
@@ -775,6 +825,117 @@ components:
           description: |
             响应派生信任标记(review_status ∈ {confirmed, corrected}):实心 =
             reviewed 或非低置信;空心 = 未核对低置信点——不隐藏数据、不冒充可信。
+    PanelsList:
+      type: object
+      additionalProperties: false
+      required: [panels]
+      properties:
+        panels:
+          type: array
+          items: { $ref: "#/components/schemas/PanelSummary" }
+    PanelSummary:
+      type: object
+      additionalProperties: false
+      required: [panel, report_count, item_count, abnormal_count, latest_report_date,
+        latest_report_id, report_types, narrative]
+      description: 项目列表一行;只返回当前成员非 failed 报告里实际出现过的项目。
+      properties:
+        panel:
+          $ref: "#/components/schemas/PanelCode"
+        report_count:
+          type: integer
+          minimum: 1
+          description: 当前成员非 failed 报告里包含该项目的份数
+        item_count:
+          type: integer
+          minimum: 0
+          description: 该项目下 name+unit 去重后的指标数(含未检测项)
+        abnormal_count:
+          type: integer
+          minimum: 0
+          description: 每个 name+unit 取最近非 not_tested 值后 flag ∈ high/low/abnormal 的数量
+        latest_report_date:
+          type: [string, "null"]
+          pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+          description: 包含该项目的最新报告日期;只有无日期报告时为 null
+        latest_report_id:
+          type: [string, "null"]
+          pattern: "^[0-9a-f]{64}$"
+          description: 最新报告身份;无报告时为 null(项目列表不返回这种行)
+        report_types:
+          type: array
+          items: { type: string, minLength: 1 }
+          description: 来源报告类别(other 行显示「其他 · 临检、免疫」)
+        narrative:
+          type: boolean
+          description: true = 影像等叙述型项目,点击直接打开最新报告详情
+    PanelDetail:
+      type: object
+      additionalProperties: false
+      required: [panel, member_id, report_count, latest_report_date, latest_report_id,
+        report_types, narrative, items]
+      properties:
+        panel:
+          $ref: "#/components/schemas/PanelCode"
+        member_id:
+          type: integer
+          format: int64
+        report_count:
+          type: integer
+          minimum: 0
+          description: 当前成员非 failed 报告里包含该项目的份数
+        latest_report_date:
+          type: [string, "null"]
+          pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        latest_report_id:
+          type: [string, "null"]
+          pattern: "^[0-9a-f]{64}$"
+        report_types:
+          type: array
+          items: { type: string, minLength: 1 }
+          description: 来源报告类别(other 详情头部显示)
+        narrative:
+          type: boolean
+          description: true 时 items=[];App 不打开该详情,项目列表直接进报告详情
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/PanelItem" }
+    PanelItem:
+      type: object
+      additionalProperties: false
+      required: [name, unit, ref_range, latest, points, report_count, not_tested_count,
+        latest_report_not_tested]
+      description: |
+        项目详情中按 name+unit 分行的指标。latest 为最近一个非 not_tested 点
+        (没有则 null);points 为同组跨报告点,report_date 升序、不含 not_tested。
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: 词典规范名(修正后以修正值为准)
+        unit:
+          type: [string, "null"]
+        ref_range:
+          type: [string, "null"]
+          description: 取 latest 点的参考范围
+        latest:
+          oneOf:
+            - $ref: "#/components/schemas/TrendPoint"
+            - type: "null"
+        points:
+          type: array
+          items: { $ref: "#/components/schemas/TrendPoint" }
+        report_count:
+          type: integer
+          minimum: 0
+          description: 有非 not_tested 点的报告数
+        not_tested_count:
+          type: integer
+          minimum: 0
+          description: 该指标被标为 not_tested 的报告数
+        latest_report_not_tested:
+          type: boolean
+          description: 最近一份含该指标的报告中此项是否为 not_tested
     Error:
       type: object
       additionalProperties: false

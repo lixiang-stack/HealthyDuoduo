@@ -13,6 +13,7 @@ export default function RootLayout() {
         <Stack.Screen name="timeline" options={{ title: '全部档案' }} />
         <Stack.Screen name="trends" options={{ title: '异常指标趋势' }} />
         <Stack.Screen name="report/[report_id]" options={{ title: '报告详情' }} />
+        <Stack.Screen name="panel/[panel]" options={{ title: '项目详情' }} />
         <Stack.Screen name="review/[report_id]" options={{ title: '核对报告' }} />
         <Stack.Screen name="upload" options={{ title: '上传检查单' }} />
       </Stack>

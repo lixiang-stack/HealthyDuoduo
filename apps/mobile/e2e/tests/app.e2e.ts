@@ -196,6 +196,18 @@ describe('App E2E', { serial: true, timeout: 300_000 }, () => {
     await expect(screen.getByTestId(testID.reportCard(seed.imaging03.report_id))).toBeVisible();
   });
 
+  test('按项目:影像行直接进最新报告详情', async ({ app, browser, screen }) => {
+    await openConfigured(app, browser, '/timeline', { memberId: seed.xiaoming.member_id });
+    await screen.getByTestId(testID.archiveViewPanel).tap();
+    await expect(screen.getByTestId(testID.panelRow('cbc'), { visible: true })).toBeVisible();
+    const imagingRow = screen.getByTestId(testID.panelRow('imaging'));
+    await expect(imagingRow).toContainText('叙述型报告');
+    await imagingRow.tap();
+    // 影像项目不做项目详情:直接打开最新影像报告(us_03 有日期,晚于 us_01)。
+    await browser.waitForURL(new RegExp(`/report/${seed.imaging03.report_id}$`));
+    await expect(screen.getByTestId(testID.reportExamName)).toBeVisible();
+  });
+
   test('上传样张后时间线出现新报告', async ({ app, browser, screen }) => {
     await stubFileChooser(browser);
     await openConfigured(app, browser, '/upload', { memberId: seed.uploadMember.member_id });

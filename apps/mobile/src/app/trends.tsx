@@ -122,7 +122,11 @@ export default function TrendsScreen() {
       {detailRow ? (
         <TrendDetailSheet
           key={`${detailRow.candidate.reportId}-${detailRow.candidate.item.item_id}`}
-          row={detailRow}
+          name={displayItemName(detailRow.candidate.item)}
+          reportType={detailRow.candidate.reportType}
+          reportDate={detailRow.candidate.reportDate}
+          latestValue={detailRow.candidate.item.value}
+          series={detailRow.series}
           onClose={() => setDetailRow(undefined)}
         />
       ) : null}

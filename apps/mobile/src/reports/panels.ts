@@ -4,6 +4,27 @@ import type { components } from '../api/schema';
 
 export type PanelCode = components['schemas']['PanelCode'];
 
+/** 固定优先级(spec §5.3):只在项目列表同日期并列时裁决,不是医学优先级;other 兜底。
+ *  唯一来源是 schemas/report.schema.json $defs.panel.x-panel-order;测试锁定三端同源。 */
+export const PANEL_ORDER: PanelCode[] = [
+  'liver',
+  'kidney',
+  'lipid',
+  'glucose',
+  'uric_acid',
+  'electrolyte',
+  'vitanemia',
+  'thyroid',
+  'sex_hormone',
+  'infection',
+  'autoimmune',
+  'coag',
+  'cbc',
+  'urinalysis',
+  'imaging',
+  'other',
+];
+
 export const PANEL_LABELS: Record<PanelCode, string> = {
   cbc: '血常规',
   urinalysis: '尿常规',

@@ -462,7 +462,7 @@ function buildXLabels(
  * 行元信息:日期范围 + 份数;追加缺日期 / 非数值指标项 / 单位不同(未连线),
  * 三项条件独立。份数按同单位去重后的报告数。
  */
-export function formatSeriesMeta(series: TrendSeries, candidate: TrendCandidate): string {
+export function formatSeriesMeta(series: TrendSeries, candidate: Pick<TrendCandidate, 'reportDate'>): string {
   const points = series.listPoints;
   const dated = points.filter(isDated);
   const parts: string[] = [];
@@ -496,15 +496,15 @@ export function formatSeriesMeta(series: TrendSeries, candidate: TrendCandidate)
 /** 详情图不可画时的中性原因;有可绘制数值点时不返回原因。 */
 export function trendUnavailableReason(
   series: TrendSeries,
-  candidate: TrendCandidate,
+  latest: { reportDate: string | null; item: Pick<ReportItem, 'value'> },
 ): string | undefined {
   if (series.chartPoints.length > 0) {
     return undefined;
   }
-  if (parseNumericForm(candidate.item.value).kind !== 'scalar') {
+  if (parseNumericForm(latest.item.value).kind !== 'scalar') {
     return '最近一次为非数值结果';
   }
-  if (candidate.reportDate === null) {
+  if (latest.reportDate === null) {
     return '最近一次缺日期';
   }
   return '没有可绘制的数值点';

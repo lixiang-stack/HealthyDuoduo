@@ -43,7 +43,7 @@ func loadFixture(t *testing.T, name string) []byte {
 	return data
 }
 
-// TestOpenAPIFrozenPathSet 12 端点集合冻结:实现票不得多加、少删或改路径/方法
+// TestOpenAPIFrozenPathSet 14 端点集合冻结:实现票不得多加、少删或改路径/方法
 // (契约变更须先改本文件与 OpenAPI 再随 PR 提走)。
 func TestOpenAPIFrozenPathSet(t *testing.T) {
 	doc := getOpenAPI(t)
@@ -57,6 +57,8 @@ func TestOpenAPIFrozenPathSet(t *testing.T) {
 		"PATCH /reports/{report_id}/items/{item_id}": true,
 		"GET /images/{sha256}":                       true,
 		"GET " + trendPath:                           true,
+		"GET /members/{member_id}/panels":            true,
+		"GET /members/{member_id}/panels/{panel}":    true,
 	}
 	got := map[string]bool{}
 	for path, item := range doc["paths"].(map[string]any) {
@@ -293,6 +295,8 @@ var reconcileCases = []fixtureCase{
 	{"review.result.json", "ReviewResult", unmarshal[ReviewResult]},
 	{"correction.pair.json", "CorrectionPair", unmarshal[CorrectionPair]},
 	{"trend.json", "TrendResult", unmarshal[TrendResult]},
+	{"panel.list.json", "PanelsList", unmarshal[PanelsList]},
+	{"panel.detail.json", "PanelDetail", unmarshal[PanelDetail]},
 }
 
 // TestFixturesReconcileOpenAPI 每个 fixture 对其声明的 OpenAPI component 校验;

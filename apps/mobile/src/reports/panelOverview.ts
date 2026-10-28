@@ -1,8 +1,8 @@
 // 报告级项目组展示(panel-browse 票 02):卡片主标签与详情分组。
 // 项目组只是浏览入口:详情按 panels 分组但始终展示报告全部指标,不按项目隐藏。
-import type { ReportDetail, ReportItem, ReportSummary } from '../api/reports';
+import type { PanelItem, ReportDetail, ReportItem, ReportSummary } from '../api/reports';
 
-import { panelLabel, type PanelCode } from './panels';
+import { PANEL_ORDER, panelLabel, type PanelCode } from './panels';
 import { isAbnormalFlag } from './trends';
 
 /** 失败 / 未回填存量没有可信项目组:卡片与次要信息都回退 report_type。 */
@@ -84,4 +84,103 @@ export function reportItemGroups(
 /** 组内异常项数(high/low/abnormal;unknown / not_tested 不计,与 PanelSummary 同口径)。 */
 export function abnormalItemCount(items: ReportItem[]): number {
   return items.filter((item) => isAbnormalFlag(item.flag)).length;
+}
+
+/** 报告是否属于某项目组:failed 不参与;未回填存量 panels=[] 按 [other] 处理
+ *  (与项目列表把存量项归「其他」一致)。 */
+export function reportHasPanel(
+  report: Pick<ReportSummary, 'panels' | 'status'>,
+  panel: PanelCode,
+): boolean {
+  if (report.status === 'failed') {
+    return false;
+  }
+  const panels = report.panels.length > 0 ? report.panels : (['other'] as PanelCode[]);
+  return panels.includes(panel);
+}
+
+/** 时间线 ?panel= 筛选:保持入参顺序,只看非 failed 且包含该项目的报告。 */
+export function filterReportsByPanel(
+  reports: ReportSummary[],
+  panel: PanelCode | undefined,
+): ReportSummary[] {
+  if (panel === undefined) {
+    return reports;
+  }
+  return reports.filter((report) => reportHasPanel(report, panel));
+}
+
+/** App 内部 ?panel= 参数解析:数组取首值,只接受合法 code,其余按无筛选。 */
+export function parsePanelParam(raw: string | string[] | undefined): PanelCode | undefined {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  return value !== undefined && PANEL_ORDER.includes(value as PanelCode)
+    ? (value as PanelCode)
+    : undefined;
+}
+
+/** other 行 / 详情头部的来源报告类别:如「其他 · 临检、免疫」;非 other 不显示。 */
+export function panelSourceLabel(
+  panel: PanelCode,
+  reportTypes: string[],
+): string | undefined {
+  if (panel !== 'other' || reportTypes.length === 0) {
+    return undefined;
+  }
+  return `其他 · ${reportTypes.join('、')}`;
+}
+
+/** 项目详情项是否异常(以最近非 not_tested 点为准;未检测 / 无点不异常)。 */
+export function panelItemIsAbnormal(item: Pick<PanelItem, 'latest'>): boolean {
+  return item.latest !== null && isAbnormalFlag(item.latest.flag);
+}
+
+/** 项目详情分组:异常项在前,其余保持后端「最新报告内顺序」。 */
+export function splitPanelItems(items: PanelItem[]): {
+  abnormal: PanelItem[];
+  rest: PanelItem[];
+} {
+  const abnormal: PanelItem[] = [];
+  const rest: PanelItem[] = [];
+  for (const item of items) {
+    (panelItemIsAbnormal(item) ? abnormal : rest).push(item);
+  }
+  return { abnormal, rest };
+}
+
+/** 报告新鲜度:日期降序、dateless 沉底;同日按 report_id 降序(与服务端
+ *  「最近报告」口径一致)。 */
+function reportIsNewer(
+  report: Pick<ReportSummary, 'report_id' | 'report_date'>,
+  date: string | null,
+  reportId: string | null,
+): boolean {
+  if (report.report_date === null) {
+    return date === null && (reportId === null || report.report_id > reportId);
+  }
+  if (date === null) {
+    return true;
+  }
+  if (report.report_date !== date) {
+    return report.report_date > date;
+  }
+  return reportId === null || report.report_id > reportId;
+}
+
+/** 比当前项目详情最新非 failed 报告更新的一份 failed 报告(用于「另有更新的一份
+ *  识别失败报告」);没有则为 undefined。 */
+export function latestFailedReportAfter(
+  reports: ReportSummary[],
+  latestDate: string | null,
+  latestReportId: string | null,
+): ReportSummary | undefined {
+  let latest: ReportSummary | undefined;
+  for (const report of reports) {
+    if (report.status !== 'failed' || !reportIsNewer(report, latestDate, latestReportId)) {
+      continue;
+    }
+    if (!latest || reportIsNewer(report, latest.report_date, latest.report_id)) {
+      latest = report;
+    }
+  }
+  return latest;
 }

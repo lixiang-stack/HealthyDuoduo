@@ -4,13 +4,20 @@ import lft08Json from '../../../../samples/expected/report/lft_08.json';
 import tft01Json from '../../../../samples/expected/report/tft_01.json';
 import ua05Json from '../../../../samples/expected/report/ua_05.json';
 import us01Json from '../../../../samples/expected/report/us_01.json';
-import type { ReportDetail, ReportItem, ReportSummary } from '../api/reports';
+import type { PanelItem, ReportDetail, ReportItem, ReportSummary } from '../api/reports';
 
 import {
   abnormalItemCount,
+  filterReportsByPanel,
+  latestFailedReportAfter,
+  panelItemIsAbnormal,
+  panelSourceLabel,
+  parsePanelParam,
+  reportHasPanel,
   reportItemGroups,
   reportPanelLabels,
   reportTypeNote,
+  splitPanelItems,
 } from './panelOverview';
 
 type GoldenItem = {
@@ -156,3 +163,127 @@ describe('reportItemGroups', () => {
     expect(groups[2].items.map((item) => item.item_id)).toEqual([99]);
   });
 });
+
+describe('按项目筛选', () => {
+  it('报告包含多个项目组时每个项目都命中;failed 不参与', () => {
+    const lft02Report = summary(lft02.panels);
+    expect(reportHasPanel(lft02Report, 'liver')).toBe(true);
+    expect(reportHasPanel(lft02Report, 'kidney')).toBe(true);
+    expect(reportHasPanel(lft02Report, 'uric_acid')).toBe(true);
+    expect(reportHasPanel(lft02Report, 'thyroid')).toBe(false);
+    expect(reportHasPanel({ ...lft02Report, status: 'failed' }, 'liver')).toBe(false);
+  });
+
+  it('未回填存量 panels=[] 按 other 参与筛选;其余项目不命中', () => {
+    const legacy = summary([], { report_type: '临检' });
+    expect(reportHasPanel(legacy, 'other')).toBe(true);
+    expect(reportHasPanel(legacy, 'cbc')).toBe(false);
+  });
+
+  it('filterReportsByPanel 保持入参顺序', () => {
+    const reports = [summary(lft06.panels), summary(tft01.panels), summary(lft08.panels)];
+    expect(filterReportsByPanel(reports, 'lipid')).toEqual([reports[0]]);
+    expect(filterReportsByPanel(reports, 'electrolyte')).toEqual([reports[2]]);
+    expect(filterReportsByPanel(reports, 'thyroid')).toEqual([reports[1]]);
+  });
+
+  it('parsePanelParam 只接受合法 code,数组取首值', () => {
+    expect(parsePanelParam('kidney')).toBe('kidney');
+    expect(parsePanelParam(['liver', 'kidney'])).toBe('liver');
+    expect(parsePanelParam('pathology')).toBeUndefined();
+    expect(parsePanelParam(undefined)).toBeUndefined();
+  });
+});
+
+describe('项目列表 / 详情展示口径', () => {
+  it('other 行显示来源报告类别;非 other 不显示', () => {
+    expect(panelSourceLabel('other', ['临检', '免疫'])).toBe('其他 · 临检、免疫');
+    expect(panelSourceLabel('liver', ['生化'])).toBeUndefined();
+    expect(panelSourceLabel('other', [])).toBeUndefined();
+  });
+
+  it('异常项以 latest flag 为准;未检测 / 无点不算异常', () => {
+    expect(panelItemIsAbnormal(panelItem({ flag: 'high' }))).toBe(true);
+    expect(panelItemIsAbnormal(panelItem({ flag: 'abnormal' }))).toBe(true);
+    expect(panelItemIsAbnormal(panelItem({ flag: 'normal' }))).toBe(false);
+    expect(panelItemIsAbnormal(panelItem({ flag: 'not_tested', latest: null }))).toBe(false);
+    expect(panelItemIsAbnormal(panelItem({ latest: null }))).toBe(false);
+  });
+
+  it('splitPanelItems 异常在前,其余保持后端顺序', () => {
+    const items = [
+      panelItem({ name: 'A', flag: 'normal' }),
+      panelItem({ name: 'B', flag: 'high' }),
+      panelItem({ name: 'C', latest: null }),
+      panelItem({ name: 'D', flag: 'low' }),
+    ];
+    const { abnormal, rest } = splitPanelItems(items);
+    expect(abnormal.map((item) => item.name)).toEqual(['B', 'D']);
+    expect(rest.map((item) => item.name)).toEqual(['A', 'C']);
+  });
+
+  it('latestFailedReportAfter 只返回比当前项目最新报告更新的 failed 报告', () => {
+    const latestDate = '2026-10-01';
+    const latestId = 'a'.repeat(64);
+    const failed = (date: string | null, id: string) =>
+      summary(['other'], { report_id: id, report_date: date, status: 'failed' });
+
+    expect(
+      latestFailedReportAfter([failed('2026-10-02', 'b'.repeat(64))], latestDate, latestId)
+        ?.report_id,
+    ).toBe('b'.repeat(64));
+    // 同日:report_id 降序更大者更新(与服务端最近报告口径一致)。
+    expect(
+      latestFailedReportAfter([failed(latestDate, 'f'.repeat(64))], latestDate, latestId)
+        ?.report_id,
+    ).toBe('f'.repeat(64));
+    expect(
+      latestFailedReportAfter([failed(latestDate, '0'.repeat(64))], latestDate, latestId),
+    ).toBeUndefined();
+    expect(
+      latestFailedReportAfter([failed('2026-09-30', 'f'.repeat(64))], latestDate, latestId),
+    ).toBeUndefined();
+    expect(
+      latestFailedReportAfter([failed(null, 'f'.repeat(64))], latestDate, latestId),
+    ).toBeUndefined();
+    expect(
+      latestFailedReportAfter(
+        [failed('2026-10-02', 'b'.repeat(64)), failed('2026-10-03', 'c'.repeat(64))],
+        latestDate,
+        latestId,
+      )?.report_id,
+    ).toBe('c'.repeat(64));
+  });
+});
+
+function panelItem({
+  name = '指标',
+  flag = 'normal',
+  latest = true,
+}: {
+  name?: string;
+  flag?: NonNullable<PanelItem['latest']>['flag'];
+  latest?: boolean | null;
+}): PanelItem {
+  const point = {
+    report_id: 'r'.repeat(64),
+    report_date: '2026-10-01',
+    value: '1.0',
+    unit: 'U/L',
+    ref_range: null,
+    method: null,
+    flag,
+    low_confidence: false,
+    reviewed: false,
+  };
+  return {
+    name,
+    unit: 'U/L',
+    ref_range: null,
+    latest: latest ? point : null,
+    points: latest ? [point] : [],
+    report_count: latest ? 1 : 0,
+    not_tested_count: latest ? 0 : 1,
+    latest_report_not_tested: !latest,
+  };
+}

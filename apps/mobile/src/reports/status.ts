@@ -70,6 +70,15 @@ export function reportDateLabel(
   return isImagingReport(report) ? IMAGING_DATE_UNPRINTED_LABEL : DATE_UNKNOWN_LABEL;
 }
 
+/** 项目列表 / 详情日期文案:narrative(影像)项目未印日期用「未印」口径,
+ *  其余项目复用检验单「日期未知」;不伪造 report_type 字符串。 */
+export function panelDateLabel(date: string | null, narrative: boolean): string {
+  if (date) {
+    return date;
+  }
+  return narrative ? IMAGING_DATE_UNPRINTED_LABEL : DATE_UNKNOWN_LABEL;
+}
+
 const FLAG_LABELS: Record<Flag, string> = {
   normal: '正常',
   high: '偏高',

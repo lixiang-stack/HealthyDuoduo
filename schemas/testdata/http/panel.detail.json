@@ -1,0 +1,96 @@
+{
+  "panel": "liver",
+  "member_id": 1,
+  "report_count": 3,
+  "latest_report_date": "2021-08-02",
+  "latest_report_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "report_types": ["生化"],
+  "narrative": false,
+  "items": [
+    {
+      "name": "丙氨酸转氨酶",
+      "unit": "U/L",
+      "ref_range": "7-40",
+      "latest": {
+        "report_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "report_date": "2021-08-02",
+        "value": "835",
+        "unit": "U/L",
+        "ref_range": "7-40",
+        "method": null,
+        "flag": "high",
+        "low_confidence": false,
+        "reviewed": true
+      },
+      "points": [
+        {
+          "report_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "report_date": "2020-01-01",
+          "value": "27.4",
+          "unit": "U/L",
+          "ref_range": "7-40",
+          "method": null,
+          "flag": "normal",
+          "low_confidence": false,
+          "reviewed": false
+        },
+        {
+          "report_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "report_date": "2021-08-02",
+          "value": "835",
+          "unit": "U/L",
+          "ref_range": "7-40",
+          "method": null,
+          "flag": "high",
+          "low_confidence": false,
+          "reviewed": true
+        }
+      ],
+      "report_count": 2,
+      "not_tested_count": 0,
+      "latest_report_not_tested": false
+    },
+    {
+      "name": "白蛋白",
+      "unit": "g/L",
+      "ref_range": "40-55",
+      "latest": {
+        "report_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "report_date": "2020-01-01",
+        "value": "42",
+        "unit": "g/L",
+        "ref_range": "40-55",
+        "method": null,
+        "flag": "normal",
+        "low_confidence": false,
+        "reviewed": false
+      },
+      "points": [
+        {
+          "report_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "report_date": "2020-01-01",
+          "value": "42",
+          "unit": "g/L",
+          "ref_range": "40-55",
+          "method": null,
+          "flag": "normal",
+          "low_confidence": false,
+          "reviewed": false
+        }
+      ],
+      "report_count": 1,
+      "not_tested_count": 1,
+      "latest_report_not_tested": true
+    },
+    {
+      "name": "前白蛋白",
+      "unit": "mg/L",
+      "ref_range": null,
+      "latest": null,
+      "points": [],
+      "report_count": 0,
+      "not_tested_count": 1,
+      "latest_report_not_tested": true
+    }
+  ]
+}

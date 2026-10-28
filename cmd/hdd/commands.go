@@ -30,6 +30,7 @@ type deps struct {
 	members    pipeline.MemberStore
 	reports    pipeline.ReportStore
 	trends     pipeline.TrendStore
+	panels     pipeline.PanelStore
 	backfill   pipeline.BackfillStore
 	classifier pipeline.PanelClassifier
 	rec        pipeline.Recognizer

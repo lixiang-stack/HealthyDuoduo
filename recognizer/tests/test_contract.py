@@ -181,6 +181,13 @@ def test_every_panel_has_label_and_parent() -> None:
     )
 
 
+def test_panel_enum_and_order_match_schema() -> None:
+    """枚举集合与 §5.3 顺序以 report.schema.json 为单一来源;改一处不会漏改三端。"""
+    panel_schema = _load(SCHEMA_DIR / "report.schema.json")["$defs"]["panel"]
+    assert set(panel_schema["enum"]) == {p.value for p in Panel}
+    assert tuple(panel_schema["x-panel-order"]) == tuple(p.value for p in PANEL_ORDER)
+
+
 def test_report_sections_optional_and_validated() -> None:
     """sections 可选;出现时 kind/text/行号均非空,且允许 failed 空 items 携带段落。"""
     schema = Draft202012Validator(_load(SCHEMA_DIR / "report.schema.json"))

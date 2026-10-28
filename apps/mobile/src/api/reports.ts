@@ -9,6 +9,7 @@ import type { ApiClient } from './client';
 import { assertOk, unwrap } from './client';
 import type { PickedImage } from '../platform/imagePicker';
 import { appendImagePart } from '../platform/imageUpload';
+import type { PanelCode } from '../reports/panels';
 import type { components } from './schema';
 
 export type ReportSummary = components['schemas']['ReportSummary'];
@@ -21,6 +22,9 @@ export type ReportSection = components['schemas']['ReportSection'];
 export type ReviewResult = components['schemas']['ReviewResult'];
 export type TrendPoint = components['schemas']['TrendPoint'];
 export type TrendResult = components['schemas']['TrendResult'];
+export type PanelSummary = components['schemas']['PanelSummary'];
+export type PanelDetail = components['schemas']['PanelDetail'];
+export type PanelItem = components['schemas']['PanelItem'];
 
 // 契约 ReviewRequest 的 oneOf 经 codegen 退化为 unknown(correct 分支的 anyOf
 // 收敛为 unknown),此处手写同一判别联合:confirm 只带 action(不产生修正对);
@@ -66,6 +70,31 @@ export async function getTrend(
         path: { member_id: memberId, name },
         query: unit ? { unit } : undefined,
       },
+    }),
+  );
+}
+
+/** 当前成员可浏览的项目列表(只包含实际出现过的项目;排序由服务端给)。 */
+export async function listMemberPanels(
+  client: ApiClient,
+  memberId: number,
+): Promise<PanelSummary[]> {
+  return unwrap(
+    await client.GET('/members/{member_id}/panels', {
+      params: { path: { member_id: memberId } },
+    }),
+  ).panels;
+}
+
+/** 项目详情:该项目全部指标的最新值与跨报告点(按 name+unit 分行)。 */
+export async function getPanelDetail(
+  client: ApiClient,
+  memberId: number,
+  panel: PanelCode,
+): Promise<PanelDetail> {
+  return unwrap(
+    await client.GET('/members/{member_id}/panels/{panel}', {
+      params: { path: { member_id: memberId, panel } },
     }),
   );
 }
