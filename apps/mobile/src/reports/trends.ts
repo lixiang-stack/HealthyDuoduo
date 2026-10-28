@@ -1,9 +1,8 @@
-// 异常指标趋势纯逻辑(票 03/04):先从当前成员的最新非 failed 报告里选出异常指标候选,
-// 再按候选单位把趋势端点返回的全部单位点切成同单位序列,最后生成迷你图/完整图几何与元信息。
-// 序列只来自趋势端点;这里不做跨报告拼装,也不做跨单位换算。
-import type { ReportDetail, ReportItem, ReportSummary, TrendPoint } from '../api/reports';
+// 趋势图纯逻辑(票 04):按指标单位把项目详情的跨报告点切成同单位序列,
+// 再生成迷你图/完整图几何与元信息。本页数据全部来自 PanelItem.points,
+// 跨单位不连线、不换算。
+import type { ReportItem, TrendPoint } from '../api/reports';
 
-import { latestByCategory } from './overview';
 import { parseNumericForm, parseRefRange, type NumericForm } from './refRange';
 import { DATE_UNKNOWN_LABEL } from './status';
 
@@ -19,13 +18,6 @@ export type AbnormalFlag = 'high' | 'low' | 'abnormal';
 export function isAbnormalFlag(flag: ReportItem['flag']): flag is AbnormalFlag {
   return flag === 'high' || flag === 'low' || flag === 'abnormal';
 }
-
-export type TrendCandidate = {
-  reportType: string;
-  reportId: string;
-  reportDate: string | null;
-  item: ReportItem;
-};
 
 export type DatedTrendPoint = TrendPoint & { report_date: string };
 export type ChartableTrendPoint = DatedTrendPoint & { value: string };
@@ -96,65 +88,10 @@ export type TrendChartLayout = {
   domain: { min: number; max: number };
 };
 
-/** null / 空串归一,单位比较与连接键共用同一口径。 */
+/** null / 空串归一,单位比较共用同一口径。 */
 function normalizedUnit(unit: string | null | undefined): string | null {
   const trimmed = unit?.trim() ?? '';
   return trimmed === '' ? null : trimmed;
-}
-
-/** 趋势连接键:name + 归一单位(与候选去重、请求去重共用)。 */
-export function trendKey(name: string, unit: string | null): string {
-  return JSON.stringify([name, normalizedUnit(unit)]);
-}
-
-function hasAbnormalFlags(report: ReportSummary): boolean {
-  const { high, low, abnormal } = report.flag_counts;
-  return high + low + abnormal > 0;
-}
-
-/** 每类最新非 failed 报告,只留 flag_counts 中有异常项的类别;顺序即类别日期降序。 */
-export function latestAbnormalByCategory(reports: ReportSummary[]): ReportSummary[] {
-  return latestByCategory(reports.filter((report) => report.status !== 'failed')).filter(
-    hasAbnormalFlags,
-  );
-}
-
-/**
- * 候选异常指标:每类最新非 failed 报告 → 只留异常项 → 按 name + unit 去重。
- * 保持类别日期序与报告内 item 序;没有候选的类别自然不出现。
- */
-export function selectAbnormalCandidates(
-  reports: ReportSummary[],
-  details: ReportDetail[],
-): TrendCandidate[] {
-  const detailById = new Map(details.map((detail) => [detail.report_id, detail]));
-  const seen = new Set<string>();
-  const candidates: TrendCandidate[] = [];
-
-  for (const report of latestAbnormalByCategory(reports)) {
-    const detail = detailById.get(report.report_id);
-    if (!detail) {
-      continue;
-    }
-    for (const item of detail.items) {
-      if (!isAbnormalFlag(item.flag)) {
-        continue;
-      }
-      const key = trendKey(item.name, item.unit);
-      if (seen.has(key)) {
-        continue;
-      }
-      seen.add(key);
-      candidates.push({
-        reportType: report.report_type,
-        reportId: report.report_id,
-        reportDate: report.report_date,
-        item,
-      });
-    }
-  }
-
-  return candidates;
 }
 
 function isDated(point: TrendPoint): point is DatedTrendPoint {
@@ -178,13 +115,13 @@ function comparePoints(a: TrendPoint, b: TrendPoint): number {
 }
 
 /**
- * 按候选单位裁出趋势序列:同单位过滤(normalize null/空)→ report_id 去重 →
+ * 按指标单位裁出趋势序列:同单位过滤(normalize null/空)→ report_id 去重 →
  * 日期升序 / dateless 沉底。跨单位只做计数,不连线。
  */
 export function selectSeries(
   points: TrendPoint[],
   unit: string | null | undefined,
-  candidateReportId: string,
+  selectedReportId: string,
 ): TrendSeries {
   const targetUnit = normalizedUnit(unit);
   const sameUnit: TrendPoint[] = [];
@@ -215,7 +152,7 @@ export function selectSeries(
   );
   const dated = listPoints.filter(isDated);
   const selected =
-    listPoints.find((point) => point.report_id === candidateReportId) ??
+    listPoints.find((point) => point.report_id === selectedReportId) ??
     dated[dated.length - 1] ??
     listPoints[listPoints.length - 1];
 
@@ -233,7 +170,7 @@ export function selectSeries(
   };
 }
 
-/** 详情层默认选中项:候选报告对应的点;找不到时回落最新点。 */
+/** 详情层默认选中项:行最新点对应的点;找不到时回落最新点。 */
 export function defaultSelectedIndex(series: TrendSeries): number {
   const index = series.listPoints.findIndex(
     (point) => point.report_id === series.selectedPoint?.report_id,
@@ -462,13 +399,16 @@ function buildXLabels(
  * 行元信息:日期范围 + 份数;追加缺日期 / 非数值指标项 / 单位不同(未连线),
  * 三项条件独立。份数按同单位去重后的报告数。
  */
-export function formatSeriesMeta(series: TrendSeries, candidate: Pick<TrendCandidate, 'reportDate'>): string {
+export function formatSeriesMeta(
+  series: TrendSeries,
+  latest: { reportDate: string | null },
+): string {
   const points = series.listPoints;
   const dated = points.filter(isDated);
   const parts: string[] = [];
 
   if (points.length === 0) {
-    parts.push(`${candidate.reportDate ?? DATE_UNKNOWN_LABEL} · 暂无趋势数据`);
+    parts.push(`${latest.reportDate ?? DATE_UNKNOWN_LABEL} · 暂无趋势数据`);
   } else if (points.length === 1) {
     parts.push(`${points[0].report_date ?? DATE_UNKNOWN_LABEL} · 仅 1 份报告`);
   } else if (dated.length === 0) {
@@ -496,12 +436,12 @@ export function formatSeriesMeta(series: TrendSeries, candidate: Pick<TrendCandi
 /** 详情图不可画时的中性原因;有可绘制数值点时不返回原因。 */
 export function trendUnavailableReason(
   series: TrendSeries,
-  latest: { reportDate: string | null; item: Pick<ReportItem, 'value'> },
+  latest: { reportDate: string | null; value: string | null },
 ): string | undefined {
   if (series.chartPoints.length > 0) {
     return undefined;
   }
-  if (parseNumericForm(latest.item.value).kind !== 'scalar') {
+  if (parseNumericForm(latest.value).kind !== 'scalar') {
     return '最近一次为非数值结果';
   }
   if (latest.reportDate === null) {

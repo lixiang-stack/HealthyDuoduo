@@ -5,8 +5,8 @@ import { beforeAll, describe, test } from '@e2e-dev/web';
 import { expect } from 'e2e';
 import type { Screen } from 'e2e';
 
-import { latestByCategory, pendingSummary } from '../../src/reports/overview';
 import { parseNumericForm } from '../../src/reports/refRange';
+import { relativeDateLabel } from '../../src/reports/relativeDate';
 import { EXAM_NAME_KIND, SECTION_LABELS, examNameText } from '../../src/reports/sections';
 import { reportDateLabel, uploadResultText } from '../../src/reports/status';
 import { flagReasonText, isBackfillItem, reviewStatusLabel } from '../../src/review/rules';
@@ -50,7 +50,9 @@ describe('App E2E', { serial: true, timeout: 300_000 }, () => {
     await expect(screen.getByText(/已连通 · 版本/)).toBeVisible();
 
     await app.open('/');
-    await expect(screen.getByText('查看谁的档案')).toBeVisible();
+    await expect(
+      screen.getByTestId(testID.headerSettingsFamily, { visible: true }),
+    ).toBeVisible();
   });
 
   test('创建并切换家庭成员', async ({ app, browser, screen }) => {
@@ -107,88 +109,135 @@ describe('App E2E', { serial: true, timeout: 300_000 }, () => {
     ).toBeVisible();
   });
 
-  test('成员概览与待处理入口', async ({ app, browser, screen }) => {
-    const xiaomingReports = [seed.reviewReport, seed.imaging01, seed.imaging03];
-    const xiaomingLatest = latestByCategory(xiaomingReports);
-    const xiaomingPending = pendingSummary(xiaomingReports);
+  test('家庭首页成员卡、双 Tab、设置 header 与上传 FAB', async ({
+    app,
+    browser,
+    screen,
+  }) => {
+    const latestRelative = relativeDateLabel('2024-09-15', new Date());
 
-    await openConfigured(app, browser, '/', { memberId: seed.xiaoming.member_id });
-    await expect(screen.getByText('查看谁的档案')).toBeVisible();
-    // cbc_03 是 success 但含未核对低置信项:概览按待核对展示份数与项数。
-    await expect(screen.getByTestId(testID.overviewPendingEmpty)).toHaveCount(0);
-    await expect(screen.getByTestId(testID.overviewPendingPartial)).toContainText(
-      `${xiaomingPending.partialReports} 份`,
-    );
-    await expect(screen.getByTestId(testID.overviewPendingPartial)).toContainText(
-      `${xiaomingPending.unreviewedItems} 项`,
-    );
-    await expect(screen.getByTestId(testID.overviewPendingFailed)).toHaveCount(0);
-    for (const report of xiaomingReports) {
-      const latest = xiaomingLatest.some((entry) => entry.report_id === report.report_id);
-      await expect(screen.getByTestId(testID.overviewLatest(report.report_id))).toHaveCount(
-        latest ? 1 : 0,
-      );
-    }
-    await expect(screen.getByTestId(testID.overviewAllReports)).toContainText(
-      `${xiaomingReports.length} 份`,
-    );
+    // 以无报告的成员为当前成员打开,点小明卡后应切换到小明并进档案。
+    await openConfigured(app, browser, '/', { memberId: seed.uploadMember.member_id });
+    await expect(
+      screen.getByTestId(testID.headerSettingsFamily, { visible: true }),
+    ).toBeVisible();
+    await expect(screen.getByTestId(testID.tabFamily)).toBeVisible();
+    await expect(screen.getByTestId(testID.tabArchive)).toBeVisible();
+    await expect(screen.getByTestId(testID.uploadFab)).toHaveCount(0);
 
-    const mamaReports = [seed.healReport];
-    const mamaPending = pendingSummary(mamaReports);
-    await screen.getByTestId(testID.memberChip(seed.mama.member_id)).tap();
-    await expect(screen.getByTestId(testID.overviewPendingPartial)).toContainText(
-      `${mamaPending.partialReports} 份`,
-    );
-    await expect(screen.getByTestId(testID.overviewPendingPartial)).toContainText(
-      `${mamaPending.unreviewedItems} 项`,
-    );
-    await expect(screen.getByTestId(testID.overviewPendingFailed)).toHaveCount(0);
-    await expect(screen.getByTestId(testID.overviewPendingEmpty)).toHaveCount(0);
-    for (const report of mamaReports) {
-      await expect(screen.getByTestId(testID.overviewLatest(report.report_id))).toBeVisible();
-    }
-    await expect(screen.getByTestId(testID.overviewLatest(seed.imaging03.report_id))).toHaveCount(0);
-    await expect(screen.getByTestId(testID.overviewAllReports)).toContainText(
-      `${mamaReports.length} 份`,
-    );
+    const xiaomingCard = screen.getByTestId(testID.familyMember(seed.xiaoming.member_id));
+    await expect(xiaomingCard).toContainText('E2E 小明');
+    await expect(xiaomingCard).toContainText('孩子');
+    await expect(
+      screen.getByTestId(testID.familyMemberPending(seed.xiaoming.member_id)),
+    ).toContainText('待核对 1 份 · 1 项');
+    await expect(
+      screen.getByTestId(testID.familyMemberLatest(seed.xiaoming.member_id)),
+    ).toContainText(`最近：影像 · 2024-09-15 · ${latestRelative}`);
+    await expect(
+      screen.getByTestId(testID.familyMemberAbnormal(seed.xiaoming.member_id)),
+    ).toContainText('异常项目：血常规 1 项');
+    await expect(
+      screen.getByTestId(testID.familyMemberFlags(seed.xiaoming.member_id)),
+    ).toContainText('最近报告 偏高 0 · 偏低 0');
+    await expect(
+      screen.getByTestId(testID.familyMemberCount(seed.xiaoming.member_id)),
+    ).toContainText('报告 3 份');
 
-    await screen.getByTestId(testID.overviewPendingPartial).tap();
-    await browser.waitForURL(/\/timeline\?filter=partial$/);
-    await expect(screen.getByTestId(testID.archiveFilterBanner)).toContainText(
-      `${mamaPending.partialReports} 份`,
-    );
-    await expect(screen.getByTestId(testID.reportCard(seed.healReport.report_id))).toBeVisible();
+    const mamaCard = screen.getByTestId(testID.familyMember(seed.mama.member_id));
+    await expect(mamaCard).toContainText('E2E 妈妈');
+    await expect(
+      screen.getByTestId(testID.familyMemberPending(seed.mama.member_id)),
+    ).toContainText('待核对 1 份 · 1 项');
+    await expect(
+      screen.getByTestId(testID.familyMemberLatest(seed.mama.member_id)),
+    ).toContainText('最近：血常规 · 2024-08-19');
+    await expect(
+      screen.getByTestId(testID.familyMemberAbnormal(seed.mama.member_id)),
+    ).toContainText('异常项目：血常规 7 项');
+    await expect(
+      screen.getByTestId(testID.familyMemberFlags(seed.mama.member_id)),
+    ).toContainText('最近报告 偏高 2 · 偏低 5');
+    await expect(
+      screen.getByTestId(testID.familyMemberCount(seed.mama.member_id)),
+    ).toContainText('报告 1 份');
 
-    await openConfigured(app, browser, '/', { memberId: seed.xiaoming.member_id });
-    await screen.getByTestId(testID.overviewAllReports).tap();
+    // 无报告成员:保留成员卡,只显示空文案,不显示待核对 / 异常项目 / 总数。
+    const emptyCard = screen.getByTestId(testID.familyMember(seed.uploadMember.member_id));
+    await expect(emptyCard).toContainText('这位成员还没有检查单');
+    await expect(
+      screen.getByTestId(testID.familyMemberPending(seed.uploadMember.member_id)),
+    ).toHaveCount(0);
+    await expect(
+      screen.getByTestId(testID.familyMemberAbnormal(seed.uploadMember.member_id)),
+    ).toHaveCount(0);
+    await expect(
+      screen.getByTestId(testID.familyMemberCount(seed.uploadMember.member_id)),
+    ).toHaveCount(0);
+    await expect(screen.getByTestId(testID.familyManageMembers)).toBeVisible();
+
+    // 点卡 = 选中该成员并进档案;档案页显示该成员报告与上传 FAB。
+    await xiaomingCard.tap();
     await browser.waitForURL(/\/timeline$/);
     await expect(screen.getByTestId(testID.reportCard(seed.reviewReport.report_id))).toBeVisible();
-    await expect(screen.getByTestId(testID.reportCard(seed.imaging01.report_id))).toBeVisible();
-    await expect(screen.getByTestId(testID.reportCard(seed.imaging03.report_id))).toBeVisible();
+    await expect(screen.getByTestId(testID.reportCard(seed.healReport.report_id))).toHaveCount(0);
+    await expect(
+      screen.getByTestId(testID.headerSettingsArchive, { visible: true }),
+    ).toBeVisible();
+    await expect(screen.getByTestId(testID.uploadFab)).toBeVisible();
+    await expect(screen.getByTestId(testID.archivePendingPartial)).toContainText('待核对 · 1 份');
+
+    // 双 Tab 切换保持 URL / 当前成员;回档案默认按时间。
+    await screen.getByTestId(testID.tabFamily).tap();
+    await browser.waitForURL(/\/$/);
+    await expect(screen.getByTestId(testID.familyMember(seed.xiaoming.member_id))).toBeVisible();
+    await screen.getByTestId(testID.tabArchive).tap();
+    await browser.waitForURL(/\/timeline$/);
+    await expect(screen.getByTestId(testID.reportCard(seed.reviewReport.report_id))).toBeVisible();
+    await expect(screen.getByTestId(testID.archivePendingPartial)).toBeVisible();
+
+    await screen.getByTestId(testID.uploadFab).tap();
+    await browser.waitForURL(/\/upload$/);
+    await expect(screen.getByText('归属成员')).toBeVisible();
+  });
+
+  test('档案未选成员提示回家庭;header 设置入口', async ({ app, browser, screen }) => {
+    await openConfigured(app, browser, '/timeline', { memberId: 999999999 });
+    await expect(screen.getByTestId(testID.archiveUnselected)).toContainText('选择一个成员查看其档案。');
+    await expect(screen.getByTestId(testID.uploadFab)).toHaveCount(0);
+
+    await screen.getByTestId(testID.archiveBackHome).tap();
+    await browser.waitForURL(/\/$/);
+    await expect(screen.getByTestId(testID.familyManageMembers)).toBeVisible();
+
+    await screen.getByTestId(testID.headerSettingsFamily, { visible: true }).tap();
+    await browser.waitForURL(/\/settings$/);
+    await expect(screen.getByText('后端 Base URL')).toBeVisible();
   });
 
   test('全部档案与筛选', async ({ app, browser, screen }) => {
-    const mamaPending = pendingSummary([seed.healReport]);
-    await openConfigured(app, browser, '/timeline?filter=partial', {
+    await openConfigured(app, browser, '/timeline', {
       memberId: seed.mama.member_id,
     });
-    await expect(screen.getByTestId(testID.archiveFilterBanner)).toContainText(
-      `${mamaPending.partialReports} 份`,
+    await expect(screen.getByTestId(testID.archivePendingPartial)).toContainText(
+      '待核对 · 1 份 · 1 项',
     );
+    await expect(screen.getByTestId(testID.archivePendingFailed)).toHaveCount(0);
+
+    await screen.getByTestId(testID.archivePendingPartial).tap();
+    await browser.waitForURL(/\/timeline\?filter=partial$/);
+    await expect(screen.getByTestId(testID.archiveFilterBanner)).toContainText('1 份');
     await expect(screen.getByTestId(testID.reportCard(seed.healReport.report_id))).toBeVisible();
 
     await screen.getByTestId(testID.archiveFilterClear).tap();
     await expect(screen.getByTestId(testID.archiveFilterBanner)).toHaveCount(0);
     await expect(screen.getByTestId(testID.reportCard(seed.healReport.report_id))).toBeVisible();
 
-    const xiaomingReports = [seed.reviewReport, seed.imaging01, seed.imaging03];
-    const xiaomingPending = pendingSummary(xiaomingReports);
     await openConfigured(app, browser, '/timeline?filter=failed', {
       memberId: seed.xiaoming.member_id,
     });
-    await expect(screen.getByTestId(testID.archiveFilterBanner)).toContainText(
-      `${xiaomingPending.failedReports} 份`,
-    );
+    await expect(screen.getByTestId(testID.archivePendingFailed)).toHaveCount(0);
+    await expect(screen.getByTestId(testID.archiveFilterBanner)).toContainText('0 份');
     await expect(screen.getByTestId(testID.archiveEmpty)).toBeVisible();
     await screen.getByTestId(testID.archiveShowAll).tap();
     await expect(screen.getByTestId(testID.reportCard(seed.reviewReport.report_id))).toBeVisible();

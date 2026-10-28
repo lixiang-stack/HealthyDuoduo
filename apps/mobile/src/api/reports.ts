@@ -1,7 +1,7 @@
 // 报告 API 封装(GET /reports 时间线,POST /reports multipart 上传,
 // GET /reports/{report_id} 详情,PATCH /reports/{report_id} 改归属,
 // DELETE /reports/{report_id} 删除,PATCH /reports/{report_id}/items/{item_id} 核对,
-// GET /members/{member_id}/indicators/{name}/trend 趋势,GET /images/{sha256} 图像;
+// GET /members/{member_id}/panels 项目列表 / 详情,GET /images/{sha256} 图像;
 // 契约 schemas/openapi.yaml)。
 // 失败一律抛 Error:解包统一走 client 的 unwrap/assertOk(契约错误体中性说明,
 // 未声明错误体回落 HTTP 状态)。
@@ -21,7 +21,6 @@ export type OcrLineLink = components['schemas']['OcrLineLink'];
 export type ReportSection = components['schemas']['ReportSection'];
 export type ReviewResult = components['schemas']['ReviewResult'];
 export type TrendPoint = components['schemas']['TrendPoint'];
-export type TrendResult = components['schemas']['TrendResult'];
 export type PanelSummary = components['schemas']['PanelSummary'];
 export type PanelDetail = components['schemas']['PanelDetail'];
 export type PanelItem = components['schemas']['PanelItem'];
@@ -54,23 +53,6 @@ export async function listReports(
 export async function getReport(client: ApiClient, reportId: string): Promise<ReportDetail> {
   return unwrap(
     await client.GET('/reports/{report_id}', { params: { path: { report_id: reportId } } }),
-  );
-}
-
-/** 成员维度趋势时序(单位可选;缺省返回全部单位,供 selectSeries 过滤/计数)。 */
-export async function getTrend(
-  client: ApiClient,
-  memberId: number,
-  name: string,
-  unit?: string,
-): Promise<TrendResult> {
-  return unwrap(
-    await client.GET('/members/{member_id}/indicators/{name}/trend', {
-      params: {
-        path: { member_id: memberId, name },
-        query: unit ? { unit } : undefined,
-      },
-    }),
   );
 }
 

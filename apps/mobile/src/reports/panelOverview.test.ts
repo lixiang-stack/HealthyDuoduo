@@ -4,10 +4,19 @@ import lft08Json from '../../../../samples/expected/report/lft_08.json';
 import tft01Json from '../../../../samples/expected/report/tft_01.json';
 import ua05Json from '../../../../samples/expected/report/ua_05.json';
 import us01Json from '../../../../samples/expected/report/us_01.json';
-import type { PanelItem, ReportDetail, ReportItem, ReportSummary } from '../api/reports';
+import type {
+  PanelDetail,
+  PanelItem,
+  PanelSummary,
+  ReportDetail,
+  ReportItem,
+  ReportSummary,
+} from '../api/reports';
 
 import {
   abnormalItemCount,
+  abnormalPanelGroups,
+  familyAbnormalLabel,
   filterReportsByPanel,
   latestFailedReportAfter,
   panelItemIsAbnormal,
@@ -18,6 +27,7 @@ import {
   reportPanelLabels,
   reportTypeNote,
   splitPanelItems,
+  totalAbnormalCount,
 } from './panelOverview';
 
 type GoldenItem = {
@@ -34,6 +44,7 @@ type GoldenItem = {
 
 type GoldenReport = {
   report_type: string;
+  report_date: string | null;
   panels: ReportSummary['panels'];
   items: GoldenItem[];
 };
@@ -90,6 +101,67 @@ function detailOf(file: GoldenReport, overrides: Partial<ReportDetail> = {}): Re
     ...summary(file.panels, { report_type: file.report_type }),
     items: file.items.map((_, index) => itemOf(file, index)),
     ...overrides,
+  };
+}
+
+function panelItemOf(file: GoldenReport, index: number, reportId: string): PanelItem {
+  const item = file.items[index];
+  const point = {
+    report_id: reportId,
+    report_date: file.report_date,
+    value: item.value,
+    unit: item.unit,
+    ref_range: item.ref_range,
+    method: item.method,
+    flag: item.flag,
+    low_confidence: item.low_confidence,
+    reviewed: false,
+  };
+  return {
+    name: item.name,
+    unit: item.unit,
+    ref_range: item.ref_range,
+    latest: point,
+    points: [point],
+    report_count: 1,
+    not_tested_count: 0,
+    latest_report_not_tested: false,
+  };
+}
+
+function panelDetailOf(
+  file: GoldenReport,
+  panel: PanelDetail['panel'],
+  reportId: string,
+): PanelDetail {
+  return {
+    panel,
+    member_id: 1,
+    report_count: 1,
+    latest_report_date: file.report_date,
+    latest_report_id: reportId,
+    report_types: [file.report_type],
+    narrative: false,
+    items: file.items
+      .map((item, index) => ({ item, index }))
+      .filter(({ item }) => item.panel === panel)
+      .map(({ index }) => panelItemOf(file, index, reportId)),
+  };
+}
+
+function panelSummaryOf(
+  panel: PanelSummary['panel'],
+  abnormalCount: number,
+): PanelSummary {
+  return {
+    panel,
+    report_count: 1,
+    item_count: 1,
+    abnormal_count: abnormalCount,
+    latest_report_date: '2026-10-01',
+    latest_report_id: 'r'.repeat(64),
+    report_types: ['生化'],
+    narrative: false,
   };
 }
 
@@ -220,6 +292,73 @@ describe('项目列表 / 详情展示口径', () => {
     const { abnormal, rest } = splitPanelItems(items);
     expect(abnormal.map((item) => item.name)).toEqual(['B', 'D']);
     expect(rest.map((item) => item.name)).toEqual(['A', 'C']);
+  });
+
+  it('abnormalPanelGroups 按传入项目顺序分组,只保留 latest 异常的指标,空组不输出', () => {
+    const details = lft08.panels.map((panel) =>
+      panelDetailOf(lft08, panel, 'lft_08'),
+    );
+    const groups = abnormalPanelGroups(details);
+
+    expect(groups.map((group) => group.panel)).toEqual(['liver', 'uric_acid']);
+    expect(groups.map((group) => group.reportDate)).toEqual(['2020-01-01', '2020-01-01']);
+    expect(groups[0].items.map((item) => item.name)).toEqual(['总蛋白', '白蛋白']);
+    expect(groups[1].items.map((item) => item.name)).toEqual(['尿酸']);
+  });
+
+  it('abnormalPanelGroups 的组头计数 = 行数,与 abnormal_count 同口径', () => {
+    const details = lft02.panels.map((panel) =>
+      panelDetailOf(lft02, panel, 'lft_02'),
+    );
+    const groups = abnormalPanelGroups(details);
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0].panel).toBe('liver');
+    expect(groups[0].items).toHaveLength(6);
+    expect(groups[0].items[0].latest?.flag).toBe('high');
+  });
+
+  it('abnormalPanelGroups 对全部 normal / unknown 与空详情返回空列表', () => {
+    expect(abnormalPanelGroups([])).toEqual([]);
+    expect(
+      abnormalPanelGroups([panelDetailOf(tft01, 'thyroid', 'tft_01')]),
+    ).toEqual([]);
+  });
+
+  it('familyAbnormalLabel 只列有异常的项目,按异常数降序 + PANEL_ORDER', () => {
+    expect(
+      familyAbnormalLabel([
+        panelSummaryOf('thyroid', 2),
+        panelSummaryOf('liver', 4),
+        panelSummaryOf('imaging', 0),
+        panelSummaryOf('kidney', 2),
+      ]),
+    ).toBe('肝功 4 项 · 肾功 2 项 +1');
+    expect(
+      familyAbnormalLabel([
+        panelSummaryOf('thyroid', 2),
+        panelSummaryOf('liver', 4),
+      ]),
+    ).toBe('肝功 4 项 · 甲状腺 2 项');
+  });
+
+  it('familyAbnormalLabel 无异常 / 空列表返回 undefined,max 控制展示数量', () => {
+    expect(familyAbnormalLabel([])).toBeUndefined();
+    expect(familyAbnormalLabel([panelSummaryOf('liver', 0)])).toBeUndefined();
+    expect(
+      familyAbnormalLabel([panelSummaryOf('liver', 1), panelSummaryOf('thyroid', 1)], 1),
+    ).toBe('肝功 1 项 +1');
+  });
+
+  it('totalAbnormalCount 汇总所有项目异常数', () => {
+    expect(totalAbnormalCount([])).toBe(0);
+    expect(
+      totalAbnormalCount([
+        panelSummaryOf('liver', 4),
+        panelSummaryOf('kidney', 0),
+        panelSummaryOf('thyroid', 2),
+      ]),
+    ).toBe(6);
   });
 
   it('latestFailedReportAfter 只返回比当前项目最新报告更新的 failed 报告', () => {

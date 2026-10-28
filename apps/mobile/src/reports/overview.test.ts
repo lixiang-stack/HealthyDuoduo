@@ -2,7 +2,6 @@ import type { ReportSummary } from '../api/reports';
 
 import {
   filterReports,
-  latestByCategory,
   parseReportFilter,
   pendingSummary,
   type ReportFilter,
@@ -130,65 +129,6 @@ describe('pendingSummary', () => {
       unreviewedItems: 0,
       failedReports: 0,
     });
-  });
-});
-
-describe('latestByCategory', () => {
-  it('每类取日期最新的一份,类别按最近日期降序,无日期沉底', () => {
-    const reports = [
-      report({ report_id: 'cbc-old', report_type: '血常规', report_date: '2026-09-01' }),
-      report({ report_id: 'cbc-new', report_type: '血常规', report_date: '2026-10-01' }),
-      report({ report_id: 'urine', report_type: '尿常规', report_date: '2026-10-02' }),
-      report({ report_id: 'dateless', report_type: '生化', report_date: null }),
-    ];
-    expect(latestByCategory(reports).map((r) => r.report_id)).toEqual([
-      'urine',
-      'cbc-new',
-      'dateless',
-    ]);
-  });
-
-  it('同日期按 report_id 升序取首份', () => {
-    const reports = [
-      report({ report_id: 'b', report_type: '血常规', report_date: '2026-10-01' }),
-      report({ report_id: 'a', report_type: '血常规', report_date: '2026-10-01' }),
-    ];
-    expect(latestByCategory(reports).map((r) => r.report_id)).toEqual(['a']);
-  });
-
-  it('同日期类别按 report_id 升序', () => {
-    const reports = [
-      report({ report_id: 'b', report_type: '血常规', report_date: '2026-10-01' }),
-      report({ report_id: 'a', report_type: '尿常规', report_date: '2026-10-01' }),
-    ];
-    expect(latestByCategory(reports).map((r) => r.report_type)).toEqual(['尿常规', '血常规']);
-  });
-
-  it('失败报告同样参与类别最近一次', () => {
-    const reports = [
-      report({
-        report_id: 'failed',
-        report_type: '血常规',
-        report_date: '2026-10-02',
-        status: 'failed',
-      }),
-      report({ report_id: 'success', report_type: '血常规', report_date: '2026-10-01' }),
-    ];
-    expect(latestByCategory(reports).map((r) => r.report_id)).toEqual(['failed']);
-  });
-
-  it('100 条混合类别:每类一份且不重复', () => {
-    const types = ['血常规', '尿常规', '生化', '临检', '影像', '免疫'];
-    const reports = Array.from({ length: 100 }, (_, index) =>
-      report({
-        report_id: `r${index}`,
-        report_type: types[index % types.length],
-        report_date: `2026-${String((index % 12) + 1).padStart(2, '0')}-01`,
-      }),
-    );
-    const latest = latestByCategory(reports);
-    expect(latest).toHaveLength(types.length);
-    expect(new Set(latest.map((r) => r.report_type)).size).toBe(types.length);
   });
 });
 

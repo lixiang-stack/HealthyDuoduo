@@ -2,15 +2,17 @@ import { Link, router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import type { PanelDetail } from '../../api/reports';
+import type { PanelItem } from '../../api/reports';
 import { sharedStyles } from '../../components/styles';
 import { colors } from '../../components/theme';
 import { useCurrentMember } from '../../members/CurrentMemberContext';
 import { FLAG_COLORS } from '../../reports/colors';
 import {
+  panelTrendOf,
   parsePanelParam,
   panelSourceLabel,
   splitPanelItems,
+  type PanelTrend,
 } from '../../reports/panelOverview';
 import { panelLabel } from '../../reports/panels';
 import { flagLabel, itemFlagLabel, panelDateLabel, refRangeLabel } from '../../reports/status';
@@ -18,19 +20,9 @@ import { TrendDetailSheet } from '../../reports/TrendDetailSheet';
 import { TrendSparkline } from '../../reports/TrendChart';
 import {
   formatSeriesMeta,
-  selectSeries,
   TREND_UNAVAILABLE_LABEL,
-  type TrendSeries,
 } from '../../reports/trends';
 import { usePanelDetail } from '../../reports/usePanelDetail';
-
-type PanelTrend = {
-  name: string;
-  reportType: string;
-  reportDate: string | null;
-  latestValue: string | null;
-  series: TrendSeries;
-};
 
 /** 其余项超过此数时默认折叠(血常规等大项目)。 */
 const REST_COLLAPSED_THRESHOLD = 12;
@@ -153,7 +145,6 @@ export default function PanelDetailScreen() {
                     {groups.abnormal.map((item, index) => (
                       <AbnormalItemCard
                         key={`${item.name}-${item.unit ?? ''}`}
-                        detail={detail}
                         item={item}
                         index={index}
                         reportTypeById={reportTypeById}
@@ -181,7 +172,6 @@ export default function PanelDetailScreen() {
                           ? groups.rest.map((item, index) => (
                               <CompactItemRow
                                 key={`${item.name}-${item.unit ?? ''}`}
-                                detail={detail}
                                 item={item}
                                 index={groups.abnormal.length + index}
                                 reportTypeById={reportTypeById}
@@ -227,41 +217,19 @@ export default function PanelDetailScreen() {
   );
 }
 
-// panelTrendOf 项目详情项 → 趋势层数据:points 已在详情响应中,不额外请求。
-// reportTypeById 取该指标最近点所在报告的真实类别,避免用项目组来源集合冒充单点类别。
-function panelTrendOf(
-  detail: PanelDetail,
-  item: PanelDetail['items'][number],
-  reportTypeById: Record<string, string>,
-): PanelTrend | undefined {
-  const latest = item.latest;
-  if (!latest) {
-    return undefined;
-  }
-  return {
-    name: item.name,
-    reportType: reportTypeById[latest.report_id] ?? '—',
-    reportDate: latest.report_date,
-    latestValue: latest.value,
-    series: selectSeries(item.points, item.unit, latest.report_id),
-  };
-}
-
 function AbnormalItemCard({
-  detail,
   item,
   index,
   reportTypeById,
   onOpen,
 }: {
-  detail: PanelDetail;
-  item: PanelDetail['items'][number];
+  item: PanelItem;
   index: number;
   reportTypeById: Record<string, string>;
   onOpen: (trend: PanelTrend) => void;
 }) {
   const latest = item.latest!;
-  const trend = panelTrendOf(detail, item, reportTypeById)!;
+  const trend = panelTrendOf(item, reportTypeById)!;
   const color = FLAG_COLORS[latest.flag];
   const lowConfidence = latest.low_confidence && !latest.reviewed;
   return (
@@ -306,20 +274,18 @@ function AbnormalItemCard({
 }
 
 function CompactItemRow({
-  detail,
   item,
   index,
   reportTypeById,
   onOpen,
 }: {
-  detail: PanelDetail;
-  item: PanelDetail['items'][number];
+  item: PanelItem;
   index: number;
   reportTypeById: Record<string, string>;
   onOpen: (trend: PanelTrend) => void;
 }) {
   const latest = item.latest;
-  const trend = panelTrendOf(detail, item, reportTypeById);
+  const trend = panelTrendOf(item, reportTypeById);
   const notTested = latest === null && item.not_tested_count > 0;
   const color = latest ? FLAG_COLORS[latest.flag] : colors.muted;
   const flagText = latest ? itemFlagLabel({ flag: latest.flag }) : notTested ? '未检测' : '—';

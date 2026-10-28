@@ -61,7 +61,7 @@ export function TrendDetailSheet({
     : -1;
   const reason = trendUnavailableReason(series, {
     reportDate,
-    item: { value: latestValue },
+    value: latestValue,
   });
 
   return (

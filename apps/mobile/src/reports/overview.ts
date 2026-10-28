@@ -4,7 +4,6 @@
 import type { ReportSummary } from '../api/reports';
 
 import { isImagingReport } from './category';
-import { sortReports } from './order';
 
 export type ReportFilter = 'partial' | 'failed';
 
@@ -42,19 +41,6 @@ export function pendingSummary(reports: ReportSummary[]): PendingSummary {
     ),
     failedReports: reports.filter(isFailedReport).length,
   };
-}
-
-/** 每个报告类别取日期最新的一份(内部复用 sortReports);类别顺序按该份日期降序(无日期沉底)。 */
-export function latestByCategory(reports: ReportSummary[]): ReportSummary[] {
-  const seen = new Set<string>();
-  const latest: ReportSummary[] = [];
-  for (const report of sortReports(reports)) {
-    if (!seen.has(report.report_type)) {
-      seen.add(report.report_type);
-      latest.push(report);
-    }
-  }
-  return latest;
 }
 
 /** 按筛选保留子集,保持入参顺序。 */
