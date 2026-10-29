@@ -178,6 +178,24 @@ export function defaultSelectedIndex(series: TrendSeries): number {
   return index >= 0 ? index : Math.max(0, series.listPoints.length - 1);
 }
 
+export type TrendPointRow = {
+  point: TrendPoint;
+  /** 同日多份报告只在首行显示日期;后续行显示「同日」,不重复日期。 */
+  dateLabel: string | undefined;
+};
+
+/** 详情逐点列表的行标签:同日期点合并日期标签,两份报告仍保留两行。 */
+export function trendPointRows(points: TrendPoint[]): TrendPointRow[] {
+  return points.map((point, index) => {
+    const previous = points[index - 1];
+    const sameDate = previous !== undefined && previous.report_date === point.report_date;
+    if (!sameDate) {
+      return { point, dateLabel: point.report_date ?? DATE_UNKNOWN_LABEL };
+    }
+    return { point, dateLabel: point.report_date === null ? undefined : '同日' };
+  });
+}
+
 /** 信任标记:实心 = 已核对或非低置信;空心 = 未核对低置信。 */
 export function isFilledPoint(
   point: Pick<TrendPoint, 'reviewed' | 'low_confidence'>,

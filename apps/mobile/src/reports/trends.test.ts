@@ -13,6 +13,7 @@ import {
   isAbnormalFlag,
   isFilledPoint,
   selectSeries,
+  trendPointRows,
   trendUnavailableReason,
 } from './trends';
 
@@ -572,5 +573,36 @@ describe('formatSeriesMeta', () => {
   it('同单位点缺失时候选报告日期兜底,不虚构份数', () => {
     const series = selectSeries([], 'U/L', 'lft_02');
     expect(formatSeriesMeta(series, latest)).toBe('2021-08-02 · 暂无趋势数据');
+  });
+});
+
+describe('trendPointRows', () => {
+  it('同日多份报告:首行显示日期,后续行标「同日」', () => {
+    const rows = trendPointRows([
+      pointOf(lft05, '丙氨酸转氨酶', 'a'),
+      pointOf(lft02, '丙氨酸转氨酶', 'b', { report_date: lft05.report_date }),
+      pointOf(lft02, '丙氨酸转氨酶', 'c'),
+    ]);
+
+    expect(rows.map((row) => row.dateLabel)).toEqual([
+      '2017-11-18',
+      '同日',
+      '2021-08-02',
+    ]);
+    expect(rows).toHaveLength(3);
+  });
+
+  it('缺日期点只在首行显示「日期未知」,不重复标签', () => {
+    const rows = trendPointRows([
+      pointOf(lft02, '丙氨酸转氨酶', 'a', { report_date: null }),
+      pointOf(lft02, '丙氨酸转氨酶', 'b', { report_date: null }),
+    ]);
+
+    expect(rows.map((row) => row.dateLabel)).toEqual(['日期未知', undefined]);
+  });
+
+  it('单点保留日期标签', () => {
+    const rows = trendPointRows([pointOf(lft04, '总胆红素', 'lft_04')]);
+    expect(rows.map((row) => row.dateLabel)).toEqual(['2011-07-02']);
   });
 });

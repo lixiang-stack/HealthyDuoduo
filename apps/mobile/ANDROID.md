@@ -1,6 +1,6 @@
-# Android APK 本地打包
+# Android 本地打包与模拟器验证
 
-面向 `apps/mobile` 的本地 release APK 构建流程。云端构建见文末「备选：EAS 云构建」。
+面向 `apps/mobile` 的本地 release APK 构建，以及用 Android 模拟器 + Expo Go 跑真实 App 的手工验证流程。云端构建见文末「备选：EAS 云构建」。
 
 实测版本：Expo SDK 57 / React Native 0.86.3 / Gradle 9.3.1 / AGP 8.12 / JDK 21（SDK 58 升级后尚未重新跑通本地 APK 构建）。
 
@@ -91,6 +91,113 @@ BT="$HOME/Library/Android/sdk/build-tools/36.0.0"
 ```
 
 也可以把 APK 传到手机直接安装。release 包没有 Metro，首次打开需到「设置」填后端地址（`http://<电脑局域网 IP>:8080/api/v1`）并点健康检查。
+
+## 模拟器验证（Expo Go）
+
+用于在无 iOS 模拟器 / 无真机时，快速验证 Android 原生渲染与交互。它不是 E2E；Web 自动化仍跑 `npm run e2e`。
+
+以下命令用两个变量简化路径：
+
+```bash
+ADB="$HOME/Library/Android/sdk/platform-tools/adb"
+EMULATOR="$HOME/Library/Android/sdk/emulator/emulator"
+```
+
+### 1. 启动模拟器
+
+```bash
+"$EMULATOR" -list-avds
+"$EMULATOR" -avd <AVD_NAME> \
+  -no-snapshot -no-audio -no-boot-anim -gpu swiftshader_indirect
+```
+
+本机实测使用 `Medium_Phone_API_37.0`（1080×2400，Android 16 / API 37）。确认启动完成：
+
+```bash
+"$ADB" devices
+"$ADB" shell getprop sys.boot_completed
+# 输出 1
+```
+
+### 2. 启动 Metro
+
+```bash
+cd apps/mobile
+npx expo start
+```
+
+保持终端运行。默认端口 `8081`；若被占用，用 `npx expo start --port 8082`，并同步修改下面的 `adb reverse` 与 `exp://` 端口。
+
+### 3. 安装 Expo Go（SDK 58）
+
+模拟器首次使用需安装与项目 SDK 匹配的 Expo Go。APK 版本以 [expo-go-releases](https://github.com/expo/expo-go-releases) 为准；当前 SDK 58 可用：
+
+```bash
+curl -L --fail -o /tmp/expo-go-58.apk \
+  https://github.com/expo/expo-go-releases/releases/download/Expo-Go-58.0.5/Expo-Go-58.0.5.apk
+"$ADB" install -r /tmp/expo-go-58.apk
+```
+
+### 4. 端口映射并打开项目
+
+模拟器里的 `localhost` 指向模拟器自身；把 Metro / 数据服务映射到宿主机：
+
+```bash
+"$ADB" reverse tcp:8081 tcp:8081
+"$ADB" reverse tcp:8080 tcp:8080
+"$ADB" shell am start \
+  -a android.intent.action.VIEW -d "exp://127.0.0.1:8081"
+```
+
+首次打开会弹 Expo Go 开发者菜单，点「Continue」。
+
+### 5. 配置后端地址
+
+首次安装后 App 没有本地存储的地址。进入「设置」填：
+
+```text
+http://localhost:8080/api/v1
+```
+
+（已做 `adb reverse tcp:8080` 时可用 `localhost`；也可填电脑局域网地址，如 `http://192.168.x.x:8080/api/v1`。）
+
+### 6. 手工点检与操作
+
+截图：
+
+```bash
+"$ADB" exec-out screencap -p > /tmp/android.png
+```
+
+点按 / 滑动：
+
+```bash
+# 坐标为 1080×2400 模拟器；换设备前先用 uiautomator 查 bounds
+"$ADB" shell input tap 540 1200
+"$ADB" shell input swipe 540 1800 540 800 300
+```
+
+查 testID / 可点击区域（RNW 的 testID 会出现在 `resource-id`）：
+
+```bash
+"$ADB" shell uiautomator dump /sdcard/window.xml
+"$ADB" shell cat /sdcard/window.xml | tr '>' '>\n' | rg 'tab-family|tab-archive|trend-detail'
+```
+
+建议至少点检：
+
+- 底部「家庭 / 档案」图标：房子 / 三横线，激活蓝色、未激活灰色；不应出现倒三角或方块。
+- 「档案 → 按项目 → 血常规」：异常项趋势层的左上角返回键可点；同日多份报告只显示一次日期，后续行显示「同日」。
+- 项目详情左上角返回键可回到「按项目」。
+- 冷启动后成员 / 报告数据可加载（验证 `adb reverse` 与后端地址）。
+
+### 7. 收尾
+
+```bash
+"$ADB" emu kill
+```
+
+Metro 用 `Ctrl+C` 停止。
 
 ## 版本与签名
 

@@ -2,7 +2,7 @@
 // 完整图与逐点列表共享 selectedIndex;点列表是主选点方式,图上的小圆点不做点击热区。
 import { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import type { TrendPoint } from '../api/reports';
 import { colors } from '../components/theme';
@@ -13,6 +13,7 @@ import {
   defaultSelectedIndex,
   formatSeriesMeta,
   isFilledPoint,
+  trendPointRows,
   trendUnavailableReason,
   TREND_UNAVAILABLE_LABEL,
   type TrendSeries,
@@ -66,88 +67,88 @@ export function TrendDetailSheet({
 
   return (
     <Modal visible animationType="slide" transparent={false} onRequestClose={onClose}>
-      <SafeAreaView testID="trend-detail" style={styles.safe}>
-        <View style={styles.header}>
-          <Pressable
-            testID="trend-detail-close"
-            accessibilityRole="button"
-            accessibilityLabel="关闭"
-            hitSlop={12}
-            onPress={onClose}
-          >
-            <Text style={styles.close}>‹</Text>
-          </Pressable>
-          <Text style={styles.title} numberOfLines={1}>
-            {name}
-          </Text>
-        </View>
-
-        <ScrollView contentContainerStyle={styles.content}>
-          <Text style={styles.headerMeta}>
-            {`最新：${reportType} · ${series.unit ?? '无单位'}`}
-          </Text>
-
-          {series.chartPoints.length > 0 ? (
-            <TrendDetailChart
-              series={series}
-              name={name}
-              selectedIndex={selectedChartIndex >= 0 ? selectedChartIndex : null}
-              testID="trend-detail-chart"
-            />
-          ) : (
-            <View style={styles.emptyChart}>
-              <Text style={styles.emptyTitle}>{TREND_UNAVAILABLE_LABEL}</Text>
-              {reason ? <Text style={styles.muted}>{reason}</Text> : null}
-            </View>
-          )}
-
-          {selectedPoint ? <PointCard point={selectedPoint} /> : null}
-
-          {series.listPoints.length > 0 ? (
-            <View style={styles.pointList}>
-              {series.listPoints.map((point, index) => (
-                <Pressable
-                  key={point.report_id}
-                  testID={`trend-point-${index}`}
-                  accessibilityRole="button"
-                  onPress={() => setSelectedIndex(index)}
-                  style={[styles.pointRow, index === selectedIndex && styles.pointRowSelected]}
-                >
-                  <PointBadge point={point} />
-                  <Text style={styles.pointRowDate}>
-                    {point.report_date ?? DATE_UNKNOWN_LABEL}
-                  </Text>
-                  <Text style={styles.pointRowValue}>
-                    {point.value ?? '—'}
-                    {point.unit ? ` ${point.unit}` : ''}
-                  </Text>
-                  <Text style={[styles.pointRowFlag, { color: FLAG_COLORS[point.flag] }]}>
-                    {flagLabel(point.flag)}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          ) : null}
-
-          <View style={styles.legend}>
-            <View style={styles.legendRow}>
-              <View style={[styles.dot, styles.legendDotFilled]} />
-              <Text style={styles.muted}>实心 = 高置信 / 已核对</Text>
-            </View>
-            <View style={styles.legendRow}>
-              <View style={[styles.dot, styles.dotHollow, styles.legendDot]} />
-              <Text style={styles.muted}>空心 = 未核对低置信</Text>
-            </View>
-            <View testID="trend-band-legend" style={styles.legendRow}>
-              <View style={styles.legendBand} />
-              <Text style={styles.muted}>灰色带 = 参考范围</Text>
-            </View>
+      <SafeAreaProvider style={styles.safe}>
+        <SafeAreaView testID="trend-detail" style={styles.safe}>
+          <View style={styles.header}>
+            <Pressable
+              testID="trend-detail-close"
+              accessibilityRole="button"
+              accessibilityLabel="关闭"
+              onPress={onClose}
+              style={styles.closeButton}
+            >
+              <Text style={styles.close}>‹</Text>
+            </Pressable>
+            <Text style={styles.title} numberOfLines={1}>
+              {name}
+            </Text>
           </View>
-          <Text style={styles.muted}>点按任一行切换选中点。</Text>
 
-          <Text style={styles.meta}>{formatSeriesMeta(series, { reportDate })}</Text>
-        </ScrollView>
-      </SafeAreaView>
+          <ScrollView contentContainerStyle={styles.content}>
+            <Text style={styles.headerMeta}>
+              {`最新：${reportType} · ${series.unit ?? '无单位'}`}
+            </Text>
+
+            {series.chartPoints.length > 0 ? (
+              <TrendDetailChart
+                series={series}
+                name={name}
+                selectedIndex={selectedChartIndex >= 0 ? selectedChartIndex : null}
+                testID="trend-detail-chart"
+              />
+            ) : (
+              <View style={styles.emptyChart}>
+                <Text style={styles.emptyTitle}>{TREND_UNAVAILABLE_LABEL}</Text>
+                {reason ? <Text style={styles.muted}>{reason}</Text> : null}
+              </View>
+            )}
+
+            {selectedPoint ? <PointCard point={selectedPoint} /> : null}
+
+            {series.listPoints.length > 0 ? (
+              <View style={styles.pointList}>
+                {trendPointRows(series.listPoints).map(({ point, dateLabel }, index) => (
+                  <Pressable
+                    key={point.report_id}
+                    testID={`trend-point-${index}`}
+                    accessibilityRole="button"
+                    onPress={() => setSelectedIndex(index)}
+                    style={[styles.pointRow, index === selectedIndex && styles.pointRowSelected]}
+                  >
+                    <PointBadge point={point} />
+                    <Text style={styles.pointRowDate}>{dateLabel ?? ''}</Text>
+                    <Text style={styles.pointRowValue}>
+                      {point.value ?? '—'}
+                      {point.unit ? ` ${point.unit}` : ''}
+                    </Text>
+                    <Text style={[styles.pointRowFlag, { color: FLAG_COLORS[point.flag] }]}>
+                      {flagLabel(point.flag)}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
+
+            <View style={styles.legend}>
+              <View style={styles.legendRow}>
+                <View style={[styles.dot, styles.legendDotFilled]} />
+                <Text style={styles.muted}>实心 = 高置信 / 已核对</Text>
+              </View>
+              <View style={styles.legendRow}>
+                <View style={[styles.dot, styles.dotHollow, styles.legendDot]} />
+                <Text style={styles.muted}>空心 = 未核对低置信</Text>
+              </View>
+              <View testID="trend-band-legend" style={styles.legendRow}>
+                <View style={styles.legendBand} />
+                <Text style={styles.muted}>灰色带 = 参考范围</Text>
+              </View>
+            </View>
+            <Text style={styles.muted}>点按任一行切换选中点。</Text>
+
+            <Text style={styles.meta}>{formatSeriesMeta(series, { reportDate })}</Text>
+          </ScrollView>
+        </SafeAreaView>
+      </SafeAreaProvider>
     </Modal>
   );
 }
@@ -178,11 +179,18 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 4,
     paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingVertical: 6,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+  },
+  closeButton: {
+    width: 44,
+    height: 44,
+    marginLeft: -20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   close: { fontSize: 30, color: colors.text, lineHeight: 32 },
   title: { flex: 1, fontSize: 18, color: colors.text },

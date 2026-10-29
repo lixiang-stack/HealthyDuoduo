@@ -1,8 +1,32 @@
 import { Link } from 'expo-router';
 import { Tabs } from 'expo-router/js-tabs';
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, StyleSheet, Text, type ColorValue } from 'react-native';
+import Svg, { Line, Path } from 'react-native-svg';
 
 import { colors } from '../../components/theme';
+
+function FamilyTabIcon({ color, size }: { color: ColorValue; size: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-9.5Z"
+        stroke={color}
+        strokeWidth={1.7}
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+function ArchiveTabIcon({ color, size }: { color: ColorValue; size: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Line x1="4" y1="7" x2="20" y2="7" stroke={color} strokeWidth={1.7} strokeLinecap="round" />
+      <Line x1="4" y1="12" x2="20" y2="12" stroke={color} strokeWidth={1.7} strokeLinecap="round" />
+      <Line x1="4" y1="17" x2="20" y2="17" stroke={color} strokeWidth={1.7} strokeLinecap="round" />
+    </Svg>
+  );
+}
 
 function HeaderSettings({ testID }: { testID: string }) {
   return (
@@ -25,12 +49,19 @@ function HeaderSettings({ testID }: { testID: string }) {
 // 上传 / 项目 / 异常指标仍走根 Stack。
 export default function TabsLayout() {
   return (
-    <Tabs screenOptions={{ headerRightContainerStyle: styles.headerActionContainer }}>
+    <Tabs
+      screenOptions={{
+        headerRightContainerStyle: styles.headerActionContainer,
+        tabBarActiveTintColor: colors.accent,
+        tabBarInactiveTintColor: colors.muted,
+      }}
+    >
       <Tabs.Screen
         name="index"
         options={{
           title: '家庭',
           tabBarButtonTestID: 'tab-family',
+          tabBarIcon: ({ color, size }) => <FamilyTabIcon color={color} size={size} />,
           headerRight: () => <HeaderSettings testID="header-settings-family" />,
         }}
       />
@@ -40,6 +71,7 @@ export default function TabsLayout() {
           title: '档案',
           href: '/timeline',
           tabBarButtonTestID: 'tab-archive',
+          tabBarIcon: ({ color, size }) => <ArchiveTabIcon color={color} size={size} />,
           headerRight: () => <HeaderSettings testID="header-settings-archive" />,
         }}
       />
