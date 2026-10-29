@@ -43,7 +43,7 @@ Status: ready-for-agent（2026-10-27 需求分析与原型选型定稿）
 | 5 | 分类集合 | 12 + `sex_hormone` / `vitanemia` / `coag` + `other`，共 15 个具名项目组 + `other`；UI 只展示当前成员实际出现过的项目组。 |
 | 6 | 术语 | **项目组（panel）**；UI 用「按项目」；不再用「病理标签 / 系统标签 / 检查大项」。 |
 | 7 | 家庭卡 | **项目口径**：待核对 + 最近报告主项目 + 异常项目（按项目最近值汇总）+ 最近报告偏高/偏低 + 报告总数。 |
-| 8 | 报告卡 | 主项目 + 次项目（最多 2 个）+ `+N`；失败回退 `report_type`。 |
+| 8 | 报告卡 | 按报告内顺序列出全部项目组；失败回退 `report_type`。 |
 | 9 | 项目详情 | 异常项内联迷你趋势；正常 / 未知 / 未检测项给最新值与入口；底部「包含该项目的报告（N 份）」→ `/timeline?panel=code`。 |
 | 10 | 异常指标页 | 保留为 Stack 页，分组从 `report_type` 改为项目；从档案「按项目」的「全部异常 N 项」进入。 |
 | 11 | 交付 | 三单：① 识别 + 数据 + API + 回填；② App 项目视图；③ IA 壳（家庭首页 + 双 Tab）。 |
@@ -217,7 +217,7 @@ _Avoid_: 病理标签、系统标签、检查大项、分类标签
 
 - 报告级 `panels` 排序：**命中指标项数降序**；同数按固定优先级：
   `liver` < `kidney` < `lipid` < `glucose` < `uric_acid` < `electrolyte` < `vitanemia` < `thyroid` < `sex_hormone` < `infection` < `autoimmune` < `coag` < `cbc` < `urinalysis` < `imaging` < `other`（数值小优先）。
-- `panels[0]` 是卡片主标签；报告卡展示前 2 个，超过 2 个显示 `+N`。
+- `panels[0]` 是卡片主标签；报告卡按报告内顺序列出全部项目组，不折叠。
 - 项目列表排序：最近报告日期降序（日期未知沉底），同日期按上述优先级。
 - **固定优先级的性质**：这是产品定义的并列裁决顺序，不是医学优先级，也不是官方标准；临床报告没有「主项目组」的官方定义（见 §5.5.4）。命中项数永远优先，固定顺序只在同数时生效；`other` 始终兜底最后。
 - **分层原则**：先基础 / 高频生化（肝功、肾功、血脂、血糖、尿酸），再生化补充（电解质、维生素/贫血），再激素 / 免疫专项（甲状腺、性激素、感染筛查、自身抗体），再临检（凝血、血常规、尿常规），最后叙述型 / 兜底（影像、其他）。依据是 §5.5 的基本项目 / 临床专项分层与真实样本分布，不照抄任何官方目录；官方文档不定义这 16 个 code。
@@ -594,10 +594,10 @@ PanelItem:
   - `PANEL_ORDER: PanelCode[]`（§5.3）
   - `panelLabel(code)`
 - 新增 `apps/mobile/src/reports/panelOverview.ts`：
-  - `reportPanelLabels(report, max=2)`：失败回退 `report_type`；`panels=[]` 回退 `report_type`；否则前 2 + `+N`。
+  - `reportPanelLabels(report)`：失败回退 `report_type`；`panels=[]` 回退 `report_type`；否则按报告内顺序列出全部项目组。
   - `reportHasPanel(report, panel)` / `filterReportsByPanel(reports, panel)`：failed 不匹配；`panels=[]` 的非 failed 存量按 `[other]` 处理，与项目列表归「其他」一致。
   - `parsePanelParam(raw)`：数组取首值，只接受合法 code。
-  - `familyAbnormalLabel(panels, max=2)`：`abnormal_count > 0`，按 count 降序 + `PANEL_ORDER`；`肝功 4 项 · 甲状腺 2 项 +N`；无则 undefined。
+  - 家庭卡异常摘要：`abnormalPanelCount(panels)` + `totalAbnormalCount(panels)` 直接生成「异常指标 N 项 · M 个项目」；不再维护项目分项文案。
   - `totalAbnormalCount(panels)`。
 - 新增 `apps/mobile/src/reports/relativeDate.ts`：`relativeDateLabel(date, today)`；今天 / 昨天 / N 天前 / N 周前 / N 个月前 / N 年前；null / 未来返回 undefined；测试传固定 today。
 - 新增 hooks：
@@ -643,12 +643,12 @@ App
 - Header「家庭」+ 右侧「设置」。
 - 成员卡片 `sortMembers`（孩子优先、其余创建序）：
   - 名字 + 「孩子」徽标。
-  - 待核对：`pendingSummary(reports)`；两项都为 0 → 「没有待核对」；否则按「待核对 N 份[ · M 项]」+（失败 > 0 时）「· 识别失败 K 份」拼接；N=0 时省略待核对段。
+  - 待核对：`pendingSummary(reports)`；两项都为 0 → 「没有待核对」；否则按「待核对 N 份[ · M 项]」+（失败 > 0 时）「· 识别失败 K 份」拼接；N=0 时省略待核对段。有待处理时**蓝色加粗**，无待处理时 muted。
   - 最近：最新报告（`sortReports` 第一份）的 `panels[0]` + 日期 + 距今；最新报告失败 → 「最近报告识别失败 · 日期」；无报告 → 「这位成员还没有检查单」。
-  - 异常项目：`familyAbnormalLabel(panels)`；如「肝功 4 项 · 甲状腺 2 项」；无异常 → 「没有异常项目」（muted）。
+  - 异常指标：只给「异常指标 N 项 · M 个项目」总数，**红色加粗**；不再列各项目分项，也不出现「另有 X 个项目共 Y 项异常」；无异常 → 「没有异常项目」（muted）。
   - 最近报告偏高/偏低：最新报告为非 failed 时用其 `flag_counts.high/low`；「最近报告 偏高 4 · 偏低 0」；最新报告 failed 或无报告时省略。
   - 报告总数：「报告 N 份」。
-- 点卡片：`selectMember(memberId)` + `router.push('/timeline')`。
+- 点卡片：`selectMember(memberId)` + `router.push('/panels')`。
 - 底部「管理成员」→ `/members`。
 - 空态 / 错误态：
   - 无成员 → 「还没有家庭成员。先到家庭成员建一个。」+ 链接；
@@ -661,15 +661,16 @@ App
 
 - Header「档案」+ 右侧「设置」。
 - 成员 chips：沿用 `MemberChips` / `CurrentMemberContext`；切换成员刷新。
-- 分段：「按时间」/「按项目」；默认按时间；分段状态不持久化（回档案默认按时间）。
+- 分段：「按项目」/「按时间」；默认按项目；两个真实 URL `/panels`（默认）与 `/timeline`（显式按时间）由同一个 Tab 路由（`[archive]`）承载，不新增底栏项；从项目详情返回保持原分段。
 - **按时间：**
   - 待核对 / 识别失败入口（沿用 `pendingSummary` 口径）→ `/timeline?filter=partial|failed`；
+  - 时间线：按天分组；左侧年 / 月 + 日 / 星期，竖线每天一个点，横线连到当天卡片；同一天多份报告共用一个点；日期未知（`report_date=null`）沉底，不画点；
   - 报告卡：日期、项目名（`reportPanelLabels`）、状态、`flagBadges`、`unreviewedBadge`；失败回退 `report_type` + 失败原因；
   - `?filter` / `?panel` 筛选横幅：`只看待核对 · N 份` / `只看识别失败 · N 份` / `只看肾功 · N 份`；「清除筛选」→ `/timeline`；
   - 筛选后为空：`没有符合筛选条件的报告。` + 「查看全部档案」；
   - 无报告：沿用现有空态。
 - **按项目：**
-  - 顶部 `全部异常 N 项 ›` → `/trends`；N = `totalAbnormalCount(panels)`；0 时不显示或显示「没有异常项目」。
+  - 顶部 `全部异常 N 项 · M 个项目 ›` → `/trends`；N = `totalAbnormalCount(panels)`，M = `abnormalPanelCount(panels)`；0 时不显示或显示「没有异常项目」。
   - 项目行：项目 label、最近日期（`reportDateLabel` 口径；null → 日期未知）、报告份数、异常数、指标数；`other` 行加来源报告类别副标题；`imaging` 行显示「叙述型报告」；
   - 点项目 → `/panel/[panel]`；`imaging` → 最新影像报告详情；
   - 无报告 / 全部 failed：`还没有可归类的报告。识别失败的记录可在按时间查看。` + 切回按时间；
@@ -681,8 +682,8 @@ App
 
 - Header：项目 label；成员名、最近日期、报告份数、异常数（= `items` 中 `latest.flag ∈ high/low/abnormal` 的数量，与 `PanelSummary.abnormal_count` 同口径）；`other` 额外显示来源报告类别。
 - 指标区：
-  - **异常项（latest.flag ∈ high/low/abnormal）**：内联 `TrendSparkline`；名称、最新值 + 单位、参考范围、flag、低置信空心点 / 待核对标签；元信息「N 份报告 · 起止日期」；
-  - **正常 / 未知 / 未检测项**：紧凑行（名称、最新值、参考范围、flag）；点按打开 `TrendDetailSheet`（用已加载的 `points`，不额外请求）；`unknown` 用 `itemFlagLabel` 文案；`not_tested` 显示「未检测」，无点不打开趋势；`latest_report_not_tested=true` 时在数值旁标「最近一次未检测」；
+  - **异常项（latest.flag ∈ high/low/abnormal）**：内联 `TrendSparkline`；名称、最新值 + 单位、参考范围、flag、低置信空心点 / 待核对标签；元信息「N 份报告 · 起止日期」；异常区标注「灰色带 = 参考范围」；
+  - **正常 / 未知 / 未检测项**：紧凑行（名称、最新值、参考范围、最新日期 / 报告份数、flag）；点按打开 `TrendDetailSheet`（用已加载的 `points`，不额外请求）；`unknown` 用 `itemFlagLabel` 文案；`not_tested` 显示「未检测」，无点不打开趋势；`latest_report_not_tested=true` 时在数值旁标「最近一次未检测」；
   - 分组标题「异常 N 项」「其余 M 项」；其余默认展开；单项目其余项超过 12 项时默认折叠为「其余 N 项」，点按展开（CBC 等大项目）。
 - 底部：`查看包含该项目的报告（N 份）›` → `/timeline?panel=code`。
 - 最新一份报告 failed：头部提示「另有更新的一份识别失败报告」+ 链接；数值取最近非 failed。
@@ -694,8 +695,9 @@ App
 
 - Header「异常指标」+ 成员 chips（沿用现有；切换刷新）。
 - 范围：当前成员 `GET /members/{id}/panels` 中 `abnormal_count > 0` 的项目；逐个取项目详情，列出 latest flag 为 high/low/abnormal 的指标。
-- 分组：项目 label + 最新报告日期 + `N 项异常`；项目顺序按 `latest_report_date` 降序 / §5.3。
-- 行：名称、最新值 + 单位、参考范围、flag、低置信标签、`TrendSparkline`、`查看趋势 ›`；点按打开 `TrendDetailSheet`。
+- 顶部汇总：「异常指标 N 项 · M 个项目」，红色加粗；N = 各组 items 总数，M = 有异常指标的项目数。
+- 分组：项目徽标（accent 描边）+ 最新报告日期 + `N 项异常`（红色）；组容器左侧 accent 竖线，强化「这些指标属于该项目」；项目顺序按 `latest_report_date` 降序 / §5.3。
+- 行：名称、最新值 + 单位、参考范围、flag、低置信标签、`TrendSparkline`、`查看趋势 ›`；行 meta 以项目 label 开头，滚动时仍能看出所属项目；点按打开 `TrendDetailSheet`。
 - 空态：无报告 → 现有「这位成员还没有检查单」；有报告无异常 → 「这位成员暂时没有异常指标。」+ 「查看全部档案」；错误 / 未配置 / 未选成员同现有。
 - 不新增 `report_type` 分组；`report_type` 只作为项目详情的次要信息。
 
@@ -704,7 +706,8 @@ App
 - 头部沿用 `ReportCard`（项目名 + 日期 + 状态 + 徽标）；短 ID；影像段落；失败原因；待核对入口。
 - 指标项按 `report.panels` 顺序分组：
   - 组头：项目 label + `N 项 · M 项异常`；
-  - 组内保持报告内指标顺序；展示报告全部指标（不按项目过滤）；
+  - 组内顺序：异常（high/low/abnormal）与可操作未知（待核对）在前；正常 / 未检测 / 不可操作未知在后；两段内部保持报告原顺序，不新造严重度排序；
+  - 展示报告全部指标（不按项目过滤）；
   - 若某 item 的 panel 不在 `report.panels`，归入末尾「其他」组；
 - 核对动作 / 修正 / 改归属 / 删除不变；核对页仍逐项平铺，不在本期分组。
 - 影像单：仍以段落 + 原图为主，不呈现指标项 / 项目分组。
@@ -716,10 +719,18 @@ App
 - `src/app/(tabs)/timeline.tsx`：档案页（现有 `timeline.tsx` 内容 + 分段 / 项目视图）。
 - `src/app/panel/[panel].tsx`：项目详情（Stack）。
 - `src/app/trends.tsx`：异常指标（Stack，保留）。
-- 根 `_layout.tsx`：`(tabs)` 关闭 Stack header；详情 / 设置 / 成员 / 上传 / 报告 / 核对 / 项目 / 趋势用 Stack header。
-- URL 保持 `/` 与 `/timeline`；`/panel/kidney` 用 code；`/timeline?panel=kidney` 为内部筛选。
-- 当前成员上下文不变；家庭卡点击 = 选中 + 进档案；档案 chips 切换；上传默认当前成员。
+- 根 `_layout.tsx`：`(tabs)` 关闭 Stack header；详情 / 设置 / 成员 / 上传 / 报告 / 核对 / 项目 / 趋势 / 原图用 Stack header。
+- URL 保持 `/` 与 `/panels`；`/timeline` 为显式按时间；`/panel/kidney` 用 code；`/timeline?panel=kidney` 为内部筛选；`/image/<report_id>` 为原图定位。
+- 当前成员上下文不变；家庭卡点击 = 选中 + 进档案（默认按项目）；档案 chips 切换；上传默认当前成员。
 - 设置页不变；从 header 进入；主路径不再有设置链接。
+
+### 8.8 原始图像定位（2026-10-29）
+
+- 趋势详情点卡的「查看原始图像」→ `/image/[report_id]?name=&unit=&report_date=`。
+- 原图页按 `report_id` 取报告与图像；用 `name + unit` 匹配指标项；有 `ocr_lines` 时用 `LineZoom` 裁到对应行并描蓝框，无行链接 / 图像失败时退化为整张检查单并保留识别值。
+- 原图页可切「整张检查单 / 定位到该项」；「打开格式化报告」进入报告详情。
+- **返回保留趋势层选中点**：趋势详情是本地 Modal，跳转原图时隐藏但保持挂载；返回聚焦时恢复显示，选中点由组件 state（必要时 `initialReportId`）恢复。原图 → 报告详情 → 返回，逐级回到原图 / 趋势层。
+- 原图页只读；核对 / 修正仍在报告详情 / 核对页。
 
 ---
 
@@ -760,7 +771,7 @@ App
    - `api/reports.ts` 类型 / 函数；`useMemberPanels` / `usePanelDetail` / `useAbnormalPanelGroups`。
    - `ReportSummary.panels` / `ReportDetail.items[].panel` 消费。
 3. **页面 / 组件**
-   - `ReportCard` 项目标签（前 2 + `+N`）；失败回退。
+   - `ReportCard` 项目标签（全部列出）；失败回退。
    - 档案页分段 + 项目列表；`/panel/[panel]`；`?panel=` 筛选横幅。
    - 报告详情项目分组。
    - `/trends` 改项目分组 + 项目详情数据。
@@ -820,14 +831,16 @@ App
 
 ### 10.3 App / E2E
 
-- **家庭首页**：3 成员卡；待核对 / 最近项目 / 异常项目 / 偏高偏低 / 总数；点卡进档案并选中该成员；设置 header；无成员 / 未配置 / 错误态。
-- **双 Tab**：家庭 / 档案切换；URL `/` 与 `/timeline`；上传 FAB 仅档案页且当前成员已选；设置不再出现在内容区。
+- **家庭首页**：3 成员卡；待核对 / 最近项目 / 异常指标 / 偏高偏低 / 总数；异常只给总数 + 项目数，不出现项目分项 / 「另有…」；待核对 / 识别失败蓝色加粗，异常红色加粗；点卡进档案并选中该成员（默认按项目）；设置 header；无成员 / 未配置 / 错误态。
+- **双 Tab**：家庭 / 档案切换；URL `/` 与 `/panels`（默认）；`/timeline` 为显式按时间；上传 FAB 仅档案页且当前成员已选；设置不再出现在内容区。
+- **时间线**：按天分组；同一天多份报告共用一个点；日期未知沉底；筛选后只显示命中的天与卡片。
 - **按项目**：肝功 / 肾功 / 尿酸 / 甲状腺 / 血常规 / 尿常规 / 血脂 / 血糖 / 电解质 / 感染筛查 / 凝血 / 影像 / 其他；`other` 副标题；影像直接进报告。
 - **项目详情**：肾功包含尿素 / 肌酐 / eGFR / 胱抑素C + 趋势；肝功默认展示 lft_02 的 4 项异常 + 6 项正常；甲状腺 TSH/TPOAb；点正常项打开趋势层；「包含该项目的报告」→ `/timeline?panel=`。跨报告单位不同会分行，不强行合并。
 - **歧义**：`ua_05` 归尿常规，不出现血糖 / 肝功；`tft_01` 归甲状腺；`fibrosis_01` / `bloodtype_01` 归其他；`coag_01` 归凝血；`vitanemia_01` 归维生素/贫血。
 - **影像 / 失败**：`us_01` 归影像，点开进报告详情；失败报告不进项目列表 / `?panel=` 筛选，按时间视图可见。
-- **报告详情**：混合报告按项目分组，展示全部指标；核对入口仍可用。
-- **异常指标**：按项目分组；只列 latest 异常项；点行打开趋势层；无异常空态。
+- **报告详情**：混合报告按项目分组，展示全部指标；组内异常 / 可操作未知在前，正常 / 未检测在后；核对入口仍可用。
+- **异常指标**：顶部「异常指标 N 项 · M 个项目」红色汇总；按项目分组，项目徽标 + 左侧 accent 竖线 + `N 项异常`；只列 latest 异常项；卡片 meta 带项目名；点行打开趋势层；无异常空态。
+- **原图定位**：趋势点卡「查看原始图像」→ `/image/<report_id>`；裁到 OCR 行 + 蓝框；返回后趋势层仍选中原点；无行链接 / 图像失败退化为整张检查单。
 - **回归**：核对、修正、改派、删除、趋势单位门控、上传归属、多图上传全绿。
 - 命令：
 
@@ -875,7 +888,7 @@ npm run e2e
 | 识别端契约 / golden 变更范围大，跨 Python / Go / App 协调 | 回归 / 版本错配 | 先识别 + golden，再 Go 契约，再 App；契约测试 + replay 全绿；部署顺序写入 runbook |
 | 项目组依赖词典逐项标注，约 90 条 | 标注错误 / 漏项 | `test_dict_coverage` 校验每项 panel 合法；真实 golden 人工核对；代码 review |
 | 项目组映射是产品抽象；官方文档只定义基本类别 / 项目名 / 参考区间，不定义 16 个 code | 医学上不准确 / 争议 | §5.5 依据 + 临床复核；新增项默认 `other`；真实数据迭代 |
-| 混合报告在多个项目下出现，列表变长 | 项目列表 / 家庭卡密度 | 项目列表只显示实际出现的项目；卡片前 2 + `+N`；真实数据观察 |
+| 混合报告在多个项目下出现，列表变长 | 项目列表 / 家庭卡密度 | 项目列表只显示实际出现的项目；报告卡列出全部项目组；真实数据观察 |
 | `other` 混多个报告类别（血型 / 肝纤维化 / 产前） | 行内信息不足 | 行内显示来源类别；详情展示全部项；有数据再拆 |
 | 项目详情一次返回所有点，数据量大 | 首屏 / 内存 | 20–50 份/年、单项目 4–25 项；先实测，超 2s 再加分页 / 惰性 |
 | 家庭首页 N+1（members + reports + panels） | 首屏慢 | 2–5 成员实测 <2s；超时再加 family 聚合端点 |
@@ -916,11 +929,18 @@ npm run e2e
 | 1 | spec 位置 | A `.scratch/panel-browse/spec.md` |
 | 2 | 项目详情 | C 混合（异常项内联趋势，正常项最新值 + 点开） |
 | 2 | 家庭卡 | B 项目口径 |
-| 2 | 报告卡标签 | B 前 2 + `+N` |
+| 2 | 报告卡标签 | B 全部列出 |
 | 2 | 项目详情报告入口 | A 完整报告列表 `/timeline?panel=` |
 | 2 | 异常指标页 | A 保留 Stack，按项目分组 |
 | 2 | 交付切分 | A 三单 |
 | 2 | ADR | A 新增 0012 |
 | 2 | `other` 行 | A 一行 + 来源类别 |
+| 3（2026-10-29） | 报告详情组内顺序 | 异常 / 可操作未知在前；正常 / 未检测 / 不可操作未知在后；不做顶部异常区 |
+| 3 | 档案默认分段 | 按项目；`/panels` 默认入口，`/timeline` 显式按时间 |
+| 3 | 时间线视觉 | 竖线 + 每天一个点 + 横线连到当天卡片；同日共点；日期未知沉底 |
+| 4（2026-10-29） | 家庭卡异常摘要 | 只给「异常指标 N 项 · M 个项目」，删除项目分项与「另有…」；待核对 / 识别失败蓝色加粗，异常红色加粗 |
+| 4 | 异常指标类型表达 | 顶部异常汇总 + 项目徽标 + 组左侧 accent 竖线 + 卡片 meta 带项目名 |
+| 3 | 趋势 → 原图 | 点卡「查看原始图像」→ 全屏原图定位（裁到 OCR 行 + 蓝框）；返回保留趋势层选中点 |
+| 3 | 原图返回 | 趋势 Modal 跳转时隐藏、聚焦恢复；原图 → 报告详情 → 返回逐级回退 |
 
 **证据边界：** 49 份 golden + 现有代码核查；没有真实用户使用数据。单标签「0 份」是按命中项数最多的模拟，具体计数会随词典标注微调，但肾功 / 血脂 / 尿酸 / 电解质在混合生化报告里被肝功吞并的结构性结论不变。人工验收仍是最终判据。

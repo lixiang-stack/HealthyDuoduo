@@ -1,36 +1,34 @@
-import { Link, router, Stack, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { Link, router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import type { PanelDetail } from '../../api/reports';
+import type { PanelItem } from '../../api/reports';
 import { sharedStyles } from '../../components/styles';
 import { colors } from '../../components/theme';
 import { useCurrentMember } from '../../members/CurrentMemberContext';
 import { FLAG_COLORS } from '../../reports/colors';
 import {
+  panelTrendOf,
   parsePanelParam,
   panelSourceLabel,
   splitPanelItems,
+  type PanelTrend,
 } from '../../reports/panelOverview';
 import { panelLabel } from '../../reports/panels';
-import { flagLabel, itemFlagLabel, panelDateLabel, refRangeLabel } from '../../reports/status';
+import {
+  DATE_UNKNOWN_LABEL,
+  flagLabel,
+  itemFlagLabel,
+  panelDateLabel,
+  refRangeLabel,
+} from '../../reports/status';
 import { TrendDetailSheet } from '../../reports/TrendDetailSheet';
 import { TrendSparkline } from '../../reports/TrendChart';
 import {
   formatSeriesMeta,
-  selectSeries,
   TREND_UNAVAILABLE_LABEL,
-  type TrendSeries,
 } from '../../reports/trends';
 import { usePanelDetail } from '../../reports/usePanelDetail';
-
-type PanelTrend = {
-  name: string;
-  reportType: string;
-  reportDate: string | null;
-  latestValue: string | null;
-  series: TrendSeries;
-};
 
 /** 其余项超过此数时默认折叠(血常规等大项目)。 */
 const REST_COLLAPSED_THRESHOLD = 12;
@@ -44,7 +42,22 @@ export default function PanelDetailScreen() {
   const { currentMemberId } = useCurrentMember();
   const { state, reload } = usePanelDetail(currentMemberId, panel);
   const [detailTrend, setDetailTrend] = useState<PanelTrend>();
+  // 原图是独立路由;Modal 在跳转时隐藏但保持挂载,返回后原位恢复选中点。
+  const [sheetHidden, setSheetHidden] = useState(false);
+  const [lastImageReportId, setLastImageReportId] = useState<string>();
   const [restExpanded, setRestExpanded] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      setSheetHidden(false);
+    }, []),
+  );
+
+  const openTrend = (trend: PanelTrend) => {
+    setLastImageReportId(undefined);
+    setSheetHidden(false);
+    setDetailTrend(trend);
+  };
 
   const detail = state.status === 'ready' ? state.detail : undefined;
   const memberName = state.status === 'ready' ? state.memberName : undefined;
@@ -118,7 +131,7 @@ export default function PanelDetailScreen() {
                     .join(' · ')}
                 </Text>
                 {panelSourceLabel(detail.panel, detail.report_types) ? (
-                  <Text style={sharedStyles.muted}>
+                  <Text testID="panel-source-label" style={sharedStyles.muted}>
                     {panelSourceLabel(detail.panel, detail.report_types)}
                   </Text>
                 ) : null}
@@ -146,18 +159,22 @@ export default function PanelDetailScreen() {
                 ) : (
                   <>
                     {groups.abnormal.length > 0 ? (
-                      <Text testID="panel-abnormal-title" style={styles.sectionTitle}>
-                        异常 {groups.abnormal.length} 项
-                      </Text>
+                      <>
+                        <Text testID="panel-abnormal-title" style={styles.sectionTitle}>
+                          异常 {groups.abnormal.length} 项
+                        </Text>
+                        <Text testID="panel-band-legend" style={styles.meta}>
+                          灰色带 = 参考范围
+                        </Text>
+                      </>
                     ) : null}
                     {groups.abnormal.map((item, index) => (
                       <AbnormalItemCard
                         key={`${item.name}-${item.unit ?? ''}`}
-                        detail={detail}
                         item={item}
                         index={index}
                         reportTypeById={reportTypeById}
-                        onOpen={(trend) => setDetailTrend(trend)}
+                        onOpen={openTrend}
                       />
                     ))}
 
@@ -181,11 +198,10 @@ export default function PanelDetailScreen() {
                           ? groups.rest.map((item, index) => (
                               <CompactItemRow
                                 key={`${item.name}-${item.unit ?? ''}`}
-                                detail={detail}
                                 item={item}
                                 index={groups.abnormal.length + index}
                                 reportTypeById={reportTypeById}
-                                onOpen={(trend) => setDetailTrend(trend)}
+                                onOpen={openTrend}
                               />
                             ))
                           : null}
@@ -220,48 +236,45 @@ export default function PanelDetailScreen() {
           reportDate={detailTrend.reportDate}
           latestValue={detailTrend.latestValue}
           series={detailTrend.series}
-          onClose={() => setDetailTrend(undefined)}
+          visible={!sheetHidden}
+          initialReportId={lastImageReportId}
+          onOpenImage={(point) => {
+            setLastImageReportId(point.report_id);
+            setSheetHidden(true);
+            router.push({
+              pathname: '/image/[report_id]',
+              params: {
+                report_id: point.report_id,
+                name: detailTrend.name,
+                unit: detailTrend.series.unit ?? '',
+                report_date: point.report_date ?? '',
+              },
+            });
+          }}
+          onClose={() => {
+            setSheetHidden(false);
+            setLastImageReportId(undefined);
+            setDetailTrend(undefined);
+          }}
         />
       ) : null}
     </>
   );
 }
 
-// panelTrendOf 项目详情项 → 趋势层数据:points 已在详情响应中,不额外请求。
-// reportTypeById 取该指标最近点所在报告的真实类别,避免用项目组来源集合冒充单点类别。
-function panelTrendOf(
-  detail: PanelDetail,
-  item: PanelDetail['items'][number],
-  reportTypeById: Record<string, string>,
-): PanelTrend | undefined {
-  const latest = item.latest;
-  if (!latest) {
-    return undefined;
-  }
-  return {
-    name: item.name,
-    reportType: reportTypeById[latest.report_id] ?? '—',
-    reportDate: latest.report_date,
-    latestValue: latest.value,
-    series: selectSeries(item.points, item.unit, latest.report_id),
-  };
-}
-
 function AbnormalItemCard({
-  detail,
   item,
   index,
   reportTypeById,
   onOpen,
 }: {
-  detail: PanelDetail;
-  item: PanelDetail['items'][number];
+  item: PanelItem;
   index: number;
   reportTypeById: Record<string, string>;
   onOpen: (trend: PanelTrend) => void;
 }) {
   const latest = item.latest!;
-  const trend = panelTrendOf(detail, item, reportTypeById)!;
+  const trend = panelTrendOf(item, reportTypeById)!;
   const color = FLAG_COLORS[latest.flag];
   const lowConfidence = latest.low_confidence && !latest.reviewed;
   return (
@@ -306,20 +319,18 @@ function AbnormalItemCard({
 }
 
 function CompactItemRow({
-  detail,
   item,
   index,
   reportTypeById,
   onOpen,
 }: {
-  detail: PanelDetail;
-  item: PanelDetail['items'][number];
+  item: PanelItem;
   index: number;
   reportTypeById: Record<string, string>;
   onOpen: (trend: PanelTrend) => void;
 }) {
   const latest = item.latest;
-  const trend = panelTrendOf(detail, item, reportTypeById);
+  const trend = panelTrendOf(item, reportTypeById);
   const notTested = latest === null && item.not_tested_count > 0;
   const color = latest ? FLAG_COLORS[latest.flag] : colors.muted;
   const flagText = latest ? itemFlagLabel({ flag: latest.flag }) : notTested ? '未检测' : '—';
@@ -347,6 +358,12 @@ function CompactItemRow({
         </View>
         <Text style={styles.ref}>{latest ? refRangeLabel(item.ref_range) : ''}</Text>
       </View>
+      {latest ? (
+        <Text testID={`panel-item-date-${index}`} style={styles.meta}>
+          {latest.report_date ?? DATE_UNKNOWN_LABEL}
+          {item.report_count > 1 ? ` · ${item.report_count} 份报告` : ''}
+        </Text>
+      ) : null}
     </>
   );
 

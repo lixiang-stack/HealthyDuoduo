@@ -84,6 +84,14 @@ def item_of(r, name: str):
     return next(i for i in r.items if i.name == name)
 
 
+def _golden_report(sample_id: str, **kwargs: Any):
+    """对 samples/expected/ocr 的真实 golden 重跑后处理(规则改动的回归入口)。"""
+    ocr = OCRResult.model_validate(
+        json.loads((paths.EXPECTED_OCR / f"{sample_id}.json").read_text(encoding="utf-8"))
+    )
+    return run_postprocess(ocr, date_hint=date_hint_for(sample_id), **kwargs)
+
+
 def section_of(r, kind: str):
     return next(s for s in r.sections or [] if s.kind == kind)
 
@@ -971,6 +979,39 @@ def test_family_map_chosen_by_item_membership() -> None:
     bilirubin = next(i for i in chem.items if i.name == "总胆红素")
     assert _postprocess._normalize_unit("μmo1/L", bilirubin) == "μmol/L"
     assert _postprocess._normalize_unit("μnol/L", bilirubin) == "μmol/L"
+
+
+def test_trailing_unit_punctuation_and_ocr_loss_forms() -> None:
+    """单位格尾点与 OCR 空格/大小写损耗不进入 unit 字段。
+
+    真实载体:lft_08 尿素 "mmol/L."、白蛋白 "g/l."、肌酐 "μmol L"、
+    二氧化碳 "mmol/l.";cbc_07 血红蛋白 "g/L."。
+    """
+    lft = _golden_report("lft_08")
+    assert item_of(lft, "尿素").unit == "mmol/L"
+    assert item_of(lft, "肌酐").unit == "μmol/L"
+    assert item_of(lft, "白蛋白").unit == "g/L"
+    assert item_of(lft, "二氧化碳").unit == "mmol/L"
+    cbc = _golden_report("cbc_07")
+    assert item_of(cbc, "血红蛋白").unit == "g/L"
+
+
+def test_vitamin_d_tiered_reference_uses_normal_tier() -> None:
+    """参考列的分级解读行(vitanemia_01/02)以「正常」档为比较基准。
+
+    原行为只取首行 "<12ng/ml缺乏",把 5.70 判 normal、39.60 判 high;
+    正确口径:5.70 → low,39.60 → normal;单位只保留 ng/ml。
+    """
+    may = _golden_report("vitanemia_01")
+    sep = _golden_report("vitanemia_02")
+    for report, value, flag in ((may, "5.70", "low"), (sep, "39.60", "normal")):
+        it = item_of(report, "总25羟基维生素D")
+        assert it.value == value
+        assert it.unit == "ng/ml"
+        assert it.ref_range == ">20ng/ml正常"
+        assert it.flag == flag
+        assert all(label in it.raw_text for label in ("缺乏", "不足", "正常"))
+    assert item_of(sep, "维生素B12").unit == "pg/mL"
 
 
 # ---------- golden(真实样本,OCR 结果来自 golden 文件,跨架构确定性) ----------

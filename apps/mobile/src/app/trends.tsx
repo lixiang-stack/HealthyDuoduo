@@ -1,64 +1,165 @@
-import { Link } from 'expo-router';
-import { useState } from 'react';
+import { Link, router, useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import type { PanelItem, ReportSummary } from '../api/reports';
 import { sharedStyles } from '../components/styles';
 import { colors } from '../components/theme';
 import { MemberChips } from '../members/components';
 import { useCurrentMember } from '../members/CurrentMemberContext';
 import { sortMembers } from '../members/order';
 import { FLAG_COLORS } from '../reports/colors';
+import {
+  panelTrendOf,
+  type AbnormalPanelGroup,
+  type PanelTrend,
+} from '../reports/panelOverview';
+import { panelLabel, type PanelCode } from '../reports/panels';
+import { flagLabel, panelDateLabel, refRangeLabel } from '../reports/status';
 import { TrendDetailSheet } from '../reports/TrendDetailSheet';
 import { TrendSparkline } from '../reports/TrendChart';
-import { flagLabel, refRangeLabel, reportDateLabel } from '../reports/status';
-import { formatSeriesMeta, TREND_UNAVAILABLE_LABEL } from '../reports/trends';
-import { displayItemName } from '../review/items';
 import {
-  useAbnormalTrends,
-  type TrendGroup,
-  type TrendRow,
-} from '../reports/useAbnormalTrends';
+  formatSeriesMeta,
+  TREND_UNAVAILABLE_LABEL,
+} from '../reports/trends';
+import { useAbnormalPanelGroups } from '../reports/useAbnormalPanelGroups';
+import { useMemberPanels } from '../reports/useMemberPanels';
 import { useMemberReports } from '../reports/useMemberReports';
 
-// 异常指标趋势列表(票 03):按报告类别展示当前成员最新非 failed 报告里的异常项,
-// 每行一条同单位迷你趋势;点按行打开详情层(票 04),详情层复用已加载数据,不额外请求。
+type SelectedTrend = PanelTrend & { panel: PanelCode };
+
+// 异常指标(panel-browse 票 04):按项目分组展示当前成员各项目 latest 的异常指标。
+// 数据来自 /members/{id}/panels(abnormal_count 过滤)+ 项目详情(PanelItem.points),
+// 点行打开详情层时只读已加载 points,不再逐指标请求趋势端点。
 export default function TrendsScreen() {
   const { currentMemberId, selectMember } = useCurrentMember();
   const { state: reportsState, reload } = useMemberReports(currentMemberId);
+
   const ready = reportsState.status === 'ready';
-  const selected = ready && reportsState.hasCurrentMember;
+  const selectedMemberId =
+    ready && reportsState.hasCurrentMember ? currentMemberId : undefined;
+  const selected = selectedMemberId !== undefined;
   const reportsForCurrent = ready && reportsState.reportsMemberId === currentMemberId;
   const switching = selected && !reportsForCurrent;
   const reports = selected && reportsForCurrent ? reportsState.reports : undefined;
-  const trendsState = useAbnormalTrends(selected ? currentMemberId : undefined, reports);
-  const [detailRow, setDetailRow] = useState<TrendRow>();
-
   const members = ready ? sortMembers(reportsState.members) : [];
+
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      {reportsState.status === 'loading' || switching ? (
+        <View style={sharedStyles.horizontal}>
+          <ActivityIndicator />
+          <Text style={sharedStyles.muted}>正在加载异常指标…</Text>
+        </View>
+      ) : null}
+
+      {reportsState.status === 'unconfigured' ? (
+        <Text style={sharedStyles.muted}>
+          尚未配置后端地址，请先到
+          <Link href="/settings" style={styles.link}>
+            设置
+          </Link>
+          填写。
+        </Text>
+      ) : null}
+
+      {reportsState.status === 'error' ? (
+        <View style={styles.stack}>
+          <Text style={styles.fail}>加载失败:{reportsState.detail}</Text>
+          <Pressable style={styles.button} onPress={() => void reload()}>
+            <Text style={styles.buttonText}>重试</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
+      {ready ? (
+        <View style={styles.stack}>
+          {members.length === 0 ? (
+            <Text style={sharedStyles.muted}>
+              还没有家庭成员。先到
+              <Link href="/members" style={styles.link}>
+                家庭成员
+              </Link>
+              建一个。
+            </Text>
+          ) : (
+            <>
+              <Text style={sharedStyles.label}>查看谁的档案</Text>
+              <MemberChips
+                members={members}
+                selectedId={currentMemberId}
+                onSelect={selectMember}
+              />
+              {selectedMemberId === undefined ? (
+                <Text style={sharedStyles.muted}>选择一个成员查看异常指标。</Text>
+              ) : reports === undefined ? null : reports.length === 0 ? (
+                <View testID="trend-empty-reports" style={styles.stack}>
+                  <Text style={sharedStyles.muted}>这位成员还没有检查单。</Text>
+                  <Link href="/upload" style={styles.link}>
+                    上传检查单
+                  </Link>
+                </View>
+              ) : (
+                <AbnormalPanels memberId={selectedMemberId} reports={reports} />
+              )}
+            </>
+          )}
+        </View>
+      ) : null}
+    </ScrollView>
+  );
+}
+
+// 项目列表就绪后再按 abnormal_count 取项目详情;未选成员 / 列表 loading 由外层与
+// 本组件的 loading 分支呈现。
+function AbnormalPanels({ memberId, reports }: { memberId: number; reports: ReportSummary[] }) {
+  const { state, reload } = useMemberPanels(memberId);
+  const panels = state.status === 'ready' ? state.panels : undefined;
+  const groupsState = useAbnormalPanelGroups(memberId, panels);
+  const [detailTrend, setDetailTrend] = useState<SelectedTrend>();
+  // 原图是独立路由;Modal 在跳转时隐藏但保持挂载,返回后原位恢复选中点。
+  const [sheetHidden, setSheetHidden] = useState(false);
+  const [lastImageReportId, setLastImageReportId] = useState<string>();
+
+  useFocusEffect(
+    useCallback(() => {
+      setSheetHidden(false);
+    }, []),
+  );
+
+  const openTrend = (trend: SelectedTrend) => {
+    setLastImageReportId(undefined);
+    setSheetHidden(false);
+    setDetailTrend(trend);
+  };
+
+  const reportTypeById = Object.fromEntries(
+    reports.map((report) => [report.report_id, report.report_type]),
+  );
   const errorDetail =
-    reportsState.status === 'error'
-      ? reportsState.detail
-      : trendsState.status === 'error'
-        ? trendsState.detail
+    state.status === 'error'
+      ? state.detail
+      : groupsState.status === 'error'
+        ? groupsState.detail
         : undefined;
   const loading =
     !errorDetail &&
-    (reportsState.status === 'loading' ||
-      switching ||
-      (selected &&
-        (trendsState.status === 'loading' || trendsState.status === 'idle')));
+    (state.status === 'loading' ||
+      (state.status === 'ready' &&
+        (groupsState.status === 'loading' || groupsState.status === 'idle')));
 
   return (
     <>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <View style={styles.stack}>
         {loading ? (
           <View style={sharedStyles.horizontal}>
             <ActivityIndicator />
-            <Text style={sharedStyles.muted}>正在加载异常指标趋势…</Text>
+            <Text style={sharedStyles.muted}>正在加载异常指标…</Text>
           </View>
         ) : null}
 
         {!errorDetail &&
-        (reportsState.status === 'unconfigured' || trendsState.status === 'unconfigured') ? (
+        (state.status === 'unconfigured' || groupsState.status === 'unconfigured') ? (
           <Text style={sharedStyles.muted}>
             尚未配置后端地址，请先到
             <Link href="/settings" style={styles.link}>
@@ -77,145 +178,158 @@ export default function TrendsScreen() {
           </View>
         ) : null}
 
-        {reportsState.status === 'ready' && !errorDetail ? (
-          <View style={styles.stack}>
-            {members.length === 0 ? (
-              <Text style={sharedStyles.muted}>
-                还没有家庭成员。先到
-                <Link href="/members" style={styles.link}>
-                  家庭成员
-                </Link>
-                建一个。
-              </Text>
-            ) : (
-              <>
-                <Text style={sharedStyles.label}>查看谁的档案</Text>
-                <MemberChips
-                  members={members}
-                  selectedId={currentMemberId}
-                  onSelect={selectMember}
-                />
-                {!selected ? (
-                  <Text style={sharedStyles.muted}>选择一个成员查看异常指标趋势。</Text>
-                ) : reports === undefined ? null : reports.length === 0 ? (
-                  <View testID="trend-empty-reports" style={styles.stack}>
-                    <Text style={sharedStyles.muted}>这位成员还没有检查单。</Text>
-                    <Link href="/upload" style={styles.link}>
-                      上传检查单
-                    </Link>
-                  </View>
-                ) : trendsState.status === 'ready' && trendsState.groups.length === 0 ? (
-                  <View testID="trend-empty-abnormal" style={styles.stack}>
-                    <Text style={sharedStyles.muted}>这位成员暂时没有异常指标。</Text>
-                    <Link href="/timeline" style={styles.link}>
-                      查看全部档案
-                    </Link>
-                  </View>
-                ) : trendsState.status === 'ready' ? (
-                  <TrendGroups groups={trendsState.groups} onSelectRow={setDetailRow} />
-                ) : null}
-              </>
-            )}
+        {groupsState.status === 'ready' && groupsState.groups.length === 0 ? (
+          <View testID="trend-empty-abnormal" style={styles.stack}>
+            <Text style={sharedStyles.muted}>这位成员暂时没有异常指标。</Text>
+            <Link href="/timeline" style={styles.link}>
+              查看全部档案
+            </Link>
           </View>
         ) : null}
-      </ScrollView>
-      {detailRow ? (
+
+        {groupsState.status === 'ready' && groupsState.groups.length > 0 ? (
+          <PanelGroups
+            groups={groupsState.groups}
+            reportTypeById={reportTypeById}
+            onSelectRow={openTrend}
+          />
+        ) : null}
+      </View>
+      {detailTrend ? (
         <TrendDetailSheet
-          key={`${detailRow.candidate.reportId}-${detailRow.candidate.item.item_id}`}
-          name={displayItemName(detailRow.candidate.item)}
-          reportType={detailRow.candidate.reportType}
-          reportDate={detailRow.candidate.reportDate}
-          latestValue={detailRow.candidate.item.value}
-          series={detailRow.series}
-          onClose={() => setDetailRow(undefined)}
+          key={`${detailTrend.panel}-${detailTrend.name}-${detailTrend.series.unit ?? ''}`}
+          name={detailTrend.name}
+          reportType={detailTrend.reportType}
+          reportDate={detailTrend.reportDate}
+          latestValue={detailTrend.latestValue}
+          series={detailTrend.series}
+          visible={!sheetHidden}
+          initialReportId={lastImageReportId}
+          onOpenImage={(point) => {
+            setLastImageReportId(point.report_id);
+            setSheetHidden(true);
+            router.push({
+              pathname: '/image/[report_id]',
+              params: {
+                report_id: point.report_id,
+                name: detailTrend.name,
+                unit: detailTrend.series.unit ?? '',
+                report_date: point.report_date ?? '',
+              },
+            });
+          }}
+          onClose={() => {
+            setSheetHidden(false);
+            setLastImageReportId(undefined);
+            setDetailTrend(undefined);
+          }}
         />
       ) : null}
     </>
   );
 }
 
-function TrendGroups({
+function PanelGroups({
   groups,
+  reportTypeById,
   onSelectRow,
 }: {
-  groups: TrendGroup[];
-  onSelectRow: (row: TrendRow) => void;
+  groups: AbnormalPanelGroup[];
+  reportTypeById: Record<string, string>;
+  onSelectRow: (trend: SelectedTrend) => void;
 }) {
   const starts = groups.map((_, index) =>
-    groups.slice(0, index).reduce((sum, group) => sum + group.rows.length, 0),
+    groups.slice(0, index).reduce((sum, group) => sum + group.items.length, 0),
   );
+
+  const total = groups.reduce((sum, group) => sum + group.items.length, 0);
 
   return (
     <>
-      {groups.map((group, groupIndex) => {
-        const date = reportDateLabel({
-          report_date: group.reportDate,
-          report_type: group.reportType,
-        });
-        return (
-          <View key={group.reportId} testID={`trend-category-${groupIndex}`} style={styles.group}>
-            <Text style={styles.groupTitle}>
-              {`${group.reportType} · ${date} · ${group.rows.length} 项异常`}
+      <Text testID="trends-summary" style={styles.summary}>
+        异常指标 {total} 项 · {groups.length} 个项目
+      </Text>
+      <Text testID="trends-band-legend" style={sharedStyles.muted}>
+        灰色带 = 参考范围
+      </Text>
+      {groups.map((group, groupIndex) => (
+        <View key={group.panel} testID={`trend-panel-${groupIndex}`} style={styles.group}>
+          <View style={styles.groupHeader}>
+            <Text style={styles.panelBadge}>{panelLabel(group.panel)}</Text>
+            <Text style={styles.groupMeta}>
+              {panelDateLabel(group.reportDate, false)} ·{' '}
+              <Text style={styles.groupCount}>{group.items.length} 项异常</Text>
             </Text>
-            {group.rows.map((row, index) => (
-              <TrendIndicatorCard
-                key={`${group.reportId}-${row.candidate.item.item_id}`}
-                row={row}
-                index={starts[groupIndex] + index}
-                onPress={() => onSelectRow(row)}
-              />
-            ))}
           </View>
-        );
-      })}
+          {group.items.map((item, index) => (
+            <AbnormalIndicatorCard
+              key={`${group.panel}-${item.name}-${item.unit ?? ''}`}
+              panel={group.panel}
+              item={item}
+              index={starts[groupIndex] + index}
+              reportTypeById={reportTypeById}
+              onPress={onSelectRow}
+            />
+          ))}
+        </View>
+      ))}
     </>
   );
 }
 
-function TrendIndicatorCard({
-  row,
+function AbnormalIndicatorCard({
+  panel,
+  item,
   index,
+  reportTypeById,
   onPress,
 }: {
-  row: TrendRow;
+  panel: PanelCode;
+  item: PanelItem;
   index: number;
-  onPress: () => void;
+  reportTypeById: Record<string, string>;
+  onPress: (trend: SelectedTrend) => void;
 }) {
-  const { candidate, series } = row;
-  const item = candidate.item;
-  const name = displayItemName(item);
-  const flagColor = FLAG_COLORS[item.flag];
-  const lowConfidence = item.low_confidence && item.review_status === 'unreviewed';
+  const latest = item.latest!;
+  const trend = panelTrendOf(item, reportTypeById)!;
+  const flagColor = FLAG_COLORS[latest.flag];
+  const lowConfidence = latest.low_confidence && !latest.reviewed;
+  const openDetail = () => onPress({ ...trend, panel });
 
   return (
     <Pressable
       testID={`trend-indicator-${index}`}
       accessibilityRole="button"
-      onPress={onPress}
+      onPress={openDetail}
       style={styles.card}
     >
       <View style={styles.cardHeader}>
-        <Text style={styles.itemName}>{name}</Text>
+        <Text style={styles.itemName}>{item.name}</Text>
         {lowConfidence ? <Text style={styles.lowTag}>低置信</Text> : null}
-        <Text style={[styles.flag, { color: flagColor }]}>{flagLabel(item.flag)}</Text>
+        <Text style={[styles.flag, { color: flagColor }]}>{flagLabel(latest.flag)}</Text>
       </View>
       <View style={styles.valueRow}>
-        <Text style={[styles.value, { color: flagColor }]}>
-          {item.value ?? '—'}
-          {item.unit ? <Text style={styles.unit}> {item.unit}</Text> : null}
-        </Text>
+        <View style={styles.valueWithTag}>
+          <Text style={[styles.value, { color: flagColor }]}>
+            {latest.value ?? '—'}
+            {latest.unit ? <Text style={styles.unit}> {latest.unit}</Text> : null}
+          </Text>
+          {item.latest_report_not_tested ? (
+            <Text testID={`trend-item-not-tested-${index}`} style={styles.notTestedTag}>
+              最近一次未检测
+            </Text>
+          ) : null}
+        </View>
         <Text style={styles.ref}>{refRangeLabel(item.ref_range)}</Text>
       </View>
-      {series.chartPoints.length === 0 ? (
+      {trend.series.chartPoints.length === 0 ? (
         <Text style={styles.emptyChart}>{TREND_UNAVAILABLE_LABEL}</Text>
       ) : (
-        <TrendSparkline
-          series={series}
-          name={name}
-          testID={`trend-sparkline-${index}`}
-        />
+        <TrendSparkline series={trend.series} name={item.name} testID={`trend-sparkline-${index}`} />
       )}
-      <Text style={styles.meta}>{formatSeriesMeta(series, candidate)}</Text>
+      <Text style={styles.meta}>
+        {panelLabel(panel)} · {formatSeriesMeta(trend.series, { reportDate: latest.report_date })}
+      </Text>
       <Text style={styles.detailLink}>查看趋势 ›</Text>
     </Pressable>
   );
@@ -225,8 +339,21 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: 24, gap: 12 },
   stack: { gap: 12 },
-  group: { gap: 8 },
-  groupTitle: { fontSize: 13, color: colors.muted },
+  summary: { fontSize: 15, color: colors.fail, fontWeight: '600' },
+  group: { gap: 8, borderLeftWidth: 3, borderLeftColor: colors.accent, paddingLeft: 10 },
+  groupHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  panelBadge: {
+    fontSize: 13,
+    color: colors.accent,
+    fontWeight: '600',
+    borderWidth: 1,
+    borderColor: colors.accent,
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  groupMeta: { fontSize: 13, color: colors.muted },
+  groupCount: { color: colors.fail, fontWeight: '600' },
   card: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -252,6 +379,8 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
     gap: 8,
   },
+  valueWithTag: { flex: 1, flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: 8 },
+  notTestedTag: { fontSize: 11, color: colors.muted },
   value: { fontSize: 20, fontVariant: ['tabular-nums'] },
   unit: { fontSize: 13 },
   ref: { fontSize: 13, color: colors.muted },

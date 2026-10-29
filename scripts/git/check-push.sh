@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 本地 Git 策略:禁止直接 push main;一个需求只保留 1 次 commit。
+# 本地 Git 策略:禁止直接 push main;commit subject 前缀在 push 前兜底检查。
 set -euo pipefail
 
 remote=${1:-origin}
@@ -24,12 +24,6 @@ while read -r local_ref local_sha remote_ref remote_sha; do
       if git rev-parse --verify --quiet "$main_ref" >/dev/null; then
         base=$(git merge-base "$main_ref" "$local_sha" 2>/dev/null || true)
         if [ -n "$base" ]; then
-          count=$(git rev-list --count "$base..$local_sha")
-          if [ "$count" -gt 1 ]; then
-            echo "✖ 一个需求只保留 1 次 commit;当前相对 $main_ref 有 $count 个提交,请先 squash。" >&2
-            echo "  (若 $main_ref 不是最新,先 git fetch $remote)" >&2
-            status=1
-          fi
           # commit-msg hook 在 core.hooksPath 环境可能未安装;push 前兜底检查。
           while IFS= read -r sha; do
             git log -1 --format=%B "$sha" > "$msg_file"

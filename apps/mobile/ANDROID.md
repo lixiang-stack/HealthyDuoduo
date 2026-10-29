@@ -1,6 +1,8 @@
-# Android APK 本地打包
+# Android 本地打包与真机体验
 
-面向 `apps/mobile` 的本地 release APK 构建流程。云端构建见文末「备选：EAS 云构建」。
+面向 `apps/mobile` 的本地 release APK 构建，以及用 Android 真机 + Expo Go 的 USB 调试流程。云端构建见文末「备选：EAS 云构建」。
+
+> 只想快速体验产品：见下文「真机体验（USB）」，手机连上 Mac 后即可加载当前代码。
 
 实测版本：Expo SDK 57 / React Native 0.86.3 / Gradle 9.3.1 / AGP 8.12 / JDK 21（SDK 58 升级后尚未重新跑通本地 APK 构建）。
 
@@ -68,7 +70,7 @@ cp android/app/build/outputs/apk/release/app-release.apk \
 
 要点：
 
-- `-PreactNativeArchitectures` 决定 ABI。只给真机装用 `arm64-v8a`（体积最小，覆盖绝大多数手机）；需要模拟器再追加 `x86_64`（逗号分隔）。
+- `-PreactNativeArchitectures` 决定 ABI。只给真机装用 `arm64-v8a`（体积最小，覆盖绝大多数手机）；需要其他 ABI 时用逗号分隔追加。
 - `--clean` 会重新生成 `android/`，并把 `package.json` 的 `android` / `ios` 脚本改成 `expo run:*`；不希望改动的话，构建后还原这两行。
 - 首次构建会下载 Gradle 9.3.1 与 Maven 依赖，之后走缓存。
 
@@ -91,6 +93,107 @@ BT="$HOME/Library/Android/sdk/build-tools/36.0.0"
 ```
 
 也可以把 APK 传到手机直接安装。release 包没有 Metro，首次打开需到「设置」填后端地址（`http://<电脑局域网 IP>:8080/api/v1`）并点健康检查。
+
+## 真机体验（USB）
+
+目的：Android 手机通过数据线连 Mac，用 Expo Go 加载当前代码，直接体验 App。全程走 USB，不依赖 Wi-Fi。
+
+### 1. 开启 USB 调试
+
+手机上：
+
+1. 设置 → 关于手机 → 连续点「版本号」7 次，开启开发者选项。
+2. 开发者选项 → 打开「USB 调试」。
+3. 插线后，通知栏把 USB 用途改为「文件传输 / MTP」。
+4. 弹出「允许 USB 调试吗？」时允许（可勾选始终允许）。
+5. 小米 / OPPO / vivo 等还需打开「USB 调试（安全设置）」「USB 安装」等开关。
+
+Mac 上确认设备：
+
+```bash
+ADB="$HOME/Library/Android/sdk/platform-tools/adb"
+"$ADB" kill-server
+"$ADB" start-server
+"$ADB" devices -l
+```
+
+必须看到 `device`：
+
+```text
+<序列号>  device  product:... model:...
+```
+
+`unauthorized`：解锁手机，点允许 USB 调试。空列表：换数据线 / USB 口，确认不是「仅充电」，再重试。`system_profiler SPUSBDataType` 里看不到手机时，问题在 USB 线 / 口 / 手机 USB 模式，不在 Expo。
+
+### 2. USB 端口映射
+
+把手机的 `localhost:8081`（Metro）和 `localhost:8080`（数据服务）转发到 Mac：
+
+```bash
+"$ADB" reverse tcp:8081 tcp:8081
+"$ADB" reverse tcp:8080 tcp:8080
+```
+
+### 3. 启动 Metro 并打开 Expo Go
+
+```bash
+cd apps/mobile
+npx expo start --android --localhost
+```
+
+- `--localhost` 使用 `exp://127.0.0.1:8081`，通过 USB 映射访问 Mac，不依赖 Wi-Fi。
+- Expo CLI 会在已连接的真机上打开 Expo Go；没装会自动安装匹配 SDK 58 的版本，也可从应用商店安装最新版 Expo Go。
+- 如果同时连接了多台 Android 设备，Expo 可能选错；先断开其他设备，或在终端按 `a` 后选择手机。
+
+若没有自动打开，另开一个终端执行：
+
+```bash
+"$ADB" shell am start -a android.intent.action.VIEW -d "exp://127.0.0.1:8081"
+```
+
+### 4. 配置后端地址
+
+前提：宿主机 `:8080` 已有数据服务（共享 deploy 栈或本地 `hdd serve`）。App 首次打开会进入「设置」，Base URL 填：
+
+```text
+http://localhost:8080/api/v1
+```
+
+因为已 `adb reverse tcp:8080`，手机上的 `localhost` 会转发到 Mac 的 8080。点「保存并校验」，地址会持久化。
+
+### 5. 鼠标控制（可选）
+
+USB 识别正常后，用 scrcpy 把手机画面投到 Mac，鼠标直接操作：
+
+```bash
+brew install scrcpy
+scrcpy
+```
+
+### 6. 手工点检
+
+需要截图或排查可点击区域时：
+
+```bash
+"$ADB" exec-out screencap -p > /tmp/android.png
+"$ADB" shell uiautomator dump /sdcard/window.xml
+"$ADB" shell cat /sdcard/window.xml | tr '>' '>\n' | rg 'tab-family|tab-archive|trend-detail'
+```
+
+建议至少点检：
+
+- 底部「家庭 / 档案」图标：房子 / 三横线，激活蓝色、未激活灰色；不应出现倒三角或方块。
+- 「档案 → 按项目 → 血常规」：异常项趋势层的左上角返回键可点；同日多份报告只显示一次日期，后续行显示「同日」。
+- 项目详情左上角返回键可回到「按项目」。
+- 冷启动后成员 / 报告数据可加载（验证 `localhost:8080` 后端地址）。
+
+### 7. 收尾
+
+```bash
+"$ADB" reverse --remove-all
+```
+
+Metro 用 `Ctrl+C` 停止，然后拔线。
 
 ## 版本与签名
 

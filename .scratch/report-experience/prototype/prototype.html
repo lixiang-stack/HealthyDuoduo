@@ -1,0 +1,661 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HealthyDuoduo · 趋势到报告原型</title>
+<style>
+  :root {
+    --text: #111827;
+    --muted: #6b7280;
+    --accent: #2563eb;
+    --ok: #15803d;
+    --fail: #b91c1c;
+    --low: #1d4ed8;
+    --border: #d1d5db;
+    --soft: #f8fafc;
+    --chip: #f3f4f6;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: #e5e7eb;
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .stage { display: flex; flex-direction: column; align-items: center; padding: 22px 0 150px; }
+  .caption {
+    width: 390px; margin-bottom: 14px; font-size: 13px; line-height: 20px; color: #374151;
+  }
+  .caption b { color: #111827; }
+  .device {
+    width: 390px; height: 844px; position: relative; overflow: hidden;
+    background: #fff; border: 10px solid #111827; border-radius: 46px;
+    box-shadow: 0 24px 60px rgba(0,0,0,.28);
+  }
+  .notch {
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+    width: 118px; height: 25px; border-radius: 16px; background: #111827; z-index: 20;
+  }
+  .screen { position: absolute; inset: 0; display: flex; flex-direction: column; background: #fff; }
+
+  .statusbar {
+    flex: 0 0 44px; height: 44px; padding: 0 22px 6px;
+    display: flex; align-items: flex-end; justify-content: space-between;
+    font-size: 12px; font-weight: 650; color: var(--text);
+  }
+  .appbar {
+    flex: 0 0 52px; height: 52px; padding: 0 16px; display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid #f1f5f9; background: #fff;
+  }
+  .appbar .back { width: 22px; font-size: 30px; line-height: 1; color: var(--text); cursor: pointer; }
+  .appbar .title { flex: 1; font-size: 17px; font-weight: 650; letter-spacing: .1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .appbar .right { color: var(--accent); font-size: 14px; }
+  .content {
+    flex: 1; overflow-y: auto; padding: 16px 16px 34px; scrollbar-width: none;
+  }
+  .content::-webkit-scrollbar { display: none; }
+
+  .card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 12px;
+    margin-bottom: 10px; background: #fff;
+  }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .row-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .muted { color: var(--muted); font-size: 13px; line-height: 20px; }
+  .small { font-size: 12px; line-height: 18px; }
+  .chev { color: #9ca3af; font-size: 22px; line-height: 1; }
+  .link { color: var(--accent); font-size: 13px; text-decoration: none; }
+  .flag { font-size: 12px; white-space: nowrap; }
+  .flag-high { color: var(--fail); }
+  .flag-low { color: var(--low); }
+  .flag-normal { color: var(--ok); }
+  .flag-unknown { color: var(--muted); }
+  .flag-not-tested { color: var(--muted); }
+
+  .trend-meta { margin: 0 2px 10px; }
+  .chart-wrap { position: relative; margin: 0 0 10px; }
+  .chart { width: 100%; height: 180px; display: block; overflow: visible; }
+  .chart .grid { stroke: #e5e7eb; stroke-width: 1; }
+  .chart .axis-label { fill: var(--muted); font-size: 10px; }
+  .chart .band { fill: #e5e7eb; opacity: .55; }
+  .chart .line { fill: none; stroke: #6b7280; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .chart .dot-normal { fill: var(--ok); stroke: var(--ok); }
+  .chart .dot-high { fill: var(--fail); stroke: var(--fail); }
+  .chart .selected-ring { fill: none; stroke: var(--accent); stroke-width: 2; }
+  .chart .hit { fill: transparent; cursor: pointer; }
+  .chart-callout {
+    position: absolute; z-index: 6; width: 178px;
+    border: 1px solid #bfdbfe; border-radius: 10px; background: #fff;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, .18); padding: 10px;
+  }
+  .chart-callout .cta { margin-top: 6px; color: var(--accent); font-size: 13px; font-weight: 600; cursor: pointer; }
+  .chart-callout .date { font-size: 12px; color: var(--muted); }
+  .chart-callout .val { margin-top: 2px; font-size: 17px; font-weight: 650; font-variant-numeric: tabular-nums; }
+
+  .point-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 10px;
+    background: var(--soft);
+  }
+  .point-card .date { font-size: 14px; font-weight: 600; }
+  .point-card .value { font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .point-card .unit { font-size: 13px; font-weight: 400; color: var(--muted); }
+  .point-card .value-row { margin-top: 3px; align-items: baseline; }
+  .report-cta {
+    width: 100%; margin-top: 10px; padding: 12px 14px; border: 1px solid #bfdbfe; border-radius: 9px;
+    background: #eff6ff; color: var(--accent); font-size: 14px; font-weight: 650; text-align: center;
+    cursor: pointer; font-family: inherit;
+  }
+  .entry-hint {
+    margin: 8px 2px 10px; padding: 9px 11px; border-radius: 8px; background: #f3f4f6;
+    color: #4b5563; font-size: 12px; line-height: 18px;
+  }
+
+  .point-list { display: flex; flex-direction: column; gap: 6px; }
+  .point-row {
+    display: flex; align-items: center; gap: 8px; border: 1px solid transparent; border-radius: 8px;
+    padding: 8px; cursor: pointer;
+  }
+  .point-row.selected { border-color: var(--accent); background: #f8fbff; }
+  .point-row .point-dot { width: 10px; height: 10px; border-radius: 5px; border: 2px solid currentColor; flex: 0 0 auto; }
+  .point-row .point-date { width: 86px; font-size: 12px; color: var(--muted); }
+  .point-row .point-value { flex: 1; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .point-row .point-flag { width: 40px; text-align: right; font-size: 12px; }
+  .point-row .row-chev { color: #9ca3af; font-size: 20px; line-height: 1; }
+
+  .legend { margin-top: 12px; display: flex; flex-direction: column; gap: 4px; }
+  .legend-row { display: flex; align-items: center; gap: 8px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 5px; background: var(--text); border: 2px solid var(--text); }
+  .legend-band { width: 18px; height: 8px; border-radius: 2px; background: var(--border); opacity: .55; }
+
+  .section-head { display: flex; align-items: baseline; justify-content: space-between; margin: 16px 2px 8px; padding-top: 12px; border-top: 1px solid #f1f5f9; }
+  .section-title { margin: 16px 2px 8px; font-size: 12px; color: var(--muted); font-weight: 600; letter-spacing: .3px; }
+  .report-head { padding: 14px; }
+  .report-title { font-size: 19px; font-weight: 700; letter-spacing: .2px; }
+  .report-date { margin-top: 2px; }
+  .badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .badge {
+    display: inline-flex; align-items: center; border: 1px solid var(--border); border-radius: 10px;
+    padding: 2px 8px; font-size: 12px; color: var(--text); white-space: nowrap;
+  }
+  .badge.high { color: var(--fail); border-color: #fecaca; background: #fef2f2; }
+  .badge.low { color: var(--low); border-color: #bfdbfe; background: #eff6ff; }
+  .badge.accent { color: var(--accent); border-color: #bfdbfe; background: #eff6ff; }
+  .badge.ok { color: var(--ok); border-color: #bbf7d0; background: #f0fdf4; }
+
+  .item-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 10px; background: #fff;
+  }
+  .item-card.highlight {
+    border: 2px solid var(--accent); background: #f8fbff;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, .10);
+  }
+  .item-card .item-name { font-size: 15px; font-weight: 600; }
+  .item-card .item-value { margin-top: 3px; font-size: 20px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .item-card .item-unit { font-size: 12px; font-weight: 400; color: var(--muted); }
+  .item-card .item-ref { font-size: 12px; color: var(--muted); }
+  .highlight-chip {
+    display: inline-flex; align-items: center; gap: 4px; margin-bottom: 7px;
+    border-radius: 8px; padding: 2px 7px; background: #dbeafe; color: #1e40af;
+    font-size: 11px; font-weight: 600;
+  }
+  .compact-row { display: flex; align-items: baseline; gap: 10px; padding: 9px 2px; border-bottom: 1px solid #f1f5f9; }
+  .compact-row:last-child { border-bottom: 0; }
+  .compact-main { flex: 1; min-width: 0; }
+  .compact-name { font-size: 14px; color: var(--text); }
+  .compact-ref { margin-left: 6px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .compact-value { font-size: 14px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .group-card { padding: 2px 14px; margin-bottom: 10px; }
+  .proto-note { margin: 14px 2px 4px; padding: 10px 12px; border-radius: 8px; background: #f3f4f6; color: #4b5563; font-size: 12px; line-height: 18px; }
+  .context-banner {
+    position: sticky; top: 0; z-index: 5; margin: -16px -16px 12px; padding: 9px 16px;
+    background: #dbeafe; color: #1e40af; font-size: 12px; line-height: 18px; font-weight: 600;
+    border-bottom: 1px solid #bfdbfe;
+  }
+  .image-viewport {
+    position: relative; overflow: hidden; border: 1px solid var(--border); border-radius: 10px;
+    background: #f8fafc; margin-bottom: 8px;
+  }
+  .image-viewport img { max-width: none; }
+  .image-highlight {
+    position: absolute; pointer-events: none; border: 2px solid var(--accent); border-radius: 3px;
+    background: rgba(37, 99, 235, .10); box-shadow: 0 0 0 2px rgba(37, 99, 235, .12);
+  }
+  .image-redact {
+    position: absolute; left: 0; right: 0; background: #fff; display: flex; align-items: flex-end;
+    justify-content: center; padding-bottom: 3px; font-size: 10px; color: #9ca3af; pointer-events: none;
+  }
+  .image-hint { margin: 0 2px 10px; font-size: 12px; color: var(--muted); line-height: 18px; }
+  .image-value-card { border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 10px; background: #fff; }
+  .image-value-card .value { font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .image-value-card .unit { font-size: 13px; font-weight: 400; color: var(--muted); }
+  .image-actions { display: flex; gap: 8px; margin-top: 2px; }
+  .image-actions .primary {
+    flex: 1; padding: 12px 14px; border: 0; border-radius: 9px; background: var(--accent); color: #fff;
+    font-size: 14px; font-weight: 650; cursor: pointer; font-family: inherit;
+  }
+  .image-actions .secondary {
+    padding: 12px 16px; border: 1px solid var(--border); border-radius: 9px; background: #fff; color: var(--text);
+    font-size: 14px; cursor: pointer; font-family: inherit;
+  }
+  .report-zoom { margin-top: 8px; }
+  .report-zoom .image-viewport { margin-bottom: 4px; }
+
+  .preview-backdrop { position: absolute; inset: 0; background: rgba(17, 24, 39, .34); z-index: 30; }
+  .preview-sheet {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 31;
+    background: #fff; border-radius: 20px 20px 0 0; padding: 10px 16px 26px;
+    box-shadow: 0 -12px 36px rgba(15, 23, 42, .22);
+  }
+  .sheet-handle { width: 38px; height: 4px; border-radius: 2px; background: #d1d5db; margin: 0 auto 12px; }
+  .preview-title-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .preview-title { font-size: 16px; font-weight: 650; }
+  .preview-close { color: var(--muted); font-size: 22px; line-height: 1; cursor: pointer; padding: 2px 6px; }
+  .preview-report { margin-top: 8px; font-size: 14px; font-weight: 600; }
+  .preview-alt {
+    margin-top: 10px; border: 1px solid #bfdbfe; background: #eff6ff; border-radius: 10px; padding: 10px 12px;
+  }
+  .preview-alt .value { font-size: 20px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .preview-actions { display: flex; gap: 8px; margin-top: 12px; }
+  .preview-actions .primary {
+    flex: 1; padding: 12px 14px; border: 0; border-radius: 9px; background: var(--accent); color: #fff;
+    font-size: 14px; font-weight: 650; cursor: pointer; font-family: inherit;
+  }
+  .preview-actions .secondary {
+    padding: 12px 16px; border: 1px solid var(--border); border-radius: 9px; background: #fff; color: var(--text);
+    font-size: 14px; cursor: pointer; font-family: inherit;
+  }
+
+  .switcher {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 100;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    padding: 10px 16px; background: #111827; color: #fff;
+    font-size: 12px;
+  }
+  .switcher .group { display: flex; align-items: center; gap: 6px; margin-right: 8px; }
+  .switcher .label { color: #9ca3af; font-size: 11px; }
+  .switcher button {
+    border: 0; border-radius: 6px; padding: 6px 10px; background: #374151; color: #fff;
+    font-size: 12px; cursor: pointer; font-family: inherit;
+  }
+  .switcher button.active { background: var(--accent); }
+  body.shot { background: #fff; }
+  body.shot .switcher, body.shot .caption { display: none; }
+  body.shot .stage { padding: 0; }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <div class="caption">
+      <b>任务：</b>在 ALT 趋势详情里看到一个点，想核对「当时原始图像」上的那一行。<br />
+      本轮只选两件事：<b>Q6 入口手势</b>、<b>Q7 原图落点</b>。报告详情按项目组；组内异常 / 未知在前，正常 / 未检测在后。<br />
+      原型里的返回为了对比回到趋势层；生产实现会先关闭趋势层，返回到项目详情 / 异常指标列表。<br />
+      <span class="muted">样例图像来自仓库脱敏样本 lft_02，仅用于版式验证。</span>
+    </div>
+    <div class="device" id="device">
+      <div class="notch"></div>
+      <div class="screen" id="screen"></div>
+    </div>
+  </div>
+
+  <div class="switcher" id="switcher">
+    <div class="group"><span class="label">Q6 入口</span><button data-screen="entry-a">A 点卡按钮</button><button data-screen="entry-b">B 点行直达</button><button data-screen="entry-c">C 图上点浮层</button></div>
+    <div class="group"><span class="label">Q7 原图落点</span><button data-screen="image-full">A 全屏原图定位</button><button data-screen="report-zoom">B 报告内原图条带</button><button data-screen="preview">C 趋势层内原图预览</button></div>
+  </div>
+
+<script>
+  const ALT = {
+    name: '丙氨酸转氨酶（ALT）',
+    unit: 'U/L',
+    reportType: '生化',
+    ref: '7-40',
+    reportDate: '2021-08-02',
+    points: [
+      { date: '2017-11-18', value: 27.4, flag: 'normal' },
+      { date: '2021-08-02', value: 835, flag: 'high' },
+    ],
+  };
+
+  // 仓库脱敏样本 lft_02；ALT 行 OCR 框（line 27-29 的并集）。
+  const SAMPLE = {
+    src: '../../../samples/lft_02.jpg',
+    width: 791,
+    height: 550,
+    box: { x: 35, y: 150, w: 310, h: 17 },
+  };
+
+  const state = { screen: 'entry-a', selected: 1, imageFull: false };
+
+  function statusbar() {
+    return `<div class="statusbar"><span>9:41</span><span>5G &nbsp;▮▮▮</span></div>`;
+  }
+
+  function appbar(title, { back = false, right = '', backTo = '' } = {}) {
+    const backHtml = back ? `<span class="back" ${backTo ? `onclick="showScreen('${backTo}')"` : ''}>‹</span>` : '';
+    return `<div class="appbar">${backHtml}<span class="title">${title}</span>${right ? `<span class="right">${right}</span>` : ''}</div>`;
+  }
+
+  function phone({ title, back = false, right = '', content, backTo = '' }) {
+    return `${statusbar()}${appbar(title, { back, right, backTo })}<div class="content">${content}</div>`;
+  }
+
+  function flagLabel(flag) {
+    return flag === 'high' ? '偏高' : flag === 'low' ? '偏低' : flag === 'normal' ? '正常' : flag === 'not_tested' ? '未检测' : '未知';
+  }
+
+  function flagClass(flag) {
+    return flag === 'high' ? 'flag-high' : flag === 'low' ? 'flag-low' : flag === 'normal' ? 'flag-normal' : flag === 'not_tested' ? 'flag-not-tested' : 'flag-unknown';
+  }
+
+  function selectedPoint() {
+    return ALT.points[state.selected];
+  }
+
+  // 与 App components/zoom.ts 同口径：行框并集 + 一成上下文，等比装进视口。
+  function cropGeometry(viewport) {
+    const margin = 0.1 * SAMPLE.box.w;
+    const region = {
+      x: SAMPLE.box.x - margin,
+      y: SAMPLE.box.y - margin,
+      w: SAMPLE.box.w + margin * 2,
+      h: SAMPLE.box.h + margin * 2,
+    };
+    const scale = Math.min(
+      (0.9 * viewport.width) / region.w,
+      (0.9 * viewport.height) / region.h,
+    );
+    const left = viewport.width / 2 - (region.x + region.w / 2) * scale;
+    const top = viewport.height / 2 - (region.y + region.h / 2) * scale;
+    return {
+      img: { left, top, width: SAMPLE.width * scale, height: SAMPLE.height * scale },
+      box: {
+        left: left + SAMPLE.box.x * scale,
+        top: top + SAMPLE.box.y * scale,
+        width: SAMPLE.box.w * scale,
+        height: SAMPLE.box.h * scale,
+      },
+      scale,
+    };
+  }
+
+  const HEADER_NATURAL_HEIGHT = 130;
+
+  function redactBand({ imgTop, scale, height }) {
+    const top = Math.max(0, imgTop);
+    const bottom = Math.min(height, imgTop + HEADER_NATURAL_HEIGHT * scale);
+    if (bottom <= top) {
+      return '';
+    }
+    return `<div class="image-redact" style="top:${top}px;height:${bottom - top}px">页眉已隐藏</div>`;
+  }
+
+  function imageViewport({ width, height, full = false }) {
+    if (full) {
+      const imgWidth = width;
+      const imgHeight = (width * SAMPLE.height) / SAMPLE.width;
+      const imgTop = (height - imgHeight) / 2;
+      const scale = imgHeight / SAMPLE.height;
+      return `<div class="image-viewport" style="height:${height}px">
+        <img src="${SAMPLE.src}" alt="检查单原图" style="position:absolute;left:0;top:${imgTop}px;width:${imgWidth}px;height:${imgHeight}px" />
+        ${redactBand({ imgTop, scale, height })}
+      </div>`;
+    }
+    const g = cropGeometry({ width, height });
+    return `<div class="image-viewport" style="height:${height}px">
+      <img src="${SAMPLE.src}" alt="检查单原图定位" style="position:absolute;left:${g.img.left}px;top:${g.img.top}px;width:${g.img.width}px;height:${g.img.height}px" />
+      ${redactBand({ imgTop: g.img.top, scale: g.scale, height })}
+      <div class="image-highlight" style="left:${g.box.left}px;top:${g.box.top}px;width:${g.box.width}px;height:${g.box.height}px"></div>
+    </div>`;
+  }
+
+  // 简版折线图：0–900 值域，参考带 7–40；点可点击选中。
+  function chart({ callout = false } = {}) {
+    const w = 340, h = 180, left = 38, right = 10, top = 12, bottom = 28;
+    const plotW = w - left - right;
+    const plotH = h - top - bottom;
+    const max = 900;
+    const y = (v) => top + plotH - (v / max) * plotH;
+    const xs = ALT.points.map((_, i) => left + (i * plotW) / (ALT.points.length - 1));
+    const line = ALT.points.map((p, i) => `${i === 0 ? 'M' : 'L'}${xs[i].toFixed(1)},${y(p.value).toFixed(1)}`).join(' ');
+    const ticks = [0, 300, 600, 900];
+    const grid = ticks.map((t) => `<line class="grid" x1="${left}" y1="${y(t)}" x2="${w - right}" y2="${y(t)}"></line><text class="axis-label" x="${left - 6}" y="${y(t) + 3}" text-anchor="end">${t}</text>`).join('');
+    const dots = ALT.points.map((p, i) => {
+      const selected = i === state.selected;
+      const cls = p.flag === 'high' ? 'dot-high' : 'dot-normal';
+      return `<circle class="${cls}" cx="${xs[i]}" cy="${y(p.value)}" r="${selected ? 5 : 3.6}"></circle>
+        ${selected ? `<circle class="selected-ring" cx="${xs[i]}" cy="${y(p.value)}" r="8"></circle>` : ''}
+        <circle class="hit" cx="${xs[i]}" cy="${y(p.value)}" r="14" onclick="selectPoint(${i})"></circle>`;
+    }).join('');
+    const labels = ALT.points.map((p, i) => {
+      const anchor = i === 0 ? 'start' : i === ALT.points.length - 1 ? 'end' : 'middle';
+      return `<text class="axis-label" x="${xs[i]}" y="${h - 7}" text-anchor="${anchor}">${p.date.slice(2, 7)}</text>`;
+    }).join('');
+    const sel = ALT.points[state.selected];
+    const calloutLeft = Math.max(6, Math.min(w - 184, xs[state.selected] - 89));
+    const calloutTop = y(sel.value) < 86 ? y(sel.value) + 14 : y(sel.value) - 96;
+    const calloutHtml = callout
+      ? `<div class="chart-callout" style="left:${calloutLeft}px; top:${calloutTop}px">
+           <div class="date">${sel.date}</div>
+           <div class="row"><span class="val ${flagClass(sel.flag)}">${sel.value} <span class="unit" style="font-size:12px;color:var(--muted);font-weight:400">${ALT.unit}</span></span><span class="flag ${flagClass(sel.flag)}">${flagLabel(sel.flag)}</span></div>
+           <div class="cta" onclick="showScreen('image-full')">查看原始图像 ›</div>
+         </div>`
+      : '';
+    return `<div class="chart-wrap">
+      <svg class="chart" viewBox="0 0 ${w} ${h}" role="img" aria-label="ALT 趋势：2 个点，最新 835 偏高">
+        <rect class="band" x="${left}" y="${y(40)}" width="${plotW}" height="${y(7) - y(40)}"></rect>
+        ${grid}
+        <path class="line" d="${line}"></path>
+        ${dots}
+        ${labels}
+      </svg>
+      ${calloutHtml}
+    </div>`;
+  }
+
+  function pointCard({ entry }) {
+    const p = selectedPoint();
+    const cta = entry === 'a'
+      ? `<button class="report-cta" onclick="showScreen('image-full')">查看原始图像 ›</button>`
+      : '';
+    return `<div class="point-card">
+      <div class="row"><span class="date">${p.date}</span><span class="flag ${flagClass(p.flag)}">${flagLabel(p.flag)}</span></div>
+      <div class="row value-row">
+        <span class="value ${flagClass(p.flag)}">${p.value} <span class="unit">${ALT.unit}</span></span>
+        <span class="muted">参考 ${ALT.ref}</span>
+      </div>
+      <div class="muted small">方法：— · 高置信（实心）</div>
+      ${cta}
+    </div>`;
+  }
+
+  function pointList({ entry }) {
+    return `<div class="point-list">${ALT.points.map((p, i) => {
+      const selected = i === state.selected;
+      const action = entry === 'b'
+        ? `onclick="showScreen('image-full')"`
+        : `onclick="selectPoint(${i})"`;
+      return `<div class="point-row ${selected ? 'selected' : ''}" ${action}>
+        <span class="point-dot ${flagClass(p.flag)}"></span>
+        <span class="point-date">${p.date}</span>
+        <span class="point-value">${p.value} ${ALT.unit}</span>
+        <span class="point-flag ${flagClass(p.flag)}">${flagLabel(p.flag)}</span>
+        ${entry === 'b' ? '<span class="row-chev">›</span>' : ''}
+      </div>`;
+    }).join('')}</div>`;
+  }
+
+  function trendSheet(entry) {
+    const hint = entry === 'a'
+      ? `<div class="entry-hint"><b>A 点卡按钮：</b>点任一行仍只切换选中点；选中后点上方「查看原始图像」进原图。</div>`
+      : entry === 'b'
+        ? `<div class="entry-hint"><b>B 点行直达：</b>点任一行直接进原图；点图上的圆点切换选中值。选中和进原图不再共用同一个手势。</div>`
+        : `<div class="entry-hint"><b>C 图上点浮层：</b>点图上的圆点，在该点旁弹出摘要；从浮层里的「查看原始图像」进原图。行点击仍只切换选中点。</div>`;
+    return phone({
+      title: ALT.name,
+      back: true,
+      backTo: 'entry-a',
+      content: `<div class="muted trend-meta">最新：${ALT.reportType} · ${ALT.unit} · 2 份报告</div>
+        ${chart({ callout: entry === 'c' })}
+        ${pointCard({ entry })}
+        ${pointList({ entry })}
+        ${hint}
+        <div class="legend">
+          <div class="legend-row"><span class="legend-dot"></span><span class="muted">实心 = 高置信 / 已核对</span></div>
+          <div class="legend-row"><span class="legend-band"></span><span class="muted">灰色带 = 参考范围</span></div>
+        </div>
+        <div class="muted small" style="margin-top:12px">2 份报告 · 2017-11-18 → 2021-08-02 · 最新点来自 2021-08-02</div>`,
+    });
+  }
+
+  const reportItems = {
+    abnormal: [
+      { name: '丙氨酸转氨酶（ALT）', value: '835', unit: 'U/L', ref: '7-40', flag: 'high', highlight: true },
+      { name: '天冬氨酸转氨酶（AST）', value: '488', unit: 'U/L', ref: '13-35', flag: 'high' },
+      { name: '总胆汁酸', value: '47', unit: 'μmol/L', ref: '≤10', flag: 'high' },
+      { name: '碱性磷酸酶', value: '150', unit: 'U/L', ref: '50-135', flag: 'high' },
+      { name: '谷氨酰转肽酶（GGT）', value: '89', unit: 'U/L', ref: '7-45', flag: 'high' },
+      { name: '前白蛋白', value: '82', unit: 'mg/L', ref: '185-350', flag: 'low' },
+    ],
+    liverRest: [
+      { name: '总胆红素', value: '17.5', unit: 'μmol/L', ref: '≤21.0', flag: 'normal' },
+      { name: '直接胆红素', value: '7.9', unit: 'μmol/L', ref: '≤8.0', flag: 'normal' },
+      { name: '总蛋白', value: '76', unit: 'g/L', ref: '65-85', flag: 'normal' },
+      { name: '白蛋白', value: '42', unit: 'g/L', ref: '40-55', flag: 'normal' },
+      { name: '球蛋白', value: '34', unit: 'g/L', ref: '20-40', flag: 'normal' },
+      { name: '白蛋白/球蛋白', value: '1.24', unit: '', ref: '1.20-2.40', flag: 'normal' },
+    ],
+    kidney: [
+      { name: '尿素', value: '4.1', unit: 'mmol/L', ref: '2.6-7.5', flag: 'normal' },
+      { name: '肌酐', value: '51', unit: 'μmol/L', ref: '41-73', flag: 'normal' },
+      { name: 'eGFR', value: '107.3', unit: 'ml/min', ref: '≥90', flag: 'normal' },
+      { name: '血清胱抑素C', value: '0.75', unit: 'mg/L', ref: '0.59-1.03', flag: 'normal' },
+    ],
+    uric: [
+      { name: '尿酸', value: '0.246', unit: 'mmol/L', ref: '0.100-0.420', flag: 'normal' },
+    ],
+  };
+
+  function itemCard(item, { highlight = false, zoom = false } = {}) {
+    const hl = highlight && item.highlight;
+    return `<div class="item-card ${hl ? 'highlight' : ''}" ${hl ? 'id="highlight-card"' : ''}>
+      ${hl ? '<div class="highlight-chip">● 从趋势打开 · 已定位</div>' : ''}
+      <div class="row"><span class="item-name">${item.name}</span><span class="flag ${flagClass(item.flag)}">${flagLabel(item.flag)}</span></div>
+      <div class="row value-row" style="margin-top:3px;align-items:baseline">
+        <span class="item-value ${flagClass(item.flag)}">${item.value}${item.unit ? ` <span class="item-unit">${item.unit}</span>` : ''}</span>
+        <span class="item-ref">参考 ${item.ref}</span>
+      </div>
+      ${hl && zoom ? `<div class="report-zoom">${imageViewport({ width: 330, height: 96 })}<div class="muted small">原图定位 · 蓝框为 ALT 行</div></div>` : ''}
+      <div class="muted small" style="margin-top:3px">方法：— · 高置信（实心）</div>
+    </div>`;
+  }
+
+  function compactRow(item) {
+    return `<div class="compact-row">
+      <div class="compact-main"><span class="compact-name">${item.name}</span><span class="compact-ref">参考 ${item.ref}</span></div>
+      <span class="compact-value ${flagClass(item.flag)}">${item.value}${item.unit ? ` ${item.unit}` : ''}</span>
+      <span class="flag ${flagClass(item.flag)}">${flagLabel(item.flag)}</span>
+    </div>`;
+  }
+
+  function isAttention(flag) {
+    return flag === 'high' || flag === 'low' || flag === 'abnormal' || flag === 'unknown';
+  }
+
+  function reportDetail({ highlight = false, zoom = false } = {}) {
+    const groups = [
+      { name: '肝功', items: [...reportItems.abnormal, ...reportItems.liverRest], abnormal: reportItems.abnormal.length },
+      { name: '肾功', items: reportItems.kidney, abnormal: 0 },
+      { name: '尿酸', items: reportItems.uric, abnormal: 0 },
+    ];
+    const groupHtml = groups.map((g) => {
+      const sorted = [...g.items].sort(
+        (a, b) => Number(isAttention(b.flag)) - Number(isAttention(a.flag)),
+      );
+      const highlighted = highlight ? sorted.find((item) => item.highlight) : undefined;
+      const rest = highlighted ? sorted.filter((item) => item !== highlighted) : sorted;
+      return `<div class="row" style="margin:14px 2px 6px"><span style="font-size:15px;font-weight:600">${g.name}</span><span class="muted">${g.items.length} 项${g.abnormal ? ` · ${g.abnormal} 项异常` : ' · 0 项异常'}</span></div>
+        ${highlighted ? itemCard(highlighted, { highlight, zoom }) : ''}
+        <div class="card group-card">${rest.map(compactRow).join('')}</div>`;
+    }).join('');
+    return phone({
+      title: '报告详情',
+      back: true,
+      backTo: 'image-full',
+      content: `${highlight ? '<div class="context-banner">从趋势打开 · 2021-08-02 · ALT 835 U/L 偏高</div>' : ''}
+        <div class="card report-head">
+          <div class="row"><span class="report-title">肝功 · 肾功 · 尿酸</span><span class="flag flag-normal">识别完成</span></div>
+          <div class="muted report-date">2021-08-02 · 生化 · 样例成员</div>
+          <div class="badges"><span class="badge high">偏高 5</span><span class="badge low">偏低 1</span></div>
+        </div>
+        <div class="muted small" style="margin:0 2px 10px">报告 3f2a9c1b7d4e</div>
+        <div class="section-title">指标项（17）</div>
+        ${groupHtml}
+        <div class="link" style="margin:14px 2px">查看检查单原图</div>
+        ${zoom ? '<div class="proto-note">B 落点：报告按项目组；组内异常 / 未知在前，正常 / 未检测在后；ALT 卡自动展开 96px 原图条带。条带适合快速对照，不适合仔细看。</div>' : ''}`,
+    });
+  }
+
+  function previewSheet() {
+    const p = selectedPoint();
+    return `<div class="preview-backdrop" onclick="showScreen('entry-a')"></div>
+      <div class="preview-sheet" onclick="event.stopPropagation()">
+        <div class="sheet-handle"></div>
+        <div class="preview-title-row">
+          <span class="preview-title">原始图像 · ${p.date}</span>
+          <span class="preview-close" onclick="showScreen('entry-a')">×</span>
+        </div>
+        <div class="muted small">ALT 行 · 生化 · 2021-08-02</div>
+        <div style="margin-top:8px">${imageViewport({ width: 340, height: 190 })}</div>
+        <div class="image-hint">蓝框 = ALT 行；细节可查看大图。</div>
+        <div class="preview-alt">
+          <div class="row"><span style="font-size:13px;color:var(--muted)">识别值</span><span class="flag flag-high">偏高</span></div>
+          <div style="margin-top:3px"><span class="value flag-high">ALT 835 <span style="font-size:12px;font-weight:400;color:var(--muted)">${ALT.unit}</span></span></div>
+          <div class="muted small">参考 ${ALT.ref} · 2021-08-02 · 生化</div>
+        </div>
+        <div class="preview-actions">
+          <button class="primary" onclick="showScreen('image-full')">查看大图 ›</button>
+          <button class="secondary" onclick="showScreen('report-zoom')">打开完整报告</button>
+        </div>
+        <div class="proto-note" style="margin:12px 0 0">C 轻预览：趋势层内直接看原图条带；不离开趋势，但视口小，细节仍需大图。</div>
+      </div>`;
+  }
+
+  function imageFullScreen() {
+    const full = state.imageFull;
+    return phone({
+      title: '原始图像',
+      back: true,
+      backTo: 'entry-a',
+      content: `<div class="muted" style="margin:0 2px 10px">2021-08-02 · 生化 · ALT 835 U/L 偏高</div>
+        ${imageViewport({ width: 358, height: 380, full })}
+        <div class="image-hint">${full ? '整张检查单；点「定位到该项」回到 ALT 行。' : '蓝框 = 该指标在原始图像中的位置；原图优先，识别值只作辅助。'}</div>
+        <div class="image-value-card">
+          <div class="row"><span class="item-name">丙氨酸转氨酶（ALT）</span><span class="flag flag-high">偏高</span></div>
+          <div class="row" style="margin-top:3px;align-items:baseline"><span class="value flag-high">835 <span class="unit">U/L</span></span><span class="muted">参考 ${ALT.ref}</span></div>
+          <div class="muted small">2021-08-02 · 生化 · 高置信（实心）</div>
+        </div>
+        <div class="image-actions">
+          <button class="secondary" onclick="toggleImageMode()">${full ? '定位到该项' : '查看整张检查单'}</button>
+          <button class="primary" onclick="showScreen('report-zoom')">打开格式化报告 ›</button>
+        </div>`,
+    });
+  }
+
+  function render() {
+    const id = state.screen;
+    if (id === 'entry-a') return trendSheet('a');
+    if (id === 'entry-b') return trendSheet('b');
+    if (id === 'entry-c') return trendSheet('c');
+    if (id === 'image-full') return imageFullScreen();
+    if (id === 'report-zoom') return reportDetail({ highlight: true, zoom: true });
+    if (id === 'preview') return `${trendSheet('a')}${previewSheet()}`;
+    return trendSheet('a');
+  }
+
+  function scrollToHighlight() {
+    const content = document.querySelector('.content');
+    const card = document.getElementById('highlight-card');
+    if (!content || !card) return;
+    const top = card.getBoundingClientRect().top - content.getBoundingClientRect().top + content.scrollTop;
+    content.scrollTop = Math.max(0, top - 96);
+  }
+
+  function showScreen(id) {
+    state.screen = id;
+    const screen = document.getElementById('screen');
+    screen.innerHTML = render();
+    document.querySelectorAll('.switcher button').forEach((button) => {
+      button.classList.toggle('active', button.dataset.screen === id);
+    });
+    if (id === 'report-zoom') {
+      requestAnimationFrame(() => requestAnimationFrame(scrollToHighlight));
+    } else {
+      const content = document.querySelector('.content');
+      if (content) content.scrollTop = 0;
+    }
+  }
+
+  function selectPoint(index) {
+    state.selected = index;
+    showScreen(state.screen.startsWith('entry-') ? state.screen : 'entry-a');
+  }
+
+  function toggleImageMode() {
+    state.imageFull = !state.imageFull;
+    showScreen('image-full');
+  }
+
+  document.querySelectorAll('.switcher button').forEach((button) => {
+    button.addEventListener('click', () => showScreen(button.dataset.screen));
+  });
+
+  const params = new URLSearchParams(location.search);
+  state.imageFull = params.get('full') === '1';
+  if (params.get('shot') === '1') {
+    document.body.classList.add('shot');
+  }
+  showScreen(params.get('screen') || 'entry-a');
+</script>
+</body>
+</html>

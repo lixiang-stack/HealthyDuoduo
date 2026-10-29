@@ -1,7 +1,12 @@
 # App E2E 专用栈覆盖(仅 e2e/run.sh 使用,共享 deploy 栈不加载)。
 # 识别服务对固定样本回放 samples/expected 下的 golden,non-OCR 用例不再依赖真实
 # 识别结果;未列出的样本(OCR smoke)仍走真实 OCR。见 docs/agents/app-e2e.md。
+# 掩码 OCR 语料没有原图:replay/ 下的 E2E 替身图只提供 sha,仍映射到同一份 golden。
+# 卷路径相对首个 compose 文件(deploy/),因此从 deploy/ 指到 apps/mobile/e2e/replay。
 services:
   recognizer:
+    volumes:
+      - ../apps/mobile/e2e/replay:/e2e-replay:ro
     environment:
-      RECOGNIZER_REPLAY_SAMPLES: cbc_02,cbc_03,cbc_04,us_01,us_03,glu_01,glu_02,glu_03,lft_02,lft_03,lft_04,lft_05,tft_01,ua_05
+      RECOGNIZER_REPLAY_SAMPLES: cbc_02,cbc_03,cbc_04,us_01,us_03,glu_01,glu_02,glu_03,lft_02,lft_03,lft_04,lft_05,lft_06,lft_08,lft_09,tft_01,ua_05,coag_01,fibrosis_01,bloodtype_01,unknown_01,glu_04,infectious_01
+      RECOGNIZER_REPLAY_IMAGES: /e2e-replay

@@ -374,7 +374,9 @@ def _decompose(text: str, d: LabDict) -> tuple[str | None, str | None, str | Non
     # 纯中文非数字文本(如「结果」「审核者：」)不产生任何 fragment,防止伪单位;
     # 短 ASCII 字母串(如 fL、pg)是合法单位形
     if not s or (
-        not _HINT_RE.search(s) and not _UNIT_WORD_RE.fullmatch(s)
+        not _HINT_RE.search(s)
+        and not _UNIT_WORD_RE.fullmatch(s)
+        and _unit_match(s, d) is None
     ):
         return None, None, None
     # 方向箭头(↑↓▲▼)是 flag 语义,数值配对当分隔符:替换为空格而非删除,
@@ -386,14 +388,12 @@ def _decompose(text: str, d: LabDict) -> tuple[str | None, str | None, str | Non
     value: str | None = None
     ref: str | None = None
     unit: str | None = None
-    # 词典单位字面前缀(含 * 前缀形态);单位按命中的原文切片保留大小写
+    # 词典单位字面前缀(含 * 前缀形态);单位按命中的原文切片保留大小写。
+    # 前缀命中后剩余片段若只是标点(如 "mmol/L." 的 "."),仍以前缀为准。
     rest = s
-    unit_from_prefix = None
-    for lit in d.unit_literals:
-        if rest.lower().startswith(lit.lower()):
-            unit_from_prefix = rest[: len(lit)]
-            rest = rest[len(lit) :].strip()
-            break
+    unit_from_prefix = _unit_match(rest, d)
+    if unit_from_prefix is not None:
+        rest = rest[len(unit_from_prefix) :].strip()
     m = _RANGE_RE.search(rest)
     if m:
         head, tail = rest[: m.start()].strip(), rest[m.end() :].strip()
@@ -404,7 +404,7 @@ def _decompose(text: str, d: LabDict) -> tuple[str | None, str | None, str | Non
         if head and _NUMBER_RE.fullmatch(head):
             value = head
         if tail:
-            unit = tail
+            unit = _unit_or_none(tail, d)
     else:
         # 数字熔尾段单位:值+单位无空白一格('39.3fL'、'3.78D');尾段须是词典登记的
         # 单位字面(如 fL/IU)才算单位,否则尾段丢弃只保 value(乱珠如 'D')。
@@ -424,7 +424,7 @@ def _decompose(text: str, d: LabDict) -> tuple[str | None, str | None, str | Non
                     value = hv.group(1)
                 ref = m.group(0)
                 if tail:
-                    unit = tail
+                    unit = _unit_or_none(tail, d)
             elif _NUMBER_RE.fullmatch(rest.strip()):
                 value = rest.strip()
             elif m := re.fullmatch(rf"({_NUM})%", rest.strip()):
@@ -433,7 +433,7 @@ def _decompose(text: str, d: LabDict) -> tuple[str | None, str | None, str | Non
             elif rest.strip() and _ASCII_UNIT_RE.fullmatch(rest.strip()):
                 # 单位字面:ASCII 数字/字母/%/^~// 形态(g/L、fL、pg、f1、109/L、1012/L);
                 # 纯中文词(审核者：、结果、赵志佳)或含中文的垃圾不成立
-                unit = rest.strip()
+                unit = _unit_or_none(rest, d)
             else:
                 # 白分隔熔断格:值+箭头+单位一格(webwxgetmsgimg_12 '2.19 ↑ IU/L'、
                 # webwxgetmsgimg_20 '37.1 %'、'85.3 fL')。首段数值 → value;
@@ -444,9 +444,101 @@ def _decompose(text: str, d: LabDict) -> tuple[str | None, str | None, str | Non
                     for tok in toks[1:]:
                         if ref is None and _RANGE_RE.fullmatch(tok):
                             ref = tok
-                        elif _ASCII_UNIT_RE.fullmatch(tok) and unit is None and not _NUMBER_RE.fullmatch(tok):
-                            unit = tok
-    return value, ref, unit or unit_from_prefix
+                        elif unit is None and _ASCII_UNIT_RE.fullmatch(tok) and not _NUMBER_RE.fullmatch(tok):
+                            unit = _unit_or_none(tok, d)
+    return value, ref, unit_from_prefix or unit
+
+
+_TIER_LABEL_RE = re.compile(r"^[\u4e00-\u9fff]{1,4}$")
+
+
+def _parse_tier_ref(text: str, d: LabDict) -> tuple[str, str | None, str] | None:
+    """参考区间列的分级解读行(如 "<12ng/ml缺乏" / ">20ng/ml正常")→ (范围, 单位, 标签)。
+
+    只认「范围 + 可选单位 + 1~4 个纯中文标签」的行;孕周前缀(1-2周:65-650)、
+    普通区间 + 单位(≤21.0μmol/L)不当作分级。
+    """
+    s = text.strip()
+    m = re.match(
+        rf"^([<>≤≥]?\s*{_NUM}(?:\s*[-–—~]{{1,2}}\s*{_NUM})?)\s*(.*)$",
+        s,
+    )
+    if m is None:
+        return None
+    range_text = re.sub(r"\s+", "", m.group(1))
+    rest = m.group(2).strip()
+    unit = _unit_match(rest, d)
+    if unit is not None:
+        rest = rest[len(unit) :].strip()
+    if not rest or _TIER_LABEL_RE.fullmatch(rest) is None:
+        return None
+    return range_text, unit, rest
+
+
+def _tier_ref_text(
+    tier: tuple[str, str | None, str],
+    item: DictItem | None,
+) -> str:
+    range_text, unit, label = tier
+    return f"{range_text}{_normalize_unit(unit, item) or ''}{label}"
+
+
+def _same_column(a: "_Cell", b: "_Cell") -> bool:
+    return min(a.x1, b.x1) - max(a.x0, b.x0) > 0
+
+
+def _attach_tier_refs(
+    rows: list["_RowPiece"],
+    ref_cells: list["_Cell"],
+    d: LabDict,
+) -> None:
+    """把参考列下方的分级解读行挂回该指标行,用「正常」档范围做比较基准。
+
+    真实版式(vitanemia_01/02):首行印 "<12ng/ml缺乏",下方空行依次印
+    "12-20ng/ml不足" / ">20ng/ml正常"。只取首行会把「<12」当整个参考区间,
+    把 5.70 判 normal、39.60 判 high;改为以正常档 ">20ng/ml正常" 为参考后,
+    5.70→low、39.60→normal。无正常档时分档文本前置「分级:」,比较层自然回到
+    unknown(不猜);原文行仍全部留在 raw_text。
+    """
+    if not ref_cells:
+        return
+    ref_ids = {id(c) for c in ref_cells}
+    used = {id(c) for row in rows for c in row.raw_cells}
+    for index, row in enumerate(rows):
+        ref_cell = next((c for c in row.raw_cells if id(c) in ref_ids), None)
+        if ref_cell is None:
+            continue
+        first = _parse_tier_ref(ref_cell.text, d)
+        if first is None:
+            continue
+        next_cy = rows[index + 1].cy if index + 1 < len(rows) else float("inf")
+        row_height = max(ref_cell.y1 - ref_cell.y0, 1.0)
+        max_cy = min(next_cy, ref_cell.cy + 6 * row_height)
+        tiers = [first]
+        extra: list[_Cell] = []
+        for cell in ref_cells:
+            if id(cell) in used or cell is ref_cell:
+                continue
+            if not (ref_cell.cy < cell.cy < max_cy):
+                continue
+            if not _same_column(cell, ref_cell):
+                continue
+            tier = _parse_tier_ref(cell.text, d)
+            if tier is None:
+                continue
+            tiers.append(tier)
+            extra.append(cell)
+        normal = next(
+            (tier for tier in tiers if "正常" in tier[2] or tier[2].lower() == "normal"),
+            None,
+        )
+        row.ref = (
+            _tier_ref_text(normal, row.item)
+            if normal is not None
+            else "分级：" + "；".join(_tier_ref_text(tier, row.item) for tier in tiers)
+        )
+        row.raw_cells.extend(extra)
+        used.update(id(cell) for cell in extra)
 
 
 @dataclass(frozen=True)
@@ -708,6 +800,54 @@ def load_unit_families() -> dict[str, tuple[str, ...]]:
     return {k: tuple(v) for k, v in out.items()}
 
 
+def _clean_unit_text(text: str) -> str:
+    """单位格尾部标点(OCR 常见 "mmol/L." / "g/l." / "pg/mL.")不是单位的一部分。
+
+    只对像单位的文本去尾点;"0." 这类乱珠保留原文,避免无依据改写。
+    """
+    cleaned = text.strip()
+    trimmed = cleaned.rstrip(".。").strip()
+    if not trimmed:
+        return ""
+    if any(ch.isalpha() or ch in "%^/" or "\u4e00" <= ch <= "\u9fff" for ch in trimmed):
+        return trimmed
+    return cleaned
+
+
+def _unit_match(text: str, d: LabDict) -> str | None:
+    """单位格/尾段命中的最长合法单位前缀(词典注册字面 + 该项可归一损耗形)。
+
+    只返回原文切片,大小写与损耗形保留;规范化仍由 _normalize_unit 按项裁决。
+    """
+    s = text.strip()
+    if not s:
+        return None
+    lower = s.lower()
+    registered = {u.lower() for u in d.unit_literals}
+    candidates = set(d.unit_literals)
+    for form, canons in load_unit_families().items():
+        if any(canon.lower() in registered for canon in canons):
+            candidates.add(form)
+    for lit in sorted(candidates, key=len, reverse=True):
+        if lower.startswith(lit.lower()):
+            return s[: len(lit)]
+    return None
+
+
+def _unit_or_none(text: str, d: LabDict) -> str | None:
+    """尾段/纯单位格的单位值:先找注册印形/损耗形;否则仅接受 ASCII 单位形态。
+
+    含中文的尾段(如 "ng/ml缺乏" 的 "缺乏")不是单位;尾随标点先清理。
+    """
+    matched = _unit_match(text, d)
+    if matched is not None:
+        return _clean_unit_text(matched) or None
+    cleaned = _clean_unit_text(text)
+    if cleaned and _ASCII_UNIT_RE.fullmatch(cleaned):
+        return cleaned
+    return None
+
+
 def _normalize_unit(unit: str | None, item: DictItem | None) -> str | None:
     """印刷单位 → 家族规范印形(unit_families.yaml;展示一致性归一)。
 
@@ -717,7 +857,8 @@ def _normalize_unit(unit: str | None, item: DictItem | None) -> str | None:
     """
     if unit is None:
         return None
-    cands = load_unit_families().get(unit.strip().lower())
+    unit = _clean_unit_text(unit)
+    cands = load_unit_families().get(unit.lower())
     if cands and item is not None:
         for canon in cands:
             if canon.lower() in item.units:
@@ -1091,6 +1232,9 @@ def _extract_items(
                     # 印刷原样字符串,可直接承载;不占 ref 位,参考列真格正常配对。
                     row.absorb(c, r, None, None)
                     used.add(id(c))
+            # 4.5 分级参考区间:参考列下方同行内空行的解读档挂回指标行。
+            _attach_tier_refs(rows, assigned.get(("ref", blk), []), d)
+
             # 5. 出项
             for row in rows:
                 if row.value is None and row.fused_value is not None:

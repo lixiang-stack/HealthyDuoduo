@@ -37,10 +37,20 @@ families:
   - canonical: "μmol/L"
     forms:
       - "μ mol/L"     # [lft_01, lft_08, webwxgetmsgimg_11]
+      - "μmol L"      # 斜杠漏识为空格 [lft_08 肌酐]
       - "μmo1/L"      # [lft_03, lft_05]
       - "μnol/L"      # [lft_03]
       - "μno1/L"      # [lft_03]
       - "umol/L"      # [lft_04]
+  - canonical: "mmol/L"
+    forms:
+      - "mmol/l"      # 大小写漂移 [lft_08 尿素/二氧化碳]
+  - canonical: "g/L"
+    forms:
+      - "g/l"         # 大小写漂移 [cbc_07 血红蛋白, lft_08 白蛋白]
+  - canonical: "ng/ml"
+    forms:
+      - "ng/m1"       # l→1 [vitanemia_02]
   - canonical: "fL"
     forms:
       - "fl"          # [cbc_05 等多册小写印]

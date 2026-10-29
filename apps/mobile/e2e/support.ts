@@ -24,12 +24,23 @@ export const API_BASE_URL = process.env.E2E_API_BASE_URL ?? 'http://127.0.0.1:58
 
 const REPO_ROOT = resolve(import.meta.dirname, '../../..');
 const SAMPLES = resolve(REPO_ROOT, 'samples');
+const REPLAY_SAMPLES = resolve(import.meta.dirname, 'replay');
 
 export const samplePath = (name: string) => resolve(SAMPLES, name);
+export const replaySamplePath = (name: string) => resolve(REPLAY_SAMPLES, `${name}.png`);
 
 /** 报告对外身份 = 图像内容 sha256;UI 断言不必依赖上传响应。 */
 export async function sampleReportId(name: string): Promise<string> {
-  return createHash('sha256').update(await readFile(samplePath(name))).digest('hex');
+  return fileSha256(samplePath(name));
+}
+
+/** 掩码语料无原图:E2E 替身图的 sha 仍对应 golden 回放产物。 */
+export async function replaySampleReportId(name: string): Promise<string> {
+  return fileSha256(replaySamplePath(name));
+}
+
+async function fileSha256(path: string): Promise<string> {
+  return createHash('sha256').update(await readFile(path)).digest('hex');
 }
 
 // 与 App 侧 settings/baseUrlStore.ts、members/currentMemberStore.ts 的键逐字一致
@@ -78,6 +89,7 @@ type BadgeKind = FlagBadgeKind | 'unreviewed';
   reportCard: (reportId: string) => `report-card-${reportId}`,
   reportBadge: (reportId: string, badge: BadgeKind) => `report-badge-${reportId}-${badge}`,
   reportItemsTitle: 'report-items-title',
+  reportPanelGroup: (panel: string) => `report-panel-group-${panel}`,
   reportPendingEntry: 'report-pending-entry',
   archiveFilterBanner: 'archive-filter-banner',
   archiveFilterClear: 'archive-filter-clear',
@@ -89,28 +101,50 @@ type BadgeKind = FlagBadgeKind | 'unreviewed';
   archivePanelClear: 'archive-panel-clear',
   archivePanelsEmpty: 'archive-panels-empty',
   archiveShowTime: 'archive-show-time',
+  archivePendingPartial: 'archive-pending-partial',
+  archivePendingFailed: 'archive-pending-failed',
+  archivePendingEmpty: 'archive-pending-empty',
   panelRow: (panel: string) => `panel-row-${panel}`,
   panelRowMeta: (panel: string) => `panel-row-meta-${panel}`,
   panelDetailHeading: 'panel-detail-heading',
   panelDetailMeta: 'panel-detail-meta',
+  panelSourceLabel: 'panel-source-label',
   panelAbnormalTitle: 'panel-abnormal-title',
   panelRestTitle: 'panel-rest-title',
   panelRestToggle: 'panel-rest-toggle',
   panelItem: (index: number) => `panel-item-${index}`,
   panelItemSparkline: (index: number) => `panel-item-sparkline-${index}`,
+  panelItemDate: (index: number) => `panel-item-date-${index}`,
   panelItemNotTested: (index: number) => `panel-item-not-tested-${index}`,
+  panelBandLegend: 'panel-band-legend',
   panelReportsLink: 'panel-reports-link',
   panelLatestFailed: 'panel-latest-failed',
   panelEmpty: 'panel-empty',
   panelBackToPanels: 'panel-back-to-panels',
-  overviewAllReports: 'overview-all-reports',
-  overviewPendingPartial: 'overview-pending-partial',
-  overviewPendingFailed: 'overview-pending-failed',
-  overviewPendingEmpty: 'overview-pending-empty',
-  overviewTrends: 'overview-trends',
-  overviewLatest: (reportId: string) => `overview-latest-${reportId}`,
-  trendCategory: (index: number) => `trend-category-${index}`,
+  tabFamily: 'tab-family',
+  tabArchive: 'tab-archive',
+  headerSettingsFamily: 'header-settings-family',
+  headerSettingsArchive: 'header-settings-archive',
+  familyMember: (memberId: number) => `family-member-${memberId}`,
+  familyMemberPending: (memberId: number) => `family-member-pending-${memberId}`,
+  familyMemberLatest: (memberId: number) => `family-member-latest-${memberId}`,
+  familyMemberAbnormal: (memberId: number) => `family-member-abnormal-${memberId}`,
+  familyMemberFlags: (memberId: number) => `family-member-flags-${memberId}`,
+  familyMemberCount: (memberId: number) => `family-member-count-${memberId}`,
+  familyManageMembers: 'family-manage-members',
+  uploadFab: 'upload-fab',
+  archiveUnselected: 'archive-unselected',
+  archiveBackHome: 'archive-back-home',
+  archiveAllAbnormal: 'archive-all-abnormal',
+  reportTimeline: 'report-timeline',
+  timelineMonth: (key: string) => `timeline-month-${key}`,
+  timelineDay: (date: string) => `timeline-day-${date}`,
+  timelineUndated: 'timeline-undated',
+  trendsBandLegend: 'trends-band-legend',
+  trendsSummary: 'trends-summary',
+  trendPanel: (index: number) => `trend-panel-${index}`,
   trendIndicator: (index: number) => `trend-indicator-${index}`,
+  trendItemNotTested: (index: number) => `trend-item-not-tested-${index}`,
   trendSparkline: (index: number) => `trend-sparkline-${index}`,
   trendEmptyAbnormal: 'trend-empty-abnormal',
   trendEmptyReports: 'trend-empty-reports',
@@ -118,11 +152,20 @@ type BadgeKind = FlagBadgeKind | 'unreviewed';
   trendDetailChart: 'trend-detail-chart',
   trendDetailClose: 'trend-detail-close',
   trendPoint: (index: number) => `trend-point-${index}`,
+  trendPointOpenImage: 'trend-point-open-image',
+  trendBandLegend: 'trend-band-legend',
   reportExamName: 'report-exam-name',
   reportSection: (index: number) => `report-section-${index}`,
   reportSectionZoom: (index: number) => `report-section-zoom-${index}`,
   reportImageToggle: 'report-image-toggle',
   reportImage: 'report-image',
+  reportImageFocus: 'report-image-focus',
+  reportImageFocusHighlight: 'report-image-focus-highlight',
+  reportImageFocusToggle: 'report-image-focus-toggle',
+  reportImageFull: 'report-image-full',
+  reportImageOpenReport: 'report-image-open-report',
+  reportImageValue: 'report-image-value',
+  reportImageMeta: 'report-image-meta',
   reviewItem: (itemId: number) => `review-item-${itemId}`,
   reviewReason: (itemId: number) => `review-reason-${itemId}`,
   reviewConfirm: (itemId: number) => `review-confirm-${itemId}`,
@@ -189,6 +232,17 @@ export async function uploadSample(name: string, memberId: number): Promise<Repo
   const bytes = await readFile(path);
   const suffix = path.slice(path.lastIndexOf('.')).toLowerCase();
   return uploadImageBytes(new Uint8Array(bytes), basename(path), memberId, MIME_BY_SUFFIX[suffix]);
+}
+
+/** 掩码语料样本经 E2E 替身图上传,识别服务按 sha 回放 golden。 */
+export async function uploadReplaySample(name: string, memberId: number): Promise<ReportDetail> {
+  const path = replaySamplePath(name);
+  return uploadImageBytes(
+    new Uint8Array(await readFile(path)),
+    basename(path),
+    memberId,
+    MIME_BY_SUFFIX['.png'],
+  );
 }
 
 /** 无文本白图(98 byte PNG):真实 OCR 返回 failed 报告,用于失败报告不进项目视图的用例。 */
@@ -497,13 +551,27 @@ export type PanelSeed = {
   thyroid: Member;
   urinalysis: Member;
   failed: Member;
+  mixed: Member;
+  other: Member;
+  coag: Member;
+  infection: Member;
   tft01: ReportDetail;
   ua05: ReportDetail;
   failedReport: ReportDetail;
+  lft06: ReportDetail;
+  lft08: ReportDetail;
+  lft09: ReportDetail;
+  glu04: ReportDetail;
+  bloodtype01: ReportDetail;
+  fibrosis01: ReportDetail;
+  unknown01: ReportDetail;
+  coag01: ReportDetail;
+  infectious01: ReportDetail;
 };
 
-/** 项目浏览用例种子:甲状腺 / 尿常规 / 仅失败报告三个独立成员。
- *  与其它 E2E 文件不共享图片(样张按 sha256 全局去重);tft_01 / ua_05 走 golden 回放。 */
+/** 项目浏览用例种子:甲状腺 / 尿常规 / 仅失败报告 / 混合生化 / 其他 / 凝血 / 感染独立成员。
+ *  与其它 E2E 文件不共享图片(样张按 sha256 全局去重);tft_01 / ua_05 走 golden 回放;
+ *  掩码语料无原图,经 e2e/replay 替身图回放同一份 golden。 */
 export async function seedPanelData(): Promise<PanelSeed> {
   const thyroid = await createMember('E2E 项目甲状腺', false);
   const tft01 = await uploadSample('tft_01.jpeg', thyroid.member_id);
@@ -518,5 +586,52 @@ export async function seedPanelData(): Promise<PanelSeed> {
   if (failedReport.status !== 'failed') {
     fixtureError('blank.png', `expected a failed report, got ${failedReport.status}`);
   }
-  return { thyroid, urinalysis, failed, tft01, ua05, failedReport };
+
+  const mixed = await createMember('E2E 项目混合', false);
+  const lft06 = await uploadReplaySample('lft_06', mixed.member_id);
+  assertReportPanels('lft_06', lft06, ['liver', 'lipid']);
+  const lft08 = await uploadReplaySample('lft_08', mixed.member_id);
+  assertReportPanels('lft_08', lft08, ['liver', 'kidney', 'uric_acid', 'electrolyte']);
+  const lft09 = await uploadReplaySample('lft_09', mixed.member_id);
+  assertReportPanels('lft_09', lft09, ['liver', 'kidney']);
+  const glu04 = await uploadReplaySample('glu_04', mixed.member_id);
+  assertReportPanels('glu_04', glu04, ['glucose']);
+
+  const other = await createMember('E2E 项目其他', false);
+  const bloodtype01 = await uploadReplaySample('bloodtype_01', other.member_id);
+  assertReportPanels('bloodtype_01', bloodtype01, ['other']);
+  const fibrosis01 = await uploadReplaySample('fibrosis_01', other.member_id);
+  assertReportPanels('fibrosis_01', fibrosis01, ['other']);
+  const unknown01 = await uploadReplaySample('unknown_01', other.member_id);
+  assertReportPanels('unknown_01', unknown01, ['other']);
+
+  const coag = await createMember('E2E 项目凝血', false);
+  const coag01 = await uploadReplaySample('coag_01', coag.member_id);
+  assertReportPanels('coag_01', coag01, ['coag']);
+
+  const infection = await createMember('E2E 项目感染', false);
+  const infectious01 = await uploadReplaySample('infectious_01', infection.member_id);
+  assertReportPanels('infectious_01', infectious01, ['infection']);
+
+  return {
+    thyroid,
+    urinalysis,
+    failed,
+    mixed,
+    other,
+    coag,
+    infection,
+    tft01,
+    ua05,
+    failedReport,
+    lft06,
+    lft08,
+    lft09,
+    glu04,
+    bloodtype01,
+    fibrosis01,
+    unknown01,
+    coag01,
+    infectious01,
+  };
 }

@@ -104,7 +104,7 @@ npm run e2e
 ## 开发约定
 
 - 每个需求在 `.worktree/<需求名>` 开发，完成后走 PR；不直接改 `main`。
-- 提交前测试必须全绿；本地 hooks 会检查分支 / worktree、commit 前缀与单 commit。
+- 提交前测试必须全绿；本地 hooks 会检查分支 / worktree 与 commit 前缀。
 - push 由用户明确授权；具体 agent 工作流见 `AGENTS.md`。
 
 ## 范围与安全边界

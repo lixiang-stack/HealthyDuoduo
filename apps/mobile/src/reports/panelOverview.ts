@@ -1,9 +1,17 @@
-// 报告级项目组展示(panel-browse 票 02):卡片主标签与详情分组。
+// 报告 / 项目组展示口径(panel-browse 票 02/04):卡片主标签、详情分组与异常指标页分组。
 // 项目组只是浏览入口:详情按 panels 分组但始终展示报告全部指标,不按项目隐藏。
-import type { PanelItem, ReportDetail, ReportItem, ReportSummary } from '../api/reports';
+import type {
+  PanelDetail,
+  PanelItem,
+  PanelSummary,
+  ReportDetail,
+  ReportItem,
+  ReportSummary,
+} from '../api/reports';
+import { isActionableUnknown } from '../review/items';
 
 import { PANEL_ORDER, panelLabel, type PanelCode } from './panels';
-import { isAbnormalFlag } from './trends';
+import { isAbnormalFlag, selectSeries, type TrendSeries } from './trends';
 
 /** 失败 / 未回填存量没有可信项目组:卡片与次要信息都回退 report_type。 */
 function usesReportTypeFallback(
@@ -12,19 +20,14 @@ function usesReportTypeFallback(
   return report.status === 'failed' || report.panels.length === 0;
 }
 
-/** 时间线卡片主标签:前 max 个项目组 + `+N`;失败 / 未回填存量回退 report_type。 */
+/** 时间线卡片主标签:列出报告全部项目组;失败 / 未回填存量回退 report_type。 */
 export function reportPanelLabels(
   report: Pick<ReportSummary, 'panels' | 'report_type' | 'status'>,
-  max = 2,
 ): string {
   if (usesReportTypeFallback(report)) {
     return report.report_type;
   }
-  const labels = report.panels.map(panelLabel);
-  if (labels.length <= max) {
-    return labels.join(' · ');
-  }
-  return `${labels.slice(0, max).join(' · ')} +${labels.length - max}`;
+  return report.panels.map(panelLabel).join(' · ');
 }
 
 /** 卡片次要信息:项目组成为主标签后,report_type 降到日期行;与主标签相同则不重复。 */
@@ -44,8 +47,28 @@ export type ReportItemGroup = {
   items: ReportItem[];
 };
 
-/** 详情分组:按 report.panels 顺序;不在 panels 里的指标项归末尾「其他」组;
- *  未回填存量(panels=[])按 report_type 单组,避免空标题。 */
+/** 组内优先展示:异常(high/low/abnormal)与可操作未知(待核对)在前;
+ *  正常 / 未检测 / 不可操作未知在后。 */
+function itemNeedsAttention(item: ReportItem): boolean {
+  return (
+    isAbnormalFlag(item.flag) ||
+    (item.flag === 'unknown' && isActionableUnknown(item.flag_reason))
+  );
+}
+
+/** 组内稳定分区:两段内部都保持报告原序;不引入严重度排序。 */
+function sortGroupItems(items: ReportItem[]): ReportItem[] {
+  const attention: ReportItem[] = [];
+  const rest: ReportItem[] = [];
+  for (const item of items) {
+    (itemNeedsAttention(item) ? attention : rest).push(item);
+  }
+  return [...attention, ...rest];
+}
+
+/** 详情分组:按 report.panels 顺序;组内异常 / 可操作未知在前,正常 / 未检测在后;
+ *  不在 panels 里的指标项归末尾「其他」组;未回填存量(panels=[])按 report_type 单组,
+ *  避免空标题。 */
 export function reportItemGroups(
   report: Pick<ReportDetail, 'panels' | 'report_type' | 'items'>,
 ): ReportItemGroup[] {
@@ -53,7 +76,7 @@ export function reportItemGroups(
     return [];
   }
   if (report.panels.length === 0) {
-    return [{ panel: null, label: report.report_type, items: report.items }];
+    return [{ panel: null, label: report.report_type, items: sortGroupItems(report.items) }];
   }
   const byPanel = new Map<PanelCode, ReportItem[]>();
   for (const item of report.items) {
@@ -65,7 +88,7 @@ export function reportItemGroups(
   for (const panel of report.panels) {
     const items = byPanel.get(panel);
     if (items && items.length > 0) {
-      groups.push({ panel, label: panelLabel(panel), items });
+      groups.push({ panel, label: panelLabel(panel), items: sortGroupItems(items) });
     }
   }
   const known = new Set<PanelCode>(report.panels);
@@ -73,9 +96,9 @@ export function reportItemGroups(
   if (leftovers.length > 0) {
     const other = groups.find((group) => group.panel === 'other');
     if (other) {
-      other.items.push(...leftovers);
+      other.items = sortGroupItems([...other.items, ...leftovers]);
     } else {
-      groups.push({ panel: 'other', label: panelLabel('other'), items: leftovers });
+      groups.push({ panel: 'other', label: panelLabel('other'), items: sortGroupItems(leftovers) });
     }
   }
   return groups;
@@ -145,6 +168,67 @@ export function splitPanelItems(items: PanelItem[]): {
     (panelItemIsAbnormal(item) ? abnormal : rest).push(item);
   }
   return { abnormal, rest };
+}
+
+export type AbnormalPanelGroup = {
+  panel: PanelCode;
+  reportDate: string | null;
+  items: PanelItem[];
+};
+
+/** 全部异常指标数(档案「全部异常 N 项」入口与家庭卡共用口径)。 */
+export function totalAbnormalCount(panels: PanelSummary[]): number {
+  return panels.reduce((sum, panel) => sum + panel.abnormal_count, 0);
+}
+
+/** 有异常指标的项目组数(与异常指标总数区分:一个项目可含多项)。 */
+export function abnormalPanelCount(panels: PanelSummary[]): number {
+  return panels.filter((panel) => panel.abnormal_count > 0).length;
+}
+
+/** 异常指标页分组:按传入项目详情顺序(项目列表顺序),只保留 latest 异常的
+ *  指标;没有异常指标的项目不输出空组。 */
+export function abnormalPanelGroups(details: PanelDetail[]): AbnormalPanelGroup[] {
+  const groups: AbnormalPanelGroup[] = [];
+  for (const detail of details) {
+    const items = splitPanelItems(detail.items).abnormal;
+    if (items.length === 0) {
+      continue;
+    }
+    groups.push({
+      panel: detail.panel,
+      reportDate: detail.latest_report_date,
+      items,
+    });
+  }
+  return groups;
+}
+
+export type PanelTrend = {
+  name: string;
+  reportType: string;
+  reportDate: string | null;
+  latestValue: string | null;
+  series: TrendSeries;
+};
+
+/** 项目指标项 → 趋势层数据:points 已随项目详情返回,不额外请求;
+ *  reportType 取该指标最近点所在报告的真实类别。 */
+export function panelTrendOf(
+  item: PanelItem,
+  reportTypeById: Record<string, string>,
+): PanelTrend | undefined {
+  const latest = item.latest;
+  if (!latest) {
+    return undefined;
+  }
+  return {
+    name: item.name,
+    reportType: reportTypeById[latest.report_id] ?? '—',
+    reportDate: latest.report_date,
+    latestValue: latest.value,
+    series: selectSeries(item.points, item.unit, latest.report_id),
+  };
 }
 
 /** 报告新鲜度:日期降序、dateless 沉底;同日按 report_id 降序(与服务端

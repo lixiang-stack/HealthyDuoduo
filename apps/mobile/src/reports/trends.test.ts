@@ -1,4 +1,4 @@
-import type { ReportDetail, ReportItem, ReportSummary, TrendPoint } from '../api/reports';
+import type { ReportItem, ReportSummary, TrendPoint } from '../api/reports';
 
 import cbc05Json from '../../../../samples/expected/report/cbc_05.json';
 import cbc07Json from '../../../../samples/expected/report/cbc_07.json';
@@ -12,12 +12,9 @@ import {
   formatSeriesMeta,
   isAbnormalFlag,
   isFilledPoint,
-  latestAbnormalByCategory,
-  selectAbnormalCandidates,
   selectSeries,
-  trendKey,
+  trendPointRows,
   trendUnavailableReason,
-  type TrendCandidate,
 } from './trends';
 
 // 测试数据直接来自真实 golden(samples/expected/report),不凭空造数值;
@@ -52,41 +49,6 @@ const lft06 = golden(lft06Json);
 const cbc05 = golden(cbc05Json);
 const cbc07 = golden(cbc07Json);
 
-function countsOf(file: GoldenReport): ReportSummary['flag_counts'] {
-  const counts = { high: 0, low: 0, abnormal: 0, unknown: 0 };
-  for (const item of file.items) {
-    if (
-      item.flag === 'high' ||
-      item.flag === 'low' ||
-      item.flag === 'abnormal' ||
-      item.flag === 'unknown'
-    ) {
-      counts[item.flag] += 1;
-    }
-  }
-  return counts;
-}
-
-function summaryOf(
-  file: GoldenReport,
-  reportId: string,
-  overrides: Partial<ReportSummary> = {},
-): ReportSummary {
-  return {
-    report_id: reportId,
-    member_id: 1,
-    report_type: file.report_type,
-    report_date: file.report_date,
-    status: file.status,
-    fail_reason: null,
-    flag_counts: countsOf(file),
-    panels: file.panels,
-    not_tested_count: 0,
-    unreviewed_low_confidence_count: 0,
-    ...overrides,
-  };
-}
-
 function toReportItem(item: GoldenItem, itemId: number): ReportItem {
   return {
     item_id: itemId,
@@ -113,27 +75,6 @@ function itemOf(file: GoldenReport, name: string): ReportItem {
   return toReportItem(file.items[index], index + 1);
 }
 
-function detailOf(
-  file: GoldenReport,
-  reportId: string,
-  overrides: Partial<ReportDetail> = {},
-): ReportDetail {
-  return {
-    report_id: reportId,
-    member_id: 1,
-    report_type: file.report_type,
-    report_date: file.report_date,
-    status: file.status,
-    fail_reason: null,
-    flag_counts: countsOf(file),
-    panels: file.panels,
-    not_tested_count: 0,
-    unreviewed_low_confidence_count: 0,
-    items: file.items.map((item, index) => toReportItem(item, index + 1)),
-    ...overrides,
-  };
-}
-
 function pointOf(
   file: GoldenReport,
   name: string,
@@ -155,18 +96,11 @@ function pointOf(
   };
 }
 
-function candidateOf(
+function latestOf(
   file: GoldenReport,
   name: string,
-  reportId: string,
-  reportType = file.report_type,
-): TrendCandidate {
-  return {
-    reportType,
-    reportId,
-    reportDate: file.report_date,
-    item: itemOf(file, name),
-  };
+): { reportDate: string | null; value: string | null } {
+  return { reportDate: file.report_date, value: itemOf(file, name).value };
 }
 
 const altLow = () => pointOf(lft05, '丙氨酸转氨酶', 'lft_05', { reviewed: false });
@@ -179,116 +113,6 @@ describe('isAbnormalFlag', () => {
     expect(isAbnormalFlag('abnormal')).toBe(true);
     expect(isAbnormalFlag('normal')).toBe(false);
     expect(isAbnormalFlag('unknown')).toBe(false);
-  });
-});
-
-describe('selectAbnormalCandidates', () => {
-  it('每类只取最新非 failed 报告;failed 最新报告不吞类别', () => {
-    const reports = [
-      summaryOf(lft05, 'lft_05'),
-      summaryOf(lft02, 'lft_02'),
-      summaryOf(lft05, 'lft_failed_newer', {
-        status: 'failed',
-        report_date: '2022-01-01',
-        flag_counts: { high: 0, low: 0, abnormal: 0, unknown: 0 },
-      }),
-    ];
-    const candidates = selectAbnormalCandidates(reports, [
-      detailOf(lft05, 'lft_05'),
-      detailOf(lft02, 'lft_02'),
-    ]);
-
-    expect(candidates.map((candidate) => candidate.item.name)).toEqual([
-      '丙氨酸转氨酶',
-      '天冬氨酸转氨酶',
-      '总胆汁酸',
-      '碱性磷酸酶',
-      '谷氨酰转肽酶',
-      '前白蛋白',
-    ]);
-    expect(candidates.every((candidate) => candidate.reportId === 'lft_02')).toBe(true);
-    expect(candidates.every((candidate) => candidate.reportType === '生化')).toBe(true);
-  });
-
-  it('最新报告正常时旧报告的异常不出现,0 候选类别不输出', () => {
-    const reports = [
-      summaryOf(lft02, 'lft_02', { report_date: '2017-01-01' }),
-      summaryOf(lft05, 'lft_05', { report_date: '2022-01-01' }),
-      summaryOf(cbc07, 'cbc_07'),
-    ];
-    const candidates = selectAbnormalCandidates(reports, [
-      detailOf(lft02, 'lft_02'),
-      detailOf(lft05, 'lft_05'),
-      detailOf(cbc07, 'cbc_07'),
-    ]);
-
-    expect(candidates.some((candidate) => candidate.reportType === '生化')).toBe(false);
-    expect(candidates.every((candidate) => candidate.reportType === '临检')).toBe(true);
-  });
-
-  it('只留 high/low/abnormal;normal/unknown 排除', () => {
-    const candidates = selectAbnormalCandidates([summaryOf(lft04, 'lft_04')], [
-      detailOf(lft04, 'lft_04'),
-    ]);
-    expect(candidates.map((candidate) => candidate.item.name)).toEqual([
-      '总胆红素',
-      '直接胆红素',
-      '间接胆红素',
-    ]);
-    expect(candidates.every((candidate) => candidate.item.name !== '谷草/谷丙比值')).toBe(true);
-  });
-
-  it('按 name+unit 去重并保留最近类别,保持 item 序;行数不是 flag_counts 之和', () => {
-    const older = summaryOf(cbc05, 'cbc_05', {
-      report_type: '临检旧',
-      report_date: '2019-08-07',
-    });
-    const reports = [older, summaryOf(cbc07, 'cbc_07')];
-    const candidates = selectAbnormalCandidates(reports, [
-      detailOf(cbc05, 'cbc_05'),
-      detailOf(cbc07, 'cbc_07'),
-    ]);
-
-    expect(candidates).toHaveLength(11);
-    expect(candidates.slice(0, 8).every((candidate) => candidate.reportId === 'cbc_07')).toBe(true);
-    expect(candidates.slice(8).every((candidate) => candidate.reportId === 'cbc_05')).toBe(true);
-    expect(candidates.slice(8).map((candidate) => candidate.item.name)).toEqual([
-      '平均红细胞血红蛋白量',
-      '淋巴细胞数',
-      '单核细胞数',
-    ]);
-    // 两个类别的 flag_counts 之和是 15,去重后行数是 11(组头计数必须用行数)。
-    const abnormalTotal = (counts: ReportSummary['flag_counts']) =>
-      counts.high + counts.low + counts.abnormal;
-    expect(abnormalTotal(countsOf(cbc05)) + abnormalTotal(countsOf(cbc07))).toBe(15);
-  });
-
-  it('同一报告内重复 name+unit 只保留第一项', () => {
-    const detail = detailOf(lft02, 'lft_02');
-    const duplicated = {
-      ...detail,
-      items: [detail.items[0], { ...detail.items[0], item_id: 99 }],
-    };
-    const candidates = selectAbnormalCandidates([summaryOf(lft02, 'lft_02')], [duplicated]);
-    expect(candidates).toHaveLength(1);
-    expect(candidates[0].item.item_id).toBe(detail.items[0].item_id);
-  });
-
-  it('无异常 / 空 reports / 缺 detail 都返回空列表', () => {
-    expect(selectAbnormalCandidates([], [])).toEqual([]);
-    expect(selectAbnormalCandidates([summaryOf(lft05, 'lft_05')], [detailOf(lft05, 'lft_05')])).toEqual(
-      [],
-    );
-    expect(selectAbnormalCandidates([summaryOf(lft02, 'lft_02')], [])).toEqual([]);
-  });
-
-  it('latestAbnormalByCategory 与候选共用同一类别口径', () => {
-    const reports = [
-      summaryOf(lft05, 'lft_05'),
-      summaryOf(lft02, 'lft_02'),
-      summaryOf(cbc05, 'cbc_05', { status: 'failed', flag_counts: countsOf(cbc05) }),
-    ];
-    expect(latestAbnormalByCategory(reports).map((report) => report.report_id)).toEqual(['lft_02']);
   });
 });
 
@@ -406,11 +230,6 @@ describe('selectSeries', () => {
     expect(ul.otherUnitCount).toBe(1);
     expect(iu.otherUnitCount).toBe(2);
   });
-
-  it('改名或改单位会得到不同连接键,旧序列不会接到新行', () => {
-    expect(trendKey('r-谷氨酰转移酶', 'U/L')).not.toBe(trendKey('谷氨酰转肽酶', 'U/L'));
-    expect(trendKey('丙氨酸转氨酶', 'U/L')).not.toBe(trendKey('丙氨酸转氨酶', 'IU/L'));
-  });
 });
 
 describe('defaultSelectedIndex', () => {
@@ -420,6 +239,12 @@ describe('defaultSelectedIndex', () => {
 
     const latest = selectSeries([altLow(), altHigh()], 'U/L', 'lft_02');
     expect(defaultSelectedIndex(latest)).toBe(1);
+  });
+
+  it('显式 reportId 优先于 selectedPoint;缺失时回落最新点', () => {
+    const series = selectSeries([altLow(), altHigh()], 'U/L', 'lft_02');
+    expect(defaultSelectedIndex(series, 'lft_05')).toBe(0);
+    expect(defaultSelectedIndex(series, 'missing')).toBe(1);
   });
 
   it('候选点缺失时回落最新点;空序列取 0', () => {
@@ -461,13 +286,15 @@ describe('chartLayout', () => {
     expect(layout.points[0].latest).toBe(false);
   });
 
-  it('单点居中,不画线', () => {
+  it('单点居中,不画线;参考带横跨绘图区', () => {
     const series = selectSeries([pointOf(lft04, '总胆红素', 'lft_04')], 'μmol/L', 'lft_04');
     const layout = chartLayout(series, 320, 64, { axes: false });
 
     expect(layout.points).toHaveLength(1);
     expect(layout.points[0].x).toBe(160);
     expect(layout.line).toBe('');
+    expect(layout.bands[0].x).toBe(8);
+    expect(layout.bands[0].width).toBe(304);
   });
 
   it('同日期点微偏移,不重叠', () => {
@@ -670,11 +497,11 @@ describe('chartLayout detail mode', () => {
 });
 
 describe('trendUnavailableReason', () => {
-  const altCandidate = candidateOf(lft02, '丙氨酸转氨酶', 'lft_02');
+  const altLatest = latestOf(lft02, '丙氨酸转氨酶');
 
   it('有可绘制点时不返回原因', () => {
     const series = selectSeries([altLow(), altHigh()], 'U/L', 'lft_02');
-    expect(trendUnavailableReason(series, altCandidate)).toBeUndefined();
+    expect(trendUnavailableReason(series, altLatest)).toBeUndefined();
   });
 
   it('最近一次为非数值结果', () => {
@@ -683,30 +510,30 @@ describe('trendUnavailableReason', () => {
       'U/L',
       'cbc_07',
     );
-    expect(
-      trendUnavailableReason(series, candidateOf(cbc07, 'C反应蛋白', 'cbc_07')),
-    ).toBe('最近一次为非数值结果');
+    expect(trendUnavailableReason(series, latestOf(cbc07, 'C反应蛋白'))).toBe(
+      '最近一次为非数值结果',
+    );
   });
 
   it('最近一次缺日期', () => {
     const series = selectSeries([], 'U/L', 'lft_02');
     expect(
-      trendUnavailableReason(series, { ...altCandidate, reportDate: null }),
+      trendUnavailableReason(series, { ...altLatest, reportDate: null }),
     ).toBe('最近一次缺日期');
   });
 
   it('没有可绘制的数值点', () => {
     const series = selectSeries([], 'U/L', 'lft_02');
-    expect(trendUnavailableReason(series, altCandidate)).toBe('没有可绘制的数值点');
+    expect(trendUnavailableReason(series, altLatest)).toBe('没有可绘制的数值点');
   });
 });
 
 describe('formatSeriesMeta', () => {
-  const candidate = candidateOf(lft02, '丙氨酸转氨酶', 'lft_02');
+  const latest = latestOf(lft02, '丙氨酸转氨酶');
 
   it('多点:日期范围 + 份数', () => {
     const series = selectSeries([altLow(), altHigh()], 'U/L', 'lft_02');
-    expect(formatSeriesMeta(series, candidate)).toBe('2017-11-18 – 2021-08-02 · 2 份报告');
+    expect(formatSeriesMeta(series, latest)).toBe('2017-11-18 – 2021-08-02 · 2 份报告');
   });
 
   it('单点:日期 + 仅 1 份报告', () => {
@@ -715,7 +542,7 @@ describe('formatSeriesMeta', () => {
       'μmol/L',
       'lft_04',
     );
-    expect(formatSeriesMeta(series, candidateOf(lft04, '总胆红素', 'lft_04'))).toBe(
+    expect(formatSeriesMeta(series, latestOf(lft04, '总胆红素'))).toBe(
       '2011-07-02 · 仅 1 份报告',
     );
   });
@@ -727,9 +554,9 @@ describe('formatSeriesMeta', () => {
         pointOf(lft05, '丙氨酸转氨酶', 'b', { report_date: null }),
       ],
       'U/L',
-      candidate.reportId,
+      'lft_02',
     );
-    expect(formatSeriesMeta(series, candidate)).toBe('日期未知 · 2 份报告');
+    expect(formatSeriesMeta(series, latest)).toBe('日期未知 · 2 份报告');
   });
 
   it('缺日期 / 非数值 / 单位不同条件独立追加', () => {
@@ -744,13 +571,44 @@ describe('formatSeriesMeta', () => {
       'U/L',
       'lft_02',
     );
-    expect(formatSeriesMeta(series, candidate)).toBe(
+    expect(formatSeriesMeta(series, latest)).toBe(
       '2017-11-18 – 2021-08-02 · 4 份报告 · 另有 1 份缺日期 · 另有 1 个非数值指标项 · 另有 1 份单位不同（未连线）',
     );
   });
 
   it('同单位点缺失时候选报告日期兜底,不虚构份数', () => {
-    const series = selectSeries([], 'U/L', candidate.reportId);
-    expect(formatSeriesMeta(series, candidate)).toBe('2021-08-02 · 暂无趋势数据');
+    const series = selectSeries([], 'U/L', 'lft_02');
+    expect(formatSeriesMeta(series, latest)).toBe('2021-08-02 · 暂无趋势数据');
+  });
+});
+
+describe('trendPointRows', () => {
+  it('同日多份报告:首行显示日期,后续行标「同日」', () => {
+    const rows = trendPointRows([
+      pointOf(lft05, '丙氨酸转氨酶', 'a'),
+      pointOf(lft02, '丙氨酸转氨酶', 'b', { report_date: lft05.report_date }),
+      pointOf(lft02, '丙氨酸转氨酶', 'c'),
+    ]);
+
+    expect(rows.map((row) => row.dateLabel)).toEqual([
+      '2017-11-18',
+      '同日',
+      '2021-08-02',
+    ]);
+    expect(rows).toHaveLength(3);
+  });
+
+  it('缺日期点只在首行显示「日期未知」,不重复标签', () => {
+    const rows = trendPointRows([
+      pointOf(lft02, '丙氨酸转氨酶', 'a', { report_date: null }),
+      pointOf(lft02, '丙氨酸转氨酶', 'b', { report_date: null }),
+    ]);
+
+    expect(rows.map((row) => row.dateLabel)).toEqual(['日期未知', undefined]);
+  });
+
+  it('单点保留日期标签', () => {
+    const rows = trendPointRows([pointOf(lft04, '总胆红素', 'lft_04')]);
+    expect(rows.map((row) => row.dateLabel)).toEqual(['2011-07-02']);
   });
 });
