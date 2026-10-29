@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>HealthyDuoduo · 趋势到原始图像方案对比</title>
+<style>
+  body { margin: 0; padding: 28px; background: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; color: #111827; }
+  h1 { font-size: 22px; margin: 0 0 6px; }
+  h2 { font-size: 16px; margin: 26px 0 10px; }
+  .sub { color: #6b7280; font-size: 13px; margin-bottom: 18px; line-height: 20px; }
+  .row { display: flex; gap: 18px; align-items: flex-start; margin-bottom: 18px; }
+  .item { background: #fff; border: 1px solid #d1d5db; border-radius: 12px; padding: 10px 10px 12px; }
+  .label { font-size: 13px; font-weight: 650; margin: 0 0 8px 4px; }
+  .label span { font-weight: 400; color: #6b7280; }
+  .label.recommended { color: #1d4ed8; }
+  img { width: 300px; display: block; border-radius: 8px; }
+  .note { width: 300px; font-size: 12px; color: #6b7280; margin-top: 8px; line-height: 18px; }
+  .note b { color: #374151; }
+  .callout { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 14px 16px; font-size: 13px; line-height: 21px; color: #1e3a8a; margin: 8px 0 18px; }
+  .callout b { color: #1e40af; }
+  ul { margin: 6px 0 0 18px; padding: 0; }
+  li { margin: 4px 0; }
+  code { background: #f3f4f6; padding: 1px 4px; border-radius: 4px; font-size: 12px; }
+</style>
+</head>
+<body>
+  <h1>趋势 → 原始图像：Q6 入口 / Q7 落点</h1>
+  <div class="sub">
+    任务：在 ALT 趋势详情里看到一个点，想核对「当时原始图像」上的那一行。<br />
+    样例图像来自仓库脱敏样本 <code>lft_02</code>；原型截图隐藏了页眉 / 个人信息，生产展示用户自己的原图。<br />
+    报告详情按项目组；组内「异常 / 未知」在前，「正常 / 未检测」在后（按你的 Q1 修正）。
+  </div>
+
+  <div class="callout">
+    <b>推荐组合：Q6-A + Q7-A。</b> 点卡上给一个明确的「查看原始图像」按钮；进入后直接看原图定位，识别值只作辅助。<br />
+    理由：用户更相信原始图像；先把原图和蓝框给到，再让用户选择是否打开格式化报告。点行仍只切换选中点，不抢手势。
+  </div>
+
+  <h2>Q6 · 从趋势层怎么进入原始图像</h2>
+  <div class="row">
+    <div class="item">
+      <div class="label recommended">A 点卡按钮 <span>· 推荐</span></div>
+      <img src="shots/01-entry-a.png" />
+      <div class="note"><b>点行仍只切换选中点</b>；选中后点上方「查看原始图像」进原图。手势不冲突，按钮明确、可测。代价是多一次点击。</div>
+    </div>
+    <div class="item">
+      <div class="label">B 点行直达 <span>· 最快</span></div>
+      <img src="shots/02-entry-b.png" />
+      <div class="note">点任一行直接进原图；选中点改用图上的小圆点。少一次点击，但「选点看值」和「进原图」抢同一个手势，图上圆点热区很小。</div>
+    </div>
+    <div class="item">
+      <div class="label">C 图上点浮层 <span>· 图优先</span></div>
+      <img src="shots/03-entry-c.png" />
+      <div class="note">点图上的圆点，在该点旁弹出摘要，再从浮层进原图。图与点的关系最直接；但浮层会盖住一部分曲线，圆点热区也小。</div>
+    </div>
+  </div>
+
+  <h2>Q7 · 点「查看原始图像」后看到什么</h2>
+  <div class="row">
+    <div class="item">
+      <div class="label recommended">A 全屏原图定位 <span>· 推荐</span></div>
+      <img src="shots/04-image-full.png" />
+      <div class="note"><b>原图是主体</b>：自动裁到该指标所在行，蓝框标出 OCR 行；识别值放在下方作辅助。可切到整张检查单，或打开格式化报告。</div>
+    </div>
+    <div class="item">
+      <div class="label">B 报告内原图条带</div>
+      <img src="shots/05-image-in-report.png" />
+      <div class="note">完整报告 + 自动展开 96px 原图条带；复用现有 <code>LineZoom</code> / <code>ocr_lines</code>，实现最省。但图像是次要信息，条带太矮，不适合仔细看。</div>
+    </div>
+    <div class="item">
+      <div class="label">C 趋势层内原图预览</div>
+      <img src="shots/06-image-inline.png" />
+      <div class="note">不离开趋势层，直接看原图条带；再决定「查看大图 / 打开完整报告」。上下不丢趋势上下文；但视口小，细节仍需大图。</div>
+    </div>
+  </div>
+
+  <h2>Q7-A 的整张检查单状态</h2>
+  <div class="row">
+    <div class="item">
+      <div class="label">整张检查单 <span>· 同一屏切换</span></div>
+      <img src="shots/07-image-whole.png" />
+      <div class="note">从「定位到该项」切到整张检查单；页眉 / 个人信息已隐藏。生产里这里就是用户上传的整张原图，不需要隐藏。</div>
+    </div>
+  </div>
+
+  <h2>实现边界（已核对代码）</h2>
+  <ul>
+    <li><code>ReportItem.ocr_lines</code> 已有行号 + 四点多边形框；现有 <code>apps/mobile/src/components/LineZoom.tsx</code> 和 <code>zoomCrop</code> 已能裁到对应行，不需要新的识别能力。</li>
+    <li><code>TrendPoint</code> 只有 <code>report_id</code>，没有 <code>item_id</code>。要定位到具体指标，需要按 <code>name + unit</code> 在报告详情里匹配，或给趋势点扩 <code>item_id</code>（契约变更）。</li>
+    <li>原图 URL 来自报告详情；如果不想先进报告详情，需要轻量接口或在趋势点里带 image URL。首版建议复用报告详情加载。</li>
+    <li>原图定位要处理 OCR 行缺失 / 框异常：退化为整张检查单，并提示「未能定位到原文行」；图像加载失败仍保留识别值。</li>
+    <li>原型为压缩展示：只有定位项画成完整卡片，其余用紧凑行；生产仍用现有 <code>ReviewItemCard</code>，排序规则不变。</li>
+  </ul>
+
+  <h2>需要你判断</h2>
+  <ul>
+    <li><b>Q1：</b>组内排序确认为「异常 / 未知在前，正常 / 未检测在后」，项目组顺序不变；不再有顶部异常区。未知里不可操作的部分（信息项 / 无参考范围 / 叙述体）也排前面吗？我建议只把可操作未知（待核对）排前面，其余和正常一起放后面，避免噪音。</li>
+    <li><b>Q6：</b>入口选 A / B / C。</li>
+    <li><b>Q7：</b>落点选 A / B / C；选 A 时是否保留「查看整张检查单」切换。</li>
+    <li><b>返回：</b>默认看完原图返回项目详情 / 异常指标列表；若要求回到趋势层并保留选中点，需要把趋势层改成路由级页面，成本更高。</li>
+  </ul>
+</body>
+</html>

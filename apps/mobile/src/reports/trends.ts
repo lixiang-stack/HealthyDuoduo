@@ -170,11 +170,11 @@ export function selectSeries(
   };
 }
 
-/** 详情层默认选中项:行最新点对应的点;找不到时回落最新点。 */
-export function defaultSelectedIndex(series: TrendSeries): number {
-  const index = series.listPoints.findIndex(
-    (point) => point.report_id === series.selectedPoint?.report_id,
-  );
+/** 详情层默认选中项:优先指定报告(从原图返回时恢复),否则行最新点对应的点;
+ *  找不到时回落最新点。 */
+export function defaultSelectedIndex(series: TrendSeries, reportId?: string): number {
+  const target = reportId ?? series.selectedPoint?.report_id;
+  const index = series.listPoints.findIndex((point) => point.report_id === target);
   return index >= 0 ? index : Math.max(0, series.listPoints.length - 1);
 }
 

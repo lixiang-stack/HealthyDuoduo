@@ -6,7 +6,7 @@ import { Image, StyleSheet, Text, View } from 'react-native';
 
 import type { OcrLineLink } from '../api/reports';
 import { colors } from './theme';
-import { zoomCrop, type Size } from './zoom';
+import { unionBox, zoomCrop, type Size } from './zoom';
 
 /** OCR 行缩放视口高(px):约三分之一屏宽,行文读到字级。 */
 const ZOOM_VIEWPORT_HEIGHT = 96;
@@ -17,10 +17,16 @@ export function LineZoom({
   imageUrl,
   lines,
   testID,
+  height = ZOOM_VIEWPORT_HEIGHT,
+  highlight = false,
 }: {
   imageUrl: string;
   lines: OcrLineLink[];
   testID?: string;
+  /** 视口高度;原图定位用更大的视口,报告内条带保持默认 96。 */
+  height?: number;
+  /** 在原图上标出 OCR 行框;默认只裁切不描框。 */
+  highlight?: boolean;
 }) {
   const [viewport, setViewport] = useState<Size>();
   const [imageState, setImageState] = useState<ImageState>();
@@ -49,12 +55,23 @@ export function LineZoom({
   const current = imageState?.url === imageUrl ? imageState : undefined;
   const crop = viewport && current?.natural ? zoomCrop(current.natural, lines, viewport) : undefined;
   const failed = current?.failed ?? false;
+  const box = highlight ? unionBox(lines) : undefined;
+  const scale = crop && current?.natural ? crop.width / current.natural.width : undefined;
+  const highlightStyle =
+    box && crop && scale
+      ? {
+          left: crop.left + box.x * scale,
+          top: crop.top + box.y * scale,
+          width: box.w * scale,
+          height: box.h * scale,
+        }
+      : undefined;
   return (
     <View
       testID={testID}
-      style={styles.zoomViewport}
+      style={[styles.zoomViewport, { height }]}
       onLayout={(event) =>
-        setViewport({ width: event.nativeEvent.layout.width, height: ZOOM_VIEWPORT_HEIGHT })
+        setViewport({ width: event.nativeEvent.layout.width, height })
       }
     >
       {crop ? (
@@ -69,6 +86,13 @@ export function LineZoom({
           }}
         />
       ) : null}
+      {highlightStyle ? (
+        <View
+          testID={testID ? `${testID}-highlight` : undefined}
+          pointerEvents="none"
+          style={[styles.highlight, highlightStyle]}
+        />
+      ) : null}
       {failed ? <Text style={styles.zoomHint}>图像区域载入失败,以上文原文与解析值为准</Text> : null}
     </View>
   );
@@ -76,13 +100,18 @@ export function LineZoom({
 
 const styles = StyleSheet.create({
   zoomViewport: {
-    height: ZOOM_VIEWPORT_HEIGHT,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 8,
     marginTop: 4,
     overflow: 'hidden',
     justifyContent: 'center',
+  },
+  highlight: {
+    position: 'absolute',
+    borderWidth: 2,
+    borderColor: colors.accent,
+    borderRadius: 3,
   },
   zoomHint: { fontSize: 12, color: colors.muted, textAlign: 'center', paddingHorizontal: 8 },
 });

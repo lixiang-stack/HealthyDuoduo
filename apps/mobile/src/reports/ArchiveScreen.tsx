@@ -7,7 +7,6 @@ import { colors } from '../components/theme';
 import { MemberChips } from '../members/components';
 import { useCurrentMember } from '../members/CurrentMemberContext';
 import { sortMembers } from '../members/order';
-import { ReportCard } from './components';
 import { sortReports } from './order';
 import { filterReports, parseReportFilter, pendingSummary } from './overview';
 import {
@@ -19,6 +18,7 @@ import {
 } from './panelOverview';
 import { panelLabel } from './panels';
 import { panelDateLabel } from './status';
+import { ReportTimeline } from './ReportTimeline';
 import { useMemberPanels } from './useMemberPanels';
 import { useMemberReports } from './useMemberReports';
 
@@ -168,20 +168,7 @@ export function ArchiveScreen({ view }: { view: ArchiveView }) {
                             </Text>
                           )
                         ) : (
-                          visibleReports.map((report) => (
-                            <Link
-                              key={report.report_id}
-                              asChild
-                              href={{
-                                pathname: '/report/[report_id]',
-                                params: { report_id: report.report_id },
-                              }}
-                            >
-                              <Pressable>
-                                <ReportCard report={report} />
-                              </Pressable>
-                            </Link>
-                          ))
+                          <ReportTimeline reports={visibleReports} />
                         )}
                       </View>
                     ) : (
@@ -223,8 +210,8 @@ function ArchiveSegments({ value }: { value: ArchiveView }) {
     <View style={styles.segments}>
       {(
         [
-          ['time', '按时间'],
           ['panel', '按项目'],
+          ['time', '按时间'],
         ] as const
       ).map(([key, label]) => (
         <Pressable

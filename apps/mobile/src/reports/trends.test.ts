@@ -241,6 +241,12 @@ describe('defaultSelectedIndex', () => {
     expect(defaultSelectedIndex(latest)).toBe(1);
   });
 
+  it('显式 reportId 优先于 selectedPoint;缺失时回落最新点', () => {
+    const series = selectSeries([altLow(), altHigh()], 'U/L', 'lft_02');
+    expect(defaultSelectedIndex(series, 'lft_05')).toBe(0);
+    expect(defaultSelectedIndex(series, 'missing')).toBe(1);
+  });
+
   it('候选点缺失时回落最新点;空序列取 0', () => {
     const dateless = pointOf(lft02, '丙氨酸转氨酶', 'dateless', { report_date: null });
     const series = selectSeries([altLow(), altHigh(), dateless], 'U/L', 'missing');

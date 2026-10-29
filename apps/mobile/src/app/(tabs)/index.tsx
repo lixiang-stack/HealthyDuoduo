@@ -19,7 +19,7 @@ export default function FamilyScreen() {
 
   const openMember = (memberId: number) => {
     selectMember(memberId);
-    router.push('/timeline');
+    router.push('/panels');
   };
 
   return (
@@ -98,7 +98,10 @@ function FamilyMemberCard({
         {member.is_child ? <Text style={styles.childBadge}>孩子</Text> : null}
       </View>
       {summary.pending ? (
-        <Text testID={`family-member-pending-${member.member_id}`} style={sharedStyles.muted}>
+        <Text
+          testID={`family-member-pending-${member.member_id}`}
+          style={summary.hasPending ? styles.pending : sharedStyles.muted}
+        >
           {summary.pending}
         </Text>
       ) : null}
@@ -108,9 +111,7 @@ function FamilyMemberCard({
       {summary.hasReports ? (
         summary.abnormal ? (
           <Text testID={`family-member-abnormal-${member.member_id}`} style={styles.abnormal}>
-            {summary.abnormalTotal
-              ? `${summary.abnormalTotal}\n${summary.abnormal}`
-              : `异常项目：${summary.abnormal}`}
+            {summary.abnormal}
           </Text>
         ) : (
           <Text testID={`family-member-abnormal-${member.member_id}`} style={sharedStyles.muted}>
@@ -155,7 +156,8 @@ const styles = StyleSheet.create({
     paddingVertical: 1,
   },
   latest: { fontSize: 14, color: colors.text },
-  abnormal: { fontSize: 14, color: colors.text, lineHeight: 20 },
+  pending: { fontSize: 14, color: colors.accent, fontWeight: '600' },
+  abnormal: { fontSize: 14, color: colors.fail, fontWeight: '600', lineHeight: 20 },
   fail: { fontSize: 13, color: colors.fail },
   link: { color: colors.accent, fontSize: 15 },
   button: {

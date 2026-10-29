@@ -1,5 +1,5 @@
-import { Link } from 'expo-router';
-import { useState } from 'react';
+import { Link, router, useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import type { PanelItem, ReportSummary } from '../api/reports';
@@ -117,6 +117,21 @@ function AbnormalPanels({ memberId, reports }: { memberId: number; reports: Repo
   const panels = state.status === 'ready' ? state.panels : undefined;
   const groupsState = useAbnormalPanelGroups(memberId, panels);
   const [detailTrend, setDetailTrend] = useState<SelectedTrend>();
+  // 原图是独立路由;Modal 在跳转时隐藏但保持挂载,返回后原位恢复选中点。
+  const [sheetHidden, setSheetHidden] = useState(false);
+  const [lastImageReportId, setLastImageReportId] = useState<string>();
+
+  useFocusEffect(
+    useCallback(() => {
+      setSheetHidden(false);
+    }, []),
+  );
+
+  const openTrend = (trend: SelectedTrend) => {
+    setLastImageReportId(undefined);
+    setSheetHidden(false);
+    setDetailTrend(trend);
+  };
 
   const reportTypeById = Object.fromEntries(
     reports.map((report) => [report.report_id, report.report_type]),
@@ -176,7 +191,7 @@ function AbnormalPanels({ memberId, reports }: { memberId: number; reports: Repo
           <PanelGroups
             groups={groupsState.groups}
             reportTypeById={reportTypeById}
-            onSelectRow={setDetailTrend}
+            onSelectRow={openTrend}
           />
         ) : null}
       </View>
@@ -188,7 +203,26 @@ function AbnormalPanels({ memberId, reports }: { memberId: number; reports: Repo
           reportDate={detailTrend.reportDate}
           latestValue={detailTrend.latestValue}
           series={detailTrend.series}
-          onClose={() => setDetailTrend(undefined)}
+          visible={!sheetHidden}
+          initialReportId={lastImageReportId}
+          onOpenImage={(point) => {
+            setLastImageReportId(point.report_id);
+            setSheetHidden(true);
+            router.push({
+              pathname: '/image/[report_id]',
+              params: {
+                report_id: point.report_id,
+                name: detailTrend.name,
+                unit: detailTrend.series.unit ?? '',
+                report_date: point.report_date ?? '',
+              },
+            });
+          }}
+          onClose={() => {
+            setSheetHidden(false);
+            setLastImageReportId(undefined);
+            setDetailTrend(undefined);
+          }}
         />
       ) : null}
     </>
@@ -208,16 +242,25 @@ function PanelGroups({
     groups.slice(0, index).reduce((sum, group) => sum + group.items.length, 0),
   );
 
+  const total = groups.reduce((sum, group) => sum + group.items.length, 0);
+
   return (
     <>
+      <Text testID="trends-summary" style={styles.summary}>
+        异常指标 {total} 项 · {groups.length} 个项目
+      </Text>
       <Text testID="trends-band-legend" style={sharedStyles.muted}>
         灰色带 = 参考范围
       </Text>
       {groups.map((group, groupIndex) => (
         <View key={group.panel} testID={`trend-panel-${groupIndex}`} style={styles.group}>
-          <Text style={styles.groupTitle}>
-            {`${panelLabel(group.panel)} · ${panelDateLabel(group.reportDate, false)} · ${group.items.length} 项异常`}
-          </Text>
+          <View style={styles.groupHeader}>
+            <Text style={styles.panelBadge}>{panelLabel(group.panel)}</Text>
+            <Text style={styles.groupMeta}>
+              {panelDateLabel(group.reportDate, false)} ·{' '}
+              <Text style={styles.groupCount}>{group.items.length} 项异常</Text>
+            </Text>
+          </View>
           {group.items.map((item, index) => (
             <AbnormalIndicatorCard
               key={`${group.panel}-${item.name}-${item.unit ?? ''}`}
@@ -285,7 +328,7 @@ function AbnormalIndicatorCard({
         <TrendSparkline series={trend.series} name={item.name} testID={`trend-sparkline-${index}`} />
       )}
       <Text style={styles.meta}>
-        {formatSeriesMeta(trend.series, { reportDate: latest.report_date })}
+        {panelLabel(panel)} · {formatSeriesMeta(trend.series, { reportDate: latest.report_date })}
       </Text>
       <Text style={styles.detailLink}>查看趋势 ›</Text>
     </Pressable>
@@ -296,8 +339,21 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: 24, gap: 12 },
   stack: { gap: 12 },
-  group: { gap: 8 },
-  groupTitle: { fontSize: 13, color: colors.muted },
+  summary: { fontSize: 15, color: colors.fail, fontWeight: '600' },
+  group: { gap: 8, borderLeftWidth: 3, borderLeftColor: colors.accent, paddingLeft: 10 },
+  groupHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  panelBadge: {
+    fontSize: 13,
+    color: colors.accent,
+    fontWeight: '600',
+    borderWidth: 1,
+    borderColor: colors.accent,
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  groupMeta: { fontSize: 13, color: colors.muted },
+  groupCount: { color: colors.fail, fontWeight: '600' },
   card: {
     borderWidth: 1,
     borderColor: colors.border,

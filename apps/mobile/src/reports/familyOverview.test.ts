@@ -83,15 +83,16 @@ describe('familyCardSummary', () => {
 
     expect(summary).toEqual({
       hasReports: true,
+      hasPending: true,
       pending: '待核对 1 份 · 5 项',
       latest: '最近：血常规 · 2024-08-19 · 2 年前',
-      abnormal: '血常规 7 项',
+      abnormal: '异常指标 7 项 · 1 个项目',
       latestFlags: '最近报告 偏高 2 · 偏低 5',
       reportCount: '报告 1 份',
     });
   });
 
-  it('异常项目超过展示上限:补异常指标总数 + 项目数,分项仍用圆点', () => {
+  it('异常指标只给总数 + 项目数,不再列项目分项', () => {
     const summary = familyCardSummary(
       {
         reports: [reportOf(cbc04, 'cbc_04')],
@@ -99,8 +100,7 @@ describe('familyCardSummary', () => {
       },
       TODAY,
     );
-    expect(summary.abnormalTotal).toBe('异常指标 15 项 · 3 个项目');
-    expect(summary.abnormal).toBe('血常规 9 项 · 肝功 4 项 · 另有 1 个项目共 2 项异常');
+    expect(summary.abnormal).toBe('异常指标 15 项 · 3 个项目');
   });
 
   it('多份报告取最新一份;影像主项目直接显示,异常项目来自项目列表', () => {
@@ -117,7 +117,7 @@ describe('familyCardSummary', () => {
 
     expect(summary.pending).toBe('待核对 1 份 · 1 项');
     expect(summary.latest).toBe('最近：影像 · 2024-09-15 · 2 年前');
-    expect(summary.abnormal).toBe('血常规 1 项');
+    expect(summary.abnormal).toBe('异常指标 1 项 · 1 个项目');
     expect(summary.latestFlags).toBe('最近报告 偏高 0 · 偏低 0');
     expect(summary.reportCount).toBe('报告 2 份');
   });
@@ -156,7 +156,7 @@ describe('familyCardSummary', () => {
     expect(summary.pending).toBe('待核对 1 份 · 5 项 · 识别失败 1 份');
     expect(summary.latest).toBe('最近报告识别失败 · 2025-01-01');
     expect(summary.latestFlags).toBeUndefined();
-    expect(summary.abnormal).toBe('血常规 7 项');
+    expect(summary.abnormal).toBe('异常指标 7 项 · 1 个项目');
     expect(summary.reportCount).toBe('报告 2 份');
   });
 

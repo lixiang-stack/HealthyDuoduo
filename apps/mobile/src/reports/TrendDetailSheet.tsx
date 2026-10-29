@@ -1,7 +1,8 @@
 // 趋势详情层(票 04):全屏 Modal,复用列表已加载的 series/listPoints,不额外请求。
 // 完整图与逐点列表共享 selectedIndex;点列表是主选点方式,图上的小圆点不做点击热区。
+// 点卡「查看原始图像」进原图路由;跳转时 Modal 隐藏但保持挂载,返回后原位恢复选中点。
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import type { TrendPoint } from '../api/reports';
@@ -45,16 +46,26 @@ export function TrendDetailSheet({
   reportDate,
   latestValue,
   series,
+  visible = true,
+  initialReportId,
   onClose,
+  onOpenImage,
 }: {
   name: string;
   reportType: string;
   reportDate: string | null;
   latestValue: string | null;
   series: TrendSeries;
+  /** 原图路由打开时隐藏 Modal 但保留组件与选中点,返回后原位恢复。 */
+  visible?: boolean;
+  /** 从原图返回时恢复的原报告;缺省用 series 的 selectedPoint。 */
+  initialReportId?: string;
   onClose: () => void;
+  onOpenImage: (point: TrendPoint) => void;
 }) {
-  const [selectedIndex, setSelectedIndex] = useState(() => defaultSelectedIndex(series));
+  const [selectedIndex, setSelectedIndex] = useState(() =>
+    defaultSelectedIndex(series, initialReportId),
+  );
   const selectedPoint = series.listPoints[selectedIndex];
   // 选中点若不是可绘制点(非数值/缺日期),图中没有对应标记:保持无放大,避免高亮与点卡不一致。
   const selectedChartIndex = selectedPoint
@@ -66,7 +77,14 @@ export function TrendDetailSheet({
   });
 
   return (
-    <Modal visible animationType="slide" transparent={false} onRequestClose={onClose}>
+    // react-native-web 的 slide 动画会让 Modal 内 ScrollView 高度塌成 0(面板入口必现);
+    // Web 用无动画保证可滚动,原生保留 slide。
+    <Modal
+      visible={visible}
+      animationType={Platform.OS === 'web' ? 'none' : 'slide'}
+      transparent={false}
+      onRequestClose={onClose}
+    >
       <SafeAreaProvider style={styles.safe}>
         <SafeAreaView testID="trend-detail" style={styles.safe}>
           <View style={styles.header}>
@@ -103,7 +121,9 @@ export function TrendDetailSheet({
               </View>
             )}
 
-            {selectedPoint ? <PointCard point={selectedPoint} /> : null}
+            {selectedPoint ? (
+              <PointCard point={selectedPoint} onOpenImage={onOpenImage} />
+            ) : null}
 
             {series.listPoints.length > 0 ? (
               <View style={styles.pointList}>
@@ -153,7 +173,13 @@ export function TrendDetailSheet({
   );
 }
 
-function PointCard({ point }: { point: TrendPoint }) {
+function PointCard({
+  point,
+  onOpenImage,
+}: {
+  point: TrendPoint;
+  onOpenImage: (point: TrendPoint) => void;
+}) {
   const color = FLAG_COLORS[point.flag];
   return (
     <View style={styles.pointCard}>
@@ -170,6 +196,14 @@ function PointCard({ point }: { point: TrendPoint }) {
       </View>
       <Text style={styles.muted}>{`方法：${point.method ?? '—'}`}</Text>
       <Text style={styles.muted}>{trustLabel(point)}</Text>
+      <Pressable
+        testID="trend-point-open-image"
+        accessibilityRole="button"
+        onPress={() => onOpenImage(point)}
+        style={styles.openImage}
+      >
+        <Text style={styles.openImageText}>查看原始图像 ›</Text>
+      </Pressable>
     </View>
   );
 }
@@ -218,6 +252,15 @@ const styles = StyleSheet.create({
   unit: { fontSize: 13 },
   ref: { fontSize: 13, color: colors.muted },
   muted: { fontSize: 13, color: colors.muted, lineHeight: 20 },
+  openImage: {
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    paddingVertical: 11,
+    alignItems: 'center',
+  },
+  openImageText: { color: colors.accent, fontSize: 14, fontWeight: '600' },
   pointList: { gap: 6 },
   pointRow: {
     flexDirection: 'row',

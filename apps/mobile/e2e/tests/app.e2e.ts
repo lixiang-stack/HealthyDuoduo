@@ -74,6 +74,19 @@ describe('App E2E', { serial: true, timeout: 300_000 }, () => {
     await openConfigured(app, browser, '/timeline', { memberId: seed.xiaoming.member_id });
     await expect(screen.getByTestId(testID.reportCard(seed.reviewReport.report_id))).toBeVisible();
     await expect(screen.getByTestId(testID.reportCard(seed.healReport.report_id))).toHaveCount(0);
+    // 时间线:报告卡按天分组,日期 / 月份节点可见;日期未知报告沉底。
+    await expect(screen.getByTestId(testID.reportTimeline)).toBeVisible();
+    if (seed.reviewReport.report_date) {
+      await expect(
+        screen.getByTestId(testID.timelineMonth(seed.reviewReport.report_date.slice(0, 7))),
+      ).toBeVisible();
+      await expect(
+        screen.getByTestId(testID.timelineDay(seed.reviewReport.report_date)),
+      ).toBeVisible();
+    }
+    if (seed.imaging01.report_date === null || seed.imaging03.report_date === null) {
+      await expect(screen.getByTestId(testID.timelineUndated)).toBeVisible();
+    }
     // 影像单不呈现指标项:卡片无未知 / 待核对徽标,未印日期文案按类别区分(票 03)。
     const imaging01Card = screen.getByTestId(testID.reportCard(seed.imaging01.report_id));
     await expect(imaging01Card).toContainText(reportDateLabel(seed.imaging01));
@@ -136,7 +149,7 @@ describe('App E2E', { serial: true, timeout: 300_000 }, () => {
     ).toContainText(`最近：影像 · 2024-09-15 · ${latestRelative}`);
     await expect(
       screen.getByTestId(testID.familyMemberAbnormal(seed.xiaoming.member_id)),
-    ).toContainText('异常项目：血常规 1 项');
+    ).toContainText('异常指标 1 项 · 1 个项目');
     await expect(
       screen.getByTestId(testID.familyMemberFlags(seed.xiaoming.member_id)),
     ).toContainText('最近报告 偏高 0 · 偏低 0');
@@ -154,7 +167,7 @@ describe('App E2E', { serial: true, timeout: 300_000 }, () => {
     ).toContainText('最近：血常规 · 2024-08-19');
     await expect(
       screen.getByTestId(testID.familyMemberAbnormal(seed.mama.member_id)),
-    ).toContainText('异常项目：血常规 7 项');
+    ).toContainText('异常指标 7 项 · 1 个项目');
     await expect(
       screen.getByTestId(testID.familyMemberFlags(seed.mama.member_id)),
     ).toContainText('最近报告 偏高 2 · 偏低 5');
@@ -176,25 +189,30 @@ describe('App E2E', { serial: true, timeout: 300_000 }, () => {
     ).toHaveCount(0);
     await expect(screen.getByTestId(testID.familyManageMembers)).toBeVisible();
 
-    // 点卡 = 选中该成员并进档案;档案页显示该成员报告与上传 FAB。
+    // 点卡 = 选中该成员并进档案;默认按项目,切到按时间才显示报告卡与待核对。
     await xiaomingCard.tap();
-    await browser.waitForURL(/\/timeline$/);
-    await expect(screen.getByTestId(testID.reportCard(seed.reviewReport.report_id))).toBeVisible();
-    await expect(screen.getByTestId(testID.reportCard(seed.healReport.report_id))).toHaveCount(0);
+    await browser.waitForURL(/\/panels$/);
+    await expect(screen.getByTestId(testID.panelRow('cbc'), { visible: true })).toBeVisible();
+    await expect(screen.getByTestId(testID.reportCard(seed.reviewReport.report_id))).toHaveCount(0);
     await expect(
       screen.getByTestId(testID.headerSettingsArchive, { visible: true }),
     ).toBeVisible();
     await expect(screen.getByTestId(testID.uploadFab)).toBeVisible();
+
+    await screen.getByTestId(testID.archiveViewTime).tap();
+    await browser.waitForURL(/\/timeline$/);
+    await expect(screen.getByTestId(testID.reportCard(seed.reviewReport.report_id))).toBeVisible();
+    await expect(screen.getByTestId(testID.reportCard(seed.healReport.report_id))).toHaveCount(0);
     await expect(screen.getByTestId(testID.archivePendingPartial)).toContainText('待核对 · 1 份');
 
-    // 双 Tab 切换保持 URL / 当前成员;回档案默认按时间。
+    // 双 Tab 切换保持 URL / 当前成员;回档案默认按项目。
     await screen.getByTestId(testID.tabFamily).tap();
     await browser.waitForURL(/\/$/);
     await expect(screen.getByTestId(testID.familyMember(seed.xiaoming.member_id))).toBeVisible();
     await screen.getByTestId(testID.tabArchive).tap();
-    await browser.waitForURL(/\/timeline$/);
-    await expect(screen.getByTestId(testID.reportCard(seed.reviewReport.report_id))).toBeVisible();
-    await expect(screen.getByTestId(testID.archivePendingPartial)).toBeVisible();
+    await browser.waitForURL(/\/panels$/);
+    await expect(screen.getByTestId(testID.panelRow('cbc'), { visible: true })).toBeVisible();
+    await expect(screen.getByTestId(testID.reportCard(seed.reviewReport.report_id))).toHaveCount(0);
 
     await screen.getByTestId(testID.uploadFab).tap();
     await browser.waitForURL(/\/upload$/);

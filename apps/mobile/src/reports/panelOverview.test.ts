@@ -17,7 +17,6 @@ import {
   abnormalItemCount,
   abnormalPanelCount,
   abnormalPanelGroups,
-  familyAbnormalLabel,
   filterReportsByPanel,
   latestFailedReportAfter,
   panelItemIsAbnormal,
@@ -194,15 +193,47 @@ describe('reportTypeNote', () => {
 });
 
 describe('reportItemGroups', () => {
-  it('lft_02 按 panels 顺序分三组,组内展示全部指标且保持报告顺序', () => {
+  it('lft_02 按 panels 顺序分三组,组内异常在前、正常在后', () => {
     const groups = reportItemGroups(detailOf(lft02));
     expect(groups.map((group) => group.label)).toEqual(['肝功', '肾功', '尿酸']);
     expect(groups.map((group) => group.items.length)).toEqual([12, 4, 1]);
     expect(groups.map((group) => abnormalItemCount(group.items))).toEqual([6, 0, 0]);
-    expect(groups[0].items[0].name).toBe('丙氨酸转氨酶');
+    expect(groups[0].items.slice(0, 6).map((item) => item.flag)).toEqual([
+      'high',
+      'high',
+      'high',
+      'high',
+      'high',
+      'low',
+    ]);
+    expect(groups[0].items.slice(6).map((item) => item.name)).toEqual([
+      '总胆红素',
+      '直接胆红素',
+      '总蛋白',
+      '白蛋白',
+      '球蛋白',
+      '白蛋白/球蛋白',
+    ]);
     expect(groups[1].items[0].name).toBe('尿素');
     expect(groups[2].items[0].name).toBe('尿酸');
     expect(groups.flatMap((group) => group.items)).toHaveLength(lft02.items.length);
+  });
+
+  it('组内可操作未知靠前;不可操作未知 / 正常 / 未检测靠后并保持原序', () => {
+    const base = itemOf(lft02, 2);
+    const item = (overrides: Partial<ReportItem>): ReportItem => ({ ...base, ...overrides });
+    const detail: ReportDetail = {
+      ...detailOf(lft02),
+      panels: ['liver'],
+      items: [
+        item({ item_id: 1, name: '正常项', flag: 'normal' }),
+        item({ item_id: 2, name: '信息项', flag: 'unknown', flag_reason: 'informational' }),
+        item({ item_id: 3, name: 'OCR 漏项', flag: 'unknown', flag_reason: 'ocr_miss' }),
+        item({ item_id: 4, name: '未检测项', flag: 'not_tested' }),
+      ],
+    };
+    const groups = reportItemGroups(detail);
+    expect(groups[0].items.map((entry) => entry.item_id)).toEqual([3, 1, 2, 4]);
   });
 
   it('lft_08 四组都出现(肝功 / 肾功 / 尿酸 / 电解质)', () => {
@@ -321,31 +352,6 @@ describe('项目列表 / 详情展示口径', () => {
     expect(
       abnormalPanelGroups([panelDetailOf(tft01, 'thyroid', 'tft_01')]),
     ).toEqual([]);
-  });
-
-  it('familyAbnormalLabel 只列有异常的项目,按异常数降序 + PANEL_ORDER', () => {
-    expect(
-      familyAbnormalLabel([
-        panelSummaryOf('thyroid', 2),
-        panelSummaryOf('liver', 4),
-        panelSummaryOf('imaging', 0),
-        panelSummaryOf('kidney', 2),
-      ]),
-    ).toBe('肝功 4 项 · 肾功 2 项 · 另有 1 个项目共 2 项异常');
-    expect(
-      familyAbnormalLabel([
-        panelSummaryOf('thyroid', 2),
-        panelSummaryOf('liver', 4),
-      ]),
-    ).toBe('肝功 4 项 · 甲状腺 2 项');
-  });
-
-  it('familyAbnormalLabel 无异常 / 空列表返回 undefined,max 控制展示数量', () => {
-    expect(familyAbnormalLabel([])).toBeUndefined();
-    expect(familyAbnormalLabel([panelSummaryOf('liver', 0)])).toBeUndefined();
-    expect(
-      familyAbnormalLabel([panelSummaryOf('liver', 1), panelSummaryOf('thyroid', 1)], 1),
-    ).toBe('肝功 1 项 · 另有 1 个项目共 1 项异常');
   });
 
   it('totalAbnormalCount 汇总所有项目异常数', () => {

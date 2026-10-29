@@ -34,9 +34,9 @@ describe('异常指标', { serial: true, timeout: 300_000 }, () => {
 
     await openConfigured(app, browser, '/timeline', { memberId: seed.multiPoint.member_id });
     await screen.getByTestId(testID.archiveViewPanel).tap();
-    const abnormalCount = totalAbnormalCount(
-      await listMemberPanels(seed.multiPoint.member_id),
-    );
+    const memberPanels = await listMemberPanels(seed.multiPoint.member_id);
+    const abnormalCount = totalAbnormalCount(memberPanels);
+    const abnormalProjects = memberPanels.filter((panel) => panel.abnormal_count > 0).length;
     await expect(screen.getByTestId(testID.archiveAllAbnormal, { visible: true })).toContainText(
       `全部异常 ${abnormalCount} 项`,
     );
@@ -44,8 +44,13 @@ describe('异常指标', { serial: true, timeout: 300_000 }, () => {
     await browser.waitForURL(/\/trends$/);
 
     await expect(screen.getByTestId(testID.trendsBandLegend)).toContainText('灰色带 = 参考范围');
+    await expect(screen.getByTestId(testID.trendsSummary)).toContainText(
+      `异常指标 ${abnormalCount} 项 · ${abnormalProjects} 个项目`,
+    );
     const liverGroup = screen.getByTestId(testID.trendPanel(0), { visible: true });
-    await expect(liverGroup).toContainText('肝功 · 2021-08-02 · 6 项异常');
+    await expect(liverGroup).toContainText('肝功');
+    await expect(liverGroup).toContainText('2021-08-02');
+    await expect(liverGroup).toContainText('6 项异常');
     await expect(screen.getByTestId(testID.trendPanel(1))).toHaveCount(0);
     const altRow = screen.getByTestId(testID.trendIndicator(0), { visible: true });
     await expect(altRow).toContainText('丙氨酸转氨酶');
@@ -81,7 +86,9 @@ describe('异常指标', { serial: true, timeout: 300_000 }, () => {
 
     await selectMember(seed.singlePoint.member_id);
     const singleGroup = screen.getByTestId(testID.trendPanel(0), { visible: true });
-    await expect(singleGroup).toContainText('肝功 · 2011-07-02 · 3 项异常');
+    await expect(singleGroup).toContainText('肝功');
+    await expect(singleGroup).toContainText('2011-07-02');
+    await expect(singleGroup).toContainText('3 项异常');
     // lft_04 同时含血糖项目,但 latest 无异常:0 异常指标的项目不出组。
     await expect(screen.getByTestId(testID.trendPanel(1))).toHaveCount(0);
     const bilirubinRow = screen.getByTestId(testID.trendIndicator(0), { visible: true });
@@ -107,6 +114,34 @@ describe('异常指标', { serial: true, timeout: 300_000 }, () => {
     await expect(screen.getByTestId(testID.trendEmptyReports, { visible: true })).toContainText(
       '这位成员还没有检查单。',
     );
+  });
+
+  test('趋势点查看原始图像,返回保留选中点', { timeout: 300_000 }, async ({
+    app,
+    browser,
+    screen,
+  }) => {
+    const memberId = seed.multiPoint.member_id;
+    await openConfigured(app, browser, '/panel/liver', { memberId });
+    await screen.getByTestId(testID.panelItem(0), { visible: true }).tap();
+    const detail = screen.getByTestId(testID.trendDetail);
+    await expect(detail).toBeVisible();
+    // Modal 入场动画结束后再点;Playwright click 会自动滚到可点区域。
+    await browser.locator(`[data-testid="${testID.trendPoint(0)}"]`).click();
+    await expect(detail).toContainText('2017-11-18');
+
+    await browser.locator(`[data-testid="${testID.trendPointOpenImage}"]`).click();
+    await browser.waitForURL(/\/image\//);
+    await expect(screen.getByTestId(testID.reportImageFocus)).toBeVisible();
+    await expect(screen.getByTestId(testID.reportImageFocusHighlight)).toBeVisible();
+    await expect(screen.getByTestId(testID.reportImageMeta)).toContainText('2017-11-18');
+    await expect(screen.getByTestId(testID.reportImageValue)).toContainText('27.40');
+
+    await browser.back();
+    await browser.waitForURL(/\/panel\/liver$/);
+    const reopened = screen.getByTestId(testID.trendDetail);
+    await expect(reopened).toBeVisible();
+    await expect(reopened).toContainText('2017-11-18');
   });
 
   // panel-browse 票 03:混合报告在多项目下出现;项目详情与 ?panel= 筛选同源。

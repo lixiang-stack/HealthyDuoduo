@@ -1,15 +1,10 @@
 // 家庭首页卡片文案(纯逻辑,spec §8.2):待核对、最近项目 + 日期 / 距今、
-// 异常项目、最近报告偏高 / 偏低、报告总数。空白成员只给空文案。
+// 异常指标总数 + 项目数、最近报告偏高 / 偏低、报告总数。空白成员只给空文案。
 import type { PanelSummary, ReportSummary } from '../api/reports';
 
 import { pendingSummary } from './overview';
 import { sortReports } from './order';
-import {
-  FAMILY_ABNORMAL_MAX,
-  abnormalPanelCount,
-  familyAbnormalLabel,
-  totalAbnormalCount,
-} from './panelOverview';
+import { abnormalPanelCount, totalAbnormalCount } from './panelOverview';
 import { panelLabel } from './panels';
 import { relativeDateLabel } from './relativeDate';
 import { reportDateLabel } from './status';
@@ -21,13 +16,13 @@ export type FamilyCardInput = {
 
 export type FamilyCardSummary = {
   hasReports: boolean;
+  /** 有待核对 / 识别失败时页面用强调色;无待处理为 false。 */
+  hasPending?: boolean;
   /** 待核对 N 份 [· M 项] · 识别失败 K 份;无待处理为「没有待核对」。 */
   pending?: string;
   /** 最近项目 / 失败文案;无报告时为「这位成员还没有检查单」。 */
   latest: string;
-  /** 异常指标总数 + 异常项目数;仅在异常项目超过展示上限时给出。 */
-  abnormalTotal?: string;
-  /** 异常项目摘要;无异常为 undefined(由页面显示「没有异常项目」)。 */
+  /** 异常指标总数 + 异常项目数;无异常为 undefined(由页面显示「没有异常项目」)。 */
   abnormal?: string;
   latestFlags?: string;
   reportCount?: string;
@@ -69,18 +64,18 @@ export function familyCardSummary(
             : latestReport.report_type
         } · ${reportDateLabel(latestReport)}${relative ? ` · ${relative}` : ''}`;
 
+  const pending = pendingSummary(reports);
   const panelCount = abnormalPanelCount(panels);
-  const abnormal = familyAbnormalLabel(panels);
+  const abnormal =
+    panelCount > 0
+      ? `异常指标 ${totalAbnormalCount(panels)} 项 · ${panelCount} 个项目`
+      : undefined;
 
   return {
     hasReports,
-    pending: pendingText(pendingSummary(reports)),
+    hasPending: pending.partialReports > 0 || pending.failedReports > 0,
+    pending: pendingText(pending),
     latest,
-    ...(panelCount > FAMILY_ABNORMAL_MAX
-      ? {
-          abnormalTotal: `异常指标 ${totalAbnormalCount(panels)} 项 · ${panelCount} 个项目`,
-        }
-      : {}),
     abnormal,
     latestFlags:
       latestReport.status === 'failed'

@@ -13,5 +13,5 @@ export default function ArchiveRoute() {
   if (view === 'timeline') {
     return <ArchiveScreen view="time" />;
   }
-  return <Redirect href="/timeline" />;
+  return <Redirect href="/panels" />;
 }

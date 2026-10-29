@@ -1,5 +1,5 @@
-import { Link, router, Stack, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { Link, router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import type { PanelItem } from '../../api/reports';
@@ -42,7 +42,22 @@ export default function PanelDetailScreen() {
   const { currentMemberId } = useCurrentMember();
   const { state, reload } = usePanelDetail(currentMemberId, panel);
   const [detailTrend, setDetailTrend] = useState<PanelTrend>();
+  // 原图是独立路由;Modal 在跳转时隐藏但保持挂载,返回后原位恢复选中点。
+  const [sheetHidden, setSheetHidden] = useState(false);
+  const [lastImageReportId, setLastImageReportId] = useState<string>();
   const [restExpanded, setRestExpanded] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      setSheetHidden(false);
+    }, []),
+  );
+
+  const openTrend = (trend: PanelTrend) => {
+    setLastImageReportId(undefined);
+    setSheetHidden(false);
+    setDetailTrend(trend);
+  };
 
   const detail = state.status === 'ready' ? state.detail : undefined;
   const memberName = state.status === 'ready' ? state.memberName : undefined;
@@ -159,7 +174,7 @@ export default function PanelDetailScreen() {
                         item={item}
                         index={index}
                         reportTypeById={reportTypeById}
-                        onOpen={(trend) => setDetailTrend(trend)}
+                        onOpen={openTrend}
                       />
                     ))}
 
@@ -186,7 +201,7 @@ export default function PanelDetailScreen() {
                                 item={item}
                                 index={groups.abnormal.length + index}
                                 reportTypeById={reportTypeById}
-                                onOpen={(trend) => setDetailTrend(trend)}
+                                onOpen={openTrend}
                               />
                             ))
                           : null}
@@ -221,7 +236,26 @@ export default function PanelDetailScreen() {
           reportDate={detailTrend.reportDate}
           latestValue={detailTrend.latestValue}
           series={detailTrend.series}
-          onClose={() => setDetailTrend(undefined)}
+          visible={!sheetHidden}
+          initialReportId={lastImageReportId}
+          onOpenImage={(point) => {
+            setLastImageReportId(point.report_id);
+            setSheetHidden(true);
+            router.push({
+              pathname: '/image/[report_id]',
+              params: {
+                report_id: point.report_id,
+                name: detailTrend.name,
+                unit: detailTrend.series.unit ?? '',
+                report_date: point.report_date ?? '',
+              },
+            });
+          }}
+          onClose={() => {
+            setSheetHidden(false);
+            setLastImageReportId(undefined);
+            setDetailTrend(undefined);
+          }}
         />
       ) : null}
     </>
