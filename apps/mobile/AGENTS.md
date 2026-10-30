@@ -23,6 +23,13 @@ npx expo install --fix      # fix incompatible package versions
 
 Run lint and typecheck before declaring any task done.
 
+## Testing
+
+- `npm test` runs unit and screen tests. Screen tests live in `src/test/screens/`;
+  keep them outside `src/app/` so Expo Router never treats them as routes.
+- Screen tests render real screens and mock the API at `src/api/resolveClient`;
+  do not mock individual data hooks.
+
 ## Navigation & Routing
 
 - Use **Expo Router** for all navigation. Routes live in `src/app/` — every file there is a screen, `_layout.tsx` files define navigators. Keep non-route code (components, hooks, utils) outside `src/app/`.
