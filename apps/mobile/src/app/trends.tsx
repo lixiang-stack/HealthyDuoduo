@@ -7,7 +7,6 @@ import { sharedStyles } from '../components/styles';
 import { colors } from '../components/theme';
 import { MemberChips } from '../members/components';
 import { useCurrentMember } from '../members/CurrentMemberContext';
-import { sortMembers } from '../members/order';
 import { FLAG_COLORS } from '../reports/colors';
 import {
   panelTrendOf,
@@ -42,7 +41,7 @@ export default function TrendsScreen() {
   const reportsForCurrent = ready && reportsState.reportsMemberId === currentMemberId;
   const switching = selected && !reportsForCurrent;
   const reports = selected && reportsForCurrent ? reportsState.reports : undefined;
-  const members = ready ? sortMembers(reportsState.members) : [];
+  const members = ready ? reportsState.members : [];
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>

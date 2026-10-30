@@ -21,7 +21,7 @@ import (
 )
 
 // fakeMemberStore 内存版成员存储:行为对齐 storage 实现——创建序 id 升序、
-// 不做孩子优先重排(排序口径由客户端做)、PATCH 只改传入字段、缺失返回 nil。
+// PATCH 只改传入字段、缺失返回 nil。
 type fakeMemberStore struct {
 	mu     sync.Mutex
 	nextID int64
@@ -166,10 +166,10 @@ func TestServeMembersCRUD(t *testing.T) {
 		t.Fatalf("created ids = %d/%d, want 2/3", adult.MemberID, second.MemberID)
 	}
 
-	// 列表口径 = 创建序(id 升序):孩子混序创建也不重排——孩子优先是客户端的事。
+	// 列表口径 = 创建序(id 升序):混序创建也不重排。
 	wantOrder := []int64{1, 2, 3}
 	if got := memberIDs(t, srv); !slices.Equal(got, wantOrder) {
-		t.Fatalf("list order = %v, want %v (creation order, client sorts children first)", got, wantOrder)
+		t.Fatalf("list order = %v, want %v (creation order)", got, wantOrder)
 	}
 
 	// 改名:只传 name,is_child 与 created_at 保持原样。

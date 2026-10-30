@@ -9,7 +9,6 @@ import { sharedStyles } from '../components/styles';
 import { colors } from '../components/theme';
 import { MemberChips } from '../members/components';
 import { useCurrentMember } from '../members/CurrentMemberContext';
-import { sortMembers } from '../members/order';
 import { pickImage, type ImageSource, type PickedImage } from '../platform/imagePicker';
 import { needsReview } from '../review/items';
 import { uploadResultText, uploadWaitText } from '../reports/status';
@@ -239,7 +238,7 @@ export default function UploadScreen() {
     [phase],
   );
 
-  const members = state.status === 'ready' ? sortMembers(state.members) : [];
+  const members = state.status === 'ready' ? state.members : [];
   // 仅当持久化的当前成员仍在服务端列表里才算已选择(清库/换后端后旧 id 可能已失效)。
   const selectedMemberId = members.find((m) => m.member_id === currentMemberId)?.member_id;
 

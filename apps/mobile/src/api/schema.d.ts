@@ -33,7 +33,7 @@ export interface paths {
         };
         /**
          * 成员列表(B1)
-         * @description 家庭档案入口;排序客户端做(孩子优先、其余按创建序)。
+         * @description 家庭档案入口;列表按 member_id 升序(创建序)返回。
          */
         get: operations["listMembers"];
         put?: never;
@@ -273,7 +273,7 @@ export interface components {
             is_child: boolean;
             /**
              * Format: date-time
-             * @description 创建时间(RFC3339;列表其余排序口径由客户端做)
+             * @description 创建时间(RFC3339;列表按 member_id 升序返回,created_at 仅展示)
              */
             created_at: string;
         };

@@ -8,11 +8,10 @@ import { sharedStyles } from '../components/styles';
 import { colors } from '../components/theme';
 import { MemberCreateForm, MemberEditRow, MemberRow, type EditDraft } from '../members/components';
 import { useCurrentMember } from '../members/CurrentMemberContext';
-import { sortMembers } from '../members/order';
 
 // 成员页(票 05):几十秒配好全家档案——建成员(显示名 + 是否孩子)、改名、改档;
 // 点选当前成员(经 CurrentMemberContext 供时间线过滤与上传归属默认消费,票 06+)。
-// 列表孩子优先、其余按创建序;无删除入口(契约与交互都不提供成员删除)。
+// 列表按创建序;无删除入口(契约与交互都不提供成员删除)。
 
 type ScreenState =
   | { status: 'loading' }
@@ -102,7 +101,7 @@ export default function MembersScreen() {
     });
   }, [editing, runAction, reload]);
 
-  const members = state.status === 'ready' ? sortMembers(state.members) : [];
+  const members = state.status === 'ready' ? state.members : [];
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>

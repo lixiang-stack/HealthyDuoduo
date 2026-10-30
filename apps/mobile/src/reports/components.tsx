@@ -19,7 +19,6 @@ import { LineZoom } from '../components/LineZoom';
 import { sharedStyles } from '../components/styles';
 import { colors } from '../components/theme';
 import { MemberChips } from '../members/components';
-import { sortMembers } from '../members/order';
 import { needsReassign, reassignConfirmText } from './manage';
 import { reportPanelLabels, reportTypeNote } from './panelOverview';
 import { EXAM_NAME_KIND, SECTION_LABELS } from './sections';
@@ -133,7 +132,7 @@ export function ReportSectionCard({
   );
 }
 
-// ReportManageCard 报告自愈操作卡(详情页;票 10)。改归属:展开成员选择(孩子优先,
+// ReportManageCard 报告自愈操作卡(详情页;票 10)。改归属:展开成员选择(按创建序,
 // 与时间线/上传同一排序)——点选只改选择态(与全 app 成员 chips 的「选择」语义一致),
 // 「确认改派」才提交(确认行显式给出 from→to,提交后时间线上移到该成员;维护者
 // 2026-10-18 增补);删除:确认步骤防误触,确认后报告与指标项、修正记录一并清除,
@@ -163,7 +162,7 @@ export function ReportManageCard({
       setBusy(true);
       setError(undefined);
       try {
-        setMembers(sortMembers(await listMembers(client)));
+        setMembers(await listMembers(client));
       } catch (loadError) {
         setError(message(loadError));
       } finally {

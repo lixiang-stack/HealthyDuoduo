@@ -6,7 +6,6 @@ import { sharedStyles } from '../components/styles';
 import { colors } from '../components/theme';
 import { MemberChips } from '../members/components';
 import { useCurrentMember } from '../members/CurrentMemberContext';
-import { sortMembers } from '../members/order';
 import { sortReports } from './order';
 import { filterReports, parseReportFilter, pendingSummary } from './overview';
 import {
@@ -37,7 +36,7 @@ export function ArchiveScreen({ view }: { view: ArchiveView }) {
   const panel = parsePanelParam(params.panel);
   const tabBarHeight = useBottomTabBarHeight();
 
-  const members = state.status === 'ready' ? sortMembers(state.members) : [];
+  const members = state.status === 'ready' ? state.members : [];
   const selectedMemberId =
     state.status === 'ready' && state.hasCurrentMember ? currentMemberId : undefined;
   const reports = state.status === 'ready' ? sortReports(state.reports) : [];
