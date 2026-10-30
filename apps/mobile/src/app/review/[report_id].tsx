@@ -3,6 +3,7 @@ import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View
 
 import { sharedStyles } from '../../components/styles';
 import { colors } from '../../components/theme';
+import { useImageViewer } from '../../components/imageViewer/ImageViewerProvider';
 import { ReportCard } from '../../reports/components';
 import { useReportData } from '../../reports/useReportData';
 import { ReviewItemCard } from '../../review/components';
@@ -17,6 +18,7 @@ export default function ReviewScreen() {
   const params = useLocalSearchParams();
   const reportId = typeof params.report_id === 'string' ? params.report_id : undefined;
   const { state, reload, applyReview } = useReportData(reportId);
+  const { open } = useImageViewer();
 
   const report = state.status === 'ready' ? state.report : undefined;
   const pending = report ? pendingItems(report.items) : [];
@@ -52,7 +54,15 @@ export default function ReviewScreen() {
           {report.status === 'failed' ? (
             <View style={styles.card}>
               <Text style={sharedStyles.muted}>这张检查单没有识别出可核对的指标项。</Text>
-              <Image source={{ uri: state.imageUrl }} style={styles.image} resizeMode="contain" />
+              <Pressable
+                testID="review-image-open"
+                accessibilityRole="button"
+                accessibilityLabel="放大查看检查单原图"
+                onPress={() => open(state.imageUrl, '检查单原图')}
+              >
+                <Image source={{ uri: state.imageUrl }} style={styles.image} resizeMode="contain" />
+              </Pressable>
+              <Text style={styles.hint}>点按原图放大查看</Text>
               <Link href="/upload" style={styles.link}>
                 重新拍照上传(生成新报告,原报告与识别记录保留)
               </Link>
@@ -111,6 +121,7 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 13, color: colors.muted },
   fail: { fontSize: 13, color: colors.fail, lineHeight: 20 },
   link: { color: colors.accent, fontSize: 15 },
+  hint: { fontSize: 12, color: colors.muted },
   image: {
     width: '100%',
     height: 320,

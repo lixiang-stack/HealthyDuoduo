@@ -1,4 +1,5 @@
 import { fireEvent, screen } from '@testing-library/react-native';
+import { Image } from 'react-native';
 
 import { resolveApiClient } from '../../api/resolveClient';
 import ReportDetailScreen from '../../app/report/[report_id]';
@@ -27,6 +28,10 @@ function useReport(detail: ReturnType<typeof makeReportDetail>) {
 beforeEach(() => {
   jest.clearAllMocks();
   mockUseLocalSearchParams.mockReturnValue({ report_id: 'r1' });
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
 });
 
 describe('ReportDetailScreen', () => {
@@ -78,6 +83,31 @@ describe('ReportDetailScreen', () => {
     expect(screen.getByTestId('report-image')).toBeTruthy();
     expect(screen.getByText(/重新拍照上传/)).toBeTruthy();
     expect(screen.queryByTestId('report-items-title')).toBeNull();
+  });
+
+  it('opens the full-screen viewer from the report image', async () => {
+    jest
+      .spyOn(Image, 'getSize')
+      .mockImplementation(((_url: string, success: (width: number, height: number) => void) =>
+        success(1000, 1500)) as typeof Image.getSize);
+    useReport(
+      makeReportDetail({
+        status: 'failed',
+        fail_reason: '图像无法识别',
+        panels: [],
+        items: [],
+      }),
+    );
+
+    await renderScreen(<ReportDetailScreen />);
+
+    fireEvent.press(await screen.findByTestId('report-image-open'));
+    const root = await screen.findByTestId('image-viewer-root');
+    fireEvent(root, 'layout', {
+      nativeEvent: { layout: { width: 390, height: 844 } },
+    });
+
+    expect(await screen.findByTestId('image-viewer-image')).toBeTruthy();
   });
 
   it('renders narrative sections without an items section', async () => {

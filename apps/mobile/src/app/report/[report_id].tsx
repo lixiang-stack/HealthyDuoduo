@@ -4,6 +4,7 @@ import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View
 
 import { sharedStyles } from '../../components/styles';
 import { colors } from '../../components/theme';
+import { useImageViewer } from '../../components/imageViewer/ImageViewerProvider';
 import { isImagingReport } from '../../reports/category';
 import { ReportCard, ReportManageCard, ReportSectionCard } from '../../reports/components';
 import { abnormalItemCount, reportItemGroups } from '../../reports/panelOverview';
@@ -24,6 +25,7 @@ export default function ReportDetailScreen() {
   const params = useLocalSearchParams();
   const reportId = typeof params.report_id === 'string' ? params.report_id : undefined;
   const { state, reload, applyReview, applyReassign } = useReportData(reportId);
+  const { open } = useImageViewer();
   // undefined = 按报告状态缺省(failed 展开、其余折叠);点按后由用户覆盖。
   const [imageOverride, setImageOverride] = useState<boolean>();
 
@@ -136,12 +138,22 @@ export default function ReportDetailScreen() {
             <Text style={styles.link}>{imageVisible ? '收起检查单原图' : '查看检查单原图'}</Text>
           </Pressable>
           {imageVisible ? (
-            <Image
-              testID="report-image"
-              source={{ uri: state.imageUrl }}
-              style={styles.image}
-              resizeMode="contain"
-            />
+            <>
+              <Pressable
+                testID="report-image-open"
+                accessibilityRole="button"
+                accessibilityLabel="放大查看检查单原图"
+                onPress={() => open(state.imageUrl, '检查单原图')}
+              >
+                <Image
+                  testID="report-image"
+                  source={{ uri: state.imageUrl }}
+                  style={styles.image}
+                  resizeMode="contain"
+                />
+              </Pressable>
+              <Text style={styles.hint}>点按原图放大查看</Text>
+            </>
           ) : null}
 
           {/* 自愈操作(票 10):改归属(时间线移位)与删除(确认后回时间线,报告已不在)。 */}
@@ -182,6 +194,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: 8,
   },
+  hint: { fontSize: 12, color: colors.muted },
   button: {
     alignSelf: 'flex-start',
     paddingVertical: 10,

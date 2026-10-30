@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 
 import { LineZoom } from '../../components/LineZoom';
+import { useImageViewer } from '../../components/imageViewer/ImageViewerProvider';
 import { sharedStyles } from '../../components/styles';
 import { colors } from '../../components/theme';
 import { FLAG_COLORS } from '../../reports/colors';
@@ -33,6 +34,7 @@ export default function ReportImageScreen() {
       ? params.report_date
       : undefined;
   const { state, reload } = useReportData(reportId);
+  const { open } = useImageViewer();
   const [full, setFull] = useState(false);
   const [fullFailed, setFullFailed] = useState(false);
 
@@ -86,13 +88,20 @@ export default function ReportImageScreen() {
 
             {full || !focusItem ? (
               <>
-                <Image
-                  testID="report-image-full"
-                  source={{ uri: state.imageUrl }}
-                  style={styles.fullImage as ImageStyle}
-                  resizeMode="contain"
-                  onError={() => setFullFailed(true)}
-                />
+                <Pressable
+                  testID="report-image-full-open"
+                  accessibilityRole="button"
+                  accessibilityLabel="放大查看检查单原图"
+                  onPress={() => open(state.imageUrl, '检查单原图')}
+                >
+                  <Image
+                    testID="report-image-full"
+                    source={{ uri: state.imageUrl }}
+                    style={styles.fullImage as ImageStyle}
+                    resizeMode="contain"
+                    onError={() => setFullFailed(true)}
+                  />
+                </Pressable>
                 {fullFailed ? (
                   <Text style={styles.fail}>图像载入失败,以识别值为准。</Text>
                 ) : null}
@@ -109,12 +118,12 @@ export default function ReportImageScreen() {
 
             <Text style={styles.hint}>
               {full
-                ? '整张检查单;点「定位到该项」回到该指标行。'
+                ? '整张检查单;点按放大,点「定位到该项」回到该指标行。'
                 : hasFocus
-                  ? '蓝框 = 该指标在原始图像中的位置;原图优先,识别值只作辅助。'
+                  ? '蓝框 = 该指标在原始图像中的位置;点按可放大,原图优先,识别值只作辅助。'
                   : item
-                    ? '这项没有原文行定位,已显示整张检查单。'
-                    : '没有找到对应指标,已显示整张检查单。'}
+                    ? '这项没有原文行定位,已显示整张检查单;点按可放大。'
+                    : '没有找到对应指标,已显示整张检查单;点按可放大。'}
             </Text>
 
             {item ? (
