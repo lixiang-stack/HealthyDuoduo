@@ -34,6 +34,8 @@ pre-commit:
       run: cd apps/mobile && npm run codegen && git diff --exit-code -- src/api/schema.d.ts
     docs:
       run: python3 scripts/check-docs.py --staged
+    path-case:
+      run: python3 scripts/check-path-case.py --staged
 
 pre-merge-commit:
   commands:

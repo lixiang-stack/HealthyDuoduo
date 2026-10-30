@@ -7,6 +7,7 @@
   样本 id 前缀仍按细类语义命名,与 report_type 解耦;掩码语料无原图、编号接续该细类图像样本。)
 
 - 只收**脱敏**图像(NF-01);未脱敏原图永不入库、永不提交本目录。
+- 在原型 / 截图中复用样本图像时,按 `docs/agents/prototype-driven-development.md` 的「隐私与截图脱敏」裁掉或遮住页眉 / 人口学信息。
 - 目录约定(实施计划 §7-3):
   - `samples/<id>.jpg`
   - `samples/expected/ocr/<id>.json`(P1 golden)
