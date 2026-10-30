@@ -68,7 +68,7 @@ export function ZoomableImageViewer({
       <StatusBar style="light" />
       <View
         testID="image-viewer-root"
-        style={styles.root}
+        style={styles.screen}
         onLayout={(event) => {
           const { width, height } = event.nativeEvent.layout;
           setViewport({ width, height });
@@ -226,7 +226,14 @@ function ZoomableCanvas({
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.text, justifyContent: 'center', alignItems: 'center' },
+  root: { flex: 1, backgroundColor: colors.text },
+  screen: {
+    flex: 1,
+    width: '100%',
+    backgroundColor: colors.text,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   canvas: { flex: 1, width: '100%', height: '100%', overflow: 'hidden' },
   frame: { position: 'absolute' },
   close: {
