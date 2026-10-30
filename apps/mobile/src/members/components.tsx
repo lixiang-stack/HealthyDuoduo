@@ -1,6 +1,6 @@
-// 成员页展示组件(票 05):成员行、行内编辑、添加成员表单。
-// 共享一份控件样式;成员行点按设为当前成员,无删除入口(契约与交互都不提供)。
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+// 成员页展示组件(票 05):成员行、行内编辑、删除确认、添加成员表单。
+// 共享一份控件样式;成员行点按设为当前成员。
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import type { Member } from '../api/members';
 import { sharedStyles } from '../components/styles';
@@ -9,19 +9,21 @@ import { colors } from '../components/theme';
 /** 行内编辑草稿;memberId 定位被编辑行。 */
 export type EditDraft = { memberId: number; name: string; isChild: boolean };
 
-// 成员行:点按设为当前成员,「编辑」进入行内改名/改档。
+// 成员行:点按设为当前成员,「编辑」进入行内改名/改档,「删除」进入确认面板。
 export function MemberRow({
   member,
   selected,
   disabled,
   onSelect,
   onEdit,
+  onDelete,
 }: {
   member: Member;
   selected: boolean;
   disabled: boolean;
   onSelect: () => void;
   onEdit: () => void;
+  onDelete: () => void;
 }) {
   return (
     <View testID={`member-row-${member.member_id}`} style={[styles.card, selected && styles.cardSelected]}>
@@ -37,9 +39,18 @@ export function MemberRow({
           {selected ? ' · 当前成员' : ''}
         </Text>
       </Pressable>
-      <Pressable onPress={onEdit} disabled={disabled}>
-        <Text style={styles.cardAction}>编辑</Text>
-      </Pressable>
+      <View style={styles.cardActions}>
+        <Pressable onPress={onEdit} disabled={disabled}>
+          <Text style={styles.cardAction}>编辑</Text>
+        </Pressable>
+        <Pressable
+          testID={`member-delete-${member.member_id}`}
+          onPress={onDelete}
+          disabled={disabled}
+        >
+          <Text style={styles.cardDangerText}>删除</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -80,6 +91,97 @@ export function MemberEditRow({
           <Text style={styles.cardAction}>取消</Text>
         </Pressable>
       </View>
+    </View>
+  );
+}
+
+// 删除成员确认面板:先显示报告数,再由家长确认不可恢复的级联删除。
+export function MemberDeleteRow({
+  member,
+  reportCount,
+  loading,
+  error,
+  busy,
+  onRetry,
+  onConfirm,
+  onCancel,
+}: {
+  member: Member;
+  reportCount: number | undefined;
+  loading: boolean;
+  error: string | undefined;
+  busy: boolean;
+  onRetry: () => void;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <View testID={`member-delete-panel-${member.member_id}`} style={styles.cardDanger}>
+      <Text style={styles.memberName}>{member.name}</Text>
+      {loading ? (
+        <>
+          <View style={sharedStyles.horizontal}>
+            <ActivityIndicator />
+            <Text style={sharedStyles.muted}>正在读取该成员的报告…</Text>
+          </View>
+          <Pressable
+            testID={`member-delete-cancel-${member.member_id}`}
+            style={styles.buttonGhost}
+            onPress={onCancel}
+            disabled={busy}
+          >
+            <Text style={styles.cardAction}>取消</Text>
+          </Pressable>
+        </>
+      ) : error ? (
+        <>
+          <Text style={styles.fail}>读取报告失败:{error}</Text>
+          <View style={sharedStyles.horizontal}>
+            <Pressable
+              testID={`member-delete-retry-${member.member_id}`}
+              style={styles.buttonGhost}
+              onPress={onRetry}
+              disabled={busy}
+            >
+              <Text style={styles.cardAction}>重试</Text>
+            </Pressable>
+            <Pressable
+              testID={`member-delete-cancel-${member.member_id}`}
+              style={styles.buttonGhost}
+              onPress={onCancel}
+              disabled={busy}
+            >
+              <Text style={styles.cardAction}>取消</Text>
+            </Pressable>
+          </View>
+        </>
+      ) : reportCount !== undefined ? (
+        <>
+          <Text style={styles.deleteWarning}>
+            {reportCount > 0
+              ? `删除成员「${member.name}」及其 ${reportCount} 份报告？报告、指标项与修正记录将一并清除；原始图像与识别历史保留。此操作不可恢复。`
+              : `删除成员「${member.name}」？此操作不可恢复。`}
+          </Text>
+          <View style={sharedStyles.horizontal}>
+            <Pressable
+              testID={`member-delete-confirm-${member.member_id}`}
+              style={[styles.dangerButton, busy && styles.buttonDisabled]}
+              onPress={onConfirm}
+              disabled={busy}
+            >
+              <Text style={styles.buttonText}>确认删除</Text>
+            </Pressable>
+            <Pressable
+              testID={`member-delete-cancel-${member.member_id}`}
+              style={styles.buttonGhost}
+              onPress={onCancel}
+              disabled={busy}
+            >
+              <Text style={styles.cardAction}>取消</Text>
+            </Pressable>
+          </View>
+        </>
+      ) : null}
     </View>
   );
 }
@@ -193,6 +295,8 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   cardSelected: { borderColor: colors.accent },
+  cardDanger: { borderWidth: 1, borderColor: colors.fail, borderRadius: 8, padding: 12, gap: 8 },
+  cardActions: { flexDirection: 'row', gap: 12 },
   cardEditing: { borderWidth: 1, borderColor: colors.accent, borderRadius: 8, padding: 12, gap: 8 },
   cardForm: {
     borderWidth: 1,
@@ -204,8 +308,11 @@ const styles = StyleSheet.create({
   },
   cardMain: { flex: 1, gap: 2 },
   cardAction: { color: colors.accent, fontSize: 15 },
+  cardDangerText: { color: colors.fail, fontSize: 15 },
   memberName: { fontSize: 16, color: colors.text },
   memberMeta: { fontSize: 13, color: colors.muted },
+  deleteWarning: { fontSize: 13, color: colors.text, lineHeight: 20 },
+  fail: { fontSize: 13, color: colors.fail, lineHeight: 20 },
   chip: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -224,6 +331,13 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   buttonDisabled: { backgroundColor: colors.border },
+  dangerButton: {
+    alignSelf: 'flex-start',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    backgroundColor: colors.fail,
+    borderRadius: 8,
+  },
   buttonGhost: { paddingVertical: 10, paddingHorizontal: 16 },
   buttonText: { color: colors.onAccent, fontSize: 15 },
 });

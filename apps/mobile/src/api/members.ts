@@ -1,7 +1,7 @@
-// 成员 API 封装(GET/POST /members 与 PATCH /members/{member_id};契约 schemas/openapi.yaml)。
-// 失败一律抛 Error:解包统一走 client 的 unwrap(契约说明或 HTTP 状态);页面层负责呈现。
+// 成员 API 封装(GET/POST /members、PATCH/DELETE /members/{member_id};契约 schemas/openapi.yaml)。
+// 失败一律抛 Error:解包统一走 client 的 unwrap / assertOk(契约说明或 HTTP 状态);页面层负责呈现。
 import type { ApiClient } from './client';
-import { unwrap } from './client';
+import { assertOk, unwrap } from './client';
 import type { components } from './schema';
 
 export type Member = components['schemas']['Member'];
@@ -25,6 +25,15 @@ export async function updateMember(
     await client.PATCH('/members/{member_id}', {
       params: { path: { member_id: memberId } },
       body,
+    }),
+  );
+}
+
+/** 删除成员及其全部报告;成功 204,未知成员抛 404 文案。 */
+export async function deleteMember(client: ApiClient, memberId: number): Promise<void> {
+  assertOk(
+    await client.DELETE('/members/{member_id}', {
+      params: { path: { member_id: memberId } },
     }),
   );
 }

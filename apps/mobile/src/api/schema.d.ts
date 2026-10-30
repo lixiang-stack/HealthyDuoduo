@@ -58,12 +58,17 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * 删除成员
+         * @description 硬删成员及其全部报告(报告/指标项/修正对级联;原始图像与 OCR 历史保留)。
+         *     不可恢复。成员不存在返回 404。
+         */
+        delete: operations["deleteMember"];
         options?: never;
         head?: never;
         /**
          * 改名 / 改是否孩子
-         * @description 至少一项;不提供成员删除。
+         * @description 至少一项;删除成员见 DELETE。
          */
         patch: operations["updateMember"];
         trace?: never;
@@ -264,7 +269,7 @@ export interface components {
         Member: {
             /**
              * Format: int64
-             * @description 外部句柄(数据库自增);不重用、不删除
+             * @description 外部句柄(数据库自增);不重用
              */
             member_id: number;
             /** @description 显示名(家庭真实称呼) */
@@ -675,6 +680,28 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+        };
+    };
+    deleteMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                member_id: components["parameters"]["MemberID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 已删除 */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
         };
     };
     updateMember: {

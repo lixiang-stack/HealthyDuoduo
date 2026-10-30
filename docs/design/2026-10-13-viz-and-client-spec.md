@@ -132,7 +132,8 @@ App / 验证环境
 #### 成员（P0）
 
 - 成员列表与切换；按创建序展示。  
-- 最小模型（1.3 定稿）：**显示名 + 是否孩子**两档信息，仅此；无生日/头像，不提供成员删除（可改名）。排序 = 创建序（服务端按 member_id 升序返回）。2026-10-30 更新：成员排序取消孩子优先，统一按创建序；`is_child` 仅作标识，不影响排序。  
+- 最小模型（1.3 定稿）：**显示名 + 是否孩子**两档信息，仅此；无生日/头像，可改名、可删除（见下）。排序 = 创建序（服务端按 member_id 升序返回）。2026-10-30 更新：成员排序取消孩子优先，统一按创建序；`is_child` 仅作标识，不影响排序。  
+- 成员可删除；删除成员会一并删除其全部报告（报告、指标项、修正记录），原图与 OCR 历史保留。删除前 App 显示报告份数并明确不可恢复。  
 - 一份报告恰好归属一个成员；多成员同单（如家庭套餐混单）是已知限制（P2+）。  
 - 选中成员决定时间线、上传归属、趋势范围（默认当前成员）。  
 
@@ -224,9 +225,10 @@ App / 验证环境
 | 方法与路径 | 用途 | 约定 |
 | --- | --- | --- |
 | `GET /api/v1/health` | 扫码后连通性校验 | `{ok, version}` |
-| `GET /api/v1/members` | 成员列表 | 返回 `is_child`、`created_at`；排序客户端做 |
+| `GET /api/v1/members` | 成员列表 | 返回 `is_child`、`created_at`；服务端按创建序返回 |
 | `POST /api/v1/members` | 建成员 | `{name, is_child}` |
-| `PATCH /api/v1/members/{id}` | 改名/改是否孩子 | 不提供成员删除 |
+| `PATCH /api/v1/members/{id}` | 改名/改是否孩子 | 至少一项 |
+| `DELETE /api/v1/members/{id}` | 删除成员 | 级联删除其全部报告；原图与 OCR 历史保留；不可恢复 |
 | `POST /api/v1/reports` | 上传（multipart：`image` + `member_id`） | 同步返回完整报告（NF-04 <3s）；sha256 命中 → `200 + duplicate:true` + 已有报告 |
 | `GET /api/v1/reports?member_id=` | 时间线 | 状态、`unreviewed_low_confidence_count`、按 flag 异常计数 |
 | `GET /api/v1/reports/{id}` | 详情 | items 含 `item_id`、核对状态、`ocr_lines: [{line, box}]`、`prev`（B2-lite Δ 上一值） |

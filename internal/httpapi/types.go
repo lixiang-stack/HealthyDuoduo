@@ -17,7 +17,7 @@ type MemberCreate struct {
 	IsChild bool   `json:"is_child"`
 }
 
-// MemberUpdate PATCH /members/{member_id} 请求体:至少一项;不提供成员删除。
+// MemberUpdate PATCH /members/{member_id} 请求体:至少一项;删除成员见 DELETE。
 type MemberUpdate struct {
 	Name    *string `json:"name,omitempty"`
 	IsChild *bool   `json:"is_child,omitempty"`

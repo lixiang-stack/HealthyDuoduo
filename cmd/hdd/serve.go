@@ -31,10 +31,11 @@ func newServeHandler(d *deps) http.Handler {
 		// 进程能应答即健康:deps 未就绪时 serve 根本不启动(openDeps fail-fast)。
 		writeJSON(w, http.StatusOK, healthResponse{OK: true, Version: version})
 	})
-	// 成员端点(票 05):建/列/改;无删除(契约冻结)。
+	// 成员端点(票 05):建/列/改/删;删除级联报告(原图与 OCR 留痕)。
 	mux.HandleFunc("GET /api/v1/members", handleListMembers(d.members))
 	mux.HandleFunc("POST /api/v1/members", handleCreateMember(d.members))
 	mux.HandleFunc("PATCH /api/v1/members/{member_id}", handleUpdateMember(d.members))
+	mux.HandleFunc("DELETE /api/v1/members/{member_id}", handleDeleteMember(d.members))
 	// 趋势端点(票 02):成员维度指标时序(unit 门控;无点 = 200 + [])。
 	mux.HandleFunc("GET /api/v1/members/{member_id}/indicators/{name}/trend", handleGetTrend(d))
 	// 项目浏览端点(panel-browse 票 03):项目列表与项目详情(按项目视图)。
