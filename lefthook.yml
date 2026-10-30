@@ -6,6 +6,8 @@ pre-commit:
   commands:
     git-policy:
       run: bash scripts/git/check-commit.sh
+    worktree-path:
+      run: bash scripts/git/check-worktree.sh
     gofmt:
       glob: "**/*.go"
       run: |
