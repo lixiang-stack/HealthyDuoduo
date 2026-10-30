@@ -53,7 +53,7 @@ type Store interface {
 }
 
 // MemberStore 成员持久化边界(serve 成员端点;viz-and-client 票 05)。
-// 列表按创建序返回,孩子优先由客户端做(契约排序口径);无删除操作——契约不提供。
+// 列表按创建序返回(契约排序口径);无删除操作——契约不提供。
 type MemberStore interface {
 	// CreateMember 建成员(名 + 是否孩子两档;id/created_at 由存储产生)。
 	CreateMember(ctx context.Context, name string, isChild bool) (*Member, error)

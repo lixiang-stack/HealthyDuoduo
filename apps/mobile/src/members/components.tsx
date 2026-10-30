@@ -139,7 +139,7 @@ function ChildPicker({ isChild, onChange }: { isChild: boolean; onChange: (isChi
 }
 
 // 成员选择条(时间线过滤与上传归属共用的紧凑控件):点按切换选中成员;
-// 排序由调用方先做(sortMembers),组件只呈现。
+// 排序由服务端给(创建序),组件只呈现。
 export function MemberChips({
   members,
   selectedId,

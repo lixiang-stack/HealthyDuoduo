@@ -1,6 +1,6 @@
 // 成员端点(GET/POST /api/v1/members 与 PATCH /api/v1/members/{member_id};
 // 契约冻结于 schemas/openapi.yaml,viz-and-client 票 05 实现)。
-// 列表按创建序(id 升序)返回,孩子优先由客户端做;无删除入口(契约层就没有 DELETE)。
+// 列表按创建序(id 升序)返回;无删除入口(契约层就没有 DELETE)。
 package main
 
 import (

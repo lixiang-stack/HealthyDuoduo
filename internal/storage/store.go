@@ -222,8 +222,8 @@ const (
 		 (report_sha256, name, panel, value, unit, ref_range, method, flag, flag_reason, low_confidence, raw_text, ocr_line_numbers)
 		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`
 
-	// 成员(迁移 0004;显示名 + 是否孩子两档,无删除):列表按 id 升序 = 创建序返回,
-	// 孩子优先由客户端做;改动用 COALESCE 只覆盖传入字段(nil = 保持不变)。
+	// 成员(迁移 0004;显示名 + 是否孩子两档,无删除):列表按 id 升序 = 创建序返回;
+	// 改动用 COALESCE 只覆盖传入字段(nil = 保持不变)。
 	sqlMemberInsert = `INSERT INTO members (name, is_child) VALUES ($1,$2)
 		 RETURNING id, created_at`
 
@@ -774,7 +774,7 @@ func (s *Store) CreateMember(ctx context.Context, name string, isChild bool) (*p
 	return &m, nil
 }
 
-// ListMembers 全量成员按创建序(id 升序);孩子优先由客户端做(契约排序口径)。
+// ListMembers 全量成员按创建序(id 升序;契约排序口径)。
 func (s *Store) ListMembers(ctx context.Context) ([]pipeline.Member, error) {
 	rows, err := s.pool.Query(ctx, sqlMembersList)
 	if err != nil {

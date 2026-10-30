@@ -11,7 +11,6 @@ import {
   type ReportSummary,
 } from '../api/reports';
 import { resolveApiClient } from '../api/resolveClient';
-import { sortMembers } from '../members/order';
 
 export type FamilyMemberOverview = {
   member: Member;
@@ -44,7 +43,7 @@ export function useFamilyOverview(): {
       return;
     }
     try {
-      const members = sortMembers(await listMembers(resolved.client));
+      const members = await listMembers(resolved.client);
       const overviews = await Promise.all(
         members.map(async (member) => {
           const [reports, panels] = await Promise.all([

@@ -23,7 +23,7 @@ type MemberUpdate struct {
 	IsChild *bool   `json:"is_child,omitempty"`
 }
 
-// MembersList GET /members 响应信封;排序(孩子优先、其余按创建序)由客户端做。
+// MembersList GET /members 响应信封;列表按 member_id 升序(创建序)返回。
 type MembersList struct {
 	Members []Member `json:"members"`
 }

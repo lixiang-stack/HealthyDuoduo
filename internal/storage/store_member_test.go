@@ -55,7 +55,7 @@ func TestMemberStoreSmoke(t *testing.T) {
 		t.Fatalf("create adult: %v", err)
 	}
 
-	// 列表 = 创建序(id 升序):孩子不前置(孩子优先是客户端的事)。
+	// 列表 = 创建序(id 升序),不因 is_child 重排。
 	members, err := st.ListMembers(ctx)
 	if err != nil {
 		t.Fatal(err)
