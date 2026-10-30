@@ -1,5 +1,7 @@
 // Shared Jest doubles for screen-level tests. Individual tests mock the API
 // client at the resolveApiClient seam; router/storage/native shells are inert.
+jest.mock('react-native-worklets', () => require('react-native-worklets/src/mock'));
+
 jest.mock('expo-router', () => {
   const actual = jest.requireActual('expo-router');
   return { ...actual, ...require('./src/test/routerMock').routerModule };

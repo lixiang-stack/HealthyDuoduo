@@ -1,5 +1,6 @@
 /** @type {import('jest').Config} */
 module.exports = {
   preset: 'jest-expo',
-  setupFiles: ['<rootDir>/jest.setup.ts'],
+  resolver: 'react-native-reanimated/jest/resolver',
+  setupFiles: ['react-native-gesture-handler/jestSetup.js', '<rootDir>/jest.setup.ts'],
 };
