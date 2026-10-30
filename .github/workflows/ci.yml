@@ -67,5 +67,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      - name: check path case
+        run: python3 scripts/check-path-case.py
       - name: check markdown
         run: python3 scripts/check-docs.py
