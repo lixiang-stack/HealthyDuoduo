@@ -114,7 +114,7 @@
 核心：**提交前测试必须全绿**；优先测行为，覆盖边界与异常。
 
 - 修 bug 先写复现测试；改既有函数先读其单元测试；失败测试必须修好或说明，不跳过。
-- 关键逻辑必有单元测试；系统行为按 `docs/agents/e2e.md` / `docs/agents/app-e2e.md` 验证。
+- 关键逻辑必有单元测试；数据链路按 `docs/agents/e2e.md` 验证；App 屏幕逻辑用 `npm test` 的 RNTL 测试，合并 UI 改动前按 `apps/mobile/ANDROID.md` 做真机 smoke。
 - 测试数据尽量用真实 golden，不用凭空捏造的占位数据。
 
 ## 文档规则
@@ -145,7 +145,7 @@
 
 ### E2E testing
 
-两条回路：**Pipeline E2E**（recognizer 词典/规则、hdd CLI 的数据链路，共享栈 + 快照）见 `docs/agents/e2e.md`；**App E2E**（家长侧 App UI，Expo Web + 专用栈，`npm run e2e`）见 `docs/agents/app-e2e.md`。
+**Pipeline E2E**（recognizer 词典/规则、hdd CLI 的数据链路，共享栈 + 快照）见 `docs/agents/e2e.md`。App UI 不保留 Web E2E：屏幕逻辑由 `apps/mobile/src/test/` 的 RNTL 测试覆盖，真机验收按 `apps/mobile/ANDROID.md` 的人工 smoke 清单；决策见 `docs/adr/0013-native-only-acceptance.md`。
 
 ### Prototype-driven development
 

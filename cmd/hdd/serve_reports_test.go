@@ -438,7 +438,7 @@ func newReportsTestServer(t *testing.T) (*httptest.Server, *fakeServeStore, *fak
 	rec := &fakeUploadRecognizer{report: sampleUploadReport()}
 	ms := &fakeMemberStore{}
 	d := &deps{store: st, members: ms, reports: st, rec: rec, obj: fakeObjectsCLI{objects: map[string][]byte{}}}
-	srv := httptest.NewServer(newServeHandler(d, ""))
+	srv := httptest.NewServer(newServeHandler(d))
 	t.Cleanup(srv.Close)
 	return srv, st, rec, ms
 }
@@ -1289,7 +1289,7 @@ func TestServeReassignConcurrentDelete(t *testing.T) {
 	}}, nil)
 	d := &deps{store: st, members: &fakeMemberStore{}, reports: reassignRaceStore{st},
 		rec: &fakeUploadRecognizer{}, obj: fakeObjectsCLI{objects: map[string][]byte{}}}
-	srv := httptest.NewServer(newServeHandler(d, ""))
+	srv := httptest.NewServer(newServeHandler(d))
 	t.Cleanup(srv.Close)
 	createOne(t, srv, `{"name":"小虎","is_child":true}`)
 

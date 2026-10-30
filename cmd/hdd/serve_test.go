@@ -15,7 +15,7 @@ import (
 // TestServeHealth GET /api/v1/health → 200 + {ok, version}(配对连通性校验契约)。
 func TestServeHealth(t *testing.T) {
 	d := &deps{store: fakeStoreCLI{}, rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
-	srv := httptest.NewServer(newServeHandler(d, ""))
+	srv := httptest.NewServer(newServeHandler(d))
 	defer srv.Close()
 
 	resp, err := http.Get(srv.URL + "/api/v1/health")
@@ -44,7 +44,7 @@ func TestServeHealth(t *testing.T) {
 // TestServeHealthPrefixFrozen API 前缀 /api/v1 冻结:裸 /health 不得响应。
 func TestServeHealthPrefixFrozen(t *testing.T) {
 	d := &deps{store: fakeStoreCLI{}, rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
-	srv := httptest.NewServer(newServeHandler(d, ""))
+	srv := httptest.NewServer(newServeHandler(d))
 	defer srv.Close()
 
 	resp, err := http.Get(srv.URL + "/health")
@@ -54,79 +54,6 @@ func TestServeHealthPrefixFrozen(t *testing.T) {
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusNotFound {
 		t.Errorf("status = %d, want 404 (prefix /api/v1 is contractual)", resp.StatusCode)
-	}
-}
-
-// TestServeCORSOffByDefault CORS 缺省关闭:响应不带 Access-Control-Allow-Origin,
-// 预检仍走 mux 的 405(ADR-0006 局域网无鉴权——常驻实例不放开跨源读取)。
-func TestServeCORSOffByDefault(t *testing.T) {
-	d := &deps{store: fakeStoreCLI{}, rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
-	srv := httptest.NewServer(newServeHandler(d, ""))
-	defer srv.Close()
-
-	resp, err := http.Get(srv.URL + "/api/v1/health")
-	if err != nil {
-		t.Fatalf("GET /api/v1/health: %v", err)
-	}
-	defer resp.Body.Close()
-	if got := resp.Header.Get("Access-Control-Allow-Origin"); got != "" {
-		t.Errorf("Access-Control-Allow-Origin = %q, want empty (CORS off by default)", got)
-	}
-
-	req, err := http.NewRequest(http.MethodOptions, srv.URL+"/api/v1/health", nil)
-	if err != nil {
-		t.Fatalf("new OPTIONS request: %v", err)
-	}
-	req.Header.Set("Origin", "http://localhost:8081")
-	req.Header.Set("Access-Control-Request-Method", "GET")
-	preflight, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("OPTIONS /api/v1/health: %v", err)
-	}
-	defer preflight.Body.Close()
-	if preflight.StatusCode != http.StatusMethodNotAllowed {
-		t.Errorf("preflight status = %d, want 405 while CORS is off", preflight.StatusCode)
-	}
-}
-
-// TestServeCORSEnabled CORS 打开:GET 带 Access-Control-Allow-Origin,预检 204 且给出允许方法/头。
-func TestServeCORSEnabled(t *testing.T) {
-	const origin = "http://localhost:8081"
-	d := &deps{store: fakeStoreCLI{}, rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
-	srv := httptest.NewServer(newServeHandler(d, origin))
-	defer srv.Close()
-
-	resp, err := http.Get(srv.URL + "/api/v1/health")
-	if err != nil {
-		t.Fatalf("GET /api/v1/health: %v", err)
-	}
-	defer resp.Body.Close()
-	if got := resp.Header.Get("Access-Control-Allow-Origin"); got != origin {
-		t.Errorf("Access-Control-Allow-Origin = %q, want %q", got, origin)
-	}
-
-	req, err := http.NewRequest(http.MethodOptions, srv.URL+"/api/v1/health", nil)
-	if err != nil {
-		t.Fatalf("new OPTIONS request: %v", err)
-	}
-	req.Header.Set("Origin", origin)
-	req.Header.Set("Access-Control-Request-Method", "GET")
-	preflight, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("OPTIONS /api/v1/health: %v", err)
-	}
-	defer preflight.Body.Close()
-	if preflight.StatusCode != http.StatusNoContent {
-		t.Fatalf("preflight status = %d, want 204", preflight.StatusCode)
-	}
-	if got := preflight.Header.Get("Access-Control-Allow-Origin"); got != origin {
-		t.Errorf("preflight Access-Control-Allow-Origin = %q, want %q", got, origin)
-	}
-	if got := preflight.Header.Get("Access-Control-Allow-Methods"); !strings.Contains(got, http.MethodGet) {
-		t.Errorf("Access-Control-Allow-Methods = %q, want it to include GET", got)
-	}
-	if got := preflight.Header.Get("Access-Control-Allow-Headers"); !strings.Contains(got, "Content-Type") {
-		t.Errorf("Access-Control-Allow-Headers = %q, want it to include Content-Type", got)
 	}
 }
 

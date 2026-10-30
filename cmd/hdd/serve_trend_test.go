@@ -39,7 +39,7 @@ func (f *fakeTrendStore) TrendPoints(ctx context.Context, memberID int64, name, 
 
 func newTrendTestServer(t *testing.T, trends pipeline.TrendStore, members pipeline.MemberStore) *httptest.Server {
 	t.Helper()
-	srv := httptest.NewServer(newServeHandler(&deps{members: members, trends: trends}, ""))
+	srv := httptest.NewServer(newServeHandler(&deps{members: members, trends: trends}))
 	t.Cleanup(srv.Close)
 	return srv
 }

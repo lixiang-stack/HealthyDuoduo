@@ -85,7 +85,7 @@ func newMembersTestServer(t *testing.T) (*httptest.Server, *fakeMemberStore) {
 	t.Helper()
 	ms := &fakeMemberStore{}
 	d := &deps{store: fakeStoreCLI{}, members: ms, rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
-	srv := httptest.NewServer(newServeHandler(d, ""))
+	srv := httptest.NewServer(newServeHandler(d))
 	t.Cleanup(srv.Close)
 	return srv, ms
 }

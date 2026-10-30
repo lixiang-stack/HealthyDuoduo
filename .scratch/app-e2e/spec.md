@@ -1,6 +1,6 @@
 # App E2E 接入 spec
 
-**Status:** resolved
+**Status:** resolved（历史；Web E2E 回路已由 ADR-0013 移除，2026-10-30）
 
 ## 为什么做
 

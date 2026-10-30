@@ -5,12 +5,7 @@ import { appendImagePart, imagePartValue } from './imageUpload';
 // 原生 part 必须提供 bytes()(expo-file-system File 即实现 Blob 接口)。
 
 describe('imagePartValue', () => {
-  it('Web 文件通道:直传 DOM File 本体', () => {
-    const file = new File(['jpeg-bytes'], 'sheet.jpg', { type: 'image/jpeg' });
-    expect(imagePartValue({ uri: 'blob:web', file })).toBe(file);
-  });
-
-  it('原生通道:expo-file-system File(uri 保留,带 bytes(),供 expo/fetch 读取)', () => {
+  it('expo-file-system File(uri 保留,带 bytes(),供 expo/fetch 读取)', () => {
     const part = imagePartValue({ uri: 'file:///tmp/sheet.jpg' }) as unknown as {
       uri: string;
       bytes: unknown;

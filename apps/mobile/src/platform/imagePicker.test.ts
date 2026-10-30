@@ -38,8 +38,8 @@ describe('pickImage', () => {
     await expect(pickImage('library', 3)).resolves.toEqual({
       kind: 'picked',
       images: [
-        { uri: 'file:///a.jpg', mimeType: 'image/jpeg', fileName: 'a.jpg', file: undefined },
-        { uri: 'file:///b.jpg', mimeType: 'image/jpeg', fileName: 'b.jpg', file: undefined },
+        { uri: 'file:///a.jpg', mimeType: 'image/jpeg', fileName: 'a.jpg' },
+        { uri: 'file:///b.jpg', mimeType: 'image/jpeg', fileName: 'b.jpg' },
       ],
     });
     expect(ImagePicker.launchImageLibraryAsync).toHaveBeenCalledWith({

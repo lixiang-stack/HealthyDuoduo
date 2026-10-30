@@ -83,12 +83,7 @@ python3 scripts/check-docs.py
 docker compose -p deploy -f deploy/docker-compose.yml up -d
 ```
 
-App E2E（会自起专用栈，结束拆除）：
-
-```bash
-cd apps/mobile
-npm run e2e
-```
+App 屏幕测试随 `npm test` 运行；合并 UI 改动前按 `apps/mobile/ANDROID.md` 做真机 smoke。
 
 ## 文档索引
 
@@ -96,7 +91,6 @@ npm run e2e
 - `docs/adr/`：架构与技术决策
 - `docs/design/`：设计与实施计划
 - `docs/agents/e2e.md`：Pipeline E2E
-- `docs/agents/app-e2e.md`：App E2E
 - `docs/agents/documentation.md`：文档约定
 - `docs/agents/prototype-driven-development.md`：前端方案选型与原型规范
 - `.scratch/<feature>/`：本地 spec 与 ticket
