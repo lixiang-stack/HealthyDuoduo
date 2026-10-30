@@ -25,12 +25,8 @@ from .ocr import run_ocr
 from .orientation import detect_rotation, rotate_image
 from .paths import IMAGE_SUFFIXES
 from .postprocess import classify_items, run_postprocess
-from .replay import Replay
 
 app = FastAPI(title="HealthyDuoduo Recognizer")
-
-# App E2E 专用栈按环境变量启用固定样本回放;缺省 None = 全部真实 OCR。
-_replay = Replay.from_env()
 
 
 def _read_image_bytes(image: UploadFile) -> bytes:
@@ -77,15 +73,8 @@ def report(
     整页横拍(90°/270°)或倒置(180°)时先在识别端转正并重新 OCR,再跑后处理;
     转正后的图像随响应返回(base64),数据服务据此入库,展示与核对不再看到
     横置或倒置原图。
-
-    App E2E 回放命中固定样本时直接返回预置 golden(date 不参与:fixture 是固定产物);
-    未命中仍走真实 OCR。生产/共享栈未配置回放,行为不变。
     """
     data = _read_image_bytes(image)
-    if _replay is not None:
-        fixture = _replay.lookup(data)
-        if fixture is not None:
-            return fixture
     ocr_result = _run_ocr(data)
     rotation = detect_rotation(ocr_result)
     if rotation != 0:

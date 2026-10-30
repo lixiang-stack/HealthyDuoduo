@@ -46,7 +46,7 @@ func newPanelsTestServer(t *testing.T) (*httptest.Server, *fakePanelStore) {
 		store: fakeStoreCLI{}, rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{},
 		members: ms, panels: ps,
 	}
-	srv := httptest.NewServer(newServeHandler(d, ""))
+	srv := httptest.NewServer(newServeHandler(d))
 	t.Cleanup(srv.Close)
 	return srv, ps
 }

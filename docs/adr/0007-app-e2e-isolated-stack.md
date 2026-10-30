@@ -1,6 +1,6 @@
 # 0007 · App E2E 独立栈先行：Expo Web + 确定性用例，不碰共享 deploy 栈
 
-**状态：** 采纳（2026-10-18，需求拷问会定稿）。
+**状态：** 已被 ADR-0013 取代（2026-10-30）。以下内容保留为决策历史。
 
 家长侧 App 的 UI 回归由新回路 **App E2E** 承担：**专用 compose 项目 `hdd-e2e` + 独立端口/卷、每轮重建**，目标先落在 **Expo Web**（`@e2e-dev/web` 的 Playwright 引擎），用例全部是**确定性 locator/expect**（无 agent/模型调用）。首版本地运行，连续全绿后升级为路径过滤的 PR 必过 job；与 Pipeline E2E（`docs/agents/e2e.md`，共享栈 + 快照）并存、互不替代。
 
@@ -23,6 +23,6 @@
 - `npm run e2e`（apps/mobile）自带栈的起停与清库，失败证据在 `apps/mobile/.e2e/`；默认不污染共享栈。
 - 首版覆盖：设置/健康检查、成员创建切换、时间线过滤、上传→时间线、核对确认/修正、改归属/删除/同图重传、后端不可达错误态。
 - 已知盲区：相机、权限、原生文件/键盘/网络；需要后续原生目标，不假装已覆盖。
-- 首版仅本地；「连续 10 次全绿」后升级为路径过滤的 PR 必过 job（操作见 `docs/agents/app-e2e.md`）。
+- 首版仅本地；「连续 10 次全绿」后升级为路径过滤的 PR 必过 job（操作手册随回路删除，见 ADR-0013）。
 - 框架仍在 1.0 前，minor 版本可能改变配置/API；升级按独立改动处理。
 - Web 文件选择器在 headless 下会被自动取消（expo-image-picker 随即移除 input），测试用 init script 屏蔽原生 chooser 再 `setInputFiles`；这是测试挂具，不改 App 行为。

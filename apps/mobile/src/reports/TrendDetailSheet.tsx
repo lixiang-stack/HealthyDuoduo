@@ -2,7 +2,7 @@
 // 完整图与逐点列表共享 selectedIndex;点列表是主选点方式,图上的小圆点不做点击热区。
 // 点卡「查看原始图像」进原图路由;跳转时 Modal 隐藏但保持挂载,返回后原位恢复选中点。
 import { useState } from 'react';
-import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import type { TrendPoint } from '../api/reports';
@@ -77,11 +77,9 @@ export function TrendDetailSheet({
   });
 
   return (
-    // react-native-web 的 slide 动画会让 Modal 内 ScrollView 高度塌成 0(面板入口必现);
-    // Web 用无动画保证可滚动,原生保留 slide。
     <Modal
       visible={visible}
-      animationType={Platform.OS === 'web' ? 'none' : 'slide'}
+      animationType="slide"
       transparent={false}
       onRequestClose={onClose}
     >

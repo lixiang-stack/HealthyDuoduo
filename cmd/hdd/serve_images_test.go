@@ -30,7 +30,7 @@ func sampleImageBytes(t *testing.T) []byte {
 func newImagesTestServer(t *testing.T, objects map[string][]byte) *httptest.Server {
 	t.Helper()
 	d := &deps{store: fakeStoreCLI{}, rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{objects: objects}}
-	srv := httptest.NewServer(newServeHandler(d, ""))
+	srv := httptest.NewServer(newServeHandler(d))
 	t.Cleanup(srv.Close)
 	return srv
 }

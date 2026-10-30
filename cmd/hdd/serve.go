@@ -18,11 +18,6 @@ import (
 // version 数据服务版本(serve 健康检查与 OpenAPI info.version 同源对齐;升级随 PR 维护)。
 const version = "0.1.0"
 
-// corsOriginEnv CORS 开关的 env 名;未设/空 = 关闭(与未加中间件完全一致)。
-// 默认关闭是安全选择:ADR-0006 局域网无鉴权,常驻实例放开跨源会让任意网页可读家庭数据;
-// 仅浏览器验证通道(Expo Web)在开发栈里显式打开。
-const corsOriginEnv = "HDD_SERVE_CORS_ORIGIN"
-
 // healthResponse GET /api/v1/health 的响应体({ok, version};OpenAPI schemas/Health)。
 type healthResponse struct {
 	OK      bool   `json:"ok"`
@@ -30,8 +25,7 @@ type healthResponse struct {
 }
 
 // newServeHandler 装配 /api/v1 路由;deps 注入保证后续端点复用同一条依赖链。
-// corsOrigin 为空即不包 CORS 中间件。
-func newServeHandler(d *deps, corsOrigin string) http.Handler {
+func newServeHandler(d *deps) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/health", func(w http.ResponseWriter, r *http.Request) {
 		// 进程能应答即健康:deps 未就绪时 serve 根本不启动(openDeps fail-fast)。
@@ -57,7 +51,7 @@ func newServeHandler(d *deps, corsOrigin string) http.Handler {
 	mux.HandleFunc("PATCH /api/v1/reports/{report_id}/items/{item_id}", handleReviewItem(d))
 	// 图像端点(票 07):后端代理对象存储、局域网直出。
 	mux.HandleFunc("GET /api/v1/images/{sha256}", handleGetImage(d.obj))
-	return withCORS(mux, corsOrigin)
+	return mux
 }
 
 // writeJSON /api/v1 的 JSON 响应写出(状态码 + Content-Type 一次收口)。
@@ -95,25 +89,6 @@ func decodeJSONBody(r *http.Request, dst any) error {
 	return nil
 }
 
-// withCORS 按配置给全部响应加跨源头,并直接应答 OPTIONS 预检(204)。
-// origin 为固定配置值(不随请求 Origin 变化),故无需 Vary。
-func withCORS(next http.Handler, origin string) http.Handler {
-	if origin == "" {
-		return next
-	}
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", origin)
-		if r.Method == http.MethodOptions {
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-			w.Header().Set("Access-Control-Max-Age", "600")
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
-}
-
 // runServe 常驻运行;返回码沿用 CLI 约定(启动错误=1,参数错误=2)。
 // 监听地址缺省取 HDD_SERVE_ADDR(compose 内缺省 :8080 绑定全部网卡,LAN 直达),flag 可覆盖。
 func runServe(out, errOut io.Writer, d *deps, args []string) int {
@@ -135,7 +110,7 @@ func runServe(out, errOut io.Writer, d *deps, args []string) int {
 	}
 	fmt.Fprintf(out, "hdd serve: listening on %s\n", ln.Addr())
 	// 不做信号处理/优雅关停:骨架阶段进程即服务生命周期(compose stop 直接终止)。
-	if err := http.Serve(ln, newServeHandler(d, fromEnv(corsOriginEnv, ""))); err != nil {
+	if err := http.Serve(ln, newServeHandler(d)); err != nil {
 		fmt.Fprintf(errOut, "serve: %v\n", err)
 		return exitError
 	}

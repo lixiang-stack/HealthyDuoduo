@@ -8,6 +8,8 @@
 
 **Status:** ready-for-human
 
+**2026-10-30:** App E2E 回路已由 ADR-0013 移除；下文的 `npm run e2e` / replay 覆盖仅作为历史证据保留，当前 UI 验收见 `apps/mobile/ANDROID.md` 的人工 smoke 清单。
+
 - [x] e2e replay 样本覆盖 lft_02 / lft_06 / lft_08 / lft_09 / tft_01 / ua_05 / us_01 / coag_01 / fibrosis_01 / bloodtype_01 / unknown_01 / 失败报告。
 - [x] App E2E 覆盖家庭首页、项目列表 / 详情、`?panel=` 筛选、报告详情分组、异常指标、影像 / 失败 / 其他、空态。
 - [x] 既有核对 / 修正 / 改派 / 删除 / 上传 / 多图上传 / 趋势 E2E 全绿。

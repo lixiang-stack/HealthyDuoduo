@@ -29,6 +29,8 @@ Run lint and typecheck before declaring any task done.
   keep them outside `src/app/` so Expo Router never treats them as routes.
 - Screen tests render real screens and mock the API at `src/api/resolveClient`;
   do not mock individual data hooks.
+- No web target: do not add `react-native-web` / `react-dom` or browser-only
+  branches; verify UI changes on Android (`ANDROID.md`).
 
 ## Navigation & Routing
 

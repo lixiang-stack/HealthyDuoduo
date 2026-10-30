@@ -4,5 +4,5 @@
     "strict": true,
     "types": ["jest"]
   },
-  "exclude": ["node_modules", "e2e", "e2e.config.ts"]
+  "exclude": ["node_modules"]
 }

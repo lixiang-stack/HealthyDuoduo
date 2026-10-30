@@ -218,9 +218,6 @@ export default function UploadScreen() {
           case 'denied':
             setPickMessage('需要相机/相册权限才能选择检查单照片');
             break;
-          case 'unsupported':
-            setPickMessage(result.reason);
-            break;
         }
       } catch (error) {
         setPickMessage(error instanceof Error ? error.message : String(error));
