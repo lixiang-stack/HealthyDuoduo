@@ -53,7 +53,7 @@ type Store interface {
 }
 
 // MemberStore 成员持久化边界(serve 成员端点;viz-and-client 票 05)。
-// 列表按创建序返回(契约排序口径);无删除操作——契约不提供。
+// 列表按创建序返回(契约排序口径);删除成员会一并删除其全部报告(原图与 OCR 历史保留)。
 type MemberStore interface {
 	// CreateMember 建成员(名 + 是否孩子两档;id/created_at 由存储产生)。
 	CreateMember(ctx context.Context, name string, isChild bool) (*Member, error)
@@ -61,6 +61,9 @@ type MemberStore interface {
 	ListMembers(ctx context.Context) ([]Member, error)
 	// UpdateMember 改名/改是否孩子(至少一项非 nil);返回 nil = 成员不存在。
 	UpdateMember(ctx context.Context, id int64, name *string, isChild *bool) (*Member, error)
+	// DeleteMember 硬删成员及其全部报告(报告/指标项/修正对级联;原图与 OCR 历史保留)。
+	// 成员不存在返回 false, nil。
+	DeleteMember(ctx context.Context, id int64) (bool, error)
 	// MemberByID 按 id 取成员(上传归属校验;缺失返回 nil,nil,与 ImageBySha256 同口径)。
 	MemberByID(ctx context.Context, id int64) (*Member, error)
 }
@@ -144,7 +147,7 @@ type ReportItemRow struct {
 }
 
 // Member 成员最小模型的业务视图:显示名 + 是否孩子两档,仅此;无生日/头像,
-// 不支持删除(可改名)。CreatedAt 为库中创建时刻,HTTP 侧序列化为 RFC3339。
+// 可改名、可删除(删除会级联其全部报告)。CreatedAt 为库中创建时刻,HTTP 侧序列化为 RFC3339。
 type Member struct {
 	MemberID  int64
 	Name      string

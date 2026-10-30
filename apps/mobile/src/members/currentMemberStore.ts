@@ -15,3 +15,7 @@ export async function loadCurrentMemberId(): Promise<number | undefined> {
 export async function saveCurrentMemberId(memberId: number): Promise<void> {
   await AsyncStorage.setItem(CURRENT_MEMBER_STORAGE_KEY, String(memberId));
 }
+
+export async function clearCurrentMemberId(): Promise<void> {
+  await AsyncStorage.removeItem(CURRENT_MEMBER_STORAGE_KEY);
+}

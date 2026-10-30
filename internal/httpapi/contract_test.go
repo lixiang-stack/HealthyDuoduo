@@ -43,15 +43,15 @@ func loadFixture(t *testing.T, name string) []byte {
 	return data
 }
 
-// TestOpenAPIFrozenPathSet 14 端点集合冻结:实现票不得多加、少删或改路径/方法
+// TestOpenAPIFrozenPathSet 15 端点集合冻结:实现票不得多加、少删或改路径/方法
 // (契约变更须先改本文件与 OpenAPI 再随 PR 提走)。
 func TestOpenAPIFrozenPathSet(t *testing.T) {
 	doc := getOpenAPI(t)
 	want := map[string]bool{
 		"GET /health":  true,
 		"GET /members": true, "POST /members": true,
-		"PATCH /members/{member_id}": true,
-		"GET /reports":               true, "POST /reports": true,
+		"PATCH /members/{member_id}": true, "DELETE /members/{member_id}": true,
+		"GET /reports": true, "POST /reports": true,
 		"GET /reports/{report_id}": true, "PATCH /reports/{report_id}": true,
 		"DELETE /reports/{report_id}":                true,
 		"PATCH /reports/{report_id}/items/{item_id}": true,

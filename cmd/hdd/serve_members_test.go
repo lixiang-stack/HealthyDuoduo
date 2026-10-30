@@ -21,7 +21,7 @@ import (
 )
 
 // fakeMemberStore 内存版成员存储:行为对齐 storage 实现——创建序 id 升序、
-// PATCH 只改传入字段、缺失返回 nil。
+// PATCH 只改传入字段、删除按 id 移除、缺失返回 nil / false。
 type fakeMemberStore struct {
 	mu     sync.Mutex
 	nextID int64
@@ -78,6 +78,19 @@ func (f *fakeMemberStore) UpdateMember(ctx context.Context, id int64, name *stri
 		return &m, nil
 	}
 	return nil, nil
+}
+
+func (f *fakeMemberStore) DeleteMember(ctx context.Context, id int64) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for i := range f.rows {
+		if f.rows[i].MemberID != id {
+			continue
+		}
+		f.rows = append(f.rows[:i], f.rows[i+1:]...)
+		return true, nil
+	}
+	return false, nil
 }
 
 // newMembersTestServer 成员端点集成测试的 handler 栈(空成员库 + CLI fakes 打底)。
@@ -149,7 +162,7 @@ func memberIDs(t *testing.T, srv *httptest.Server) []int64 {
 }
 
 // TestServeMembersCRUD 建/列/改全回路:创建序(id 升序)列表口径、PATCH 只改传入字段
-// (name/is_child 各自单独可改,created_at 不变)、成员无删除入口。
+// (name/is_child 各自单独可改,created_at 不变);删除见 TestServeMembersDelete。
 func TestServeMembersCRUD(t *testing.T) {
 	srv, _ := newMembersTestServer(t)
 
@@ -201,6 +214,48 @@ func TestServeMembersCRUD(t *testing.T) {
 	// 再列:改动落库、顺序不变。
 	if got := memberIDs(t, srv); !slices.Equal(got, []int64{1, 2, 3}) {
 		t.Fatalf("list after patches = %v, want [1 2 3]", got)
+	}
+}
+
+// TestServeMembersDelete 删成员:成功 204 无响应体、列表移除;未知成员 404、
+// 非法 id 400,均走契约 Error 形状。
+func TestServeMembersDelete(t *testing.T) {
+	srv, _ := newMembersTestServer(t)
+	createOne(t, srv, `{"name":"小虎","is_child":true}`)
+	createOne(t, srv, `{"name":"妈妈","is_child":false}`)
+
+	status, raw := doJSON(t, srv, http.MethodDelete, "/api/v1/members/1", "")
+	if status != http.StatusNoContent {
+		t.Fatalf("DELETE member: status = %d, want 204; body = %s", status, raw)
+	}
+	if len(raw) != 0 {
+		t.Errorf("204 body = %q, want empty", raw)
+	}
+	if got := memberIDs(t, srv); !slices.Equal(got, []int64{2}) {
+		t.Fatalf("list after delete = %v, want [2]", got)
+	}
+
+	status, raw = doJSON(t, srv, http.MethodDelete, "/api/v1/members/999", "")
+	if status != http.StatusNotFound {
+		t.Fatalf("DELETE unknown: status = %d, want 404; body = %s", status, raw)
+	}
+	var apiErr httpapi.Error
+	if err := json.Unmarshal(raw, &apiErr); err != nil {
+		t.Fatalf("404 body is not an Error shape: %s", raw)
+	}
+	if apiErr.Message != memberNotFoundMessage {
+		t.Errorf("404 message = %q, want %q", apiErr.Message, memberNotFoundMessage)
+	}
+
+	status, raw = doJSON(t, srv, http.MethodDelete, "/api/v1/members/abc", "")
+	if status != http.StatusBadRequest {
+		t.Fatalf("DELETE invalid id: status = %d, want 400; body = %s", status, raw)
+	}
+
+	// 再删已删成员:同样 404,不伪装成成功。
+	status, _ = doJSON(t, srv, http.MethodDelete, "/api/v1/members/1", "")
+	if status != http.StatusNotFound {
+		t.Fatalf("DELETE deleted member: status = %d, want 404", status)
 	}
 }
 

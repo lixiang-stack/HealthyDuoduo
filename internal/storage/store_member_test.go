@@ -10,6 +10,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -106,5 +107,100 @@ func TestMemberStoreSmoke(t *testing.T) {
 	}
 	if reports != 1 || owned != 0 {
 		t.Fatalf("reports = %d rows / %d owned, want 1/0 (unowned legacy report untouched)", reports, owned)
+	}
+}
+
+// TestDeleteMemberCascadesReports 删除成员:成员与其全部报告硬删,报告级联
+// 指标项 / 修正对;原图与 OCR 历史保留;其他成员不受影响。
+func TestDeleteMemberCascadesReports(t *testing.T) {
+	dsn := os.Getenv("HDD_TEST_DSN")
+	if dsn == "" {
+		t.Skip("HDD_TEST_DSN not set: member delete cascade runs against a disposable PG container")
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	defer pool.Close()
+	if err := Migrate(ctx, dsn); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	st := NewStore(pool)
+	defer st.Close()
+
+	target, err := st.CreateMember(ctx, "待删成员", true)
+	if err != nil {
+		t.Fatalf("create target: %v", err)
+	}
+	keep, err := st.CreateMember(ctx, "保留成员", false)
+	if err != nil {
+		t.Fatalf("create keep: %v", err)
+	}
+
+	sha := strings.Repeat("d", 64)
+	if _, err := pool.Exec(ctx, `INSERT INTO images (sha256, original_filename) VALUES ($1, 'delete.jpg')`, sha); err != nil {
+		t.Fatalf("seed image: %v", err)
+	}
+	var ocrID int64
+	if err := pool.QueryRow(ctx, `INSERT INTO ocr_results (image_sha256, engine_output) VALUES ($1, '{}') RETURNING id`, sha).Scan(&ocrID); err != nil {
+		t.Fatalf("seed ocr: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO reports
+		 (image_sha256, ocr_result_id, report_type, report_date, status, member_id, panels)
+		 VALUES ($1, $2, '临检', '2026-10-01', 'success', $3, '{cbc}')`, sha, ocrID, target.MemberID); err != nil {
+		t.Fatalf("seed report: %v", err)
+	}
+	var itemID int64
+	if err := pool.QueryRow(ctx, `INSERT INTO report_items
+		 (report_sha256, name, panel, value, unit, ref_range, flag, low_confidence, raw_text)
+		 VALUES ($1, '血红蛋白', 'cbc', '128', 'g/L', '115-150', 'normal', false, '血红蛋白 128 g/L 115-150')
+		 RETURNING id`, sha).Scan(&itemID); err != nil {
+		t.Fatalf("seed item: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO correction_pairs
+		 (item_id, before_value, after_value, raw_text, ocr_line_numbers)
+		 VALUES ($1, '120', '128', '血红蛋白 128 g/L 115-150', '{0}')`, itemID); err != nil {
+		t.Fatalf("seed correction pair: %v", err)
+	}
+
+	deleted, err := st.DeleteMember(ctx, target.MemberID)
+	if err != nil || !deleted {
+		t.Fatalf("delete member = (%v, %v), want (true, nil)", deleted, err)
+	}
+
+	count := func(query string, arg any) int {
+		t.Helper()
+		var n int
+		if err := pool.QueryRow(ctx, query, arg).Scan(&n); err != nil {
+			t.Fatalf("count: %v", err)
+		}
+		return n
+	}
+	if got := count(`SELECT count(*) FROM members WHERE id = $1`, target.MemberID); got != 0 {
+		t.Errorf("target member rows = %d, want 0", got)
+	}
+	if got := count(`SELECT count(*) FROM members WHERE id = $1`, keep.MemberID); got != 1 {
+		t.Errorf("other member rows = %d, want 1", got)
+	}
+	if got := count(`SELECT count(*) FROM reports WHERE member_id = $1`, target.MemberID); got != 0 {
+		t.Errorf("owned reports = %d, want 0", got)
+	}
+	if got := count(`SELECT count(*) FROM report_items WHERE report_sha256 = $1`, sha); got != 0 {
+		t.Errorf("report items = %d, want 0", got)
+	}
+	if got := count(`SELECT count(*) FROM correction_pairs WHERE item_id = $1`, itemID); got != 0 {
+		t.Errorf("correction pairs = %d, want 0", got)
+	}
+	if got := count(`SELECT count(*) FROM images WHERE sha256 = $1`, sha); got != 1 {
+		t.Errorf("image rows = %d, want 1 (original image retained)", got)
+	}
+	if got := count(`SELECT count(*) FROM ocr_results WHERE image_sha256 = $1`, sha); got != 1 {
+		t.Errorf("ocr rows = %d, want 1 (ocr history retained)", got)
+	}
+
+	deleted, err = st.DeleteMember(ctx, 999)
+	if err != nil || deleted {
+		t.Fatalf("delete unknown = (%v, %v), want (false, nil)", deleted, err)
 	}
 }

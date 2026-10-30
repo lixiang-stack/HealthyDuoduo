@@ -1,6 +1,6 @@
-// 成员端点(GET/POST /api/v1/members 与 PATCH /api/v1/members/{member_id};
+// 成员端点(GET/POST /api/v1/members 与 PATCH/DELETE /api/v1/members/{member_id};
 // 契约冻结于 schemas/openapi.yaml,viz-and-client 票 05 实现)。
-// 列表按创建序(id 升序)返回;无删除入口(契约层就没有 DELETE)。
+// 列表按创建序(id 升序)返回;删除会一并删除该成员的全部报告(原图与 OCR 历史保留)。
 package main
 
 import (
@@ -107,7 +107,7 @@ func handleCreateMember(ms pipeline.MemberStore) http.HandlerFunc {
 }
 
 // handleUpdateMember PATCH /api/v1/members/{member_id}:改名/改是否孩子,至少一项;
-// 未知成员 404(无删除语义,只有存在与否)。
+// 未知成员 404。
 func handleUpdateMember(ms pipeline.MemberStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id, err := strconv.ParseInt(r.PathValue("member_id"), 10, 64)
@@ -135,6 +135,28 @@ func handleUpdateMember(ms pipeline.MemberStore) http.HandlerFunc {
 			return
 		}
 		writeJSON(w, http.StatusOK, toAPIMember(*m))
+	}
+}
+
+// handleDeleteMember DELETE /api/v1/members/{member_id}:硬删成员及其全部报告
+// (报告/指标项/修正对级联;原图与 OCR 历史保留;不可恢复)。未知成员 404,成功 204。
+func handleDeleteMember(ms pipeline.MemberStore) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id, err := strconv.ParseInt(r.PathValue("member_id"), 10, 64)
+		if err != nil {
+			writeErrorJSON(w, http.StatusBadRequest, "member_id must be an integer")
+			return
+		}
+		deleted, err := ms.DeleteMember(r.Context(), id)
+		if err != nil {
+			writeErrorJSON(w, http.StatusInternalServerError, "delete member failed")
+			return
+		}
+		if !deleted {
+			writeErrorJSON(w, http.StatusNotFound, memberNotFoundMessage)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
 	}
 }
 

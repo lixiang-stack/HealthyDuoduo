@@ -222,7 +222,10 @@ const (
 		 (report_sha256, name, panel, value, unit, ref_range, method, flag, flag_reason, low_confidence, raw_text, ocr_line_numbers)
 		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`
 
-	// 成员(迁移 0004;显示名 + 是否孩子两档,无删除):列表按 id 升序 = 创建序返回;
+	// 成员(迁移 0004;显示名 + 是否孩子两档):列表按 id 升序 = 创建序返回;
+	// 删除时先删该成员报告再删成员(单事务;原图与 OCR 历史保留)。
+	sqlMemberDelete        = `DELETE FROM members WHERE id = $1`
+	sqlMemberReportsDelete = `DELETE FROM reports WHERE member_id = $1`
 	// 改动用 COALESCE 只覆盖传入字段(nil = 保持不变)。
 	sqlMemberInsert = `INSERT INTO members (name, is_child) VALUES ($1,$2)
 		 RETURNING id, created_at`
@@ -823,4 +826,26 @@ func (s *Store) UpdateMember(ctx context.Context, id int64, name *string, isChil
 		return nil, err
 	}
 	return &m, nil
+}
+
+// DeleteMember 硬删成员及其全部报告(报告/指标项/修正对级联;原图与 OCR 历史保留)。
+// 单事务:先删该成员报告,再删成员;成员不存在返回 false, nil。
+func (s *Store) DeleteMember(ctx context.Context, id int64) (bool, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, sqlMemberReportsDelete, id); err != nil {
+		return false, fmt.Errorf("delete member reports: %w", err)
+	}
+	tag, err := tx.Exec(ctx, sqlMemberDelete, id)
+	if err != nil {
+		return false, fmt.Errorf("delete member: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() > 0, nil
 }
