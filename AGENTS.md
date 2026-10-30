@@ -106,7 +106,7 @@
 
 ## Git 与提交
 
-- 每个需求在 `.worktree/<需求名>` 开发，完成后走 PR；`main` 只读，不在本地 merge。
+- 完成后走 PR；`main` 只读，不在本地 merge。
 - **仅当用户明确要求时才 push**；需改写已推送分支时用 `--force-with-lease`。
 
 ## 测试规则
