@@ -698,18 +698,39 @@ def _trend_rows(item: str, show_all: bool, from_root: Path) -> list[dict]:
     out = []
     for line in r.stdout.splitlines()[1:]:
         cols = line.split()
-        if len(cols) == 7:
+        if len(cols) >= 7:
             out.append(
                 dict(
-                    zip(("date", "type", "value", "unit", "delta", "flag", "sha"), cols)
+                    zip(
+                        ("date", "type", "value", "unit", "delta", "flag", "sha"),
+                        cols[:7],
+                    )
                 )
+                | {"note": cols[7] if len(cols) > 7 else ""}
             )
     return out
+
+
+def verify_unit_status_audit() -> None:
+    """未验证单位点数量与原因可审计(票 12/13):status + 空 unit + 低置信计数。"""
+    rows = psql(
+        "select string_agg(status || '=' || n || ' (unit=null ' || nulls || ', low_confidence ' || low || ')', '; ') "
+        "from (select coalesce(unit_status,'none') as status, count(*) as n, "
+        "count(*) filter (where unit is null) as nulls, "
+        "count(*) filter (where low_confidence) as low "
+        "from report_items group by 1 order by 1) a;"
+    ).strip()
+    bad = psql(
+        "select count(*) from report_items "
+        "where unit_status is not null and unit_status not in ('verified','unverified');"
+    ).strip()
+    _check(bad == "0", f"unit_status audit: {rows.replace(chr(10), '; ')}; invalid={bad}")
 
 
 def verify(item: str, from_root: Path) -> None:
     """真实数据不变量(无需 seed;refresh 之后的收口检查)。"""
     verify_no_orphans()
+    verify_unit_status_audit()
     # 词典/单位家族语义跟随被测检出(--from)加载,避免吞并进 harness 自身的旧规则
     sys.path.insert(0, str(Path(from_root) / "recognizer"))
     import importlib
@@ -763,21 +784,24 @@ def verify(item: str, from_root: Path) -> None:
     rows_all = _trend_rows(item, True, from_root)
     hidden = [r for r in rows_all if r["sha"] not in {x["sha"] for x in rows_def}]
     for r in hidden:
-        f, lc = (
+        f, lc, us = (
             psql(
-                f"select flag, low_confidence from report_items where report_sha256 like '{r['sha']}%' and name = '{item}';"
+                f"select flag, low_confidence, coalesce(unit_status,'') from report_items where report_sha256 like '{r['sha']}%' and name = '{item}';"
             )
             .strip()
             .replace("|", " ")
             .split()
         )
-        if f != "unknown" and lc != "t":
+        if f != "unknown" and lc != "t" and us != "unverified":
             raise SystemExit(
-                f"FAIL: {r['sha'][:12]} hidden but not low-quality (flag={f}, low_confidence={lc})"
+                f"FAIL: {r['sha'][:12]} hidden but not low-quality/unverified "
+                f"(flag={f}, low_confidence={lc}, unit_status={us})"
             )
+    unverified_hidden = sum("unverified_unit" in r["note"] for r in hidden)
     _check(
         True,
-        f"trend gate: hidden {len(hidden)}/{len(rows_all)} all justified (item={item})",
+        f"trend gate: hidden {len(hidden)}/{len(rows_all)} all justified "
+        f"(unverified={unverified_hidden}, item={item})",
     )
 
     for prev, cur in itertools.pairwise(rows_def):

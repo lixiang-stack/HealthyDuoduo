@@ -404,6 +404,11 @@ items:
     unit_display: mmol/L
     accepted_units: []
     ocr_unit_forms: []
+    # 技术复核建议 10..40（成人常见参考约 22–29，放宽覆盖真实结果并挡数量级错误）。
+    # LOINC 2028-9 为 total CO2；实际测 CO2CP，已在 mapping notes 标注。
+    plausible_range:
+      low: 10
+      high: 40
   - name: 总胆固醇测定
     panel: lipid
     aliases: []

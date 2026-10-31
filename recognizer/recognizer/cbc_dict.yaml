@@ -269,6 +269,9 @@ items:
     plausible_range:
       low: 0
       high: 10
+  # 2026-10-31 技术复核结论:PDW-SD(fL)与 PDW-CV(%)定义不同,应拆为独立条目。
+  # 现有样本只有无后缀印名(fL),无 PDW-SD/CV 真实证据;按 corpus gate 暂保留
+  # legacy 条目,待新样本后拆分并重新复核。
   - name: 血小板分布宽度
     aliases: [PDW]
     code:
