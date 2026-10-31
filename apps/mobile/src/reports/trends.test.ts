@@ -240,6 +240,20 @@ describe('selectSeries', () => {
     expect(iu.otherUnitCount).toBe(3);
   });
 
+  it('全部点未验证时仍用 unit_display 展示单位', () => {
+    const unverified = pointOf(cbc07, 'C反应蛋白测定', 'unverified', {
+      unit: 'mg/L',
+      unit_display: 'mg/L',
+      unit_status: 'unverified',
+    });
+    const point = { ...unverified, unit: '10*9/L', unit_display: '10^9/L' };
+    const series = selectSeries([point], '10*9/L', 'unverified');
+
+    expect(series.listPoints).toEqual([]);
+    expect(series.unverifiedCount).toBe(1);
+    expect(series.unitDisplay).toBe('10^9/L');
+  });
+
   it('unit_status=unverified 默认不连接,display 单位用 unit_display', () => {
     const verified = pointOf(lft02, '总胆红素测定', 'verified', {
       unit: 'umol/L',
