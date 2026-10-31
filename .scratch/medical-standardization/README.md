@@ -48,8 +48,9 @@ uv run python -m recognizer.golden   # 只改词典/输出规则后
 - 票 12：趋势键改为 `code > loinc > name`，同分析物跨报告/跨面板连接；CLI `--all` 显示 unverified 并标注原因；App 趋势显示 `unit_display` 且默认不连接 unverified 点。
 - 票 13：全量 golden 零 diff；`hdd reparse` 70 份全成功；`e2e verify` / `verify --golden` 通过；未验证项 668 项（全部 pending 复核）数量与原因可审计。
 - 票 14/15 工作包：`review/batch-1.csv`（95 项）、`review/batch-2.csv`（86 项）与 `review/summary.md`；逐项复核决策字段留空，仍全部 `pending`。
+- 票 14/15 技术复核：`docs/batch-{1,2}-reviewed.csv`、`docs/summary-reviewed.md`；batch 1 建议 approve 94/95（PDW 待拆分），batch 2 建议 approve 39/86（47 项缺来源）。复核人为非持证技术复核，`review_status` 仍保持 pending。
 
-**Frontier：** `14`（医学复核 batch 1，工作包已就绪，待具名复核人签核）；之后 `15` 复核 batch 2。复核前所有 `unit_status=unverified`、`review_status=pending`，默认趋势为空是预期。
+**Frontier：** `14`/`15` 待具名临床检验人员正式签核；PDW-SD/CV 待真实样本证据。复核前所有 `unit_status=unverified`、`review_status=pending`，默认趋势为空是预期。
 
 **下一步：**
 

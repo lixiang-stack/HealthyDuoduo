@@ -1,7 +1,11 @@
 # 医学复核工作包（票 14/15）
 
 本文件由 `recognizer/tools/review_packet.py` 生成；所有条目仍为 `review_status=pending`，
-未经具名复核人签核不得翻 `approved`，也不得声称 `unit_status=verified`。
+未经具名临床检验复核人签核不得翻 `approved`，也不得声称 `unit_status=verified`。
+
+已收到的技术复核结果：`docs/batch-1-reviewed.csv`、`docs/batch-2-reviewed.csv`、
+`docs/summary-reviewed.md`。复核人明确为非持证检验医师，正式医学签核仍待完成；
+因此本工作包只记录技术结论，不改 review_status。
 
 ## 填写方式
 
@@ -17,7 +21,7 @@
 | --- | ---: | ---: | ---: | ---: | ---: |
 | cbc | 31 | 0 | 0 | 18 | 0 |
 | coag | 9 | 0 | 0 | 2 | 0 |
-| electrolyte | 1 | 1 | 0 | 0 | 0 |
+| electrolyte | 1 | 0 | 0 | 0 | 0 |
 | glucose | 9 | 0 | 0 | 4 | 0 |
 | kidney | 4 | 0 | 0 | 1 | 0 |
 | lipid | 5 | 0 | 0 | 1 | 0 |
@@ -26,10 +30,6 @@
 | thyroid | 9 | 0 | 0 | 0 | 0 |
 | uric_acid | 1 | 0 | 0 | 0 | 0 |
 | vitanemia | 4 | 0 | 0 | 0 | 0 |
-
-**量化项缺 `plausible_range`：**
-
-- 二氧化碳结合力（mmol/L）
 
 ## Batch 2（86 项）
 
@@ -44,13 +44,19 @@
 
 ### PDW
 
-当前：`血小板分布宽度`，`LOCAL-CBC-PDW`，canonical `fL`，`plausible_range 1..50`。
-待裁决：保留 SD（fL）还是拆成 PDW-SD / PDW-CV（%）？若只保留一种，另一种是否标 `local`。
+技术结论：拆成 PDW-SD（fL）与 PDW-CV（%）；当前无后缀条目保留为 local 历史兼容。
+实施约束：现有样本只有无后缀 PDW（fL），没有 PDW-SD/CV 真实印形证据；
+按 corpus gate 暂不注册新条目，待真实样本后拆分并重新复核。
 
 ### D-二聚体
 
 当前：canonical `ug/L`，`result_basis=FEU`；`ng/mL FEU` 等值、`mg/L FEU` ×1000，DDU 不换算。
 待裁决：FEU 基准是否作为唯一 canonical；DDU 报告是否保留 `unit=null` + `unverified`。
+
+### 二氧化碳结合力
+
+技术结论：补充 `plausible_range 10..40`（成人常见参考约 22–29，放宽以挡数量级错误）；
+LOINC 2028-9 为 total CO2，实际测 CO2CP，保持 notes 标注。
 
 ### eGFR
 

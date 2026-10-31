@@ -20,3 +20,10 @@
 - 当前仍全部 `review_status=pending`，未翻 approved，未声称 verified。
 - 工作包发现：batch 2 有 47 项 `source_status=pending`（autoimmune 17、urinalysis 30），复核前不得 approved；S/CO、AU、滴度、/HP、/LPF、个/uL 的当前建模与待裁决问题已列入 `summary.md`。
 - 复核人需逐行给出 approve / reject / needs-info 并签名；实施侧按批准清单翻状态、重生成 golden、跑全量验证。
+
+**技术复核结果（2026-10-31）**
+
+- 复核记录：`docs/batch-2-reviewed.csv`、`docs/summary-reviewed.md`；复核人「技术复核人（姓名见线下记录）/Grok AI-assisted」，明确为非持证检验医师。
+- 技术结论：39 项建议 approve；47 项 `source_status=pending`（autoimmune 17 + urinalysis 30）标 needs-info，缺权威来源，不得 approved。
+- 伪单位口径确认：S/CO → ratio + `unit=1`；AU → arbitrary + `[arb'U]`；滴度 → titer；/HP、/LPF → microscopy + field；个/uL → 定量计数 `/[uL]`，与镜检分开。当前实现与结论一致，无额外代码改动。
+- **未翻 approved / 未产生 verified**：复核人非持证临床检验人员，正式医学签核仍待完成；`review_status=pending` 保持不变，票仍为 `ready-for-human`。
