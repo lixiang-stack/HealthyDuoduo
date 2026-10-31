@@ -1,0 +1,41 @@
+# 真实单位换算表(单位归一与后续换算的数据源;postprocess.load_unit_forms 合并加载)。
+#
+# 【为什么存在】原 unit_families.yaml 把「真实单位等价」与「OCR 印形损耗」混在一张表:
+# uIU/ml → mIU/L 是真实单位等价(数值相等),而 109/L、7/6.0 只是 OCR 字形损坏。
+# 两者证据要求与使用方式不同:真实单位可参与数值/参考范围换算,OCR 形只做展示修复。
+# 本表只收真实单位、精确等价、线性系数与方程换算;OCR/印刷损耗形一律进 ocr_forms.yaml。
+#
+# 【字段】units[].canonical = 当前报告 unit 字段的规范印形(展示层;标准层 ASCII UCUM
+# 在 *_dict.yaml 的 canonical_unit,票 01/03 输出迁移时对齐);equivalents[] = 真实
+# 替代单位 + conversion。conversion.type:
+#   exact    同一物理单位的不同印法(含大小写/ASCII 写法),数值不变;source 必填。
+#            spec §4.2 的「精确等值」;none 不是换算,不进入本表(不可换算项留在词典)。
+#   linear   有权威系数的线性换算,accepted unit × factor = canonical;factor +
+#            source + from/to 必填,from == unit、to == canonical。
+#   equation 方程换算(如 HbA1c IFCC-NGSP),id + formula + source 必填。
+# 同一单位字面不得同时作为本表的真实单位与 ocr_forms.yaml 的 OCR form(loader 强制)。
+units:
+  - canonical: "10^9/L"
+  - canonical: "10^12/L"
+  - canonical: "μmol/L"
+    equivalents:
+      - unit: "umol/L"        # UCUM ASCII 写法(μ → u)
+        conversion: {type: exact, source: "UCUM"}
+  - canonical: "mmol/L"
+    equivalents:
+      - unit: "mmol/l"        # 大小写漂移,同一物理单位
+        conversion: {type: exact, source: "UCUM"}
+  - canonical: "g/L"
+    equivalents:
+      - unit: "g/l"           # 大小写漂移,同一物理单位
+        conversion: {type: exact, source: "UCUM"}
+  - canonical: "ng/ml"
+  - canonical: "fL"
+    equivalents:
+      - unit: "fl"            # 大小写漂移,同一物理单位
+        conversion: {type: exact, source: "UCUM"}
+  - canonical: "pmol/L"
+  - canonical: "mIU/L"
+    equivalents:
+      - unit: "uIU/ml"        # µIU/mL 与 mIU/L 数值等价(×10³ 约分)
+        conversion: {type: exact, source: "UCUM"}

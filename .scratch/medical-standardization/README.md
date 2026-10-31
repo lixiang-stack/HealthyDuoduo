@@ -15,8 +15,9 @@ Status: in progress（2026-10-31）
 - 新标准 schema 试点：`recognizer/recognizer/coag_dict.yaml` 9 项已迁移（WS/T 886 码 / LOINC / canonical UCUM / accepted units / result_kind / result_basis）。
 - `postprocess.py` loader 支持新字段；`test_dict_coverage.py` 区分 `synonyms`（来源门）与 `ocr_aliases`（语料门）；新增 `test_standard_schema.py`。
 - 非本地 golden 测试：335 passed / 27 skipped；本地 golden 未刷新（既有 panels 漂移）。
+- 票 02：`unit_families.yaml` 拆为 `unit_conversions.yaml` + `ocr_forms.yaml`；loader 合并加载并门禁真实单位/OCR 形混放；单位输出不变（350 passed / 28 skipped）。
 
-**Frontier：** `01`、`02`（无阻塞）。建议先做 `02`（单位层拆分，范围小），再做 `01`（契约贯穿），然后 `03`（凝血 tracer bullet）。
+**Frontier：** `01`（无阻塞）；`03` 待 `01` 完成后启动。建议顺序：`01` → `03`。
 
 **下一步：**
 

@@ -885,7 +885,108 @@ def test_sections_status_ignores_report_date() -> None:
     assert section_of(r, "impression").text == "正常。"
 
 
-# ---------- 单位规一化(印刷损耗形 → 词典注册的规范印形,unit_families.yaml) ----------
+# ---------- 单位规一化(印刷损耗形 → 词典注册的规范印形,单位表) ----------
+
+
+def test_unit_tables_split_real_units_from_ocr_forms() -> None:
+    """真实单位换算表只收真实单位;OCR 损耗形只在印形修复表;两表无交集。"""
+    conversions = yaml.safe_load(
+        _postprocess.UNIT_CONVERSIONS_FILE.read_text(encoding="utf-8")
+    )
+    ocr = yaml.safe_load(_postprocess.OCR_FORMS_FILE.read_text(encoding="utf-8"))
+    real = {entry["canonical"].lower() for entry in conversions["units"]}
+    for entry in conversions["units"]:
+        real |= {eq["unit"].lower() for eq in entry.get("equivalents") or ()}
+    forms = {form.lower() for fam in ocr["families"] for form in fam["forms"]}
+    assert not real & forms
+    assert not any(_postprocess._REAL_UNIT_RE.fullmatch(form) for form in forms)
+    assert {"umol/l", "uiu/ml", "fl"} <= real
+    assert {"109/l", "7/6.0", "f1", "μno1/l"} <= forms
+
+
+def test_unit_form_map_rejects_ocr_form_in_conversions() -> None:
+    """OCR 损耗形混入换算表(自称真实单位)必须失败。"""
+    with pytest.raises(ValueError, match="not a real unit"):
+        _postprocess._unit_form_map(
+            {
+                "units": [
+                    {
+                        "canonical": "10^9/L",
+                        "equivalents": [
+                            {
+                                "unit": "109/L",
+                                "conversion": {"type": "exact", "source": "UCUM"},
+                            }
+                        ],
+                    }
+                ]
+            },
+            {"families": []},
+        )
+
+
+def test_unit_form_map_rejects_real_unit_in_ocr_forms() -> None:
+    """未在换算表登记的真实单位混入 OCR 修复表也必须失败。"""
+    with pytest.raises(ValueError, match="is a real unit"):
+        _postprocess._unit_form_map(
+            {"units": [{"canonical": "g/L"}]},
+            {"families": [{"canonical": "g/L", "forms": ["mg/dL"]}]},
+        )
+
+
+def test_unit_form_map_rejects_form_in_both_tables() -> None:
+    """同一字符串不得同时出现在换算表与修复表。"""
+    with pytest.raises(ValueError, match="both tables"):
+        _postprocess._unit_form_map(
+            {
+                "units": [
+                    {
+                        "canonical": "fL",
+                        "equivalents": [
+                            {
+                                "unit": "fl",
+                                "conversion": {"type": "exact", "source": "UCUM"},
+                            }
+                        ],
+                    }
+                ]
+            },
+            {"families": [{"canonical": "fL", "forms": ["fl"]}]},
+        )
+
+
+def test_unit_form_map_rejects_ocr_canonical_not_registered() -> None:
+    """OCR 修复目标必须是换算表登记的真实单位。"""
+    with pytest.raises(ValueError, match="OCR canonical"):
+        _postprocess._unit_form_map(
+            {"units": []},
+            {"families": [{"canonical": "g/L", "forms": ["g1/L"]}]},
+        )
+
+
+def test_unit_form_map_rejects_linear_without_from_to() -> None:
+    """linear 换算方向必须显式写 from/to,且与 accepted/canonical 一致(spec §7.9)。"""
+    with pytest.raises(ValueError, match="from/to"):
+        _postprocess._unit_form_map(
+            {
+                "units": [
+                    {
+                        "canonical": "g/L",
+                        "equivalents": [
+                            {
+                                "unit": "mg/dL",
+                                "conversion": {
+                                    "type": "linear",
+                                    "factor": 0.01,
+                                    "source": "X",
+                                },
+                            }
+                        ],
+                    }
+                ]
+            },
+            {"families": []},
+        )
 
 
 def test_loss_form_normalized_to_registered_canonical() -> None:
@@ -979,6 +1080,13 @@ def test_family_map_chosen_by_item_membership() -> None:
     bilirubin = next(i for i in chem.items if i.name == "总胆红素")
     assert _postprocess._normalize_unit("μmo1/L", bilirubin) == "μmol/L"
     assert _postprocess._normalize_unit("μnol/L", bilirubin) == "μmol/L"
+
+
+def test_real_unit_equivalence_normalized_from_conversion_table() -> None:
+    """换算表里的真实单位等价(umol/L → μmol/L)也参与展示归一。"""
+    chem = next(d for d in _postprocess.load_dicts() if d.report_type == "生化")
+    creatinine = next(i for i in chem.items if i.name == "肌酐")
+    assert _postprocess._normalize_unit("umol/L", creatinine) == "μmol/L"
 
 
 def test_trailing_unit_punctuation_and_ocr_loss_forms() -> None:

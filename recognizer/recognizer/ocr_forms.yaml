@@ -1,17 +1,21 @@
-# 单位族规范印形表(单位规一化的数据源;postprocess.load_unit_families 加载)。
+# OCR 字形修复表(只做印形修复;postprocess.load_unit_forms 合并加载)。
 #
 # 【为什么存在】上标印形(10^9/L)与低分辨率源图(600px 微信截图/手机拍照件)令 OCR
 # 读出一批不可比单位字面(109/L、7/6.0、1/6.0…);词典 units 的多印形注册解决
 # 「匹配」,不解决「展示一致」:同一指标项跨单印形不同 → hdd trend 的 sameUnit
-# 判不等,delta 全 "-",时序不可比。本表把同一物理单位的全部已知印形收敛到唯一
-# 规范印形(canonical),在 postprocess 落报告时替换 unit 字段。
+# 判不等,delta 全 "-",时序不可比。本表把同一物理单位的全部已知 OCR/印刷损耗形
+# 收敛到唯一规范印形(canonical),在 postprocess 落报告时替换 unit 字段。
+#
+# 【边界】本表只收 OCR/印刷损耗形(上标拍平、l→1、m→n、斜杠丢失、空格/装饰符等)。
+# 真实单位及其等价写法在 unit_conversions.yaml;真实单位不得作为本表的 form,
+# 同一单位字面不得同时出现在两张表(loader 强制)。
 #
 # 【证据规则】与 *_dict.yaml 同源,每条 form 须有真实语料证据
 # (samples/expected/ocr 或 data/masked/ocr,行尾 [样本 id] 注明)或已由词典
 # units 登记背书;证据不足或映射链可疑的不收录(rmol/L、ag/L、ng/al、10/a1、
 # IU/al 等保留原文,列在 docs/design/2026-10-12-unit-normalization.md)。
 #
-# 【语义】canonical = 报告 unit 字段的唯一印形;forms = 同族规范印形 + OCR 损耗形
+# 【语义】canonical = 报告 unit 字段的唯一印形;forms = 同族 OCR/印刷损耗形
 # (匹配小写、大小写不敏感;同 form 可属多族,归一时由该项注册集裁决唯一生效者,
 # 见 postprocess._normalize_unit:仅当该项 units 已注册 canonical 才替换)。
 families:
@@ -41,23 +45,12 @@ families:
       - "μmo1/L"      # [lft_03, lft_05]
       - "μnol/L"      # [lft_03]
       - "μno1/L"      # [lft_03]
-      - "umol/L"      # [lft_04]
-  - canonical: "mmol/L"
-    forms:
-      - "mmol/l"      # 大小写漂移 [lft_08 尿素/二氧化碳]
-  - canonical: "g/L"
-    forms:
-      - "g/l"         # 大小写漂移 [cbc_07 血红蛋白, lft_08 白蛋白]
   - canonical: "ng/ml"
     forms:
       - "ng/m1"       # l→1 [vitanemia_02]
   - canonical: "fL"
     forms:
-      - "fl"          # [cbc_05 等多册小写印]
       - "f1"          # l→1 [cbc_05 MPV/红细胞平均体积]
   - canonical: "pmol/L"
     forms:
       - "pmo1/L"      # [tft_01 游离甲状腺素]
-  - canonical: "mIU/L"
-    forms:
-      - "uIU/ml"      # [endocrine 词典登记;µIU/mL 与 mIU/L 数值等价(×10³ 约分)]

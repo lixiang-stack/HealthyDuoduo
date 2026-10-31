@@ -1,5 +1,7 @@
 # 单位规一化与 trend 质量门(2026-10-12)
 
+> **2026-10-31 更新**：`unit_families.yaml` 已拆为 `unit_conversions.yaml`（真实单位等价）+ `ocr_forms.yaml`（OCR 印形修复），loader 合并加载并门禁两表混放；本文所述归一行为不变。见 `.scratch/medical-standardization/issues/02-unit-conversions-ocr-split.md`。
+
 ## 为什么做
 
 `./hdd trend 血小板` 的 5 个时序点中,2 个单位是 OCR 乱珠(`109/L`、`7/6.0`),

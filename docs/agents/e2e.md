@@ -49,7 +49,7 @@ App 层 UI 验收不在这里：屏幕逻辑由 `apps/mobile/src/test/` 的 RNTL
 
 - `up -d --force-recreate` 后立刻批量 reparse 会撞 uvicorn keep-alive 竞态(随机 EOF);
   `refresh` 已内置等待与重试。绕过工具手工批量时,同样先等 /healthz 再发。
-- 词典与 unit_families 语义随被测检出:`--from` 已处理;自己写脚本时注意 sys.path 别
+- 词典与单位归一表（`unit_conversions.yaml` / `ocr_forms.yaml`）语义随被测检出:`--from` 已处理;自己写脚本时注意 sys.path 别
   用错检出的 recognizer 包。
 - e2e 快照/台账放 `<主检出>/data/`(gitignored);工具自动解析主检出,不受 worktree 影响。
 - golden 基准跟随 `--from` 检出取(main 与 feature 分支的 golden 可能不同)。
