@@ -172,8 +172,10 @@ export function selectSeries(
     listPoints.find((point) => point.report_id === selectedReportId) ??
     dated[dated.length - 1] ??
     listPoints[listPoints.length - 1];
-  const unitDisplayPoint = listPoints.find(
-    (point) => normalizedUnit(point.unit_display) !== null,
+  const unitDisplayPoint = points.find(
+    (point) =>
+      normalizedUnit(point.unit) === targetUnit &&
+      normalizedUnit(point.unit_display) !== null,
   );
   const unitDisplay = unitDisplayPoint
     ? normalizedUnit(unitDisplayPoint.unit_display)

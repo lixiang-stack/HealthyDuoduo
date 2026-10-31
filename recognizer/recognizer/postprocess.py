@@ -236,6 +236,8 @@ class DictItem:
     local_code: str | None = None
     source_status: str = "pending"
     review_status: str = "pending"
+    notes: str = ""
+    default_unit: str | None = None
     result_kind: str = "quantitative"
     canonical_unit: str | None = None
     unit_display: str | None = None
@@ -364,6 +366,8 @@ def _build_dict(path: Path) -> LabDict:
             local_code=it.get("local_code"),
             source_status=str(it.get("source_status", "pending")),
             review_status=str(it.get("review_status", "pending")),
+            notes=str(it.get("notes", "")),
+            default_unit=it.get("default_unit"),
             result_kind=str(it.get("result_kind", "quantitative")),
             canonical_unit=it.get("canonical_unit"),
             unit_display=it.get("unit_display"),
@@ -1062,6 +1066,13 @@ def _normalize_unit(unit: str | None, item: DictItem | None) -> str | None:
     if unit is None:
         return None
     unit = _clean_unit_text(unit)
+    if item is not None:
+        for form in item.ocr_unit_forms:
+            if str(form.get("form", "")).strip().lower() != unit.lower():
+                continue
+            canonical = str(form.get("canonical", "")).strip()
+            if canonical and canonical.lower() in item.units:
+                return canonical
     cands = load_unit_forms().get(unit.lower())
     if cands and item is not None:
         for canon in cands:
@@ -1179,6 +1190,11 @@ def _resolve_standard_unit(
     display = item.unit_display or canonical
     if key in {_unit_key(canonical), _unit_key(display)}:
         return canonical, display, UnitConversion(type="exact", factor=1, source="UCUM")
+    for form in item.ocr_unit_forms:
+        if _unit_key(str(form.get("form", ""))) != key:
+            continue
+        if _unit_key(str(form.get("canonical", ""))) in {_unit_key(canonical), _unit_key(display)}:
+            return canonical, display, UnitConversion(type="exact", factor=1, source="UCUM")
     for accepted in item.accepted_units:
         if key in {_unit_key(accepted.unit), _unit_key(accepted.ucum)}:
             if accepted.conversion is None or accepted.conversion.type == "none":
@@ -1239,6 +1255,19 @@ def _standardize_item(
             unresolved = numeric_value
         else:
             resolved = _resolve_standard_unit(item, printed)
+            if (
+                resolved is None
+                and printed is None
+                and numeric_value
+                and item.default_unit
+                and _unit_key(item.default_unit)
+                in {_unit_key(item.canonical_unit or ""), _unit_key(item.unit_display or "")}
+            ):
+                out_unit, out_display = item.canonical_unit, item.unit_display or item.canonical_unit
+                if _outside_plausible(out_value, item.plausible_range):
+                    out_unit, out_display = None, None
+                    unresolved = True
+                resolved = (out_unit, out_display, UnitConversion(type="exact", factor=1, source="item default unit"))
             if resolved is None:
                 unresolved = printed is not None or numeric_value
             else:

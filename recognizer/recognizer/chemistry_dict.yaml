@@ -861,7 +861,10 @@ items:
           from: mg/dL
           to: mmol/L
           source: local (pending review)
-    ocr_unit_forms: []
+    ocr_unit_forms:
+      - form: "mol/L"
+        canonical: mmol/L
+        source: "OCR 缺失 m [glu_02]"
     plausible_range:
       low: 0
       high: 100

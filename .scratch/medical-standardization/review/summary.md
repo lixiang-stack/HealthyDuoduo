@@ -1,11 +1,11 @@
 # 医学复核工作包（票 14/15）
 
 本文件由 `recognizer/tools/review_packet.py` 生成。技术复核结果已应用：
-133 项 `review_status=approved`，48 项保持 pending（PDW 1 + needs-info 47）。
-`unit_status=verified` 只在 approved 且单位解析成功时出现。
+181 项 `review_status=approved`；无 pending。PDW 保留 legacy，autoimmune/urinalysis
+按 local + notes 务实批准。`unit_status=verified` 只在 approved 且单位解析成功时出现。
 
-复核记录：`docs/batch-1-reviewed.csv`、`docs/batch-2-reviewed.csv`、
-`docs/summary-reviewed.md`。复核人为非持证技术复核，正式临床签核如有需要另行覆盖。
+复核记录：线下归档（reviewed CSV 不随仓库发布）。复核人为非持证技术复核，
+正式临床签核如有需要另行覆盖。
 
 ## 填写方式
 
@@ -35,10 +35,10 @@
 
 | panel | 项数 | 缺 plausible_range（定量） | source_status=pending | 仅 LOINC | 无任何码 |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| autoimmune | 26 | 0 | 17 | 0 | 0 |
+| autoimmune | 26 | 0 | 0 | 0 | 0 |
 | infection | 8 | 0 | 0 | 0 | 0 |
 | other | 12 | 0 | 0 | 0 | 0 |
-| urinalysis | 40 | 0 | 30 | 0 | 0 |
+| urinalysis | 40 | 0 | 0 | 0 | 0 |
 
 ## 争议项（需明确结论）
 

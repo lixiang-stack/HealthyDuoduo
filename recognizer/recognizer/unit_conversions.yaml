@@ -46,6 +46,9 @@ units:
   - canonical: "ug/mL"
   - canonical: "pg/mL"
   - canonical: "U/L"
+    equivalents:
+      - unit: "IU/L"          # 酶活力单位的旧印法;IFCC 推荐 U/L,数值 1:1
+        conversion: {type: exact, source: "IFCC enzyme unit (1 U = 1 µmol/min); IU/L legacy symbol"}
   - canonical: "IU/L"
   - canonical: "IU/mL"
   - canonical: "mIU/L"

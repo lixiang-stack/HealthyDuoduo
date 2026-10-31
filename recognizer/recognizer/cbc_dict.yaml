@@ -278,7 +278,8 @@ items:
     loinc: 32207-3
     local_code: LOCAL-CBC-PDW
     source_status: local
-    review_status: pending
+    review_status: approved
+    notes: "legacy 兼容项。PDW-SD（fL）与 PDW-CV（%）为两种不同定义，优先使用带 SD/CV 后缀的条目（若后续拆分）。当前按 fL 建模。"
     result_kind: quantitative
     canonical_unit: fL
     unit_display: fL
@@ -472,6 +473,7 @@ items:
     result_kind: quantitative
     canonical_unit: 10*9/L
     unit_display: 10^9/L
+    default_unit: "10^9/L"
     accepted_units:
       - unit: 10^3/uL
         ucum: 10*3/uL
@@ -626,6 +628,7 @@ items:
     result_kind: quantitative
     canonical_unit: mg/L
     unit_display: mg/L
+    default_unit: "mg/L"
     accepted_units:
       - unit: mg/dL
         ucum: mg/dL

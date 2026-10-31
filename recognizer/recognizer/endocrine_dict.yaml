@@ -32,6 +32,7 @@ items:
     result_kind: quantitative
     canonical_unit: m[IU]/L
     unit_display: mIU/L
+    default_unit: "m[IU]/L"
     accepted_units:
       - unit: uIU/mL
         ucum: u[IU]/mL

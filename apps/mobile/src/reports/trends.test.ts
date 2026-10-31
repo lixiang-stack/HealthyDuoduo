@@ -128,7 +128,10 @@ describe('selectSeries', () => {
   it('同单位过滤,日期升序,dateless 沉底;跨单位只计数不混入', () => {
     const points = [
       altHigh(),
-      pointOf(lft06, '丙氨酸氨基转移酶测定', 'lft_06'),
+      pointOf(lft06, '丙氨酸氨基转移酶测定', 'lft_06', {
+        unit: 'mg/L',
+        unit_display: 'mg/L',
+      }),
       altLow(),
     ];
     const series = selectSeries(points, 'U/L', 'lft_02');
@@ -228,16 +231,32 @@ describe('selectSeries', () => {
     const points = [
       altLow(),
       altHigh(),
-      pointOf(lft06, '丙氨酸氨基转移酶测定', 'lft_06'),
+      pointOf(lft06, '丙氨酸氨基转移酶测定', 'lft_06', {
+        unit: 'mg/L',
+        unit_display: 'mg/L',
+      }),
     ];
-    expect(pointOf(lft06, '丙氨酸氨基转移酶测定', 'lft_06').unit).toBeNull();
     const ul = selectSeries(points, 'U/L', 'lft_02');
-    const iu = selectSeries(points, 'IU/L', 'lft_06');
+    const mg = selectSeries(points, 'mg/L', 'lft_06');
 
     expect(ul.listPoints.map((point) => point.report_id)).toEqual(['lft_05', 'lft_02']);
-    expect(iu.listPoints).toEqual([]);
+    expect(mg.listPoints.map((point) => point.report_id)).toEqual(['lft_06']);
     expect(ul.otherUnitCount).toBe(1);
-    expect(iu.otherUnitCount).toBe(3);
+    expect(mg.otherUnitCount).toBe(2);
+  });
+
+  it('全部点未验证时仍用 unit_display 展示单位', () => {
+    const unverified = pointOf(cbc07, 'C反应蛋白测定', 'unverified', {
+      unit: 'mg/L',
+      unit_display: 'mg/L',
+      unit_status: 'unverified',
+    });
+    const point = { ...unverified, unit: '10*9/L', unit_display: '10^9/L' };
+    const series = selectSeries([point], '10*9/L', 'unverified');
+
+    expect(series.listPoints).toEqual([]);
+    expect(series.unverifiedCount).toBe(1);
+    expect(series.unitDisplay).toBe('10^9/L');
   });
 
   it('unit_status=unverified 默认不连接,display 单位用 unit_display', () => {
@@ -613,7 +632,10 @@ describe('formatSeriesMeta', () => {
         altHigh(),
         pointOf(lft02, '丙氨酸氨基转移酶测定', 'undated', { report_date: null }),
         pointOf(lft02, '丙氨酸氨基转移酶测定', 'bad', { value: '<2.00' }),
-        pointOf(lft06, '丙氨酸氨基转移酶测定', 'other-unit'),
+        pointOf(lft06, '丙氨酸氨基转移酶测定', 'other-unit', {
+          unit: 'mg/L',
+          unit_display: 'mg/L',
+        }),
       ],
       'U/L',
       'lft_02',

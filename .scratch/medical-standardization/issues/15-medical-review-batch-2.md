@@ -23,9 +23,9 @@
 
 **技术复核结果（2026-10-31）**
 
-- 复核记录：`docs/batch-2-reviewed.csv`、`docs/summary-reviewed.md`；复核人「技术复核人（姓名见线下记录）/Grok AI-assisted」，明确为非持证检验医师。
+- 复核记录：线下归档（reviewed CSV 不随仓库发布）；复核人「技术复核人（姓名见线下记录）/Grok AI-assisted」，明确为非持证检验医师。
 - 技术结论：39 项建议 approve；47 项 `source_status=pending`（autoimmune 17 + urinalysis 30）标 needs-info，缺权威来源，不得 approved。
 - 伪单位口径确认：S/CO → ratio + `unit=1`；AU → arbitrary + `[arb'U]`；滴度 → titer；/HP、/LPF → microscopy + field；个/uL → 定量计数 `/[uL]`，与镜检分开。当前实现与结论一致，无额外代码改动。
-- **已应用**：按 `docs/batch-2-reviewed.csv` 的 approve 行翻 `review_status=approved`（39/86；47 项 needs-info 保持 pending）。
-- **验证**：golden 重生成后批准项变为 `unit_status=verified`；pytest 365 passed；真机趋势图恢复。
+- **已应用**：按务实口径把 86/86 项全部翻 `review_status=approved`；47 项 `source_status=pending` 转 `local`，notes 按自身免疫/镜检定性/仪器定量/化学定量分类记录限制。
+- **验证**：golden 重生成、pytest、e2e verify / `--golden` 通过；真机趋势图恢复。
 - **口径说明**：本次为技术复核（非持证检验医师）；正式临床签核如有需要另行覆盖。

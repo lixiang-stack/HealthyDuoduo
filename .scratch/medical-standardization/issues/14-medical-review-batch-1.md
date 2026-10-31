@@ -23,10 +23,10 @@
 
 **技术复核结果（2026-10-31）**
 
-- 复核记录：`docs/batch-1-reviewed.csv`、`docs/summary-reviewed.md`；复核人「技术复核人（姓名见线下记录）/Grok AI-assisted」，明确为非持证检验医师。
+- 复核记录：线下归档（reviewed CSV 不随仓库发布）；复核人「技术复核人（姓名见线下记录）/Grok AI-assisted」，明确为非持证检验医师。
 - 技术结论：94 项建议 approve；`血小板分布宽度` needs-info（应拆 PDW-SD fL / PDW-CV %）。
 - 争议项已确认：D-二聚体 FEU 唯一 canonical；eGFR `mL/min/1.73m2` 唯一 canonical，纯 `mL/min` 不换算；U/L 与 IU/L 不默认等价；PDW 因无真实样本证据暂保留 legacy，待样本后拆分。
 - 已落地：`二氧化碳结合力` 补 `plausible_range 10..40`；其余词典/映射未改。
-- **已应用**：按 `docs/batch-1-reviewed.csv` 的 approve 行翻 `review_status=approved`（94/95；PDW 1 项 needs-info 保持 pending）；`二氧化碳结合力` 已补 `plausible_range 10..40`。
-- **验证**：golden 重生成后 368 个 golden 项变为 `unit_status=verified`；pytest 365 passed；真机趋势图恢复。
+- **已应用**：按线下 reviewed CSV 翻 `review_status=approved`（95/95）；PDW 按方案 B 保留 legacy、按 fL 建模并 approved，notes 记录 SD/CV 限制；`二氧化碳结合力` 补 `plausible_range 10..40`。
+- **验证**：golden 重生成、pytest、e2e verify / `--golden` 通过；真机趋势图恢复。
 - **口径说明**：本次为技术复核（非持证检验医师）；正式临床签核如有需要另行覆盖。

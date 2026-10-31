@@ -1037,6 +1037,29 @@ def test_loss_form_dispatched_by_item_registration() -> None:
     assert item_of(r, "嗜碱性粒细胞数").unit == "10*9/L"
 
 
+def test_g1_and_platelet_ocr_forms_normalize() -> None:
+    """g/1→g/L、1/0.01→10^9/L 仅在项注册集内生效。"""
+    ocr = mk_ocr(
+        header_row()
+        + row(30, "血红蛋白", "135", unit="g/1")
+        + row(50, "血小板计数", "152", unit="1/0.01")
+    )
+    r = run_postprocess(ocr)
+    assert item_of(r, "血红蛋白").unit == "g/L"
+    assert item_of(r, "血小板计数").unit == "10*9/L"
+
+
+def test_item_specific_ocr_form_allows_missing_m() -> None:
+    """mol/L 是真实单位，不全局等价；仅该项以 OCR 缺失 m 的形式修复为 mmol/L。"""
+    ocr = mk_ocr(
+        report_header("葡萄糖测定")
+        + row(30, "餐后三小时葡萄糖", "17.04", unit="mol/L", ref="3.9-6.1")
+    )
+    item = item_of(run_postprocess(ocr), "餐后三小时葡萄糖")
+    assert item.unit == "mmol/L"
+    assert item.raw_unit == "mol/L"
+
+
 def test_unknown_unit_kept_raw_as_unverified() -> None:
     """注册集与单位族之外的乱珠不归一:unit=null、raw_unit 留原文、标 unverified。"""
     ocr = mk_ocr(header_row() + row(30, "血红蛋白", "128", unit="xw/L", ref="115-150"))
@@ -1226,7 +1249,7 @@ def test_cbc_standard_output_conversions() -> None:
 
 
 def test_liver_bilirubin_protein_and_enzyme_units() -> None:
-    """票 05:胆红素/蛋白换算;U/L 与 IU/L 不默认等价。"""
+    """票 05:胆红素/蛋白换算;IU/L 作为 U/L 的旧印法按 1:1 归一。"""
     ocr = mk_ocr(
         report_header("肝功报告单")
         + row(30, "总胆红素", "1.2", unit="mg/dL", ref="0.2-1.2")
@@ -1242,10 +1265,10 @@ def test_liver_bilirubin_protein_and_enzyme_units() -> None:
     assert tp.value == "74"
     assert tp.unit == "g/L"
     alt = item_of(r, "丙氨酸转氨酶")
-    assert alt.unit is None
+    assert alt.unit == "U/L"
     assert alt.raw_unit == "IU/L"
-    assert alt.unit_status == "unverified"
-    assert alt.low_confidence is True
+    assert alt.unit_status == "verified"
+    assert alt.low_confidence is False
 
 
 def test_kidney_urate_gate_and_egfr_unverified() -> None:
@@ -1381,6 +1404,40 @@ def test_verified_only_after_approval() -> None:
     approved = _standardize_item(dataclasses.replace(ua, review_status="approved"),
                                  "0.246", "mmol/L", "0.1-0.42", False)
     assert approved.unit_status == "verified"
+
+
+def test_iu_l_normalizes_to_u_l_for_enzyme_items() -> None:
+    """IU/L 是酶活力单位的旧印法；对 canonical U/L 项数值 1:1 归一。"""
+    from recognizer.postprocess import _standardize_item
+
+    chem = next(d for d in _postprocess.load_dicts() if d.report_type == "生化")
+    alt = next(i for i in chem.items if i.name == "丙氨酸氨基转移酶测定")
+    out = _standardize_item(alt, "70", "IU/L", "9-50", False)
+    assert out.unit == "U/L"
+    assert out.raw_unit == "IU/L"
+    assert out.unit_status == "verified"
+
+
+def test_default_unit_fills_missing_print_unit() -> None:
+    """仅对配置了 default_unit 的项，在单据完全未印单位且值为数值时兜底。"""
+    from recognizer.postprocess import _standardize_item
+
+    items = {it.name: it for d in _postprocess.load_dicts() for it in d.items}
+    cases = [
+        ("单核细胞数", "1.03", "0.12-0.80", "10*9/L"),
+        ("超敏C反应蛋白测定", "4.61", "0-3", "mg/L"),
+        ("促甲状腺激素测定", "0.014", "0.350-4.940", "m[IU]/L"),
+    ]
+    for name, value, ref, unit in cases:
+        out = _standardize_item(items[name], value, None, ref, False)
+        assert out.unit == unit, name
+        assert out.unit_status == "verified", name
+
+    # 未配置默认单位的酶类：缺单位仍不猜，保持 unverified。
+    alt = items["丙氨酸氨基转移酶测定"]
+    out = _standardize_item(alt, "70", None, "9-50", False)
+    assert out.unit is None
+    assert out.unit_status == "unverified"
 
 
 def test_golden_standard_fields_are_canonical_and_review_gated() -> None:

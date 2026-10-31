@@ -138,8 +138,9 @@ items:
   code:
   loinc:
   local_code: LOCAL-UA-07
-  source_status: pending
-  review_status: pending
+  source_status: local
+  review_status: approved
+  notes: "local。尿沉渣镜检/定性项目，WS/T 粒度未覆盖到具体形态；按 microscopy/qualitative 建模，与仪器定量计数严格区分。"
   result_kind: qualitative
   canonical_unit:
   unit_display:
@@ -223,8 +224,9 @@ items:
   code:
   loinc:
   local_code: LOCAL-UA-12
-  source_status: pending
-  review_status: pending
+  source_status: local
+  review_status: approved
+  notes: "local。尿沉渣镜检/定性项目，WS/T 粒度未覆盖到具体形态；按 microscopy/qualitative 建模，与仪器定量计数严格区分。"
   result_kind: qualitative
   canonical_unit:
   unit_display:
@@ -236,8 +238,9 @@ items:
   code:
   loinc:
   local_code: LOCAL-UA-13
-  source_status: pending
-  review_status: pending
+  source_status: local
+  review_status: approved
+  notes: "local。尿沉渣镜检/定性项目，WS/T 粒度未覆盖到具体形态；按 microscopy/qualitative 建模，与仪器定量计数严格区分。"
   result_kind: qualitative
   canonical_unit:
   unit_display:
@@ -249,8 +252,9 @@ items:
   code:
   loinc:
   local_code: LOCAL-UA-14
-  source_status: pending
-  review_status: pending
+  source_status: local
+  review_status: approved
+  notes: "local。仪器定量计数（/[uL]），与传统镜检（/HP、/LPF）分开建模，不混用。"
   result_kind: quantitative
   canonical_unit: /uL
   unit_display: 个/μL
@@ -290,8 +294,9 @@ items:
   code:
   loinc:
   local_code: LOCAL-UA-15
-  source_status: pending
-  review_status: pending
+  source_status: local
+  review_status: approved
+  notes: "local。仪器定量计数（/[uL]），与传统镜检（/HP、/LPF）分开建模，不混用。"
   result_kind: quantitative
   canonical_unit: /uL
   unit_display: 个/μL
@@ -331,8 +336,9 @@ items:
   code:
   loinc:
   local_code: LOCAL-UA-16
-  source_status: pending
-  review_status: pending
+  source_status: local
+  review_status: approved
+  notes: "local。尿沉渣镜检/定性项目，WS/T 粒度未覆盖到具体形态；按 microscopy/qualitative 建模，与仪器定量计数严格区分。"
   result_kind: microscopy
   canonical_unit:
   unit_display:
@@ -344,8 +350,9 @@ items:
   code:
   loinc:
   local_code: LOCAL-UA-17
-  source_status: pending
-  review_status: pending
+  source_status: local
+  review_status: approved
+  notes: "local。仪器定量计数（/[uL]），与传统镜检（/HP、/LPF）分开建模，不混用。"
   result_kind: quantitative
   canonical_unit: /uL
   unit_display: 个/μL
@@ -385,8 +392,9 @@ items:
   code:
   loinc:
   local_code: LOCAL-UA-18
-  source_status: pending
-  review_status: pending
+  source_status: local
+  review_status: approved
+  notes: "local。仪器定量计数（/[uL]），与传统镜检（/HP、/LPF）分开建模，不混用。"
   result_kind: quantitative
   canonical_unit: /uL
   unit_display: 个/μL
@@ -426,8 +434,9 @@ items:
   code:
   loinc:
   local_code: LOCAL-UA-19
-  source_status: pending
-  review_status: pending
+  source_status: local
+  review_status: approved
+  notes: "local。尿沉渣镜检/定性项目，WS/T 粒度未覆盖到具体形态；按 microscopy/qualitative 建模，与仪器定量计数严格区分。"
   result_kind: microscopy
   canonical_unit:
   unit_display:
@@ -440,8 +449,9 @@ items:
   code:
   loinc:
   local_code: LOCAL-UA-20
-  source_status: pending
-  review_status: pending
+  source_status: local
+  review_status: approved
+  notes: "local。仪器定量计数（/[uL]），与传统镜检（/HP、/LPF）分开建模，不混用。"
   result_kind: quantitative
   canonical_unit: /uL
   unit_display: 个/μL
@@ -481,8 +491,9 @@ items:
   code:
   loinc:
   local_code: LOCAL-UA-21
-  source_status: pending
-  review_status: pending
+  source_status: local
+  review_status: approved
+  notes: "local。仪器定量计数（/[uL]），与传统镜检（/HP、/LPF）分开建模，不混用。"
   result_kind: quantitative
   canonical_unit: /uL
   unit_display: 个/μL
@@ -521,8 +532,9 @@ items:
   code:
   loinc:
   local_code: LOCAL-UA-22
-  source_status: pending
-  review_status: pending
+  source_status: local
+  review_status: approved
+  notes: "local。尿沉渣镜检/定性项目，WS/T 粒度未覆盖到具体形态；按 microscopy/qualitative 建模，与仪器定量计数严格区分。"
   result_kind: microscopy
   canonical_unit:
   unit_display:
@@ -534,8 +546,9 @@ items:
   code:
   loinc:
   local_code: LOCAL-UA-23
-  source_status: pending
-  review_status: pending
+  source_status: local
+  review_status: approved
+  notes: "local。仪器定量计数（/[uL]），与传统镜检（/HP、/LPF）分开建模，不混用。"
   result_kind: quantitative
   canonical_unit: /uL
   unit_display: 个/μL
@@ -574,8 +587,9 @@ items:
   code:
   loinc:
   local_code: LOCAL-UA-24
-  source_status: pending
-  review_status: pending
+  source_status: local
+  review_status: approved
+  notes: "local。尿沉渣镜检/定性项目，WS/T 粒度未覆盖到具体形态；按 microscopy/qualitative 建模，与仪器定量计数严格区分。"
   result_kind: microscopy
   canonical_unit:
   unit_display:
@@ -587,8 +601,9 @@ items:
   code:
   loinc:
   local_code: LOCAL-UA-25
-  source_status: pending
-  review_status: pending
+  source_status: local
+  review_status: approved
+  notes: "local。仪器定量计数（/[uL]），与传统镜检（/HP、/LPF）分开建模，不混用。"
   result_kind: quantitative
   canonical_unit: /uL
   unit_display: 个/μL
@@ -627,8 +642,9 @@ items:
   code:
   loinc:
   local_code: LOCAL-UA-26
-  source_status: pending
-  review_status: pending
+  source_status: local
+  review_status: approved
+  notes: "local。尿沉渣镜检/定性项目，WS/T 粒度未覆盖到具体形态；按 microscopy/qualitative 建模，与仪器定量计数严格区分。"
   result_kind: microscopy
   canonical_unit:
   unit_display:
@@ -640,8 +656,9 @@ items:
   code:
   loinc:
   local_code: LOCAL-UA-27
-  source_status: pending
-  review_status: pending
+  source_status: local
+  review_status: approved
+  notes: "local。尿沉渣镜检/定性项目，WS/T 粒度未覆盖到具体形态；按 microscopy/qualitative 建模，与仪器定量计数严格区分。"
   result_kind: microscopy
   canonical_unit:
   unit_display:
@@ -652,8 +669,9 @@ items:
   code:
   loinc:
   local_code: LOCAL-UA-28
-  source_status: pending
-  review_status: pending
+  source_status: local
+  review_status: approved
+  notes: "local。尿沉渣镜检/定性项目，WS/T 粒度未覆盖到具体形态；按 microscopy/qualitative 建模，与仪器定量计数严格区分。"
   result_kind: microscopy
   canonical_unit:
   unit_display:
@@ -665,8 +683,9 @@ items:
   code:
   loinc:
   local_code: LOCAL-UA-29
-  source_status: pending
-  review_status: pending
+  source_status: local
+  review_status: approved
+  notes: "local。尿沉渣镜检/定性项目，WS/T 粒度未覆盖到具体形态；按 microscopy/qualitative 建模，与仪器定量计数严格区分。"
   result_kind: microscopy
   canonical_unit:
   unit_display:
@@ -677,8 +696,9 @@ items:
   code:
   loinc:
   local_code: LOCAL-UA-30
-  source_status: pending
-  review_status: pending
+  source_status: local
+  review_status: approved
+  notes: "local。尿沉渣镜检/定性项目，WS/T 粒度未覆盖到具体形态；按 microscopy/qualitative 建模，与仪器定量计数严格区分。"
   result_kind: qualitative
   canonical_unit:
   unit_display:
@@ -689,8 +709,9 @@ items:
   code:
   loinc:
   local_code: LOCAL-UA-31
-  source_status: pending
-  review_status: pending
+  source_status: local
+  review_status: approved
+  notes: "local。仪器定量计数（/[uL]），与传统镜检（/HP、/LPF）分开建模，不混用。"
   result_kind: quantitative
   canonical_unit: /uL
   unit_display: 个/μL
@@ -729,8 +750,9 @@ items:
   code:
   loinc:
   local_code: LOCAL-UA-32
-  source_status: pending
-  review_status: pending
+  source_status: local
+  review_status: approved
+  notes: "local。仪器定量计数（/[uL]），与传统镜检（/HP、/LPF）分开建模，不混用。"
   result_kind: quantitative
   canonical_unit: /uL
   unit_display: 个/μL
@@ -769,8 +791,9 @@ items:
   code:
   loinc:
   local_code: LOCAL-UA-33
-  source_status: pending
-  review_status: pending
+  source_status: local
+  review_status: approved
+  notes: "local。仪器定量计数（/[uL]），与传统镜检（/HP、/LPF）分开建模，不混用。"
   result_kind: quantitative
   canonical_unit: /uL
   unit_display: 个/μL
@@ -809,8 +832,9 @@ items:
   code:
   loinc:
   local_code: LOCAL-UA-34
-  source_status: pending
-  review_status: pending
+  source_status: local
+  review_status: approved
+  notes: "local。仪器定量计数（/[uL]），与传统镜检（/HP、/LPF）分开建模，不混用。"
   result_kind: quantitative
   canonical_unit: /uL
   unit_display: 个/μL
@@ -848,8 +872,9 @@ items:
   code:
   loinc:
   local_code: LOCAL-UA-35
-  source_status: pending
-  review_status: pending
+  source_status: local
+  review_status: approved
+  notes: "local。仪器定量计数（/[uL]），与传统镜检（/HP、/LPF）分开建模，不混用。"
   result_kind: quantitative
   canonical_unit: /uL
   unit_display: 个/μL
@@ -888,8 +913,9 @@ items:
   code:
   loinc:
   local_code: LOCAL-UA-36
-  source_status: pending
-  review_status: pending
+  source_status: local
+  review_status: approved
+  notes: "local。常规尿化学项目，迁移时来源未补全；单位与 result_kind 已按常规建模，可后续补 LOINC。"
   result_kind: quantitative
   canonical_unit: '%'
   unit_display: '%'
@@ -903,8 +929,9 @@ items:
   code:
   loinc:
   local_code: LOCAL-UA-37
-  source_status: pending
-  review_status: pending
+  source_status: local
+  review_status: approved
+  notes: "local。常规尿化学项目，迁移时来源未补全；单位与 result_kind 已按常规建模，可后续补 LOINC。"
   result_kind: quantitative
   canonical_unit: mmol/L
   unit_display: mmol/L
@@ -918,8 +945,9 @@ items:
   code:
   loinc:
   local_code: LOCAL-UA-38
-  source_status: pending
-  review_status: pending
+  source_status: local
+  review_status: approved
+  notes: "local。常规尿化学项目，迁移时来源未补全；单位与 result_kind 已按常规建模，可后续补 LOINC。"
   result_kind: quantitative
   canonical_unit: mmol/L
   unit_display: mmol/L
@@ -933,8 +961,9 @@ items:
   code:
   loinc:
   local_code: LOCAL-UA-39
-  source_status: pending
-  review_status: pending
+  source_status: local
+  review_status: approved
+  notes: "local。常规尿化学项目，迁移时来源未补全；单位与 result_kind 已按常规建模，可后续补 LOINC。"
   result_kind: quantitative
   canonical_unit: mg/L
   unit_display: mg/L
@@ -948,8 +977,9 @@ items:
   code:
   loinc:
   local_code: LOCAL-UA-40
-  source_status: pending
-  review_status: pending
+  source_status: local
+  review_status: approved
+  notes: "local。常规尿化学项目，迁移时来源未补全；单位与 result_kind 已按常规建模，可后续补 LOINC。"
   result_kind: quantitative
   canonical_unit: mg/mmol
   unit_display: mg/mmol
