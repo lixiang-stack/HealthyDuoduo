@@ -1,37 +1,177 @@
 # 凝血词典(真实语料:coag_01 凝血六项(掩码语料);决策 #8 同上)。
 # 名称带互认标记/方法后缀/括号缩写(凝血酶原时间测定(PT)),去装饰后等价规范名。
+# 2026-10-31:新标准 schema 试点(spec: .scratch/medical-standardization/spec.md)。
+# canonical_unit 为 UCUM 码;unit_display 为展示串;accepted_units 只放真实替代单位。
 report_type: 临检
 category:
   title_keywords: ["凝血"]
   min_matched_items: 2
-  # 依据: WS/T 406—2024(凝血初筛 PT/APTT/TT/FIB);WS/T 477—2026(D-二聚体);
-  #       2013 医疗机构临床检验项目目录
+  # 依据: WS/T 886—2026(项目名称/代码);WS/T 406—2024(凝血初筛 PT/APTT/TT/FIB);
+  #       WS/T 477—2026(D-二聚体);2013 医疗机构临床检验项目目录
   panel: coag
 items:
-  - name: 凝血酶原时间
-    aliases: []
-    units: [秒, s]
+  - name: 凝血酶原时间检测
+    code: "0500103A"
+    loinc: "5902-2"
+    source_status: primary
+    review_status: pending
+    synonyms:
+      - term: 凝血酶原时间
+        source: "WS/T 886 0500103A"
+      - term: PT
+        source: "LOINC 5902-2"
+    ocr_aliases: []
+    result_kind: quantitative
+    canonical_unit: "s"
+    unit_display: "秒"
+    accepted_units:
+      - unit: "秒"
+        ucum: "s"
+        conversion: { type: linear, factor: 1, source: "UCUM" }
+    ocr_unit_forms: []
   - name: 凝血酶原时间比值
-    aliases: [凝血酶原时间比值(PTR)]
-    units: []
+    loinc: "5894-1"
+    source_status: secondary
+    review_status: pending
+    synonyms:
+      - term: "凝血酶原时间比值(PTR)"
+        source: "local"
+      - term: PTR
+        source: "LOINC 5894-1"
+    ocr_aliases: []
+    result_kind: ratio
+    canonical_unit: "1"
+    unit_display: "1"
+    accepted_units: []
+    ocr_unit_forms: []
   - name: 国际标准化比值
-    aliases: []
-    units: []
+    loinc: "6301-6"
+    source_status: secondary
+    review_status: pending
+    synonyms:
+      - term: INR
+        source: "LOINC 6301-6"
+    ocr_aliases: []
+    result_kind: ratio
+    canonical_unit: "1"
+    unit_display: "1"
+    accepted_units: []
+    ocr_unit_forms: []
   - name: 凝血酶原活动度
-    aliases: [凝血酶原活动度(PTA)]
-    units: ["%"]
-  - name: 活化部分凝血活酶时间
-    aliases: []
-    units: [秒, s]
-  - name: 纤维蛋白原
-    aliases: []
-    units: [g/L]
-  - name: 凝血酶时间
-    aliases: []
-    units: [秒, s]
-  - name: D-二聚体
-    aliases: [D一二聚体]
-    units: [ng/mL]
-  - name: 纤维蛋白原降解产物
-    aliases: [纤维蛋白（原）降解产物, 纤维蛋白（原）降解产物(FDP)]
-    units: ["μg/mL"]
+    local_code: "LOCAL-PTA"
+    source_status: local
+    review_status: pending
+    synonyms:
+      - term: "凝血酶原活动度(PTA)"
+        source: "local"
+      - term: PTA
+        source: "local"
+    ocr_aliases: []
+    result_kind: quantitative
+    canonical_unit: "%"
+    unit_display: "%"
+    accepted_units: []
+    ocr_unit_forms: []
+  - name: 活化部分凝血活酶时间检测
+    code: "0500203A"
+    loinc: "3173-2"
+    source_status: primary
+    review_status: pending
+    synonyms:
+      - term: 活化部分凝血活酶时间
+        source: "WS/T 886 0500203A"
+      - term: APTT
+        source: "LOINC 3173-2"
+    ocr_aliases: []
+    result_kind: quantitative
+    canonical_unit: "s"
+    unit_display: "秒"
+    accepted_units:
+      - unit: "秒"
+        ucum: "s"
+        conversion: { type: linear, factor: 1, source: "UCUM" }
+    ocr_unit_forms: []
+  - name: 纤维蛋白原检测
+    code: "0500403A"
+    loinc: "3255-7"
+    source_status: primary
+    review_status: pending
+    synonyms:
+      - term: 纤维蛋白原
+        source: "WS/T 886 0500403A"
+      - term: FIB
+        source: "LOINC 3255-7"
+    ocr_aliases: []
+    result_kind: quantitative
+    canonical_unit: "g/L"
+    unit_display: "g/L"
+    accepted_units:
+      - unit: "mg/dL"
+        ucum: "mg/dL"
+        conversion: { type: linear, factor: 0.01, source: "UCUM" }
+    ocr_unit_forms: []
+  - name: 凝血酶时间检测
+    code: "0500303A"
+    loinc: "3243-3"
+    source_status: primary
+    review_status: pending
+    synonyms:
+      - term: 凝血酶时间
+        source: "WS/T 886 0500303A"
+      - term: TT
+        source: "LOINC 3243-3"
+    ocr_aliases: []
+    result_kind: quantitative
+    canonical_unit: "s"
+    unit_display: "秒"
+    accepted_units:
+      - unit: "秒"
+        ucum: "s"
+        conversion: { type: linear, factor: 1, source: "UCUM" }
+    ocr_unit_forms: []
+  - name: D-二聚体检测
+    code: "0501703A"
+    loinc: "48065-7"
+    source_status: primary
+    review_status: pending
+    result_basis: FEU
+    synonyms:
+      - term: D-二聚体
+        source: "WS/T 886 0501703A"
+      - term: D-Dimer
+        source: "LOINC 48065-7"
+    ocr_aliases:
+      - term: D一二聚体
+        evidence: ["coag_01"]
+    result_kind: quantitative
+    canonical_unit: "ug/L"
+    unit_display: "μg/L"
+    accepted_units:
+      - unit: "ng/mL"
+        ucum: "ng/mL"
+        conversion: { type: linear, factor: 1, source: "WS/T 477—2026" }
+      - unit: "mg/L"
+        ucum: "mg/L"
+        conversion: { type: linear, factor: 1000, source: "WS/T 477—2026" }
+    ocr_unit_forms: []
+  - name: 纤维蛋白（原）降解产物检测
+    code: "0501803A"
+    loinc: "30226-5"
+    source_status: primary
+    review_status: pending
+    synonyms:
+      - term: 纤维蛋白（原）降解产物
+        source: "WS/T 886 0501803A"
+      - term: "纤维蛋白（原）降解产物(FDP)"
+        source: "WS/T 886 0501803A"
+      - term: FDP
+        source: "LOINC 30226-5"
+    ocr_aliases: []
+    result_kind: quantitative
+    canonical_unit: "ug/mL"
+    unit_display: "μg/mL"
+    accepted_units:
+      - unit: "mg/L"
+        ucum: "mg/L"
+        conversion: { type: linear, factor: 1, source: "UCUM" }
+    ocr_unit_forms: []

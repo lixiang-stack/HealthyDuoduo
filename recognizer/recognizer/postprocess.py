@@ -206,6 +206,20 @@ class DictItem:
     aliases: tuple[str, ...]
     units: frozenset[str]
     panel: Panel
+    # 标准层:名称/代码/单位/结果类型/来源;缺省时保持旧词典行为。
+    code: str | None = None
+    loinc: str | None = None
+    local_code: str | None = None
+    source_status: str = "pending"
+    review_status: str = "pending"
+    result_kind: str = "quantitative"
+    canonical_unit: str | None = None
+    unit_display: str | None = None
+    accepted_units: tuple[dict[str, object], ...] = ()
+    ocr_unit_forms: tuple[dict[str, object], ...] = ()
+    synonyms: tuple[str, ...] = ()
+    ocr_aliases: tuple[str, ...] = ()
+    result_basis: str | None = None
 
 
 @dataclass
@@ -233,6 +247,37 @@ def load_dicts() -> tuple[LabDict, ...]:
     return tuple(_build_dict(p) for p in sorted(DICT_DIR.glob(DICT_GLOB)))
 
 
+def _aliases_of(it: dict) -> tuple[str, ...]:
+    """别名 = 旧 aliases + 标准 synonyms + OCR 变体;去重保序,末尾补规范名。"""
+    aliases = list(it.get("aliases", []))
+    aliases += [s["term"] for s in it.get("synonyms") or []]
+    aliases += [a["term"] for a in it.get("ocr_aliases") or []]
+    return tuple(dict.fromkeys(aliases)) + (it["name"],)
+
+
+def _canonical_units_of(it: dict) -> list[str]:
+    """词典项的单位注册集:新 schema 用 canonical + display,旧 schema 用 units。"""
+    if it.get("canonical_unit") or it.get("unit_display"):
+        return [u for u in (it.get("canonical_unit"), it.get("unit_display")) if u]
+    return list(it.get("units", []))
+
+
+def _literals_of(it: DictItem) -> set[str]:
+    """一项可参与匹配的单位字面量:canonical/display + 真实替代 + OCR 损耗形。"""
+    out = {u for u in it.units if u and u != "1"}
+    for u in (it.canonical_unit, it.unit_display):
+        if u and u != "1":
+            out.add(u)
+    for au in it.accepted_units:
+        for key in ("unit", "ucum"):
+            if au.get(key):
+                out.add(str(au[key]))
+    for form in it.ocr_unit_forms:
+        if form.get("form"):
+            out.add(str(form["form"]))
+    return out
+
+
 def _build_dict(path: Path) -> LabDict:
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     category = raw["category"]
@@ -242,9 +287,22 @@ def _build_dict(path: Path) -> LabDict:
     items = tuple(
         DictItem(
             name=it["name"],
-            aliases=tuple(it.get("aliases", [])) + (it["name"],),
-            units=frozenset(u.lower() for u in it.get("units", [])),
+            aliases=_aliases_of(it),
+            units=frozenset(u.lower() for u in _canonical_units_of(it)),
             panel=Panel(it.get("panel", default_panel)),
+            code=it.get("code"),
+            loinc=it.get("loinc"),
+            local_code=it.get("local_code"),
+            source_status=str(it.get("source_status", "pending")),
+            review_status=str(it.get("review_status", "pending")),
+            result_kind=str(it.get("result_kind", "quantitative")),
+            canonical_unit=it.get("canonical_unit"),
+            unit_display=it.get("unit_display"),
+            accepted_units=tuple(it.get("accepted_units") or ()),
+            ocr_unit_forms=tuple(it.get("ocr_unit_forms") or ()),
+            synonyms=tuple(s["term"] for s in it.get("synonyms") or ()),
+            ocr_aliases=tuple(a["term"] for a in it.get("ocr_aliases") or ()),
+            result_basis=it.get("result_basis"),
         )
         for it in raw.get("items") or []
     )
@@ -255,7 +313,7 @@ def _build_dict(path: Path) -> LabDict:
     # 全部词典单位的字面量(含 * 前缀变体),longest-first 供前缀剥离
     units: set[str] = set()
     for it in items:
-        units |= it.units
+        units |= _literals_of(it)
     literals: list[str] = []
     for u in sorted(units):
         literals.append(u)
