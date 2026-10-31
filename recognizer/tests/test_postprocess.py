@@ -755,7 +755,10 @@ def test_narrative_right_value_pairs_risk_ratios() -> None:
         risk = item_of(r, name)
         assert risk.result_kind == "ratio"
         assert risk.raw_value == risk.value
-        assert risk.unit_status == "unverified"
+        # 1:1913 这类比值串不是纯数值,无法给出可验证的 canonical 单位;
+        # 2.5 / 33.25 这类数值可在 approved 后标 verified。
+        expected = "unverified" if risk.value.startswith("1:") else "verified"
+        assert risk.unit_status == expected
 
 
 def test_imaging_dict_has_no_measurement_items() -> None:
@@ -1170,7 +1173,7 @@ def test_coag_standard_output_golden() -> None:
     assert (pt.unit, pt.unit_display, pt.raw_unit) == ("s", "秒", "秒")
     assert pt.code == "0500103A"
     assert pt.result_kind == "quantitative"
-    assert pt.unit_status == "unverified"
+    assert pt.unit_status == "verified"
     assert pt.ref_kind == "numeric"
 
     for name in ("凝血酶原时间比值", "国际标准化比值"):
@@ -1372,18 +1375,21 @@ def test_verified_only_after_approval() -> None:
 
     chem = next(d for d in _postprocess.load_dicts() if d.report_type == "生化")
     ua = next(i for i in chem.items if i.name == "尿酸测定")
-    pending = _standardize_item(ua, "0.246", "mmol/L", "0.1-0.42", False)
+    pending = _standardize_item(dataclasses.replace(ua, review_status="pending"),
+                                "0.246", "mmol/L", "0.1-0.42", False)
     assert pending.unit_status == "unverified"
     approved = _standardize_item(dataclasses.replace(ua, review_status="approved"),
                                  "0.246", "mmol/L", "0.1-0.42", False)
     assert approved.unit_status == "verified"
 
 
-def test_golden_standard_fields_are_canonical_and_pending() -> None:
-    """全量 golden:unit 只含 canonical;pending 项不得出现 verified;OCR 碎片为 0。"""
+def test_golden_standard_fields_are_canonical_and_review_gated() -> None:
+    """全量 golden:unit 只含 canonical;verified 仅限 approved;OCR 碎片为 0。"""
     canonical = set()
+    review_status: dict[str, str] = {}
     for d in _postprocess.load_dicts():
         for it in d.items:
+            review_status[it.name] = it.review_status
             if it.canonical_unit:
                 canonical.add(it.canonical_unit)
     canonical |= {"1", "[arb'U]", "[IU]/mL", "[IU]/L", "m[IU]/L", "m[IU]/mL", "U/mL", "/uL"}
@@ -1395,7 +1401,12 @@ def test_golden_standard_fields_are_canonical_and_pending() -> None:
             if item.unit is not None:
                 assert item.unit in canonical, f"{sample_id}/{item.name}: {item.unit!r}"
             assert item.unit not in fragments, f"{sample_id}/{item.name}: OCR fragment"
-            assert item.unit_status != "verified", f"{sample_id}/{item.name}: pending verified"
+            if item.unit_status == "verified":
+                assert review_status[item.name] == "approved", (
+                    f"{sample_id}/{item.name}: verified but review_status={review_status[item.name]}"
+                )
+            elif review_status[item.name] == "pending":
+                assert item.unit_status != "verified", f"{sample_id}/{item.name}: pending verified"
             if item.value is not None:
                 assert item.raw_value is not None, f"{sample_id}/{item.name}: raw_value 丢失"
 

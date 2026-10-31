@@ -29,7 +29,7 @@ items:
   loinc:
   local_code:
   source_status: primary
-  review_status: pending
+  review_status: approved
   result_kind: qualitative
   canonical_unit:
   unit_display:
@@ -45,7 +45,7 @@ items:
   loinc:
   local_code:
   source_status: primary
-  review_status: pending
+  review_status: approved
   result_kind: qualitative
   canonical_unit:
   unit_display:
@@ -62,7 +62,7 @@ items:
   loinc:
   local_code:
   source_status: primary
-  review_status: pending
+  review_status: approved
   result_kind: qualitative
   canonical_unit:
   unit_display:
@@ -81,7 +81,7 @@ items:
   loinc:
   local_code:
   source_status: primary
-  review_status: pending
+  review_status: approved
   result_kind: qualitative
   canonical_unit:
   unit_display:
@@ -97,7 +97,7 @@ items:
   loinc:
   local_code:
   source_status: primary
-  review_status: pending
+  review_status: approved
   result_kind: quantitative
   canonical_unit: umol/L
   unit_display: μmol/L
@@ -125,7 +125,7 @@ items:
   loinc:
   local_code:
   source_status: primary
-  review_status: pending
+  review_status: approved
   result_kind: qualitative
   canonical_unit:
   unit_display:
@@ -155,7 +155,7 @@ items:
   loinc:
   local_code:
   source_status: primary
-  review_status: pending
+  review_status: approved
   result_kind: quantitative
   canonical_unit: '1'
   unit_display: '1'
@@ -174,7 +174,7 @@ items:
   loinc:
   local_code:
   source_status: primary
-  review_status: pending
+  review_status: approved
   result_kind: qualitative
   canonical_unit:
   unit_display:
@@ -190,7 +190,7 @@ items:
   loinc:
   local_code:
   source_status: primary
-  review_status: pending
+  review_status: approved
   result_kind: qualitative
   canonical_unit:
   unit_display:
@@ -208,7 +208,7 @@ items:
   loinc:
   local_code:
   source_status: primary
-  review_status: pending
+  review_status: approved
   result_kind: quantitative
   canonical_unit: '1'
   unit_display: '1'

@@ -28,7 +28,7 @@ items:
     loinc: 3016-3
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: m[IU]/L
     unit_display: mIU/L
@@ -55,7 +55,7 @@ items:
     loinc: 3013-0
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: ug/L
     unit_display: μg/L
@@ -82,7 +82,7 @@ items:
     loinc: 3053-6
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: nmol/L
     unit_display: nmol/L
@@ -125,7 +125,7 @@ items:
     loinc: 3026-2
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: nmol/L
     unit_display: nmol/L
@@ -160,7 +160,7 @@ items:
     loinc: 3051-0
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: pmol/L
     unit_display: pmol/L
@@ -187,7 +187,7 @@ items:
     loinc: 3024-7
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: pmol/L
     unit_display: pmol/L
@@ -214,7 +214,7 @@ items:
     loinc: 8099-4
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: "[IU]/mL"
     unit_display: IU/mL
@@ -246,7 +246,7 @@ items:
     loinc: 8098-6
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: "[IU]/mL"
     unit_display: IU/mL
@@ -278,7 +278,7 @@ items:
     loinc: 57416-0
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: "[IU]/L"
     unit_display: IU/L
@@ -299,7 +299,7 @@ items:
     loinc: 2839-9
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: nmol/L
     unit_display: nmol/L
@@ -326,7 +326,7 @@ items:
     loinc: 19080-1
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: "[IU]/L"
     unit_display: IU/L

@@ -14,7 +14,7 @@ items:
     loinc:
     local_code: LOCAL-BLOOD-01
     source_status: local
-    review_status: pending
+    review_status: approved
     result_kind: qualitative
     canonical_unit:
     unit_display:
@@ -26,7 +26,7 @@ items:
     loinc:
     local_code: LOCAL-BLOOD-02
     source_status: local
-    review_status: pending
+    review_status: approved
     result_kind: qualitative
     canonical_unit:
     unit_display:
@@ -38,7 +38,7 @@ items:
     loinc:
     local_code: LOCAL-BLOOD-03
     source_status: local
-    review_status: pending
+    review_status: approved
     result_kind: qualitative
     canonical_unit:
     unit_display:
