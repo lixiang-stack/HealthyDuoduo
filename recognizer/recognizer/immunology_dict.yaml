@@ -17,159 +17,938 @@ category:
 items:
 
 # ==== ana_dict.yaml(原 自身抗体;min=2;titles=['抗核抗体', '自免肝', '自身抗体']) ====
-  - name: 抗RNP抗体
+  - name: 抗 RNP抗体测定
     panel: autoimmune
     aliases: [抗RNP抗体(RNP)]
-    units: [AU]
-  - name: 抗Sm抗体
+    synonyms:
+      - term: 抗RNP抗体
+        source: legacy printed name (pre-standardization dictionary)
+    code: 2500304A
+    loinc:
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: arbitrary
+    canonical_unit: "[arb'U]"
+    unit_display: AU
+    accepted_units:
+      - unit: AU
+        ucum: "[arb'U]"
+        conversion:
+          type: exact
+          factor: 1
+          from: AU
+          to: "[arb'U]"
+          source: LOINC arbitrary unit
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000
+  - name: 抗 Sm抗体测定
     panel: autoimmune
     aliases: [抗Sm抗体(Sm)]
-    units: [AU]
-  - name: 抗SS-A 60抗体
+    synonyms:
+      - term: 抗Sm抗体
+        source: legacy printed name (pre-standardization dictionary)
+    code: 2500404A
+    loinc:
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: arbitrary
+    canonical_unit: "[arb'U]"
+    unit_display: AU
+    accepted_units:
+      - unit: AU
+        ucum: "[arb'U]"
+        conversion:
+          type: exact
+          factor: 1
+          from: AU
+          to: "[arb'U]"
+          source: LOINC arbitrary unit
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000
+  - name: 抗 SS-A 60抗体测定
     panel: autoimmune
     aliases: [抗SS—A 60抗体, 抗SS—A 60抗体(SS-A 60)]
-    units: [AU]
-  - name: 抗SS-A 52抗体
+    synonyms:
+      - term: 抗SS-A 60抗体
+        source: legacy printed name (pre-standardization dictionary)
+    code: 2500504A
+    loinc:
+    local_code: LOCAL-IMM-03
+    source_status: primary
+    review_status: pending
+    result_kind: arbitrary
+    canonical_unit: "[arb'U]"
+    unit_display: AU
+    accepted_units:
+      - unit: AU
+        ucum: "[arb'U]"
+        conversion:
+          type: exact
+          factor: 1
+          from: AU
+          to: "[arb'U]"
+          source: LOINC arbitrary unit
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000
+  - name: 抗 SS-A 52抗体测定
     panel: autoimmune
     aliases: [抗SS—A 52抗体, 抗SS—A 52抗体(SS-A 52)]
-    units: [AU]
-  - name: 抗SS-B抗体
+    synonyms:
+      - term: 抗SS-A 52抗体
+        source: legacy printed name (pre-standardization dictionary)
+    code: 2500504A
+    loinc:
+    local_code: LOCAL-IMM-04
+    source_status: primary
+    review_status: pending
+    result_kind: arbitrary
+    canonical_unit: "[arb'U]"
+    unit_display: AU
+    accepted_units:
+      - unit: AU
+        ucum: "[arb'U]"
+        conversion:
+          type: exact
+          factor: 1
+          from: AU
+          to: "[arb'U]"
+          source: LOINC arbitrary unit
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000
+  - name: 抗 SS-B抗体测定
     panel: autoimmune
     aliases: [抗SS—B抗体, 抗SS—B抗体(SS-B)]
-    units: [AU]
-  - name: 抗Scl-70抗体
+    synonyms:
+      - term: 抗SS-B抗体
+        source: legacy printed name (pre-standardization dictionary)
+    code: 2500604A
+    loinc:
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: arbitrary
+    canonical_unit: "[arb'U]"
+    unit_display: AU
+    accepted_units:
+      - unit: AU
+        ucum: "[arb'U]"
+        conversion:
+          type: exact
+          factor: 1
+          from: AU
+          to: "[arb'U]"
+          source: LOINC arbitrary unit
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000
+  - name: 抗 Scl-70抗体测定
     panel: autoimmune
     aliases: [抗Scl-70抗体(Sc1-70), 抗Sc1-70抗体(Sc1-70)]
-    units: [AU]
+    synonyms:
+      - term: 抗Scl-70抗体
+        source: legacy printed name (pre-standardization dictionary)
+    code: 2500804A
+    loinc:
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: arbitrary
+    canonical_unit: "[arb'U]"
+    unit_display: AU
+    accepted_units:
+      - unit: AU
+        ucum: "[arb'U]"
+        conversion:
+          type: exact
+          factor: 1
+          from: AU
+          to: "[arb'U]"
+          source: LOINC arbitrary unit
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000
   - name: 抗PM-Scl抗体
     panel: autoimmune
     aliases: [抗PM—Scl抗体, 抗PM—Scl抗体(PM-Scl)]
-    units: [AU]
-  - name: 抗Jo-1抗体
+    code:
+    loinc:
+    local_code: LOCAL-IMM-07
+    source_status: pending
+    review_status: pending
+    result_kind: arbitrary
+    canonical_unit: "[arb'U]"
+    unit_display: AU
+    accepted_units:
+      - unit: AU
+        ucum: "[arb'U]"
+        conversion:
+          type: exact
+          factor: 1
+          from: AU
+          to: "[arb'U]"
+          source: LOINC arbitrary unit
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000
+  - name: 抗 Jo-1抗体测定
     panel: autoimmune
     aliases: [抗Jo-1抗体(Jo-1)]
-    units: [AU]
+    synonyms:
+      - term: 抗Jo-1抗体
+        source: legacy printed name (pre-standardization dictionary)
+    code: 2500904A
+    loinc:
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: arbitrary
+    canonical_unit: "[arb'U]"
+    unit_display: AU
+    accepted_units:
+      - unit: AU
+        ucum: "[arb'U]"
+        conversion:
+          type: exact
+          factor: 1
+          from: AU
+          to: "[arb'U]"
+          source: LOINC arbitrary unit
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000
   - name: 抗CENP B抗体
     panel: autoimmune
     aliases: [抗CENP B抗体(CENP B)]
-    units: [AU]
+    code:
+    loinc:
+    local_code: LOCAL-IMM-09
+    source_status: pending
+    review_status: pending
+    result_kind: arbitrary
+    canonical_unit: "[arb'U]"
+    unit_display: AU
+    accepted_units:
+      - unit: AU
+        ucum: "[arb'U]"
+        conversion:
+          type: exact
+          factor: 1
+          from: AU
+          to: "[arb'U]"
+          source: LOINC arbitrary unit
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000
   - name: 抗PCNA抗体
     panel: autoimmune
     aliases: [抗PCNA抗体(PCNA)]
-    units: [AU]
+    code:
+    loinc:
+    local_code: LOCAL-IMM-10
+    source_status: pending
+    review_status: pending
+    result_kind: arbitrary
+    canonical_unit: "[arb'U]"
+    unit_display: AU
+    accepted_units:
+      - unit: AU
+        ucum: "[arb'U]"
+        conversion:
+          type: exact
+          factor: 1
+          from: AU
+          to: "[arb'U]"
+          source: LOINC arbitrary unit
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000
   - name: 抗Nucleosome抗体
     panel: autoimmune
     aliases: [抗Nucleosome抗体(Nucleosome)]
-    units: [AU]
+    code:
+    loinc:
+    local_code: LOCAL-IMM-11
+    source_status: pending
+    review_status: pending
+    result_kind: arbitrary
+    canonical_unit: "[arb'U]"
+    unit_display: AU
+    accepted_units:
+      - unit: AU
+        ucum: "[arb'U]"
+        conversion:
+          type: exact
+          factor: 1
+          from: AU
+          to: "[arb'U]"
+          source: LOINC arbitrary unit
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000
   - name: 抗Histone抗体
     panel: autoimmune
     aliases: [抗Histone抗体(Histone)]
-    units: [AU]
+    code:
+    loinc:
+    local_code: LOCAL-IMM-12
+    source_status: pending
+    review_status: pending
+    result_kind: arbitrary
+    canonical_unit: "[arb'U]"
+    unit_display: AU
+    accepted_units:
+      - unit: AU
+        ucum: "[arb'U]"
+        conversion:
+          type: exact
+          factor: 1
+          from: AU
+          to: "[arb'U]"
+          source: LOINC arbitrary unit
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000
   - name: 抗Ribosomal P抗体
     panel: autoimmune
     aliases: [抗Ribosomal P抗体(Ribosomal P)]
-    units: [AU]
+    code:
+    loinc:
+    local_code: LOCAL-IMM-13
+    source_status: pending
+    review_status: pending
+    result_kind: arbitrary
+    canonical_unit: "[arb'U]"
+    unit_display: AU
+    accepted_units:
+      - unit: AU
+        ucum: "[arb'U]"
+        conversion:
+          type: exact
+          factor: 1
+          from: AU
+          to: "[arb'U]"
+          source: LOINC arbitrary unit
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000
   - name: 抗AMA-M2抗体
     panel: autoimmune
     aliases: [抗AMA—M2抗体, 抗AMA—M2抗体(AMA-M2)]
-    units: [AU]
+    code:
+    loinc:
+    local_code: LOCAL-IMM-14
+    source_status: pending
+    review_status: pending
+    result_kind: arbitrary
+    canonical_unit: "[arb'U]"
+    unit_display: AU
+    accepted_units:
+      - unit: AU
+        ucum: "[arb'U]"
+        conversion:
+          type: exact
+          factor: 1
+          from: AU
+          to: "[arb'U]"
+          source: LOINC arbitrary unit
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000
   - name: 抗C1q抗体
     panel: autoimmune
     aliases: [抗C1q抗体(C1q)]
-    units: [U/mL]
-  - name: 抗dsDNA抗体
+    code:
+    loinc:
+    local_code: LOCAL-IMM-15
+    source_status: pending
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: U/mL
+    unit_display: U/mL
+    accepted_units:
+      - unit: U/mL
+        ucum: U/mL
+        conversion:
+          type: exact
+          factor: 1
+          from: U/mL
+          to: U/mL
+          source: local arbitrary unit
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 10000
+  - name: 抗双链 DNA抗体测定
     panel: autoimmune
     aliases: [抗dsDNA抗体(dsDNA)]
-    units: [IU/mL]
-  - name: ANA(IIF)
+    synonyms:
+      - term: 抗dsDNA抗体
+        source: legacy printed name (pre-standardization dictionary)
+    code: 2500204A
+    loinc:
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: "[IU]/mL"
+    unit_display: IU/mL
+    accepted_units:
+      - unit: IU/mL
+        ucum: "[IU]/mL"
+        conversion:
+          type: exact
+          factor: 1
+          from: IU/mL
+          to: "[IU]/mL"
+          source: UCUM
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000
+  - name: 抗核抗体检测
     panel: autoimmune
     aliases: [ANA(IIF)(ANA(IIF)), "ANA(I IF)(ANA(IIF))", "ANA(IIF) (ANA(IIF))"]
-    units: []
+    synonyms:
+      - term: ANA(IIF)
+        source: legacy printed name (pre-standardization dictionary)
+    code: 2500104B
+    loinc:
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: qualitative
+    canonical_unit:
+    unit_display:
+    accepted_units: []
+    ocr_unit_forms: []
   - name: 抗核抗体主荧光核型
     panel: autoimmune
     aliases: [抗核抗体主荧光核型(ZHX2)]
-    units: []
+    code:
+    loinc:
+    local_code: LOCAL-IMM-18
+    source_status: pending
+    review_status: pending
+    result_kind: qualitative
+    canonical_unit:
+    unit_display:
+    accepted_units: []
+    ocr_unit_forms: []
   - name: 抗线粒体抗体
     panel: autoimmune
     aliases: [抗线粒体抗体(AMA)]
-    units: []
+    code:
+    loinc:
+    local_code: LOCAL-IMM-19
+    source_status: pending
+    review_status: pending
+    result_kind: qualitative
+    canonical_unit:
+    unit_display:
+    accepted_units: []
+    ocr_unit_forms: []
   - name: 抗平滑肌抗体
     panel: autoimmune
     aliases: [抗平滑肌抗体(ASMA)]
-    units: []
+    code:
+    loinc:
+    local_code: LOCAL-IMM-20
+    source_status: pending
+    review_status: pending
+    result_kind: qualitative
+    canonical_unit:
+    unit_display:
+    accepted_units: []
+    ocr_unit_forms: []
   - name: 抗sp100抗体
     panel: autoimmune
     aliases: [抗sp100抗体(sp100)]
-    units: [AU]
+    code:
+    loinc:
+    local_code: LOCAL-IMM-21
+    source_status: pending
+    review_status: pending
+    result_kind: arbitrary
+    canonical_unit: "[arb'U]"
+    unit_display: AU
+    accepted_units:
+      - unit: AU
+        ucum: "[arb'U]"
+        conversion:
+          type: exact
+          factor: 1
+          from: AU
+          to: "[arb'U]"
+          source: LOINC arbitrary unit
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000
   - name: 抗LC-1抗体
     panel: autoimmune
     aliases: [抗LC—1抗体, 抗LC—1抗体(LC-1)]
-    units: [AU]
+    code:
+    loinc:
+    local_code: LOCAL-IMM-22
+    source_status: pending
+    review_status: pending
+    result_kind: arbitrary
+    canonical_unit: "[arb'U]"
+    unit_display: AU
+    accepted_units:
+      - unit: AU
+        ucum: "[arb'U]"
+        conversion:
+          type: exact
+          factor: 1
+          from: AU
+          to: "[arb'U]"
+          source: LOINC arbitrary unit
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000
   - name: 抗LKM-1抗体
     panel: autoimmune
     aliases: [抗LKM—1抗体, 抗LKM—1抗体(LKM-1)]
-    units: [AU]
+    code:
+    loinc:
+    local_code: LOCAL-IMM-23
+    source_status: pending
+    review_status: pending
+    result_kind: arbitrary
+    canonical_unit: "[arb'U]"
+    unit_display: AU
+    accepted_units:
+      - unit: AU
+        ucum: "[arb'U]"
+        conversion:
+          type: exact
+          factor: 1
+          from: AU
+          to: "[arb'U]"
+          source: LOINC arbitrary unit
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000
   - name: 抗SLA/LP抗体
     panel: autoimmune
     aliases: [抗SLA/LP抗体(SLA/LP)]
-    units: [AU]
+    code:
+    loinc:
+    local_code: LOCAL-IMM-24
+    source_status: pending
+    review_status: pending
+    result_kind: arbitrary
+    canonical_unit: "[arb'U]"
+    unit_display: AU
+    accepted_units:
+      - unit: AU
+        ucum: "[arb'U]"
+        conversion:
+          type: exact
+          factor: 1
+          from: AU
+          to: "[arb'U]"
+          source: LOINC arbitrary unit
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000
   - name: 抗AMA-M2-3E抗体
     panel: autoimmune
     aliases: [抗AMA—M2—3E抗体, 抗AMA—M2—3E抗体(AMA-M2-3E)]
-    units: [U/mL]
+    code:
+    loinc:
+    local_code: LOCAL-IMM-25
+    source_status: pending
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: U/mL
+    unit_display: U/mL
+    accepted_units:
+      - unit: U/mL
+        ucum: U/mL
+        conversion:
+          type: exact
+          factor: 1
+          from: U/mL
+          to: U/mL
+          source: local arbitrary unit
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 10000
   - name: 抗gp210抗体
     panel: autoimmune
     aliases: [抗gp210抗体(gp210)]
-    units: [AU]
+    code:
+    loinc:
+    local_code: LOCAL-IMM-26
+    source_status: pending
+    review_status: pending
+    result_kind: arbitrary
+    canonical_unit: "[arb'U]"
+    unit_display: AU
+    accepted_units:
+      - unit: AU
+        ucum: "[arb'U]"
+        conversion:
+          type: exact
+          factor: 1
+          from: AU
+          to: "[arb'U]"
+          source: LOINC arbitrary unit
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000
 
 # ==== infectious_dict.yaml(原 传染病;min=2;titles=['术前八项', '乙肝', '肝炎']) ====
-  - name: 乙肝表面抗原
+  - name: 乙型肝炎病毒表面抗原测定
     panel: infection
     aliases: [乙肝病毒表面抗原定量(HBsAg), 乙型肝炎表面抗原（HBsAg)]
-    units: [IU/mL]
-  - name: 乙肝表面抗体
+    synonyms:
+      - term: 乙肝表面抗原
+        source: legacy printed name (pre-standardization dictionary)
+    code: 2400104A
+    loinc:
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: "[IU]/mL"
+    unit_display: IU/mL
+    accepted_units:
+      - unit: IU/mL
+        ucum: "[IU]/mL"
+        conversion:
+          type: exact
+          factor: 1
+          from: IU/mL
+          to: "[IU]/mL"
+          source: UCUM
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000
+  - name: 乙型肝炎病毒表面抗体测定
     panel: infection
     aliases: [乙肝表面抗体定量(HBsAb), 乙型肝炎表面抗体（HBsAb）]
-    units: [mIU/mL]
-  - name: 乙肝e抗原
+    synonyms:
+      - term: 乙肝表面抗体
+        source: legacy printed name (pre-standardization dictionary)
+    code: 2400204A
+    loinc:
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: m[IU]/mL
+    unit_display: mIU/mL
+    accepted_units:
+      - unit: mIU/mL
+        ucum: m[IU]/mL
+        conversion:
+          type: exact
+          factor: 1
+          from: mIU/mL
+          to: m[IU]/mL
+          source: UCUM
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000
+  - name: 乙型肝炎病毒e 抗原测定
     panel: infection
     aliases: [乙肝e抗原定量(HBeAg), 乙型肝炎e抗原]
-    units: [s/co, S/CO]
-  - name: 乙肝e抗体
+    synonyms:
+      - term: 乙肝e抗原
+        source: legacy printed name (pre-standardization dictionary)
+    code: 2400304A
+    loinc:
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: ratio
+    canonical_unit: '1'
+    unit_display: '1'
+    accepted_units:
+      - unit: S/CO
+        ucum: '1'
+        conversion:
+          type: exact
+          factor: 1
+          from: S/CO
+          to: '1'
+          source: local ratio convention
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000
+  - name: 乙型肝炎病毒e 抗体检测
     panel: infection
     aliases: [乙肝e抗体定量(HBeAb), 乙型肝炎e抗体]
-    units: [s/co, S/CO]
-  - name: 乙肝核心抗体
+    synonyms:
+      - term: 乙肝e抗体
+        source: legacy printed name (pre-standardization dictionary)
+    code: 2400404B
+    loinc:
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: ratio
+    canonical_unit: '1'
+    unit_display: '1'
+    accepted_units:
+      - unit: S/CO
+        ucum: '1'
+        conversion:
+          type: exact
+          factor: 1
+          from: S/CO
+          to: '1'
+          source: local ratio convention
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000
+  - name: 乙型肝炎病毒核心抗体检测
     panel: infection
     aliases: [乙肝核心抗体定量(HBcAb), 乙型肝炎核心抗体（HBcAb)]
-    units: [s/co, S/CO]
-  - name: 丙肝抗体
+    synonyms:
+      - term: 乙肝核心抗体
+        source: legacy printed name (pre-standardization dictionary)
+    code: 2400504B
+    loinc:
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: ratio
+    canonical_unit: '1'
+    unit_display: '1'
+    accepted_units:
+      - unit: S/CO
+        ucum: '1'
+        conversion:
+          type: exact
+          factor: 1
+          from: S/CO
+          to: '1'
+          source: local ratio convention
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000
+  - name: 丙型肝炎病毒抗体检测
     panel: infection
     aliases: [丙肝病毒抗体(HCV-Ab)]
-    units: [S/CO]
-  - name: 艾滋病抗体抗原
+    synonyms:
+      - term: 丙肝抗体
+        source: legacy printed name (pre-standardization dictionary)
+    code: 2400604B
+    loinc:
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: ratio
+    canonical_unit: '1'
+    unit_display: '1'
+    accepted_units:
+      - unit: S/CO
+        ucum: '1'
+        conversion:
+          type: exact
+          factor: 1
+          from: S/CO
+          to: '1'
+          source: local ratio convention
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000
+  - name: 人类免疫缺陷病毒抗原抗体联合检测
     panel: infection
     aliases: [人免疫缺陷病毒抗体/抗原(HIV-Ab/Ag)]
-    units: [S/CO]
-  - name: 梅毒螺旋体抗体
+    synonyms:
+      - term: 艾滋病抗体抗原
+        source: legacy printed name (pre-standardization dictionary)
+    code: 2401004B
+    loinc:
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: ratio
+    canonical_unit: '1'
+    unit_display: '1'
+    accepted_units:
+      - unit: S/CO
+        ucum: '1'
+        conversion:
+          type: exact
+          factor: 1
+          from: S/CO
+          to: '1'
+          source: local ratio convention
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000
+  - name: 梅毒螺旋体特异性抗体检测
     panel: infection
     aliases: [梅毒螺旋体抗体(TP-Ab)]
-    units: [S/CO]
+    synonyms:
+      - term: 梅毒螺旋体抗体
+        source: legacy printed name (pre-standardization dictionary)
+    code: 2401204B
+    loinc:
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: ratio
+    canonical_unit: '1'
+    unit_display: '1'
+    accepted_units:
+      - unit: S/CO
+        ucum: '1'
+        conversion:
+          type: exact
+          factor: 1
+          from: S/CO
+          to: '1'
+          source: local ratio convention
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000
 
 # ==== fibrosis_dict.yaml(原 肝纤维化;min=2;titles=['肝纤维化']) ====
-  - name: 透明质酸
+  - name: 透明质酸测定
     panel: other
     aliases: [透明质酸(HA)]
-    units: ["μg/L"]
-  - name: 层粘连蛋白
+    synonyms:
+      - term: 透明质酸
+        source: legacy printed name (pre-standardization dictionary)
+    code: 1701004A
+    loinc:
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: ug/L
+    unit_display: μg/L
+    accepted_units:
+      - unit: μg/L
+        ucum: ug/L
+        conversion:
+          type: exact
+          factor: 1
+          from: μg/L
+          to: ug/L
+          source: UCUM
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000
+  - name: 层黏连蛋白测定
     panel: other
     aliases: [层粘连蛋白(LN)]
-    units: ["μg/L"]
-  - name: 三型前胶原N端肽
+    synonyms:
+      - term: 层粘连蛋白
+        source: legacy printed name (pre-standardization dictionary)
+    code: 1103104A
+    loinc:
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: ug/L
+    unit_display: μg/L
+    accepted_units:
+      - unit: μg/L
+        ucum: ug/L
+        conversion:
+          type: exact
+          factor: 1
+          from: μg/L
+          to: ug/L
+          source: UCUM
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000
+  - name: Ⅲ型前胶原N 端肽测定
     panel: other
     aliases: [三型前胶原N端肽(PIIINP)]
-    units: ["μg/L"]
-  - name: 四型前胶原
+    synonyms:
+      - term: 三型前胶原N端肽
+        source: legacy printed name (pre-standardization dictionary)
+    code: 1103204A
+    loinc:
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: ug/L
+    unit_display: μg/L
+    accepted_units:
+      - unit: μg/L
+        ucum: ug/L
+        conversion:
+          type: exact
+          factor: 1
+          from: μg/L
+          to: ug/L
+          source: UCUM
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000
+  - name: Ⅳ型胶原蛋白测定
     panel: other
     aliases: [四型前胶原(IV-Col)]
-    units: ["μg/L"]
+    synonyms:
+      - term: 四型前胶原
+        source: legacy printed name (pre-standardization dictionary)
+    code: 1103304A
+    loinc:
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: ug/L
+    unit_display: μg/L
+    accepted_units:
+      - unit: μg/L
+        ucum: ug/L
+        conversion:
+          type: exact
+          factor: 1
+          from: μg/L
+          to: ug/L
+          source: UCUM
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000

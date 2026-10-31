@@ -1,19 +1,19 @@
 batch,dict,report_type,panel,current_name,standard_name,wst886_code,loinc,loinc_status,unit_display,canonical_unit,accepted_units,result_kind,source_status,sources,review_status,notes
-2,bloodtype_dict.yaml,临检,other,ABO血型,ABO血型,,,missing,,,,qualitative,pending,local（WS/T 886 未覆盖）,pending,batch 2 待映射
-2,bloodtype_dict.yaml,临检,other,RH血型,RH血型,,,missing,,,,qualitative,pending,local（WS/T 886 未覆盖）,pending,batch 2 待映射
-2,bloodtype_dict.yaml,临检,other,抗体筛查,抗体筛查,,,missing,,,,qualitative,pending,local（WS/T 886 未覆盖）,pending,batch 2 待映射
+2,bloodtype_dict.yaml,临检,other,ABO血型,ABO血型,,,missing,,,,qualitative,local,local（WS/T 886 未覆盖）,pending,batch 2 已迁移;待复核
+2,bloodtype_dict.yaml,临检,other,RH血型,RH血型,,,missing,,,,qualitative,local,local（WS/T 886 未覆盖）,pending,batch 2 已迁移;待复核
+2,bloodtype_dict.yaml,临检,other,抗体筛查,抗体筛查,,,missing,,,,qualitative,local,local（WS/T 886 未覆盖）,pending,batch 2 已迁移;待复核
 1,cbc_dict.yaml,临检,cbc,白细胞计数,白细胞计数,0100101A,6690-2,confirmed,10^9/L,10*9/L,10^3/uL=1,quantitative,primary,WS/T 886—2026 表1; WS/T 405—2012; WS/T 406—2024; UCUM,pending,
 1,cbc_dict.yaml,临检,cbc,红细胞计数,红细胞计数,0100201A,789-8,confirmed,10^12/L,10*12/L,10^6/uL=1,quantitative,primary,WS/T 886—2026 表1; WS/T 405—2012; WS/T 406—2024; UCUM,pending,
-1,cbc_dict.yaml,临检,cbc,血红蛋白,血红蛋白测定,0100401A,718-7,confirmed,g/L,g/L,g/dL=10,quantitative,primary,WS/T 886—2026 表1; WS/T 405—2012; WS/T 406—2024; UCUM,pending,
-1,cbc_dict.yaml,临检,cbc,红细胞压积,血细胞比容测定,0100501A,4544-3,confirmed,L/L,L/L,%=0.01,quantitative,primary,WS/T 886—2026 表1; WS/T 405—2012; WS/T 406—2024; UCUM,pending,WS/T 886 标准名与单据印名不同
+1,cbc_dict.yaml,临检,cbc,血红蛋白,血红蛋白测定,0100401A,718-7,confirmed,g/L,g/L,g/dL=10 (待核),quantitative,primary,WS/T 886—2026 表1; WS/T 405—2012; WS/T 406—2024; UCUM,pending,
+1,cbc_dict.yaml,临检,cbc,红细胞压积,血细胞比容测定,0100501A,4544-3,confirmed,L/L,L/L,%=0.01 (待核),quantitative,primary,WS/T 886—2026 表1; WS/T 405—2012; WS/T 406—2024; UCUM,pending,WS/T 886 标准名与单据印名不同
 1,cbc_dict.yaml,临检,cbc,平均红细胞体积,平均红细胞体积测定,0100601A,787-2,confirmed,fL,fL,,quantitative,primary,WS/T 886—2026 表1; WS/T 405—2012; WS/T 406—2024; UCUM,pending,
 1,cbc_dict.yaml,临检,cbc,平均红细胞血红蛋白量,平均红细胞血红蛋白含量测定,0100701A,785-6,confirmed,pg,pg,,quantitative,primary,WS/T 886—2026 表1; WS/T 405—2012; WS/T 406—2024; UCUM,pending,
-1,cbc_dict.yaml,临检,cbc,平均红细胞血红蛋白浓度,平均红细胞血红蛋白浓度测定,0100801A,786-4,confirmed,g/L,g/L,g/dL=10,quantitative,primary,WS/T 886—2026 表1; WS/T 405—2012; WS/T 406—2024; UCUM,pending,
+1,cbc_dict.yaml,临检,cbc,平均红细胞血红蛋白浓度,平均红细胞血红蛋白浓度测定,0100801A,786-4,confirmed,g/L,g/L,g/dL=10 (待核),quantitative,primary,WS/T 886—2026 表1; WS/T 405—2012; WS/T 406—2024; UCUM,pending,
 1,cbc_dict.yaml,临检,cbc,红细胞分布宽度-CV,红细胞分布宽度-CV,,788-0,confirmed,%,%,,quantitative,local,WS/T 886—2026 表1; WS/T 405—2012; WS/T 406—2024; UCUM,pending,WS/T 886 无独立行; LOINC 788-0 为 RDW-CV
 1,cbc_dict.yaml,临检,cbc,红细胞分布宽度-SD,红细胞分布宽度-SD,,21000-5,candidate,fL,fL,,quantitative,local,WS/T 886—2026 表1; WS/T 405—2012; WS/T 406—2024; UCUM,pending,"LOINC 21000-5 已 deprecated, 待确认替代码"
 1,cbc_dict.yaml,临检,cbc,血小板,血小板计数,0100301A,777-3,confirmed,10^9/L,10*9/L,10^3/uL=1,quantitative,primary,WS/T 886—2026 表1; WS/T 405—2012; WS/T 406—2024; UCUM,pending,
-1,cbc_dict.yaml,临检,cbc,血小板比积,血小板比积,,51637-7,confirmed,%,%,L/L=100,quantitative,local,WS/T 886—2026 表1; WS/T 405—2012; WS/T 406—2024; UCUM,pending,WS/T 886 无独立行
-1,cbc_dict.yaml,临检,cbc,血小板分布宽度,血小板分布宽度,,32207-3,candidate,TBD,TBD,,quantitative,local,WS/T 886—2026 表1; WS/T 405—2012; WS/T 406—2024; UCUM,pending,PDW fL 与 % 是两种定义; 需拆分 SD/CV
+1,cbc_dict.yaml,临检,cbc,血小板比积,血小板比积,,51637-7,confirmed,%,%,L/L=100 (待核),quantitative,local,WS/T 886—2026 表1; WS/T 405—2012; WS/T 406—2024; UCUM,pending,WS/T 886 无独立行
+1,cbc_dict.yaml,临检,cbc,血小板分布宽度,血小板分布宽度,,32207-3,candidate,fL,fL,,quantitative,local,WS/T 886—2026 表1; WS/T 405—2012; WS/T 406—2024; UCUM,pending,PDW fL 与 % 是两种定义; 需拆分 SD/CV
 1,cbc_dict.yaml,临检,cbc,血小板平均体积,血小板平均体积,,32623-1,confirmed,fL,fL,,quantitative,local,WS/T 886—2026 表1; WS/T 405—2012; WS/T 406—2024; UCUM,pending,
 1,cbc_dict.yaml,临检,cbc,大型血小板比率,大型血小板比率,,48386-7,candidate,%,%,,quantitative,local,WS/T 886—2026 表1; WS/T 405—2012; WS/T 406—2024; UCUM,pending,
 1,cbc_dict.yaml,临检,cbc,大血小板数目,大血小板数目,,96354-6,candidate,10^9/L,10*9/L,10^3/uL=1,quantitative,local,WS/T 886—2026 表1; WS/T 405—2012; WS/T 406—2024; UCUM,pending,
@@ -30,17 +30,17 @@ batch,dict,report_type,panel,current_name,standard_name,wst886_code,loinc,loinc_
 1,cbc_dict.yaml,临检,cbc,有核红细胞百分比,有核红细胞百分比,,30393-3,candidate,%,%,,quantitative,local,WS/T 886—2026 表1; WS/T 405—2012; WS/T 406—2024; UCUM,pending,"LOINC 30393-3 已 deprecated, 待确认替代码"
 1,cbc_dict.yaml,临检,cbc,有核红细胞绝对值,有核红细胞绝对值,,771-6,confirmed,10^9/L,10*9/L,10^3/uL=1,quantitative,local,WS/T 886—2026 表1; WS/T 405—2012; WS/T 406—2024; UCUM,pending,
 1,cbc_dict.yaml,临检,cbc,血沉,红细胞沉降率测定,0300101A,4537-7,confirmed,mm/h,mm/h,,quantitative,primary,WS/T 886—2026 表1; WS/T 405—2012; WS/T 406—2024; UCUM,pending,
-1,cbc_dict.yaml,临检,cbc,C反应蛋白,C反应蛋白测定,1101405A,1988-5,confirmed,mg/L,mg/L,mg/dL=10,quantitative,primary,WS/T 886—2026 表1; WS/T 405—2012; WS/T 406—2024; UCUM,pending,
-1,cbc_dict.yaml,临检,cbc,超敏C反应蛋白,C反应蛋白测定,1101405A,30522-7,confirmed,mg/L,mg/L,mg/dL=10,quantitative,primary,WS/T 886—2026 表1; WS/T 405—2012; WS/T 406—2024; UCUM,pending,与 CRP 共用 WS/T 码; hs 为方法学
+1,cbc_dict.yaml,临检,cbc,C反应蛋白,C反应蛋白测定,1101405A,1988-5,confirmed,mg/L,mg/L,mg/dL=10 (待核),quantitative,primary,WS/T 886—2026 表1; WS/T 405—2012; WS/T 406—2024; UCUM,pending,
+1,cbc_dict.yaml,临检,cbc,超敏C反应蛋白,超敏C反应蛋白测定,1101405A,30522-7,confirmed,mg/L,mg/L,mg/dL=10 (待核),quantitative,primary,WS/T 886—2026 表1; WS/T 405—2012; WS/T 406—2024; UCUM,pending,与 CRP 共用 WS/T 码; hs 为方法学
 1,cbc_dict.yaml,临检,cbc,血清淀粉样蛋白A,血清淀粉样蛋白A 测定,1101604A,48498-0,confirmed,mg/L,mg/L,,quantitative,primary,WS/T 886—2026 表1; WS/T 405—2012; WS/T 406—2024; UCUM,pending,LOINC 48498-0 为 Amyloid A; 与 SAA 同义
 1,chemistry_dict.yaml,生化,liver,丙氨酸转氨酶,丙氨酸氨基转移酶测定,1500104A,1742-6,confirmed,U/L,U/L,,quantitative,primary,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,
 1,chemistry_dict.yaml,生化,liver,天冬氨酸转氨酶,天门冬氨酸氨基转移酶测定,1500204A,1920-8,confirmed,U/L,U/L,,quantitative,primary,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,
 1,chemistry_dict.yaml,生化,liver,谷氨酰转肽酶,γ-谷氨酰基转移酶测定,1500904A,2324-2,confirmed,U/L,U/L,,quantitative,primary,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,
 1,chemistry_dict.yaml,生化,liver,谷草/谷丙比值,谷草/谷丙比值,,1916-6,confirmed,1,1,,ratio,local,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,计算项
 1,chemistry_dict.yaml,生化,liver,碱性磷酸酶,碱性磷酸酶测定,1500404A,6768-6,confirmed,U/L,U/L,,quantitative,primary,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,
-1,chemistry_dict.yaml,生化,liver,总蛋白,总蛋白测定,1100204A,2885-2,confirmed,g/L,g/L,g/dL=10,quantitative,primary,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,
-1,chemistry_dict.yaml,生化,liver,白蛋白,白蛋白测定,1100104A,1751-7,confirmed,g/L,g/L,g/dL=10,quantitative,primary,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,
-1,chemistry_dict.yaml,生化,liver,球蛋白,球蛋白,,10834-0,confirmed,g/L,g/L,g/dL=10,quantitative,local,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,计算项; WS/T 886 无独立行
+1,chemistry_dict.yaml,生化,liver,总蛋白,总蛋白测定,1100204A,2885-2,confirmed,g/L,g/L,g/dL=10 (待核),quantitative,primary,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,
+1,chemistry_dict.yaml,生化,liver,白蛋白,白蛋白测定,1100104A,1751-7,confirmed,g/L,g/L,g/dL=10 (待核),quantitative,primary,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,
+1,chemistry_dict.yaml,生化,liver,球蛋白,球蛋白,,10834-0,confirmed,g/L,g/L,g/dL=10 (待核),quantitative,local,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,计算项; WS/T 886 无独立行
 1,chemistry_dict.yaml,生化,liver,白蛋白/球蛋白,白蛋白/球蛋白,,1759-0,confirmed,1,1,,ratio,local,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,计算项
 1,chemistry_dict.yaml,生化,liver,总胆红素,总胆红素测定,1700504A,1975-2,confirmed,μmol/L,umol/L,mg/dL=17.1 (待核),quantitative,primary,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,
 1,chemistry_dict.yaml,生化,liver,直接胆红素,直接胆红素测定,1700604A,1968-7,confirmed,μmol/L,umol/L,mg/dL=17.1 (待核),quantitative,primary,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,
@@ -48,14 +48,14 @@ batch,dict,report_type,panel,current_name,standard_name,wst886_code,loinc,loinc_
 1,chemistry_dict.yaml,生化,liver,总胆汁酸,胆汁酸测定,1700704A,14628-2,confirmed,μmol/L,umol/L,,quantitative,primary,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,
 1,chemistry_dict.yaml,生化,kidney,尿素,尿素测定,1700204A,3091-6,confirmed,mmol/L,mmol/L,mg/dL=0.1665 (待核),quantitative,primary,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,BUN 与尿素不等价; 删除 BUN 同义名
 1,chemistry_dict.yaml,生化,kidney,肌酐,肌酐测定,1700404A,2160-0,confirmed,μmol/L,umol/L,mg/dL=88.4 (待核),quantitative,primary,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,
-1,chemistry_dict.yaml,生化,uric_acid,尿酸,尿酸测定,1700304A,3084-1,confirmed,μmol/L,umol/L,mg/dL=59.48 (待核); mmol/L=1000,quantitative,primary,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,当前只登记 mmol/L; 需补 μmol/L
+1,chemistry_dict.yaml,生化,uric_acid,尿酸,尿酸测定,1700304A,3084-1,confirmed,μmol/L,umol/L,mg/dL=59.48 (待核); mmol/L=1000 (待核),quantitative,primary,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,已补 μmol/L; mmol/L×1000 待复核
 1,chemistry_dict.yaml,生化,electrolyte,二氧化碳,二氧化碳结合力,,2028-9,confirmed,mmol/L,mmol/L,,quantitative,local,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,LOINC 2028-9 为 CO2 total; 实际测 CO2CP
 1,chemistry_dict.yaml,生化,lipid,总胆固醇,总胆固醇测定,2000104A,2093-3,confirmed,mmol/L,mmol/L,mg/dL=0.02586 (待核),quantitative,primary,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,
 1,chemistry_dict.yaml,生化,lipid,甘油三酯,甘油三酯测定,2000204A,2571-8,confirmed,mmol/L,mmol/L,mg/dL=0.01129 (待核),quantitative,primary,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,
 1,chemistry_dict.yaml,生化,lipid,高密度脂蛋白胆固醇,高密度脂蛋白胆固醇测定,2000304A,2085-9,confirmed,mmol/L,mmol/L,mg/dL=0.02586 (待核),quantitative,primary,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,
 1,chemistry_dict.yaml,生化,lipid,低密度脂蛋白胆固醇,低密度脂蛋白胆固醇测定,2000404A,2089-1,confirmed,mmol/L,mmol/L,mg/dL=0.02586 (待核),quantitative,primary,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,
 1,chemistry_dict.yaml,生化,glucose,葡萄糖,葡萄糖测定,1700104A,2345-7,confirmed,mmol/L,mmol/L,mg/dL=0.0555 (待核),quantitative,primary,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,
-1,chemistry_dict.yaml,生化,kidney,eGFR,eGFR,,62238-1,candidate,mL/min/1.73m2,TBD,mL/min=不换算,quantitative,local,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,UCUM 待核; 62238-1 为 CKD-EPI
+1,chemistry_dict.yaml,生化,kidney,eGFR,eGFR,,62238-1,candidate,mL/min/1.73m²,mL/min/1.73m2,mL/min=不换算,quantitative,local,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,UCUM 待核; 62238-1 为 CKD-EPI
 1,chemistry_dict.yaml,生化,kidney,血清胱抑素C,半胱氨酸蛋白酶抑制剂 C测定,1101204A,33863-2,confirmed,mg/L,mg/L,,quantitative,primary,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,
 1,chemistry_dict.yaml,生化,liver,胆碱酯酶,胆碱酯酶测定,1501104A,2098-2,confirmed,U/L,U/L,,quantitative,primary,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,
 1,chemistry_dict.yaml,生化,liver,前白蛋白,前白蛋白测定,1102904A,14338-8,confirmed,mg/L,mg/L,,quantitative,primary,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,
@@ -64,8 +64,8 @@ batch,dict,report_type,panel,current_name,standard_name,wst886_code,loinc,loinc_
 1,chemistry_dict.yaml,生化,liver,亮氨酸氨基肽酶,亮氨酸氨基肽酶,,2187-3,confirmed,U/L,U/L,,quantitative,local,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,WS/T 886/LOINC 无 exact 项
 1,chemistry_dict.yaml,生化,lipid,游离脂肪酸,游离脂肪酸,,15066-4,candidate,mmol/L,mmol/L,,quantitative,local,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,LOINC 15066-4 为 moles/volume
 1,chemistry_dict.yaml,生化,liver,单胺氧化酶,单胺氧化酶,,12918-9,candidate,U/L,U/L,,quantitative,local,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,"LOINC 12918-9 为 platelet rich plasma, 待核"
-1,chemistry_dict.yaml,生化,liver,铜蓝蛋白,铜蓝蛋白,,2064-4,confirmed,g/L,g/L,mg/dL=10,quantitative,local,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,WS/T 886 无独立行
-1,chemistry_dict.yaml,生化,glucose,空腹葡萄糖,葡萄糖测定,1700104A,1558-6,candidate,mmol/L,mmol/L,mg/dL=0.0555 (待核),quantitative,primary,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,LOINC 1558-6 空腹血糖; WS/T 886 只有葡萄糖测定
+1,chemistry_dict.yaml,生化,liver,铜蓝蛋白,铜蓝蛋白,,2064-4,confirmed,g/L,g/L,mg/dL=0.01,quantitative,local,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,WS/T 886 无独立行
+1,chemistry_dict.yaml,生化,glucose,空腹葡萄糖,空腹葡萄糖测定,1700104A,1558-6,candidate,mmol/L,mmol/L,mg/dL=0.0555 (待核),quantitative,primary,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,LOINC 1558-6 空腹血糖; WS/T 886 只有葡萄糖测定
 1,chemistry_dict.yaml,生化,glucose,餐后半小时葡萄糖,餐后半小时葡萄糖,,1527-1,confirmed,mmol/L,mmol/L,mg/dL=0.0555 (待核),quantitative,local,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,LOINC 1527-1 30min post 75g
 1,chemistry_dict.yaml,生化,glucose,餐后一小时葡萄糖,餐后一小时葡萄糖,,1507-3,confirmed,mmol/L,mmol/L,mg/dL=0.0555 (待核),quantitative,local,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,LOINC 1507-3 1h post 75g
 1,chemistry_dict.yaml,生化,glucose,餐后二小时葡萄糖,餐后二小时葡萄糖,,1518-0,confirmed,mmol/L,mmol/L,mg/dL=0.0555 (待核),quantitative,local,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,LOINC 1518-0 2h post 75g
@@ -73,110 +73,110 @@ batch,dict,report_type,panel,current_name,standard_name,wst886_code,loinc,loinc_
 1,chemistry_dict.yaml,生化,glucose,糖化血红蛋白,糖化血红蛋白测定,1100301A,4548-4,confirmed,mmol/mol,mmol/mol,%=IFCC-NGSP 方程,quantitative,primary,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,WS/T 461—2024; 当前只有 %
 1,chemistry_dict.yaml,生化,glucose,C肽,C肽测定,1202004A,1986-9,confirmed,pmol/L,pmol/L,ng/mL=331 (待核),quantitative,primary,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,
 1,chemistry_dict.yaml,生化,glucose,胰岛素,胰岛素测定,1201904A,20448-7,confirmed,pmol/L,pmol/L,mIU/L=6.945 (待核); uIU/mL=6.945 (待核),quantitative,primary,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,
-1,chemistry_dict.yaml,生化,vitanemia,总25羟基维生素D,总维生素 D测定,1900604A,62292-8,confirmed,nmol/L,nmol/L,ng/mL=2.5,quantitative,primary,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,
+1,chemistry_dict.yaml,生化,vitanemia,总25羟基维生素D,总维生素 D测定,1900604A,62292-8,confirmed,nmol/L,nmol/L,ng/mL=2.5 (待核),quantitative,primary,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,
 1,chemistry_dict.yaml,生化,vitanemia,铁蛋白,铁蛋白测定,1102804A,2276-4,confirmed,μg/L,ug/L,ng/mL=1,quantitative,primary,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,
 1,chemistry_dict.yaml,生化,vitanemia,叶酸,维生素B9测定,1901504A,2284-8,confirmed,nmol/L,nmol/L,ng/mL=2.266 (待核),quantitative,primary,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,
 1,chemistry_dict.yaml,生化,vitanemia,维生素B12,维生素B12 测定,1901604A,2132-9,confirmed,pmol/L,pmol/L,pg/mL=0.7378 (待核),quantitative,primary,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,
-1,coag_dict.yaml,临检,coag,凝血酶原时间,凝血酶原时间检测,0500103A,5902-2,confirmed,s,s,秒=1,quantitative,primary,WS/T 886—2026 表1; WS/T 406—2024; WS/T 477—2026 (D-二聚体); UCUM,pending,
+1,coag_dict.yaml,临检,coag,凝血酶原时间,凝血酶原时间检测,0500103A,5902-2,confirmed,秒,s,秒=1,quantitative,primary,WS/T 886—2026 表1; WS/T 406—2024; WS/T 477—2026 (D-二聚体); UCUM,pending,
 1,coag_dict.yaml,临检,coag,凝血酶原时间比值,凝血酶原时间比值,,5894-1,confirmed,1,1,,ratio,secondary,WS/T 886—2026 表1; WS/T 406—2024; WS/T 477—2026 (D-二聚体); UCUM,pending,计算项
 1,coag_dict.yaml,临检,coag,国际标准化比值,国际标准化比值,,6301-6,confirmed,1,1,,ratio,secondary,WS/T 886—2026 表1; WS/T 406—2024; WS/T 477—2026 (D-二聚体); UCUM,pending,计算项
 1,coag_dict.yaml,临检,coag,凝血酶原活动度,凝血酶原活动度,,,missing,%,%,,quantitative,local,WS/T 886—2026 表1; WS/T 406—2024; WS/T 477—2026 (D-二聚体); UCUM,pending,计算项
-1,coag_dict.yaml,临检,coag,活化部分凝血活酶时间,活化部分凝血活酶时间检测,0500203A,3173-2,confirmed,s,s,秒=1,quantitative,primary,WS/T 886—2026 表1; WS/T 406—2024; WS/T 477—2026 (D-二聚体); UCUM,pending,
+1,coag_dict.yaml,临检,coag,活化部分凝血活酶时间,活化部分凝血活酶时间检测,0500203A,3173-2,confirmed,秒,s,秒=1,quantitative,primary,WS/T 886—2026 表1; WS/T 406—2024; WS/T 477—2026 (D-二聚体); UCUM,pending,
 1,coag_dict.yaml,临检,coag,纤维蛋白原,纤维蛋白原检测,0500403A,3255-7,confirmed,g/L,g/L,mg/dL=0.01,quantitative,primary,WS/T 886—2026 表1; WS/T 406—2024; WS/T 477—2026 (D-二聚体); UCUM,pending,
-1,coag_dict.yaml,临检,coag,凝血酶时间,凝血酶时间检测,0500303A,3243-3,confirmed,s,s,秒=1,quantitative,primary,WS/T 886—2026 表1; WS/T 406—2024; WS/T 477—2026 (D-二聚体); UCUM,pending,
+1,coag_dict.yaml,临检,coag,凝血酶时间,凝血酶时间检测,0500303A,3243-3,confirmed,秒,s,秒=1,quantitative,primary,WS/T 886—2026 表1; WS/T 406—2024; WS/T 477—2026 (D-二聚体); UCUM,pending,
 1,coag_dict.yaml,临检,coag,D-二聚体,D-二聚体检测,0501703A,48065-7,confirmed,μg/L,ug/L,ng/mL=1; mg/L=1000,quantitative,primary,WS/T 886—2026 表1; WS/T 406—2024; WS/T 477—2026 (D-二聚体); UCUM,pending,result_basis=FEU; DDU 不换算
 1,coag_dict.yaml,临检,coag,纤维蛋白原降解产物,纤维蛋白（原）降解产物检测,0501803A,30226-5,candidate,μg/mL,ug/mL,mg/L=1,quantitative,primary,WS/T 886—2026 表1; WS/T 406—2024; WS/T 477—2026 (D-二聚体); UCUM,pending,LOINC 30226-5 为 fibrin+fibrinogen fragments; 待核
 1,endocrine_dict.yaml,激素,thyroid,促甲状腺素,促甲状腺激素测定,1200604A,3016-3,confirmed,mIU/L,m[IU]/L,uIU/mL=1,quantitative,primary,WS/T 886—2026 表1; WS/T 404.10—2022; UCUM,pending,
 1,endocrine_dict.yaml,激素,thyroid,甲状腺球蛋白,甲状腺球蛋白测定,1100604A,3013-0,confirmed,μg/L,ug/L,ng/mL=1,quantitative,primary,WS/T 886—2026 表1; WS/T 404.10—2022; UCUM,pending,
-1,endocrine_dict.yaml,激素,thyroid,三碘甲状腺原氨酸,三碘甲状腺原氨酸测定,1200704A,3053-6,confirmed,nmol/L,nmol/L,ng/dL=0.01536 (待核); ng/mL=1.536 (待核),quantitative,primary,WS/T 886—2026 表1; WS/T 404.10—2022; UCUM,pending,"当前接受 mmol/L, 需删"
-1,endocrine_dict.yaml,激素,thyroid,甲状腺素,甲状腺素测定,1200804A,3026-2,confirmed,nmol/L,nmol/L,μg/dL=12.87 (待核); ng/mL=1.287 (待核),quantitative,primary,WS/T 886—2026 表1; WS/T 404.10—2022; UCUM,pending,"当前接受 rmol/L, 需删"
+1,endocrine_dict.yaml,激素,thyroid,三碘甲状腺原氨酸,三碘甲状腺原氨酸测定,1200704A,3053-6,confirmed,nmol/L,nmol/L,ng/dL=0.01536 (待核); ng/mL=1.536 (待核); mmol/L=1000 (待核),quantitative,primary,WS/T 886—2026 表1; WS/T 404.10—2022; UCUM,pending,"mmol/L 保留为 accepted 并受量级门约束;待复核"
+1,endocrine_dict.yaml,激素,thyroid,甲状腺素,甲状腺素测定,1200804A,3026-2,confirmed,nmol/L,nmol/L,μg/dL=12.87 (待核); ng/mL=1.287 (待核),quantitative,primary,WS/T 886—2026 表1; WS/T 404.10—2022; UCUM,pending,"rmol/L 为 OCR 形,已由 ocr_forms 修复;待复核"
 1,endocrine_dict.yaml,激素,thyroid,游离三碘甲状腺原氨酸,游离三碘甲状腺原氨酸测定,1200904A,3051-0,confirmed,pmol/L,pmol/L,pg/mL=1.536 (待核),quantitative,primary,WS/T 886—2026 表1; WS/T 404.10—2022; UCUM,pending,
 1,endocrine_dict.yaml,激素,thyroid,游离甲状腺素,游离甲状腺素测定,1201004A,3024-7,confirmed,pmol/L,pmol/L,ng/dL=12.87 (待核),quantitative,primary,WS/T 886—2026 表1; WS/T 404.10—2022; UCUM,pending,
-1,endocrine_dict.yaml,激素,thyroid,抗甲状腺过氧化物酶抗体,抗甲状腺过氧化物酶抗体测定,2501504A,8099-4,confirmed,IU/mL,[IU]/mL,U/mL=不换算,quantitative,primary,WS/T 886—2026 表1; WS/T 404.10—2022; UCUM,pending,U 与 IU 不默认等价
-1,endocrine_dict.yaml,激素,thyroid,抗甲状腺球蛋白抗体,甲状腺球蛋白抗体测定,2501404A,8098-6,confirmed,IU/mL,[IU]/mL,U/mL=不换算,quantitative,primary,WS/T 886—2026 表1; WS/T 404.10—2022; UCUM,pending,
+1,endocrine_dict.yaml,激素,thyroid,抗甲状腺过氧化物酶抗体,抗甲状腺过氧化物酶抗体测定,2501504A,8099-4,confirmed,IU/mL,[IU]/mL,IU/mL=1; U/mL=不换算,quantitative,primary,WS/T 886—2026 表1; WS/T 404.10—2022; UCUM,pending,U 与 IU 不默认等价
+1,endocrine_dict.yaml,激素,thyroid,抗甲状腺球蛋白抗体,甲状腺球蛋白抗体测定,2501404A,8098-6,confirmed,IU/mL,[IU]/mL,IU/mL=1; U/mL=不换算,quantitative,primary,WS/T 886—2026 表1; WS/T 404.10—2022; UCUM,pending,
 1,endocrine_dict.yaml,激素,thyroid,抗促甲状腺素受体抗体,促甲状腺受体抗体测定,2501604A,57416-0,confirmed,IU/L,[IU]/L,,quantitative,primary,WS/T 886—2026 表1; WS/T 404.10—2022; UCUM,pending,
 1,endocrine_dict.yaml,激素,sex_hormone,孕酮,孕酮测定,1201304A,2839-9,confirmed,nmol/L,nmol/L,ng/mL=3.18 (待核),quantitative,primary,WS/T 886—2026 表1; WS/T 404.10—2022; UCUM,pending,
 1,endocrine_dict.yaml,激素,sex_hormone,人绒毛膜促性腺激素及β亚单位,人绒毛膜促性腺激素测定,1601304A,19080-1,confirmed,IU/L,[IU]/L,mIU/mL=1,quantitative,primary,WS/T 886—2026 表1; WS/T 404.10—2022; UCUM,pending,总 hCG; β 亚单位可另立 local
-2,immunology_dict.yaml,免疫,autoimmune,抗RNP抗体,抗 RNP抗体测定,2500304A,,missing,,,,arbitrary,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 待映射
-2,immunology_dict.yaml,免疫,autoimmune,抗Sm抗体,抗 Sm抗体测定,2500404A,,missing,,,,arbitrary,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 待映射
-2,immunology_dict.yaml,免疫,autoimmune,抗SS-A 60抗体,抗 SS-A抗体测定,2500504A,,missing,,,,arbitrary,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 待映射
-2,immunology_dict.yaml,免疫,autoimmune,抗SS-A 52抗体,抗 SS-A抗体测定,2500504A,,missing,,,,arbitrary,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 待映射
-2,immunology_dict.yaml,免疫,autoimmune,抗SS-B抗体,抗 SS-B抗体测定,2500604A,,missing,,,,arbitrary,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 待映射
-2,immunology_dict.yaml,免疫,autoimmune,抗Scl-70抗体,抗 Scl-70抗体测定,2500804A,,missing,,,,arbitrary,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 待映射
-2,immunology_dict.yaml,免疫,autoimmune,抗PM-Scl抗体,抗PM-Scl抗体,,,missing,,,,arbitrary,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 待映射
-2,immunology_dict.yaml,免疫,autoimmune,抗Jo-1抗体,抗 Jo-1抗体测定,2500904A,,missing,,,,arbitrary,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 待映射
-2,immunology_dict.yaml,免疫,autoimmune,抗CENP B抗体,抗CENP B抗体,,,missing,,,,arbitrary,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 待映射
-2,immunology_dict.yaml,免疫,autoimmune,抗PCNA抗体,抗PCNA抗体,,,missing,,,,arbitrary,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 待映射
-2,immunology_dict.yaml,免疫,autoimmune,抗Nucleosome抗体,抗Nucleosome抗体,,,missing,,,,arbitrary,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 待映射
-2,immunology_dict.yaml,免疫,autoimmune,抗Histone抗体,抗Histone抗体,,,missing,,,,arbitrary,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 待映射
-2,immunology_dict.yaml,免疫,autoimmune,抗Ribosomal P抗体,抗Ribosomal P抗体,,,missing,,,,arbitrary,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 待映射
-2,immunology_dict.yaml,免疫,autoimmune,抗AMA-M2抗体,抗AMA-M2抗体,,,missing,,,,arbitrary,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 待映射
-2,immunology_dict.yaml,免疫,autoimmune,抗C1q抗体,抗C1q抗体,,,missing,,,,quantitative,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 待映射
-2,immunology_dict.yaml,免疫,autoimmune,抗dsDNA抗体,抗双链 DNA抗体测定,2500204A,,missing,,,,quantitative,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 待映射
-2,immunology_dict.yaml,免疫,autoimmune,ANA(IIF),抗核抗体检测,2500104B,,missing,,,,qualitative,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 待映射
-2,immunology_dict.yaml,免疫,autoimmune,抗核抗体主荧光核型,抗核抗体主荧光核型,,,missing,,,,qualitative,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 待映射
-2,immunology_dict.yaml,免疫,autoimmune,抗线粒体抗体,抗线粒体抗体,,,missing,,,,qualitative,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 待映射
-2,immunology_dict.yaml,免疫,autoimmune,抗平滑肌抗体,抗平滑肌抗体,,,missing,,,,qualitative,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 待映射
-2,immunology_dict.yaml,免疫,autoimmune,抗sp100抗体,抗sp100抗体,,,missing,,,,arbitrary,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 待映射
-2,immunology_dict.yaml,免疫,autoimmune,抗LC-1抗体,抗LC-1抗体,,,missing,,,,arbitrary,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 待映射
-2,immunology_dict.yaml,免疫,autoimmune,抗LKM-1抗体,抗LKM-1抗体,,,missing,,,,arbitrary,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 待映射
-2,immunology_dict.yaml,免疫,autoimmune,抗SLA/LP抗体,抗SLA/LP抗体,,,missing,,,,arbitrary,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 待映射
-2,immunology_dict.yaml,免疫,autoimmune,抗AMA-M2-3E抗体,抗AMA-M2-3E抗体,,,missing,,,,quantitative,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 待映射
-2,immunology_dict.yaml,免疫,autoimmune,抗gp210抗体,抗gp210抗体,,,missing,,,,arbitrary,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 待映射
-2,immunology_dict.yaml,免疫,infection,乙肝表面抗原,乙型肝炎病毒表面抗原测定,2400104A,,missing,,,,quantitative,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 待映射
-2,immunology_dict.yaml,免疫,infection,乙肝表面抗体,乙型肝炎病毒表面抗体测定,2400204A,,missing,,,,quantitative,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 待映射
-2,immunology_dict.yaml,免疫,infection,乙肝e抗原,乙型肝炎病毒e 抗原测定,2400304A,,missing,,,,ratio,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 待映射
-2,immunology_dict.yaml,免疫,infection,乙肝e抗体,乙型肝炎病毒e 抗体检测,2400404B,,missing,,,,ratio,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 待映射
-2,immunology_dict.yaml,免疫,infection,乙肝核心抗体,乙型肝炎病毒核心抗体检测,2400504B,,missing,,,,ratio,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 待映射
-2,immunology_dict.yaml,免疫,infection,丙肝抗体,丙型肝炎病毒抗体检测,2400604B,,missing,,,,ratio,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 待映射
-2,immunology_dict.yaml,免疫,infection,艾滋病抗体抗原,人类免疫缺陷病毒抗原抗体联合检测,2401004B,,missing,,,,ratio,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 待映射
-2,immunology_dict.yaml,免疫,infection,梅毒螺旋体抗体,梅毒螺旋体特异性抗体检测,2401204B,,missing,,,,ratio,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 待映射
-2,immunology_dict.yaml,免疫,other,透明质酸,透明质酸测定,1701004A,,missing,,,,quantitative,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 待映射
-2,immunology_dict.yaml,免疫,other,层粘连蛋白,层黏连蛋白测定,1103104A,,missing,,,,quantitative,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 待映射
-2,immunology_dict.yaml,免疫,other,三型前胶原N端肽,Ⅲ型前胶原N 端肽测定,1103204A,,missing,,,,quantitative,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 待映射
-2,immunology_dict.yaml,免疫,other,四型前胶原,Ⅳ型胶原蛋白测定,1103304A,,missing,,,,quantitative,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 待映射
-2,special_dict.yaml,其他专项,other,母龄风险,母龄风险,,,missing,,,,qualitative,pending,local（WS/T 886 未覆盖）,pending,batch 2 待映射
-2,special_dict.yaml,其他专项,other,开放性神经管缺陷,开放性神经管缺陷,,,missing,,,,qualitative,pending,local（WS/T 886 未覆盖）,pending,batch 2 待映射
-2,special_dict.yaml,其他专项,other,18-三体综合征,18-三体综合征,,,missing,,,,qualitative,pending,local（WS/T 886 未覆盖）,pending,batch 2 待映射
-2,special_dict.yaml,其他专项,other,唐氏综合征,唐氏综合征,,,missing,,,,qualitative,pending,local（WS/T 886 未覆盖）,pending,batch 2 待映射
-2,special_dict.yaml,其他专项,other,人绒毛膜促性腺激素β亚单位,人绒毛膜促性腺激素β亚单位,,,missing,,,,quantitative,pending,local（WS/T 886 未覆盖）,pending,batch 2 待映射
-2,ua_dict.yaml,临检,urinalysis,潜血,干化学尿液隐血试验,0600610D,,missing,,,,qualitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 待映射
-2,ua_dict.yaml,临检,urinalysis,白细胞酯酶,干化学尿液白细胞测定,0600910D,,missing,,,,qualitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 待映射
-2,ua_dict.yaml,临检,urinalysis,蛋白质,干化学尿液蛋白测定,0600210D,,missing,,,,qualitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 待映射
-2,ua_dict.yaml,临检,urinalysis,葡萄糖,干化学尿液葡萄糖测定,0600410D,,missing,,,,qualitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 待映射
-2,ua_dict.yaml,临检,urinalysis,尿胆原,干化学尿液尿胆原测定,0600810D,,missing,,,,quantitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 待映射
-2,ua_dict.yaml,临检,urinalysis,胆红素,干化学尿液胆红素测定,0600310D,,missing,,,,qualitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 待映射
-2,ua_dict.yaml,临检,urinalysis,维生素C,维生素C,,,missing,,,,qualitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 待映射
-2,ua_dict.yaml,临检,urinalysis,比重,干化学尿液比重测定,0601010D,,missing,,,,qualitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 待映射
-2,ua_dict.yaml,临检,urinalysis,酮体,干化学尿液酮体测定,0600510D,,missing,,,,qualitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 待映射
-2,ua_dict.yaml,临检,urinalysis,亚硝酸盐,干化学尿液亚硝酸盐测定,0600710B,,missing,,,,qualitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 待映射
-2,ua_dict.yaml,临检,urinalysis,PH,干化学尿液 pH测定,0600110D,,missing,,,,qualitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 待映射
-2,ua_dict.yaml,临检,urinalysis,尿液颜色,尿液颜色,,,missing,,,,qualitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 待映射
-2,ua_dict.yaml,临检,urinalysis,尿液浊度,尿液浊度,,,missing,,,,qualitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 待映射
-2,ua_dict.yaml,临检,urinalysis,尿白细胞计数,尿白细胞计数,,,missing,,,,quantitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 待映射
-2,ua_dict.yaml,临检,urinalysis,尿白细胞计数(镜检),尿白细胞计数(镜检),,,missing,,,,quantitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 待映射
-2,ua_dict.yaml,临检,urinalysis,镜检白细胞,镜检白细胞,,,missing,,,,quantitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 待映射
-2,ua_dict.yaml,临检,urinalysis,尿红细胞计数,尿红细胞计数,,,missing,,,,quantitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 待映射
-2,ua_dict.yaml,临检,urinalysis,尿红细胞计数(镜检),尿红细胞计数(镜检),,,missing,,,,quantitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 待映射
-2,ua_dict.yaml,临检,urinalysis,镜检红细胞,镜检红细胞,,,missing,,,,quantitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 待映射
-2,ua_dict.yaml,临检,urinalysis,尿上皮细胞计数,尿上皮细胞计数,,,missing,,,,quantitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 待映射
-2,ua_dict.yaml,临检,urinalysis,尿上皮细胞计数(镜检),尿上皮细胞计数(镜检),,,missing,,,,quantitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 待映射
-2,ua_dict.yaml,临检,urinalysis,镜检上皮细胞,镜检上皮细胞,,,missing,,,,quantitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 待映射
-2,ua_dict.yaml,临检,urinalysis,小圆上皮细胞,小圆上皮细胞,,,missing,,,,quantitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 待映射
-2,ua_dict.yaml,临检,urinalysis,尿透明管型计数,尿透明管型计数,,,missing,,,,quantitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 待映射
-2,ua_dict.yaml,临检,urinalysis,尿管型计数,尿管型计数,,,missing,,,,qualitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 待映射
-2,ua_dict.yaml,临检,urinalysis,镜检管型,镜检管型,,,missing,,,,qualitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 待映射
-2,ua_dict.yaml,临检,urinalysis,镜检结晶,镜检结晶,,,missing,,,,quantitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 待映射
-2,ua_dict.yaml,临检,urinalysis,颗粒管型,颗粒管型,,,missing,,,,quantitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 待映射
-2,ua_dict.yaml,临检,urinalysis,尿粘液丝,尿粘液丝,,,missing,,,,quantitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 待映射
-2,ua_dict.yaml,临检,urinalysis,滴虫,滴虫,,,missing,,,,qualitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 待映射
-2,ua_dict.yaml,临检,urinalysis,白细胞团,白细胞团,,,missing,,,,quantitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 待映射
-2,ua_dict.yaml,临检,urinalysis,酵母样菌,酵母样菌,,,missing,,,,quantitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 待映射
-2,ua_dict.yaml,临检,urinalysis,尿细菌计数,尿细菌计数,,,missing,,,,quantitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 待映射
-2,ua_dict.yaml,临检,urinalysis,尿细菌计数(镜检),尿细菌计数(镜检),,,missing,,,,quantitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 待映射
-2,ua_dict.yaml,临检,urinalysis,非透明管型,非透明管型,,,missing,,,,quantitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 待映射
-2,ua_dict.yaml,临检,urinalysis,异形红细胞率,异形红细胞率,,,missing,,,,quantitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 待映射
-2,ua_dict.yaml,临检,urinalysis,尿钙,尿钙,,,missing,,,,quantitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 待映射
-2,ua_dict.yaml,临检,urinalysis,尿肌酐,尿肌酐,,,missing,,,,quantitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 待映射
-2,ua_dict.yaml,临检,urinalysis,微白蛋白,微白蛋白,,,missing,,,,quantitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 待映射
-2,ua_dict.yaml,临检,urinalysis,微白蛋白/尿肌酐,微白蛋白/尿肌酐,,,missing,,,,quantitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 待映射
+2,immunology_dict.yaml,免疫,autoimmune,抗RNP抗体,抗 RNP抗体测定,2500304A,,missing,AU,[arb'U],AU=1,arbitrary,primary,WS/T 886—2026 表1; UCUM,pending,batch 2 已迁移;待复核
+2,immunology_dict.yaml,免疫,autoimmune,抗Sm抗体,抗 Sm抗体测定,2500404A,,missing,AU,[arb'U],AU=1,arbitrary,primary,WS/T 886—2026 表1; UCUM,pending,batch 2 已迁移;待复核
+2,immunology_dict.yaml,免疫,autoimmune,抗SS-A 60抗体,抗 SS-A 60抗体测定,2500504A,,missing,AU,[arb'U],AU=1,arbitrary,primary,WS/T 886—2026 表1; UCUM,pending,batch 2 已迁移;待复核
+2,immunology_dict.yaml,免疫,autoimmune,抗SS-A 52抗体,抗 SS-A 52抗体测定,2500504A,,missing,AU,[arb'U],AU=1,arbitrary,primary,WS/T 886—2026 表1; UCUM,pending,batch 2 已迁移;待复核
+2,immunology_dict.yaml,免疫,autoimmune,抗SS-B抗体,抗 SS-B抗体测定,2500604A,,missing,AU,[arb'U],AU=1,arbitrary,primary,WS/T 886—2026 表1; UCUM,pending,batch 2 已迁移;待复核
+2,immunology_dict.yaml,免疫,autoimmune,抗Scl-70抗体,抗 Scl-70抗体测定,2500804A,,missing,AU,[arb'U],AU=1,arbitrary,primary,WS/T 886—2026 表1; UCUM,pending,batch 2 已迁移;待复核
+2,immunology_dict.yaml,免疫,autoimmune,抗PM-Scl抗体,抗PM-Scl抗体,,,missing,AU,[arb'U],AU=1,arbitrary,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 已迁移;待复核
+2,immunology_dict.yaml,免疫,autoimmune,抗Jo-1抗体,抗 Jo-1抗体测定,2500904A,,missing,AU,[arb'U],AU=1,arbitrary,primary,WS/T 886—2026 表1; UCUM,pending,batch 2 已迁移;待复核
+2,immunology_dict.yaml,免疫,autoimmune,抗CENP B抗体,抗CENP B抗体,,,missing,AU,[arb'U],AU=1,arbitrary,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 已迁移;待复核
+2,immunology_dict.yaml,免疫,autoimmune,抗PCNA抗体,抗PCNA抗体,,,missing,AU,[arb'U],AU=1,arbitrary,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 已迁移;待复核
+2,immunology_dict.yaml,免疫,autoimmune,抗Nucleosome抗体,抗Nucleosome抗体,,,missing,AU,[arb'U],AU=1,arbitrary,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 已迁移;待复核
+2,immunology_dict.yaml,免疫,autoimmune,抗Histone抗体,抗Histone抗体,,,missing,AU,[arb'U],AU=1,arbitrary,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 已迁移;待复核
+2,immunology_dict.yaml,免疫,autoimmune,抗Ribosomal P抗体,抗Ribosomal P抗体,,,missing,AU,[arb'U],AU=1,arbitrary,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 已迁移;待复核
+2,immunology_dict.yaml,免疫,autoimmune,抗AMA-M2抗体,抗AMA-M2抗体,,,missing,AU,[arb'U],AU=1,arbitrary,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 已迁移;待复核
+2,immunology_dict.yaml,免疫,autoimmune,抗C1q抗体,抗C1q抗体,,,missing,U/mL,U/mL,U/mL=1,quantitative,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 已迁移;待复核
+2,immunology_dict.yaml,免疫,autoimmune,抗dsDNA抗体,抗双链 DNA抗体测定,2500204A,,missing,IU/mL,[IU]/mL,IU/mL=1,quantitative,primary,WS/T 886—2026 表1; UCUM,pending,batch 2 已迁移;待复核
+2,immunology_dict.yaml,免疫,autoimmune,ANA(IIF),抗核抗体检测,2500104B,,missing,,,,qualitative,primary,WS/T 886—2026 表1; UCUM,pending,batch 2 已迁移;待复核
+2,immunology_dict.yaml,免疫,autoimmune,抗核抗体主荧光核型,抗核抗体主荧光核型,,,missing,,,,qualitative,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 已迁移;待复核
+2,immunology_dict.yaml,免疫,autoimmune,抗线粒体抗体,抗线粒体抗体,,,missing,,,,qualitative,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 已迁移;待复核
+2,immunology_dict.yaml,免疫,autoimmune,抗平滑肌抗体,抗平滑肌抗体,,,missing,,,,qualitative,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 已迁移;待复核
+2,immunology_dict.yaml,免疫,autoimmune,抗sp100抗体,抗sp100抗体,,,missing,AU,[arb'U],AU=1,arbitrary,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 已迁移;待复核
+2,immunology_dict.yaml,免疫,autoimmune,抗LC-1抗体,抗LC-1抗体,,,missing,AU,[arb'U],AU=1,arbitrary,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 已迁移;待复核
+2,immunology_dict.yaml,免疫,autoimmune,抗LKM-1抗体,抗LKM-1抗体,,,missing,AU,[arb'U],AU=1,arbitrary,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 已迁移;待复核
+2,immunology_dict.yaml,免疫,autoimmune,抗SLA/LP抗体,抗SLA/LP抗体,,,missing,AU,[arb'U],AU=1,arbitrary,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 已迁移;待复核
+2,immunology_dict.yaml,免疫,autoimmune,抗AMA-M2-3E抗体,抗AMA-M2-3E抗体,,,missing,U/mL,U/mL,U/mL=1,quantitative,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 已迁移;待复核
+2,immunology_dict.yaml,免疫,autoimmune,抗gp210抗体,抗gp210抗体,,,missing,AU,[arb'U],AU=1,arbitrary,pending,WS/T 886—2026 表1; UCUM,pending,batch 2 已迁移;待复核
+2,immunology_dict.yaml,免疫,infection,乙肝表面抗原,乙型肝炎病毒表面抗原测定,2400104A,,missing,IU/mL,[IU]/mL,IU/mL=1,quantitative,primary,WS/T 886—2026 表1; UCUM,pending,batch 2 已迁移;待复核
+2,immunology_dict.yaml,免疫,infection,乙肝表面抗体,乙型肝炎病毒表面抗体测定,2400204A,,missing,mIU/mL,m[IU]/mL,mIU/mL=1,quantitative,primary,WS/T 886—2026 表1; UCUM,pending,batch 2 已迁移;待复核
+2,immunology_dict.yaml,免疫,infection,乙肝e抗原,乙型肝炎病毒e 抗原测定,2400304A,,missing,1,1,S/CO=1,ratio,primary,WS/T 886—2026 表1; UCUM,pending,batch 2 已迁移;待复核
+2,immunology_dict.yaml,免疫,infection,乙肝e抗体,乙型肝炎病毒e 抗体检测,2400404B,,missing,1,1,S/CO=1,ratio,primary,WS/T 886—2026 表1; UCUM,pending,batch 2 已迁移;待复核
+2,immunology_dict.yaml,免疫,infection,乙肝核心抗体,乙型肝炎病毒核心抗体检测,2400504B,,missing,1,1,S/CO=1,ratio,primary,WS/T 886—2026 表1; UCUM,pending,batch 2 已迁移;待复核
+2,immunology_dict.yaml,免疫,infection,丙肝抗体,丙型肝炎病毒抗体检测,2400604B,,missing,1,1,S/CO=1,ratio,primary,WS/T 886—2026 表1; UCUM,pending,batch 2 已迁移;待复核
+2,immunology_dict.yaml,免疫,infection,艾滋病抗体抗原,人类免疫缺陷病毒抗原抗体联合检测,2401004B,,missing,1,1,S/CO=1,ratio,primary,WS/T 886—2026 表1; UCUM,pending,batch 2 已迁移;待复核
+2,immunology_dict.yaml,免疫,infection,梅毒螺旋体抗体,梅毒螺旋体特异性抗体检测,2401204B,,missing,1,1,S/CO=1,ratio,primary,WS/T 886—2026 表1; UCUM,pending,batch 2 已迁移;待复核
+2,immunology_dict.yaml,免疫,other,透明质酸,透明质酸测定,1701004A,,missing,μg/L,ug/L,μg/L=1,quantitative,primary,WS/T 886—2026 表1; UCUM,pending,batch 2 已迁移;待复核
+2,immunology_dict.yaml,免疫,other,层粘连蛋白,层黏连蛋白测定,1103104A,,missing,μg/L,ug/L,μg/L=1,quantitative,primary,WS/T 886—2026 表1; UCUM,pending,batch 2 已迁移;待复核
+2,immunology_dict.yaml,免疫,other,三型前胶原N端肽,Ⅲ型前胶原N 端肽测定,1103204A,,missing,μg/L,ug/L,μg/L=1,quantitative,primary,WS/T 886—2026 表1; UCUM,pending,batch 2 已迁移;待复核
+2,immunology_dict.yaml,免疫,other,四型前胶原,Ⅳ型胶原蛋白测定,1103304A,,missing,μg/L,ug/L,μg/L=1,quantitative,primary,WS/T 886—2026 表1; UCUM,pending,batch 2 已迁移;待复核
+2,special_dict.yaml,其他专项,other,母龄风险,母龄风险,,,missing,1,1,,ratio,local,local（WS/T 886 未覆盖）,pending,batch 2 已迁移;待复核
+2,special_dict.yaml,其他专项,other,开放性神经管缺陷,开放性神经管缺陷,,,missing,1,1,,ratio,local,local（WS/T 886 未覆盖）,pending,batch 2 已迁移;待复核
+2,special_dict.yaml,其他专项,other,18-三体综合征,18-三体综合征,,,missing,1,1,,ratio,local,local（WS/T 886 未覆盖）,pending,batch 2 已迁移;待复核
+2,special_dict.yaml,其他专项,other,唐氏综合征,唐氏综合征,,,missing,1,1,,ratio,local,local（WS/T 886 未覆盖）,pending,batch 2 已迁移;待复核
+2,special_dict.yaml,其他专项,other,人绒毛膜促性腺激素β亚单位,人绒毛膜促性腺激素β亚单位,,,missing,μg/L,ug/L,ng/mL=1; U/mL=不换算,quantitative,local,local（WS/T 886 未覆盖）,pending,batch 2 已迁移;待复核
+2,ua_dict.yaml,临检,urinalysis,潜血,干化学尿液隐血试验,0600610D,,missing,,,,qualitative,primary,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 已迁移;待复核
+2,ua_dict.yaml,临检,urinalysis,白细胞酯酶,干化学尿液白细胞测定,0600910D,,missing,,,,qualitative,primary,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 已迁移;待复核
+2,ua_dict.yaml,临检,urinalysis,蛋白质,干化学尿液蛋白测定,0600210D,,missing,,,,qualitative,primary,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 已迁移;待复核
+2,ua_dict.yaml,临检,urinalysis,葡萄糖,干化学尿液葡萄糖测定,0600410D,,missing,,,,qualitative,primary,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 已迁移;待复核
+2,ua_dict.yaml,临检,urinalysis,尿胆原,干化学尿液尿胆原测定,0600810D,,missing,μmol/L,umol/L,umol/l=1,quantitative,primary,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 已迁移;待复核
+2,ua_dict.yaml,临检,urinalysis,胆红素,干化学尿液胆红素测定,0600310D,,missing,,,,qualitative,primary,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 已迁移;待复核
+2,ua_dict.yaml,临检,urinalysis,维生素C,维生素C,,,missing,,,,qualitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 已迁移;待复核
+2,ua_dict.yaml,临检,urinalysis,比重,干化学尿液比重测定,0601010D,,missing,1,1,,quantitative,primary,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 已迁移;待复核
+2,ua_dict.yaml,临检,urinalysis,酮体,干化学尿液酮体测定,0600510D,,missing,,,,qualitative,primary,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 已迁移;待复核
+2,ua_dict.yaml,临检,urinalysis,亚硝酸盐,干化学尿液亚硝酸盐测定,0600710B,,missing,,,,qualitative,primary,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 已迁移;待复核
+2,ua_dict.yaml,临检,urinalysis,PH,干化学尿液 pH测定,0600110D,,missing,1,1,,quantitative,primary,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 已迁移;待复核
+2,ua_dict.yaml,临检,urinalysis,尿液颜色,尿液颜色,,,missing,,,,qualitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 已迁移;待复核
+2,ua_dict.yaml,临检,urinalysis,尿液浊度,尿液浊度,,,missing,,,,qualitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 已迁移;待复核
+2,ua_dict.yaml,临检,urinalysis,尿白细胞计数,尿白细胞计数,,,missing,个/μL,/uL,个/uL=1; 个/ul=1; /ul=1,quantitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 已迁移;待复核
+2,ua_dict.yaml,临检,urinalysis,尿白细胞计数(镜检),尿白细胞计数(镜检),,,missing,个/μL,/uL,个/uL=1; 个/ul=1; /ul=1,quantitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 已迁移;待复核
+2,ua_dict.yaml,临检,urinalysis,镜检白细胞,镜检白细胞,,,missing,,,,microscopy,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 已迁移;待复核
+2,ua_dict.yaml,临检,urinalysis,尿红细胞计数,尿红细胞计数,,,missing,个/μL,/uL,个/uL=1; 个/ul=1; /ul=1,quantitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 已迁移;待复核
+2,ua_dict.yaml,临检,urinalysis,尿红细胞计数(镜检),尿红细胞计数(镜检),,,missing,个/μL,/uL,个/uL=1; 个/ul=1; /ul=1,quantitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 已迁移;待复核
+2,ua_dict.yaml,临检,urinalysis,镜检红细胞,镜检红细胞,,,missing,,,,microscopy,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 已迁移;待复核
+2,ua_dict.yaml,临检,urinalysis,尿上皮细胞计数,尿上皮细胞计数,,,missing,个/μL,/uL,个/uL=1; 个/ul=1; /ul=1,quantitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 已迁移;待复核
+2,ua_dict.yaml,临检,urinalysis,尿上皮细胞计数(镜检),尿上皮细胞计数(镜检),,,missing,个/μL,/uL,个/uL=1; 个/ul=1; /ul=1,quantitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 已迁移;待复核
+2,ua_dict.yaml,临检,urinalysis,镜检上皮细胞,镜检上皮细胞,,,missing,,,,microscopy,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 已迁移;待复核
+2,ua_dict.yaml,临检,urinalysis,小圆上皮细胞,小圆上皮细胞,,,missing,个/μL,/uL,个/uL=1; 个/ul=1; /ul=1,quantitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 已迁移;待复核
+2,ua_dict.yaml,临检,urinalysis,尿透明管型计数,尿透明管型计数,,,missing,,,,microscopy,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 已迁移;待复核
+2,ua_dict.yaml,临检,urinalysis,尿管型计数,尿管型计数,,,missing,个/μL,/uL,个/uL=1; 个/ul=1; /ul=1,quantitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 已迁移;待复核
+2,ua_dict.yaml,临检,urinalysis,镜检管型,镜检管型,,,missing,,,,microscopy,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 已迁移;待复核
+2,ua_dict.yaml,临检,urinalysis,镜检结晶,镜检结晶,,,missing,,,,microscopy,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 已迁移;待复核
+2,ua_dict.yaml,临检,urinalysis,颗粒管型,颗粒管型,,,missing,,,,microscopy,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 已迁移;待复核
+2,ua_dict.yaml,临检,urinalysis,尿粘液丝,尿粘液丝,,,missing,,,,microscopy,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 已迁移;待复核
+2,ua_dict.yaml,临检,urinalysis,滴虫,滴虫,,,missing,,,,qualitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 已迁移;待复核
+2,ua_dict.yaml,临检,urinalysis,白细胞团,白细胞团,,,missing,个/μL,/uL,个/uL=1; 个/ul=1; /ul=1,quantitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 已迁移;待复核
+2,ua_dict.yaml,临检,urinalysis,酵母样菌,酵母样菌,,,missing,个/μL,/uL,个/uL=1; 个/ul=1; /ul=1,quantitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 已迁移;待复核
+2,ua_dict.yaml,临检,urinalysis,尿细菌计数,尿细菌计数,,,missing,个/μL,/uL,个/uL=1; 个/ul=1; /ul=1,quantitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 已迁移;待复核
+2,ua_dict.yaml,临检,urinalysis,尿细菌计数(镜检),尿细菌计数(镜检),,,missing,个/μL,/uL,个/uL=1; 个/ul=1; /ul=1,quantitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 已迁移;待复核
+2,ua_dict.yaml,临检,urinalysis,非透明管型,非透明管型,,,missing,个/μL,/uL,个/uL=1; 个/ul=1; /ul=1,quantitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 已迁移;待复核
+2,ua_dict.yaml,临检,urinalysis,异形红细胞率,异形红细胞率,,,missing,%,%,,quantitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 已迁移;待复核
+2,ua_dict.yaml,临检,urinalysis,尿钙,尿钙,,,missing,mmol/L,mmol/L,,quantitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 已迁移;待复核
+2,ua_dict.yaml,临检,urinalysis,尿肌酐,尿肌酐,,,missing,mmol/L,mmol/L,,quantitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 已迁移;待复核
+2,ua_dict.yaml,临检,urinalysis,微白蛋白,微白蛋白,,,missing,mg/L,mg/L,,quantitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 已迁移;待复核
+2,ua_dict.yaml,临检,urinalysis,微白蛋白/尿肌酐,微白蛋白/尿肌酐,,,missing,mg/mmol,mg/mmol,,quantitative,pending,WS/T 886—2026 表1; WS/T 806—2022; UCUM,pending,batch 2 已迁移;待复核

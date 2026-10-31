@@ -45,13 +45,13 @@ func TestTrendStoreSmoke(t *testing.T) {
 	if _, err := pool.Exec(ctx, `INSERT INTO images (sha256, original_filename) VALUES
 			('trend-a-2017','a.jpg'),('trend-a-2020-iu','a.jpg'),('trend-a-2021-aa','a.jpg'),
 			('trend-a-2021-ab','a.jpg'),('trend-a-null','a.jpg'),('trend-a-other','a.jpg'),
-			('trend-a-null-unit','a.jpg'),('trend-b-2021','b.jpg')`); err != nil {
+			('trend-a-null-unit','a.jpg'),('trend-a-unverified','a.jpg'),('trend-b-2021','b.jpg')`); err != nil {
 		t.Fatalf("seed images: %v", err)
 	}
 	if _, err := pool.Exec(ctx, `INSERT INTO ocr_results (image_sha256, engine_output) VALUES
 			('trend-a-2017','{}'),('trend-a-2020-iu','{}'),('trend-a-2021-aa','{}'),
 			('trend-a-2021-ab','{}'),('trend-a-null','{}'),('trend-a-other','{}'),
-			('trend-a-null-unit','{}'),('trend-b-2021','{}')`); err != nil {
+			('trend-a-null-unit','{}'),('trend-a-unverified','{}'),('trend-b-2021','{}')`); err != nil {
 		t.Fatalf("seed ocr_results: %v", err)
 	}
 	if _, err := pool.Exec(ctx, `INSERT INTO reports
@@ -63,6 +63,7 @@ func TestTrendStoreSmoke(t *testing.T) {
 			('trend-a-null',(SELECT id FROM ocr_results WHERE image_sha256='trend-a-null'),'生化',NULL,'success',$1),
 			('trend-a-other',(SELECT id FROM ocr_results WHERE image_sha256='trend-a-other'),'生化','2022-01-01','success',$1),
 			('trend-a-null-unit',(SELECT id FROM ocr_results WHERE image_sha256='trend-a-null-unit'),'生化','2023-01-01','success',$1),
+			('trend-a-unverified',(SELECT id FROM ocr_results WHERE image_sha256='trend-a-unverified'),'生化','2022-06-01','success',$1),
 			('trend-b-2021',(SELECT id FROM ocr_results WHERE image_sha256='trend-b-2021'),'生化','2021-08-02','success',$2)`,
 		memberA, memberB); err != nil {
 		t.Fatalf("seed reports: %v", err)
@@ -76,9 +77,15 @@ func TestTrendStoreSmoke(t *testing.T) {
 			('trend-a-2021-ab','丙氨酸转氨酶','900','U/L','7-40','干化学','high',false,'ALT 900 U/L','corrected'),
 			('trend-a-null','丙氨酸转氨酶','30','U/L','7-40',NULL,'normal',false,'ALT 30 U/L','unreviewed'),
 			('trend-a-null-unit','丙氨酸转氨酶','40',NULL,'7-40',NULL,'normal',false,'ALT 40','unreviewed'),
+			('trend-a-unverified','丙氨酸转氨酶','900','U/L','7-40',NULL,'high',false,'ALT 900 U/L','unreviewed'),
 			('trend-a-other','天冬氨酸转氨酶','488','U/L','13-35',NULL,'high',false,'AST 488 U/L','unreviewed'),
 			('trend-b-2021','丙氨酸转氨酶','111','U/L','7-40',NULL,'high',false,'ALT 111 U/L','unreviewed')`); err != nil {
 		t.Fatalf("seed report_items: %v", err)
+	}
+	// 未验证单位点默认不进入趋势(票 03 起;票 12 将增加 code 键与 --all)。
+	if _, err := pool.Exec(ctx, `UPDATE report_items SET unit_status='unverified'
+			WHERE report_sha256='trend-a-unverified'`); err != nil {
+		t.Fatalf("mark unverified: %v", err)
 	}
 
 	// 全部单位:2017 → 2020(IU/L) → 2021 两份同日按 sha → dateless 沉底。

@@ -207,15 +207,15 @@ describe('reportItemGroups', () => {
       'low',
     ]);
     expect(groups[0].items.slice(6).map((item) => item.name)).toEqual([
-      '总胆红素',
-      '直接胆红素',
-      '总蛋白',
-      '白蛋白',
+      '总胆红素测定',
+      '直接胆红素测定',
+      '总蛋白测定',
+      '白蛋白测定',
       '球蛋白',
       '白蛋白/球蛋白',
     ]);
-    expect(groups[1].items[0].name).toBe('尿素');
-    expect(groups[2].items[0].name).toBe('尿酸');
+    expect(groups[1].items[0].name).toBe('尿素测定');
+    expect(groups[2].items[0].name).toBe('尿酸测定');
     expect(groups.flatMap((group) => group.items)).toHaveLength(lft02.items.length);
   });
 
@@ -331,8 +331,8 @@ describe('项目列表 / 详情展示口径', () => {
 
     expect(groups.map((group) => group.panel)).toEqual(['liver', 'uric_acid']);
     expect(groups.map((group) => group.reportDate)).toEqual(['2020-01-01', '2020-01-01']);
-    expect(groups[0].items.map((item) => item.name)).toEqual(['总蛋白', '白蛋白']);
-    expect(groups[1].items.map((item) => item.name)).toEqual(['尿酸']);
+    expect(groups[0].items.map((item) => item.name)).toEqual(['总蛋白测定', '白蛋白测定']);
+    expect(groups[1].items.map((item) => item.name)).toEqual(['尿酸测定']);
   });
 
   it('abnormalPanelGroups 的组头计数 = 行数,与 abnormal_count 同口径', () => {

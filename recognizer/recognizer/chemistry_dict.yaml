@@ -22,183 +22,1041 @@ category:
 items:
 
 # ==== lft_dict.yaml(原 肝肾功能;min=4;titles=['肝功', '肾功能', '铜蓝蛋白']) ====
-  - name: 丙氨酸转氨酶
+  - name: 丙氨酸氨基转移酶测定
     panel: liver
     aliases: [谷丙转氨酶, "丙氨酸转氨酶(ALT)", "【互】谷丙转氨酶[ALT]", 丙氨酸氨基转移酶]
-    units: [U/L]
-  - name: 天冬氨酸转氨酶
+    synonyms:
+      - term: 丙氨酸转氨酶
+        source: legacy printed name (pre-standardization dictionary)
+    code: 1500104A
+    loinc: 1742-6
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: U/L
+    unit_display: U/L
+    accepted_units: []
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000
+  - name: 天门冬氨酸氨基转移酶测定
     panel: liver
     aliases: ["天冬氨酸转氨酶(AST)", 天冬氨酸氨基转移, 天门冬氨酸氨基转移酶, "【互】谷草转氨酶[AST]", 谷草转氨酮, 谷草转氨酶]
-    units: [U/L]
-  - name: 谷氨酰转肽酶
+    synonyms:
+      - term: 天冬氨酸转氨酶
+        source: legacy printed name (pre-standardization dictionary)
+    code: 1500204A
+    loinc: 1920-8
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: U/L
+    unit_display: U/L
+    accepted_units: []
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000
+  - name: γ-谷氨酰基转移酶测定
     panel: liver
     aliases: ["r-谷氨酰转移酶(GGT)", "【互】γ一谷氨酰转肽酶[γ-GT]", "*Y谷氨酰转肽酶", 谷酰转肽酶, γ-谷氨酰基转移酶]
-    units: [U/L]
+    synonyms:
+      - term: 谷氨酰转肽酶
+        source: legacy printed name (pre-standardization dictionary)
+    code: 1500904A
+    loinc: 2324-2
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: U/L
+    unit_display: U/L
+    accepted_units: []
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000
   - name: 谷草/谷丙比值
     panel: liver
     aliases: ["谷草/谷丙比值[AST/ALT]", "AST/ALT"]
-    units: []
-  - name: 碱性磷酸酶
+    code:
+    loinc: 1916-6
+    local_code:
+    source_status: local
+    review_status: pending
+    result_kind: ratio
+    canonical_unit: '1'
+    unit_display: '1'
+    accepted_units: []
+    ocr_unit_forms: []
+  - name: 碱性磷酸酶测定
     panel: liver
     aliases: ["碱性磷酸酶(ALP)", 碱性硫酸酶, "碱性磷酸酶[ALP]", "*碱性磷酸酶"]
-    units: [U/L]
-  - name: 总蛋白
+    synonyms:
+      - term: 碱性磷酸酶
+        source: legacy printed name (pre-standardization dictionary)
+    code: 1500404A
+    loinc: 6768-6
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: U/L
+    unit_display: U/L
+    accepted_units: []
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000
+  - name: 总蛋白测定
     panel: liver
     aliases: ["总蛋白(TP)", "总蛋白[TP]", "【互】总蛋白[TP]", "*总蛋白"]
-    units: [g/L]
-  - name: 白蛋白
+    synonyms:
+      - term: 总蛋白
+        source: legacy printed name (pre-standardization dictionary)
+    code: 1100204A
+    loinc: 2885-2
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: g/L
+    unit_display: g/L
+    accepted_units:
+      - unit: g/dL
+        ucum: g/dL
+        conversion:
+          type: linear
+          factor: 10.0
+          from: g/dL
+          to: g/L
+          source: local (pending review)
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 200
+  - name: 白蛋白测定
     panel: liver
     aliases: ["白蛋白(ALB)", "白蛋白[ALB]", "【互】白蛋白[ALB]", "*白蛋白"]
-    units: [g/L]
+    synonyms:
+      - term: 白蛋白
+        source: legacy printed name (pre-standardization dictionary)
+    code: 1100104A
+    loinc: 1751-7
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: g/L
+    unit_display: g/L
+    accepted_units:
+      - unit: g/dL
+        ucum: g/dL
+        conversion:
+          type: linear
+          factor: 10.0
+          from: g/dL
+          to: g/L
+          source: local (pending review)
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 200
   - name: 球蛋白
     panel: liver
     aliases: ["球蛋白(GLO)", "球蛋白[GLB]"]
-    units: [g/L]
+    code:
+    loinc: 10834-0
+    local_code:
+    source_status: local
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: g/L
+    unit_display: g/L
+    accepted_units:
+      - unit: g/dL
+        ucum: g/dL
+        conversion:
+          type: linear
+          factor: 10.0
+          from: g/dL
+          to: g/L
+          source: local (pending review)
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 200
   - name: 白蛋白/球蛋白
     panel: liver
     aliases: [白球比例, "白球比例(A/G)", "白蛋白/球蛋白", "白蛋白/球蛋白[A/G]", "A/G", 白/球比值]
-    units: []
-  - name: 总胆红素
+    code:
+    loinc: 1759-0
+    local_code:
+    source_status: local
+    review_status: pending
+    result_kind: ratio
+    canonical_unit: '1'
+    unit_display: '1'
+    accepted_units: []
+    ocr_unit_forms: []
+  - name: 总胆红素测定
     panel: liver
     aliases: ["总胆红素(TBIL)", "总胆红素[TBIL]", "【互】总胆红素[T-Bi1]", "*总胆红素"]
-    units: ["μmol/L", μmo1/L, "μ mol/L"]
-  - name: 直接胆红素
+    synonyms:
+      - term: 总胆红素
+        source: legacy printed name (pre-standardization dictionary)
+    code: 1700504A
+    loinc: 1975-2
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: umol/L
+    unit_display: μmol/L
+    accepted_units:
+      - unit: mg/dL
+        ucum: mg/dL
+        conversion:
+          type: linear
+          factor: 17.1
+          from: mg/dL
+          to: umol/L
+          source: local (pending review)
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 2000
+  - name: 直接胆红素测定
     panel: liver
     aliases: ["直接胆红素(DBIL)", "直接胆红素[DBIL]", "【互】直接胆红素[D-Bi1]"]
-    units: ["μmol/L", μmo1/L]
+    synonyms:
+      - term: 直接胆红素
+        source: legacy printed name (pre-standardization dictionary)
+    code: 1700604A
+    loinc: 1968-7
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: umol/L
+    unit_display: μmol/L
+    accepted_units:
+      - unit: mg/dL
+        ucum: mg/dL
+        conversion:
+          type: linear
+          factor: 17.1
+          from: mg/dL
+          to: umol/L
+          source: local (pending review)
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 2000
   - name: 间接胆红素
     panel: liver
     aliases: ["间接胆红素[IBIL]", "问接胆红素[1-Bi1]"]
-    units: ["μmol/L", μmo1/L, μnol/L, μno1/L]
-  - name: 总胆汁酸
+    code:
+    loinc: 1971-1
+    local_code:
+    source_status: local
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: umol/L
+    unit_display: μmol/L
+    accepted_units:
+      - unit: mg/dL
+        ucum: mg/dL
+        conversion:
+          type: linear
+          factor: 17.1
+          from: mg/dL
+          to: umol/L
+          source: local (pending review)
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 2000
+  - name: 胆汁酸测定
     panel: liver
     aliases: ["总胆汁酸(TBA)"]
-    units: ["μmol/L", μmo1/L]
-  - name: 尿素
+    synonyms:
+      - term: 总胆汁酸
+        source: legacy printed name (pre-standardization dictionary)
+    code: 1700704A
+    loinc: 14628-2
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: umol/L
+    unit_display: μmol/L
+    accepted_units: []
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 1000
+  - name: 尿素测定
     panel: kidney
     aliases: ["尿素(BUN)", Urea]
-    units: [mmol/L]
-  - name: 肌酐
+    synonyms:
+      - term: 尿素
+        source: legacy printed name (pre-standardization dictionary)
+    code: 1700204A
+    loinc: 3091-6
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: mmol/L
+    unit_display: mmol/L
+    accepted_units:
+      - unit: mg/dL
+        ucum: mg/dL
+        conversion:
+          type: linear
+          factor: 0.1665
+          from: mg/dL
+          to: mmol/L
+          source: local (pending review)
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100
+  - name: 肌酐测定
     panel: kidney
     aliases: ["肌酐(CRE)", Cr]
-    units: ["μmol/L", umol/L]
-  - name: 尿酸
+    synonyms:
+      - term: 肌酐
+        source: legacy printed name (pre-standardization dictionary)
+    code: 1700404A
+    loinc: 2160-0
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: umol/L
+    unit_display: μmol/L
+    accepted_units:
+      - unit: mg/dL
+        ucum: mg/dL
+        conversion:
+          type: linear
+          factor: 88.4
+          from: mg/dL
+          to: umol/L
+          source: local (pending review)
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 5000
+  - name: 尿酸测定
     panel: uric_acid
     aliases: ["尿酸(UA)", UA]
-    units: [mmol/L]
-  - name: 二氧化碳
+    synonyms:
+      - term: 尿酸
+        source: legacy printed name (pre-standardization dictionary)
+    code: 1700304A
+    loinc: 3084-1
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: umol/L
+    unit_display: μmol/L
+    accepted_units:
+      - unit: mg/dL
+        ucum: mg/dL
+        conversion:
+          type: linear
+          factor: 59.48
+          from: mg/dL
+          to: umol/L
+          source: local (pending review)
+      - unit: mmol/L
+        ucum: mmol/L
+        conversion:
+          type: linear
+          factor: 1000.0
+          from: mmol/L
+          to: umol/L
+          source: local (pending review)
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 5000
+  - name: 二氧化碳结合力
     panel: electrolyte
     aliases: [Co2CP]
-    units: [mmol/L]
-  - name: 总胆固醇
+    synonyms:
+      - term: 二氧化碳
+        source: legacy printed name (pre-standardization dictionary)
+    code:
+    loinc: 2028-9
+    local_code: LOCAL-CHEM-CO2CP
+    source_status: local
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: mmol/L
+    unit_display: mmol/L
+    accepted_units: []
+    ocr_unit_forms: []
+  - name: 总胆固醇测定
     panel: lipid
     aliases: []
-    units: [mmol/L]
-  - name: 甘油三酯
+    synonyms:
+      - term: 总胆固醇
+        source: legacy printed name (pre-standardization dictionary)
+    code: 2000104A
+    loinc: 2093-3
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: mmol/L
+    unit_display: mmol/L
+    accepted_units:
+      - unit: mg/dL
+        ucum: mg/dL
+        conversion:
+          type: linear
+          factor: 0.02586
+          from: mg/dL
+          to: mmol/L
+          source: local (pending review)
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100
+  - name: 甘油三酯测定
     panel: lipid
     aliases: []
-    units: [mmol/L]
-  - name: 高密度脂蛋白胆固醇
+    synonyms:
+      - term: 甘油三酯
+        source: legacy printed name (pre-standardization dictionary)
+    code: 2000204A
+    loinc: 2571-8
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: mmol/L
+    unit_display: mmol/L
+    accepted_units:
+      - unit: mg/dL
+        ucum: mg/dL
+        conversion:
+          type: linear
+          factor: 0.01129
+          from: mg/dL
+          to: mmol/L
+          source: local (pending review)
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100
+  - name: 高密度脂蛋白胆固醇测定
     panel: lipid
     aliases: [高密度脂蛋白]
-    units: [mmol/L]
-  - name: 低密度脂蛋白胆固醇
+    synonyms:
+      - term: 高密度脂蛋白胆固醇
+        source: legacy printed name (pre-standardization dictionary)
+    code: 2000304A
+    loinc: 2085-9
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: mmol/L
+    unit_display: mmol/L
+    accepted_units:
+      - unit: mg/dL
+        ucum: mg/dL
+        conversion:
+          type: linear
+          factor: 0.02586
+          from: mg/dL
+          to: mmol/L
+          source: local (pending review)
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100
+  - name: 低密度脂蛋白胆固醇测定
     panel: lipid
     aliases: [低密度脂蛋白]
-    units: [mmol/L]
-  - name: 葡萄糖
+    synonyms:
+      - term: 低密度脂蛋白胆固醇
+        source: legacy printed name (pre-standardization dictionary)
+    code: 2000404A
+    loinc: 2089-1
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: mmol/L
+    unit_display: mmol/L
+    accepted_units:
+      - unit: mg/dL
+        ucum: mg/dL
+        conversion:
+          type: linear
+          factor: 0.02586
+          from: mg/dL
+          to: mmol/L
+          source: local (pending review)
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100
+  - name: 葡萄糖测定
     panel: glucose
     aliases: ["葡萄糖[GLU]"]
-    units: [mmol/L]
+    synonyms:
+      - term: 葡萄糖
+        source: legacy printed name (pre-standardization dictionary)
+    code: 1700104A
+    loinc: 2345-7
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: mmol/L
+    unit_display: mmol/L
+    accepted_units:
+      - unit: mg/dL
+        ucum: mg/dL
+        conversion:
+          type: linear
+          factor: 0.0555
+          from: mg/dL
+          to: mmol/L
+          source: local (pending review)
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100
   - name: eGFR
     panel: kidney
     aliases: ["eGFR(EPI公式计算)(eGFR)"]
-    units: [ml/min]
-  - name: 血清胱抑素C
+    code:
+    loinc: 62238-1
+    local_code:
+    source_status: local
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: mL/min/1.73m2
+    unit_display: mL/min/1.73m²
+    accepted_units:
+      - unit: mL/min
+        ucum: mL/min
+        conversion:
+          type: none
+          source: local (pending review)
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 300
+  - name: 半胱氨酸蛋白酶抑制剂 C测定
     panel: kidney
     aliases: ["血清胱抑素C(CysC)"]
-    units: [mg/L]
-  - name: 胆碱酯酶
+    synonyms:
+      - term: 血清胱抑素C
+        source: legacy printed name (pre-standardization dictionary)
+    code: 1101204A
+    loinc: 33863-2
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: mg/L
+    unit_display: mg/L
+    accepted_units: []
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100
+  - name: 胆碱酯酶测定
     panel: liver
     aliases: [胆碱脂酶, CHE]
-    units: [U/L]
-  - name: 前白蛋白
+    synonyms:
+      - term: 胆碱酯酶
+        source: legacy printed name (pre-standardization dictionary)
+    code: 1501104A
+    loinc: 2098-2
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: U/L
+    unit_display: U/L
+    accepted_units: []
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000
+  - name: 前白蛋白测定
     panel: liver
     aliases: ["前白蛋白(PA)"]
-    units: [mg/L]
-  - name: 岩藻糖苷酶
+    synonyms:
+      - term: 前白蛋白
+        source: legacy printed name (pre-standardization dictionary)
+    code: 1102904A
+    loinc: 14338-8
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: mg/L
+    unit_display: mg/L
+    accepted_units: []
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 5000
+  - name: α-L-岩藻糖苷酶测定
     panel: liver
     aliases: [a-L-岩藻糖苷酶]
-    units: [U/L]
-  - name: 甲胎蛋白
+    synonyms:
+      - term: 岩藻糖苷酶
+        source: legacy printed name (pre-standardization dictionary)
+    code: 1501304A
+    loinc: 24045-7
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: U/L
+    unit_display: U/L
+    accepted_units: []
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000
+  - name: 甲胎蛋白测定
     panel: liver
     aliases: ["甲胎蛋白(筛查)", AFP]
-    units: [ug/L]
+    synonyms:
+      - term: 甲胎蛋白
+        source: legacy printed name (pre-standardization dictionary)
+    code: 1600104A
+    loinc: 1834-1
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: ug/L
+    unit_display: μg/L
+    accepted_units:
+      - unit: ng/mL
+        ucum: ng/mL
+        conversion:
+          type: exact
+          factor: 1.0
+          from: ng/mL
+          to: ug/L
+          source: UCUM
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000
   - name: 亮氨酸氨基肽酶
     panel: liver
     aliases: [LAP]
-    units: [IU/L]
+    code:
+    loinc: 2187-3
+    local_code:
+    source_status: local
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: U/L
+    unit_display: U/L
+    accepted_units: []
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000
   - name: 游离脂肪酸
     panel: lipid
     aliases: [FFA]
-    units: [mmol/L]
+    code:
+    loinc: 15066-4
+    local_code:
+    source_status: local
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: mmol/L
+    unit_display: mmol/L
+    accepted_units: []
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100
   - name: 单胺氧化酶
     panel: liver
     aliases: [单氨氧化酶, MAO]
-    units: [IU/L]
+    code:
+    loinc: 12918-9
+    local_code:
+    source_status: local
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: U/L
+    unit_display: U/L
+    accepted_units: []
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000
   - name: 铜蓝蛋白
     panel: liver
     aliases: [铜蓝蛋白(CER)]
-    units: [g/L]
+    code:
+    loinc: 2064-4
+    local_code:
+    source_status: local
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: g/L
+    unit_display: g/L
+    accepted_units:
+      - unit: mg/dL
+        ucum: mg/dL
+        conversion:
+          type: linear
+          factor: 0.01
+          from: mg/dL
+          to: g/L
+          source: WS/T 404
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 10
 
 # ==== glu_dict.yaml(原 血糖;min=2;titles=['葡萄糖测定', '葡萄糖耐量', '糖耐量', '糖化血红蛋白']) ====
-  - name: 空腹葡萄糖
+  - name: 空腹葡萄糖测定
     panel: glucose
     aliases: [GLUO, HR葡萄糖, 糖耐量-空腹血糖, FPG]
-    units: [mmol/L, unol/1, mnol/L, mmo1/L, mol/L]
+    synonyms:
+      - term: 空腹葡萄糖
+        source: legacy printed name (pre-standardization dictionary)
+    code: 1700104A
+    loinc: 1558-6
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: mmol/L
+    unit_display: mmol/L
+    accepted_units:
+      - unit: mg/dL
+        ucum: mg/dL
+        conversion:
+          type: linear
+          factor: 0.0555
+          from: mg/dL
+          to: mmol/L
+          source: local (pending review)
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100
   - name: 餐后半小时葡萄糖
     panel: glucose
     aliases: [GLU1/2]
-    units: [mmol/L, mnol/L, mmo1/L, mol/L]
+    code:
+    loinc: 1527-1
+    local_code:
+    source_status: local
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: mmol/L
+    unit_display: mmol/L
+    accepted_units:
+      - unit: mg/dL
+        ucum: mg/dL
+        conversion:
+          type: linear
+          factor: 0.0555
+          from: mg/dL
+          to: mmol/L
+          source: local (pending review)
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100
   - name: 餐后一小时葡萄糖
     panel: glucose
     aliases: [GLUI, 1hPG]
-    units: [mmol/L, mnol/L, mmo1/L, mol/L]
+    code:
+    loinc: 1507-3
+    local_code:
+    source_status: local
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: mmol/L
+    unit_display: mmol/L
+    accepted_units:
+      - unit: mg/dL
+        ucum: mg/dL
+        conversion:
+          type: linear
+          factor: 0.0555
+          from: mg/dL
+          to: mmol/L
+          source: local (pending review)
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100
   - name: 餐后二小时葡萄糖
     panel: glucose
     aliases: [GLU2, 餐后2h血糖, GLU2h, 2hPG]
-    units: [mmol/L, mmo1/L]
+    code:
+    loinc: 1518-0
+    local_code:
+    source_status: local
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: mmol/L
+    unit_display: mmol/L
+    accepted_units:
+      - unit: mg/dL
+        ucum: mg/dL
+        conversion:
+          type: linear
+          factor: 0.0555
+          from: mg/dL
+          to: mmol/L
+          source: local (pending review)
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100
   - name: 餐后三小时葡萄糖
     panel: glucose
     aliases: [GLU3]
-    units: [mmol/L, mol/L]
-  - name: 糖化血红蛋白
+    code:
+    loinc: 1533-9
+    local_code:
+    source_status: local
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: mmol/L
+    unit_display: mmol/L
+    accepted_units:
+      - unit: mg/dL
+        ucum: mg/dL
+        conversion:
+          type: linear
+          factor: 0.0555
+          from: mg/dL
+          to: mmol/L
+          source: local (pending review)
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100
+  - name: 糖化血红蛋白测定
     panel: glucose
     aliases: [糖化血红蛋白HbA1C, HbA1C, GHB]
-    units: ["%"]
-  - name: C肽
+    synonyms:
+      - term: 糖化血红蛋白
+        source: legacy printed name (pre-standardization dictionary)
+    code: 1100301A
+    loinc: 4548-4
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: mmol/mol
+    unit_display: mmol/mol
+    accepted_units:
+      - unit: '%'
+        ucum: '%'
+        conversion:
+          type: equation
+          id: IFCC-NGSP
+          formula: (NGSP% - 2.15) * 10.929
+          from: '%'
+          to: mmol/mol
+          source: WS/T 461—2024 / IFCC-NGSP
+    ocr_unit_forms: []
+    plausible_range:
+      low: 10
+      high: 250
+  - name: C肽测定
     panel: glucose
     aliases: [C_P, C_肽]
-    units: [ng/mL]
-  - name: 胰岛素
+    synonyms:
+      - term: C肽
+        source: legacy printed name (pre-standardization dictionary)
+    code: 1202004A
+    loinc: 1986-9
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: pmol/L
+    unit_display: pmol/L
+    accepted_units:
+      - unit: ng/mL
+        ucum: ng/mL
+        conversion:
+          type: linear
+          factor: 331.0
+          from: ng/mL
+          to: pmol/L
+          source: local (pending review)
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 50000
+  - name: 胰岛素测定
     panel: glucose
     aliases: [IRI]
-    units: [uIU/mL]
+    synonyms:
+      - term: 胰岛素
+        source: legacy printed name (pre-standardization dictionary)
+    code: 1201904A
+    loinc: 20448-7
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: pmol/L
+    unit_display: pmol/L
+    accepted_units:
+      - unit: mIU/L
+        ucum: m[IU]/L
+        conversion:
+          type: linear
+          factor: 6.945
+          from: mIU/L
+          to: pmol/L
+          source: local (pending review)
+      - unit: uIU/mL
+        ucum: u[IU]/mL
+        conversion:
+          type: linear
+          factor: 6.945
+          from: uIU/mL
+          to: pmol/L
+          source: local (pending review)
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 10000
 
 # ==== vitanemia_dict.yaml(原 维生素与贫血;min=2;titles=['维生素D', '贫血']) ====
-  - name: 总25羟基维生素D
+  - name: 总维生素 D测定
     panel: vitanemia
     aliases: ["25(0H) D", "25(OH)D"]
-    units: [ng/ml]
-  - name: 铁蛋白
+    synonyms:
+      - term: 总25羟基维生素D
+        source: legacy printed name (pre-standardization dictionary)
+    code: 1900604A
+    loinc: 62292-8
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: nmol/L
+    unit_display: nmol/L
+    accepted_units:
+      - unit: ng/mL
+        ucum: ng/mL
+        conversion:
+          type: linear
+          factor: 2.5
+          from: ng/mL
+          to: nmol/L
+          source: local (pending review)
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 1000
+  - name: 铁蛋白测定
     panel: vitanemia
     aliases: []
-    units: [ng/ml]
-  - name: 叶酸
+    synonyms:
+      - term: 铁蛋白
+        source: legacy printed name (pre-standardization dictionary)
+    code: 1102804A
+    loinc: 2276-4
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: ug/L
+    unit_display: μg/L
+    accepted_units:
+      - unit: ng/mL
+        ucum: ng/mL
+        conversion:
+          type: exact
+          factor: 1.0
+          from: ng/mL
+          to: ug/L
+          source: UCUM
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000
+  - name: 维生素B9测定
     panel: vitanemia
     aliases: [叶酸测定]
-    units: [ng/ml]
-  - name: 维生素B12
+    synonyms:
+      - term: 叶酸
+        source: legacy printed name (pre-standardization dictionary)
+    code: 1901504A
+    loinc: 2284-8
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: nmol/L
+    unit_display: nmol/L
+    accepted_units:
+      - unit: ng/mL
+        ucum: ng/mL
+        conversion:
+          type: linear
+          factor: 2.266
+          from: ng/mL
+          to: nmol/L
+          source: local (pending review)
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 500
+  - name: 维生素B12 测定
     panel: vitanemia
     aliases: [维生素B12测定]
-    units: [pg/mL]
+    synonyms:
+      - term: 维生素B12
+        source: legacy printed name (pre-standardization dictionary)
+    code: 1901604A
+    loinc: 2132-9
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: pmol/L
+    unit_display: pmol/L
+    accepted_units:
+      - unit: pg/mL
+        ucum: pg/mL
+        conversion:
+          type: linear
+          factor: 0.7378
+          from: pg/mL
+          to: pmol/L
+          source: local (pending review)
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 20000

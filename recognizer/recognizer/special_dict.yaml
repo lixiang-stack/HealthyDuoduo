@@ -15,16 +15,89 @@ category:
 items:
   - name: 母龄风险
     aliases: []
-    units: []
+    code:
+    loinc:
+    local_code: LOCAL-SPECIAL-01
+    source_status: local
+    review_status: pending
+    result_kind: ratio
+    canonical_unit: '1'
+    unit_display: '1'
+    accepted_units: []
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 1000000000
   - name: 开放性神经管缺陷
     aliases: []
-    units: []
+    code:
+    loinc:
+    local_code: LOCAL-SPECIAL-02
+    source_status: local
+    review_status: pending
+    result_kind: ratio
+    canonical_unit: '1'
+    unit_display: '1'
+    accepted_units: []
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 1000000000
   - name: 18-三体综合征
     aliases: []
-    units: []
+    code:
+    loinc:
+    local_code: LOCAL-SPECIAL-03
+    source_status: local
+    review_status: pending
+    result_kind: ratio
+    canonical_unit: '1'
+    unit_display: '1'
+    accepted_units: []
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 1000000000
   - name: 唐氏综合征
     aliases: []
-    units: []
+    code:
+    loinc:
+    local_code: LOCAL-SPECIAL-04
+    source_status: local
+    review_status: pending
+    result_kind: ratio
+    canonical_unit: '1'
+    unit_display: '1'
+    accepted_units: []
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 1000000000
   - name: 人绒毛膜促性腺激素β亚单位
     aliases: [HCG β]
-    units: [ng/ml, U/ml]
+    code:
+    loinc:
+    local_code: LOCAL-SPECIAL-05
+    source_status: local
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: ug/L
+    unit_display: μg/L
+    accepted_units:
+      - unit: ng/mL
+        ucum: ng/mL
+        conversion:
+          type: exact
+          factor: 1
+          from: ng/mL
+          to: ug/L
+          source: UCUM
+      - unit: U/mL
+        ucum: U/mL
+        conversion:
+          type: none
+          source: U 与质量单位不可直接换算
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 10000000

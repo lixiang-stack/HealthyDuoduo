@@ -16,217 +16,945 @@ category:
   #       尿糖 / 尿胆红素按 report_type=临检 归尿常规(spec §5.4)
   panel: urinalysis
 items:
-- name: 潜血
+- name: 干化学尿液隐血试验
   aliases:
   - 尿潜血(BLD)
   - 尿潜血
   - 尿隐血
   - 潜血（或）红细胞
-  units: []
-- name: 白细胞酯酶
+  synonyms:
+  - term: 潜血
+    source: legacy printed name (pre-standardization dictionary)
+  code: 0600610D
+  loinc:
+  local_code:
+  source_status: primary
+  review_status: pending
+  result_kind: qualitative
+  canonical_unit:
+  unit_display:
+  accepted_units: []
+  ocr_unit_forms: []
+- name: 干化学尿液白细胞测定
   aliases:
   - 尿粒细胞酯酶
-  units: []
-- name: 蛋白质
+  synonyms:
+  - term: 白细胞酯酶
+    source: legacy printed name (pre-standardization dictionary)
+  code: 0600910D
+  loinc:
+  local_code:
+  source_status: primary
+  review_status: pending
+  result_kind: qualitative
+  canonical_unit:
+  unit_display:
+  accepted_units: []
+  ocr_unit_forms: []
+- name: 干化学尿液蛋白测定
   aliases:
   - 尿蛋白(PRO)
   - 尿蛋白
-  units: []
-- name: 葡萄糖
+  synonyms:
+  - term: 蛋白质
+    source: legacy printed name (pre-standardization dictionary)
+  code: 0600210D
+  loinc:
+  local_code:
+  source_status: primary
+  review_status: pending
+  result_kind: qualitative
+  canonical_unit:
+  unit_display:
+  accepted_units: []
+  ocr_unit_forms: []
+- name: 干化学尿液葡萄糖测定
   aliases:
   - 尿葡萄糖(GLU)
   - 尿葡萄糖
   - 尿糖
   - GLU
-  units: []
-- name: 尿胆原
+  synonyms:
+  - term: 葡萄糖
+    source: legacy printed name (pre-standardization dictionary)
+  code: 0600410D
+  loinc:
+  local_code:
+  source_status: primary
+  review_status: pending
+  result_kind: qualitative
+  canonical_unit:
+  unit_display:
+  accepted_units: []
+  ocr_unit_forms: []
+- name: 干化学尿液尿胆原测定
   aliases:
   - 尿胆原(UBG)
-  units:
-  - umol/l
-  - umol/L
-- name: 胆红素
+  synonyms:
+  - term: 尿胆原
+    source: legacy printed name (pre-standardization dictionary)
+  code: 0600810D
+  loinc:
+  local_code:
+  source_status: primary
+  review_status: pending
+  result_kind: quantitative
+  canonical_unit: umol/L
+  unit_display: μmol/L
+  accepted_units:
+  - unit: umol/l
+    ucum: umol/L
+    conversion:
+      type: exact
+      factor: 1
+      from: umol/l
+      to: umol/L
+      source: UCUM
+  ocr_unit_forms: []
+  plausible_range:
+    low: 0
+    high: 1000
+- name: 干化学尿液胆红素测定
   aliases:
   - 尿胆红素(BIL)
   - 尿胆红素
-  units: []
+  synonyms:
+  - term: 胆红素
+    source: legacy printed name (pre-standardization dictionary)
+  code: 0600310D
+  loinc:
+  local_code:
+  source_status: primary
+  review_status: pending
+  result_kind: qualitative
+  canonical_unit:
+  unit_display:
+  accepted_units: []
+  ocr_unit_forms: []
 - name: 维生素C
   aliases:
   - 抗坏血酸
   - 维C(Vc)
-  units: []
-- name: 比重
+  code:
+  loinc:
+  local_code: LOCAL-UA-07
+  source_status: pending
+  review_status: pending
+  result_kind: qualitative
+  canonical_unit:
+  unit_display:
+  accepted_units: []
+  ocr_unit_forms: []
+- name: 干化学尿液比重测定
   aliases:
   - 尿比重
-  units: []
-- name: 酮体
+  synonyms:
+  - term: 比重
+    source: legacy printed name (pre-standardization dictionary)
+  code: 0601010D
+  loinc:
+  local_code:
+  source_status: primary
+  review_status: pending
+  result_kind: quantitative
+  canonical_unit: '1'
+  unit_display: '1'
+  accepted_units: []
+  ocr_unit_forms: []
+  plausible_range:
+    low: 1.0
+    high: 1.1
+- name: 干化学尿液酮体测定
   aliases:
   - 尿酮体
-  units: []
-- name: 亚硝酸盐
+  synonyms:
+  - term: 酮体
+    source: legacy printed name (pre-standardization dictionary)
+  code: 0600510D
+  loinc:
+  local_code:
+  source_status: primary
+  review_status: pending
+  result_kind: qualitative
+  canonical_unit:
+  unit_display:
+  accepted_units: []
+  ocr_unit_forms: []
+- name: 干化学尿液亚硝酸盐测定
   aliases:
   - 尿亚硝酸盐
-  units: []
-- name: PH
+  synonyms:
+  - term: 亚硝酸盐
+    source: legacy printed name (pre-standardization dictionary)
+  code: 0600710B
+  loinc:
+  local_code:
+  source_status: primary
+  review_status: pending
+  result_kind: qualitative
+  canonical_unit:
+  unit_display:
+  accepted_units: []
+  ocr_unit_forms: []
+- name: 干化学尿液 pH测定
   aliases:
   - 酸碱度(pH)
   - 酸碱度(PH)
   - 尿酸碱度
-  units: []
+  synonyms:
+  - term: PH
+    source: legacy printed name (pre-standardization dictionary)
+  code: 0600110D
+  loinc:
+  local_code:
+  source_status: primary
+  review_status: pending
+  result_kind: quantitative
+  canonical_unit: '1'
+  unit_display: '1'
+  accepted_units: []
+  ocr_unit_forms: []
+  plausible_range:
+    low: 0
+    high: 14
 - name: 尿液颜色
   aliases:
   - 颜色
-  units: []
+  code:
+  loinc:
+  local_code: LOCAL-UA-12
+  source_status: pending
+  review_status: pending
+  result_kind: qualitative
+  canonical_unit:
+  unit_display:
+  accepted_units: []
+  ocr_unit_forms: []
 - name: 尿液浊度
   aliases:
   - 浊度
-  units: []
+  code:
+  loinc:
+  local_code: LOCAL-UA-13
+  source_status: pending
+  review_status: pending
+  result_kind: qualitative
+  canonical_unit:
+  unit_display:
+  accepted_units: []
+  ocr_unit_forms: []
 - name: 尿白细胞计数
   aliases:
   - 白细胞计数(WBC)
-  units:
-  - 个/uL
-  - 个/ul
-  - /ul
+  code:
+  loinc:
+  local_code: LOCAL-UA-14
+  source_status: pending
+  review_status: pending
+  result_kind: quantitative
+  canonical_unit: /uL
+  unit_display: 个/μL
+  accepted_units:
+  - unit: 个/uL
+    ucum: /uL
+    conversion:
+      type: exact
+      factor: 1
+      from: 个/uL
+      to: /uL
+      source: local count convention
+  - unit: 个/ul
+    ucum: /uL
+    conversion:
+      type: exact
+      factor: 1
+      from: 个/ul
+      to: /uL
+      source: local count convention
+  - unit: /ul
+    ucum: /uL
+    conversion:
+      type: exact
+      factor: 1
+      from: /ul
+      to: /uL
+      source: local count convention
+  ocr_unit_forms: []
+  plausible_range:
+    low: 0
+    high: 10000000
 - name: 尿白细胞计数(镜检)
   aliases:
   - 白细胞(*WBC)
   - 白细胞
-  units:
-  - 个/uL
-  - 个/ul
-  - /ul
+  code:
+  loinc:
+  local_code: LOCAL-UA-15
+  source_status: pending
+  review_status: pending
+  result_kind: quantitative
+  canonical_unit: /uL
+  unit_display: 个/μL
+  accepted_units:
+  - unit: 个/uL
+    ucum: /uL
+    conversion:
+      type: exact
+      factor: 1
+      from: 个/uL
+      to: /uL
+      source: local count convention
+  - unit: 个/ul
+    ucum: /uL
+    conversion:
+      type: exact
+      factor: 1
+      from: 个/ul
+      to: /uL
+      source: local count convention
+  - unit: /ul
+    ucum: /uL
+    conversion:
+      type: exact
+      factor: 1
+      from: /ul
+      to: /uL
+      source: local count convention
+  ocr_unit_forms: []
+  plausible_range:
+    low: 0
+    high: 10000000
 - name: 镜检白细胞
   aliases:
   - 白细胞镜检
   - 尿白细胞镜检
-  units:
-  - /HP
-  - 个/HP
+  code:
+  loinc:
+  local_code: LOCAL-UA-16
+  source_status: pending
+  review_status: pending
+  result_kind: microscopy
+  canonical_unit:
+  unit_display:
+  accepted_units: []
+  ocr_unit_forms: []
 - name: 尿红细胞计数
   aliases:
   - 红细胞计数(RBC)
-  units:
-  - 个/uL
-  - 个/ul
-  - /ul
+  code:
+  loinc:
+  local_code: LOCAL-UA-17
+  source_status: pending
+  review_status: pending
+  result_kind: quantitative
+  canonical_unit: /uL
+  unit_display: 个/μL
+  accepted_units:
+  - unit: 个/uL
+    ucum: /uL
+    conversion:
+      type: exact
+      factor: 1
+      from: 个/uL
+      to: /uL
+      source: local count convention
+  - unit: 个/ul
+    ucum: /uL
+    conversion:
+      type: exact
+      factor: 1
+      from: 个/ul
+      to: /uL
+      source: local count convention
+  - unit: /ul
+    ucum: /uL
+    conversion:
+      type: exact
+      factor: 1
+      from: /ul
+      to: /uL
+      source: local count convention
+  ocr_unit_forms: []
+  plausible_range:
+    low: 0
+    high: 10000000
 - name: 尿红细胞计数(镜检)
   aliases:
   - 红细胞(*RBC)
   - 红细胞
-  units:
-  - 个/uL
-  - 个/ul
-  - /ul
+  code:
+  loinc:
+  local_code: LOCAL-UA-18
+  source_status: pending
+  review_status: pending
+  result_kind: quantitative
+  canonical_unit: /uL
+  unit_display: 个/μL
+  accepted_units:
+  - unit: 个/uL
+    ucum: /uL
+    conversion:
+      type: exact
+      factor: 1
+      from: 个/uL
+      to: /uL
+      source: local count convention
+  - unit: 个/ul
+    ucum: /uL
+    conversion:
+      type: exact
+      factor: 1
+      from: 个/ul
+      to: /uL
+      source: local count convention
+  - unit: /ul
+    ucum: /uL
+    conversion:
+      type: exact
+      factor: 1
+      from: /ul
+      to: /uL
+      source: local count convention
+  ocr_unit_forms: []
+  plausible_range:
+    low: 0
+    high: 10000000
 - name: 镜检红细胞
   aliases:
   - 尿红细胞镜检
   - 红细胞镜检
-  units:
-  - /HP
+  code:
+  loinc:
+  local_code: LOCAL-UA-19
+  source_status: pending
+  review_status: pending
+  result_kind: microscopy
+  canonical_unit:
+  unit_display:
+  accepted_units: []
+  ocr_unit_forms: []
 - name: 尿上皮细胞计数
   aliases:
   - 上皮细胞计数
   - 上皮细胞计数(EC)
-  units:
-  - 个/uL
-  - 个/ul
-  - /ul
+  code:
+  loinc:
+  local_code: LOCAL-UA-20
+  source_status: pending
+  review_status: pending
+  result_kind: quantitative
+  canonical_unit: /uL
+  unit_display: 个/μL
+  accepted_units:
+  - unit: 个/uL
+    ucum: /uL
+    conversion:
+      type: exact
+      factor: 1
+      from: 个/uL
+      to: /uL
+      source: local count convention
+  - unit: 个/ul
+    ucum: /uL
+    conversion:
+      type: exact
+      factor: 1
+      from: 个/ul
+      to: /uL
+      source: local count convention
+  - unit: /ul
+    ucum: /uL
+    conversion:
+      type: exact
+      factor: 1
+      from: /ul
+      to: /uL
+      source: local count convention
+  ocr_unit_forms: []
+  plausible_range:
+    low: 0
+    high: 10000000
 - name: 尿上皮细胞计数(镜检)
   aliases:
   - 上皮细胞(*EC)
   - 上皮细胞
-  units:
-  - 个/uL
-  - 个/ul
-  - /ul
+  code:
+  loinc:
+  local_code: LOCAL-UA-21
+  source_status: pending
+  review_status: pending
+  result_kind: quantitative
+  canonical_unit: /uL
+  unit_display: 个/μL
+  accepted_units:
+  - unit: 个/uL
+    ucum: /uL
+    conversion:
+      type: exact
+      factor: 1
+      from: 个/uL
+      to: /uL
+      source: local count convention
+  - unit: 个/ul
+    ucum: /uL
+    conversion:
+      type: exact
+      factor: 1
+      from: 个/ul
+      to: /uL
+      source: local count convention
+  - unit: /ul
+    ucum: /uL
+    conversion:
+      type: exact
+      factor: 1
+      from: /ul
+      to: /uL
+      source: local count convention
+  ocr_unit_forms: []
+  plausible_range:
+    low: 0
+    high: 10000000
 - name: 镜检上皮细胞
   aliases:
   - 上皮细胞镜检
-  units:
-  - /HP
+  code:
+  loinc:
+  local_code: LOCAL-UA-22
+  source_status: pending
+  review_status: pending
+  result_kind: microscopy
+  canonical_unit:
+  unit_display:
+  accepted_units: []
+  ocr_unit_forms: []
 - name: 小圆上皮细胞
   aliases:
   - 小圆上皮细胞(SRC)
-  units:
-  - 个/uL
-  - 个/ul
+  code:
+  loinc:
+  local_code: LOCAL-UA-23
+  source_status: pending
+  review_status: pending
+  result_kind: quantitative
+  canonical_unit: /uL
+  unit_display: 个/μL
+  accepted_units:
+  - unit: 个/uL
+    ucum: /uL
+    conversion:
+      type: exact
+      factor: 1
+      from: 个/uL
+      to: /uL
+      source: local count convention
+  - unit: 个/ul
+    ucum: /uL
+    conversion:
+      type: exact
+      factor: 1
+      from: 个/ul
+      to: /uL
+      source: local count convention
+  - unit: /ul
+    ucum: /uL
+    conversion:
+      type: exact
+      factor: 1
+      from: /ul
+      to: /uL
+      source: local count convention
+  ocr_unit_forms: []
+  plausible_range:
+    low: 0
+    high: 10000000
 - name: 尿透明管型计数
   aliases:
   - 透明管型
-  units:
-  - /LP
+  code:
+  loinc:
+  local_code: LOCAL-UA-24
+  source_status: pending
+  review_status: pending
+  result_kind: microscopy
+  canonical_unit:
+  unit_display:
+  accepted_units: []
+  ocr_unit_forms: []
 - name: 尿管型计数
   aliases:
   - 管型计数(CAST)
-  units: []
+  code:
+  loinc:
+  local_code: LOCAL-UA-25
+  source_status: pending
+  review_status: pending
+  result_kind: quantitative
+  canonical_unit: /uL
+  unit_display: 个/μL
+  accepted_units:
+  - unit: 个/uL
+    ucum: /uL
+    conversion:
+      type: exact
+      factor: 1
+      from: 个/uL
+      to: /uL
+      source: local count convention
+  - unit: 个/ul
+    ucum: /uL
+    conversion:
+      type: exact
+      factor: 1
+      from: 个/ul
+      to: /uL
+      source: local count convention
+  - unit: /ul
+    ucum: /uL
+    conversion:
+      type: exact
+      factor: 1
+      from: /ul
+      to: /uL
+      source: local count convention
+  ocr_unit_forms: []
+  plausible_range:
+    low: 0
+    high: 10000000
 - name: 镜检管型
   aliases:
   - 管型(*CAST)
-  units: []
+  code:
+  loinc:
+  local_code: LOCAL-UA-26
+  source_status: pending
+  review_status: pending
+  result_kind: microscopy
+  canonical_unit:
+  unit_display:
+  accepted_units: []
+  ocr_unit_forms: []
 - name: 镜检结晶
   aliases:
   - 结晶
-  units:
-  - 个/uL
-  - 个/ul
+  code:
+  loinc:
+  local_code: LOCAL-UA-27
+  source_status: pending
+  review_status: pending
+  result_kind: microscopy
+  canonical_unit:
+  unit_display:
+  accepted_units: []
+  ocr_unit_forms: []
 - name: 颗粒管型
   aliases: []
-  units:
-  - /LP
+  code:
+  loinc:
+  local_code: LOCAL-UA-28
+  source_status: pending
+  review_status: pending
+  result_kind: microscopy
+  canonical_unit:
+  unit_display:
+  accepted_units: []
+  ocr_unit_forms: []
 - name: 尿粘液丝
   aliases:
   - 粘液丝
-  units:
-  - /LP
+  code:
+  loinc:
+  local_code: LOCAL-UA-29
+  source_status: pending
+  review_status: pending
+  result_kind: microscopy
+  canonical_unit:
+  unit_display:
+  accepted_units: []
+  ocr_unit_forms: []
 - name: 滴虫
   aliases: []
-  units:
-  - /HP
+  code:
+  loinc:
+  local_code: LOCAL-UA-30
+  source_status: pending
+  review_status: pending
+  result_kind: qualitative
+  canonical_unit:
+  unit_display:
+  accepted_units: []
+  ocr_unit_forms: []
 - name: 白细胞团
   aliases: []
-  units:
-  - 个/uL
+  code:
+  loinc:
+  local_code: LOCAL-UA-31
+  source_status: pending
+  review_status: pending
+  result_kind: quantitative
+  canonical_unit: /uL
+  unit_display: 个/μL
+  accepted_units:
+  - unit: 个/uL
+    ucum: /uL
+    conversion:
+      type: exact
+      factor: 1
+      from: 个/uL
+      to: /uL
+      source: local count convention
+  - unit: 个/ul
+    ucum: /uL
+    conversion:
+      type: exact
+      factor: 1
+      from: 个/ul
+      to: /uL
+      source: local count convention
+  - unit: /ul
+    ucum: /uL
+    conversion:
+      type: exact
+      factor: 1
+      from: /ul
+      to: /uL
+      source: local count convention
+  ocr_unit_forms: []
+  plausible_range:
+    low: 0
+    high: 10000000
 - name: 酵母样菌
   aliases:
   - 酵母菌(YLC)
-  units:
-  - 个/uL
-  - 个/ul
+  code:
+  loinc:
+  local_code: LOCAL-UA-32
+  source_status: pending
+  review_status: pending
+  result_kind: quantitative
+  canonical_unit: /uL
+  unit_display: 个/μL
+  accepted_units:
+  - unit: 个/uL
+    ucum: /uL
+    conversion:
+      type: exact
+      factor: 1
+      from: 个/uL
+      to: /uL
+      source: local count convention
+  - unit: 个/ul
+    ucum: /uL
+    conversion:
+      type: exact
+      factor: 1
+      from: 个/ul
+      to: /uL
+      source: local count convention
+  - unit: /ul
+    ucum: /uL
+    conversion:
+      type: exact
+      factor: 1
+      from: /ul
+      to: /uL
+      source: local count convention
+  ocr_unit_forms: []
+  plausible_range:
+    low: 0
+    high: 10000000
 - name: 尿细菌计数
   aliases:
   - 细菌计数(BACT)
-  units:
-  - 个/μL
-  - 个/uL
-  - 个/HP
+  code:
+  loinc:
+  local_code: LOCAL-UA-33
+  source_status: pending
+  review_status: pending
+  result_kind: quantitative
+  canonical_unit: /uL
+  unit_display: 个/μL
+  accepted_units:
+  - unit: 个/uL
+    ucum: /uL
+    conversion:
+      type: exact
+      factor: 1
+      from: 个/uL
+      to: /uL
+      source: local count convention
+  - unit: 个/ul
+    ucum: /uL
+    conversion:
+      type: exact
+      factor: 1
+      from: 个/ul
+      to: /uL
+      source: local count convention
+  - unit: /ul
+    ucum: /uL
+    conversion:
+      type: exact
+      factor: 1
+      from: /ul
+      to: /uL
+      source: local count convention
+  ocr_unit_forms: []
+  plausible_range:
+    low: 0
+    high: 10000000
 - name: 尿细菌计数(镜检)
   aliases:
   - 细菌(*BACT)
-  units:
-  - 个/uL
+  code:
+  loinc:
+  local_code: LOCAL-UA-34
+  source_status: pending
+  review_status: pending
+  result_kind: quantitative
+  canonical_unit: /uL
+  unit_display: 个/μL
+  accepted_units:
+  - unit: 个/uL
+    ucum: /uL
+    conversion:
+      type: exact
+      factor: 1
+      from: 个/uL
+      to: /uL
+      source: local count convention
+  - unit: 个/ul
+    ucum: /uL
+    conversion:
+      type: exact
+      factor: 1
+      from: 个/ul
+      to: /uL
+      source: local count convention
+  - unit: /ul
+    ucum: /uL
+    conversion:
+      type: exact
+      factor: 1
+      from: /ul
+      to: /uL
+      source: local count convention
+  ocr_unit_forms: []
+  plausible_range:
+    low: 0
+    high: 10000000
 - name: 非透明管型
   aliases: []
-  units:
-  - 个/uL
+  code:
+  loinc:
+  local_code: LOCAL-UA-35
+  source_status: pending
+  review_status: pending
+  result_kind: quantitative
+  canonical_unit: /uL
+  unit_display: 个/μL
+  accepted_units:
+  - unit: 个/uL
+    ucum: /uL
+    conversion:
+      type: exact
+      factor: 1
+      from: 个/uL
+      to: /uL
+      source: local count convention
+  - unit: 个/ul
+    ucum: /uL
+    conversion:
+      type: exact
+      factor: 1
+      from: 个/ul
+      to: /uL
+      source: local count convention
+  - unit: /ul
+    ucum: /uL
+    conversion:
+      type: exact
+      factor: 1
+      from: /ul
+      to: /uL
+      source: local count convention
+  ocr_unit_forms: []
+  plausible_range:
+    low: 0
+    high: 10000000
 - name: 异形红细胞率
   aliases:
   - 异性红细胞率%
-  units:
-  - '%'
+  code:
+  loinc:
+  local_code: LOCAL-UA-36
+  source_status: pending
+  review_status: pending
+  result_kind: quantitative
+  canonical_unit: '%'
+  unit_display: '%'
+  accepted_units: []
+  ocr_unit_forms: []
+  plausible_range:
+    low: 0
+    high: 100
 - name: 尿钙
   aliases: []
-  units:
-  - mmol/L
+  code:
+  loinc:
+  local_code: LOCAL-UA-37
+  source_status: pending
+  review_status: pending
+  result_kind: quantitative
+  canonical_unit: mmol/L
+  unit_display: mmol/L
+  accepted_units: []
+  ocr_unit_forms: []
+  plausible_range:
+    low: 0
+    high: 100
 - name: 尿肌酐
   aliases: []
-  units:
-  - mmol/L
+  code:
+  loinc:
+  local_code: LOCAL-UA-38
+  source_status: pending
+  review_status: pending
+  result_kind: quantitative
+  canonical_unit: mmol/L
+  unit_display: mmol/L
+  accepted_units: []
+  ocr_unit_forms: []
+  plausible_range:
+    low: 0
+    high: 100
 - name: 微白蛋白
   aliases: []
-  units:
-  - mg/L
+  code:
+  loinc:
+  local_code: LOCAL-UA-39
+  source_status: pending
+  review_status: pending
+  result_kind: quantitative
+  canonical_unit: mg/L
+  unit_display: mg/L
+  accepted_units: []
+  ocr_unit_forms: []
+  plausible_range:
+    low: 0
+    high: 100000
 - name: 微白蛋白/尿肌酐
   aliases: []
-  units:
-  - mg/mmol
+  code:
+  loinc:
+  local_code: LOCAL-UA-40
+  source_status: pending
+  review_status: pending
+  result_kind: quantitative
+  canonical_unit: mg/mmol
+  unit_display: mg/mmol
+  accepted_units: []
+  ocr_unit_forms: []
+  plausible_range:
+    low: 0
+    high: 100000

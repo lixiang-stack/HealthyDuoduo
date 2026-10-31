@@ -18,49 +18,328 @@ category:
 items:
 
 # ==== tft_dict.yaml(原 甲状腺功能;min=4;titles=['甲状腺', '甲功']) ====
-  - name: 促甲状腺素
+  - name: 促甲状腺激素测定
     panel: thyroid
     aliases: [高敏促甲状腺激素(sTSH), TSH]
-    units: [mIU/L, uIU/ml]
-  - name: 甲状腺球蛋白
+    synonyms:
+      - term: 促甲状腺素
+        source: legacy printed name (pre-standardization dictionary)
+    code: 1200604A
+    loinc: 3016-3
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: m[IU]/L
+    unit_display: mIU/L
+    accepted_units:
+      - unit: uIU/mL
+        ucum: u[IU]/mL
+        conversion:
+          type: exact
+          factor: 1
+          from: uIU/mL
+          to: m[IU]/L
+          source: UCUM
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 1000
+  - name: 甲状腺球蛋白测定
     panel: thyroid
     aliases: [TG]
-    units: [ng/ml, ng/al]
-  - name: 三碘甲状腺原氨酸
+    synonyms:
+      - term: 甲状腺球蛋白
+        source: legacy printed name (pre-standardization dictionary)
+    code: 1100604A
+    loinc: 3013-0
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: ug/L
+    unit_display: μg/L
+    accepted_units:
+      - unit: ng/mL
+        ucum: ng/mL
+        conversion:
+          type: exact
+          factor: 1
+          from: ng/mL
+          to: ug/L
+          source: UCUM
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 10000
+  - name: 三碘甲状腺原氨酸测定
     panel: thyroid
     aliases: [总三碘甲状腺原氨酸, T3, TT3]
-    units: [nmol/L, mmol/L, ng/ml, ng/d1]
-  - name: 甲状腺素
+    synonyms:
+      - term: 三碘甲状腺原氨酸
+        source: legacy printed name (pre-standardization dictionary)
+    code: 1200704A
+    loinc: 3053-6
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: nmol/L
+    unit_display: nmol/L
+    accepted_units:
+      - unit: ng/dL
+        ucum: ng/dL
+        conversion:
+          type: linear
+          factor: 0.01536
+          from: ng/dL
+          to: nmol/L
+          source: local (pending review)
+      - unit: ng/mL
+        ucum: ng/mL
+        conversion:
+          type: linear
+          factor: 1.536
+          from: ng/mL
+          to: nmol/L
+          source: local (pending review)
+      - unit: mmol/L
+        ucum: mmol/L
+        conversion:
+          type: linear
+          factor: 1000
+          from: mmol/L
+          to: nmol/L
+          source: local (pending review)
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0.1
+      high: 50
+  - name: 甲状腺素测定
     panel: thyroid
     aliases: [总甲状腺素, T4, T74]
-    units: [nmol/L, rmol/L, ng/ml]
-  - name: 游离三碘甲状腺原氨酸
+    synonyms:
+      - term: 甲状腺素
+        source: legacy printed name (pre-standardization dictionary)
+    code: 1200804A
+    loinc: 3026-2
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: nmol/L
+    unit_display: nmol/L
+    accepted_units:
+      - unit: μg/dL
+        ucum: ug/dL
+        conversion:
+          type: linear
+          factor: 12.87
+          from: μg/dL
+          to: nmol/L
+          source: local (pending review)
+      - unit: ng/mL
+        ucum: ng/mL
+        conversion:
+          type: linear
+          factor: 1.287
+          from: ng/mL
+          to: nmol/L
+          source: local (pending review)
+    ocr_unit_forms: []
+    plausible_range:
+      low: 1
+      high: 1000
+  - name: 游离三碘甲状腺原氨酸测定
     panel: thyroid
     aliases: [游离T3, FT3, 游离三碘甲状腺原氨酸(FT3), 淤离三碘甲状腺原氨酸FT3]
-    units: [pmol/L, pg/al]
-  - name: 游离甲状腺素
+    synonyms:
+      - term: 游离三碘甲状腺原氨酸
+        source: legacy printed name (pre-standardization dictionary)
+    code: 1200904A
+    loinc: 3051-0
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: pmol/L
+    unit_display: pmol/L
+    accepted_units:
+      - unit: pg/mL
+        ucum: pg/mL
+        conversion:
+          type: linear
+          factor: 1.536
+          from: pg/mL
+          to: pmol/L
+          source: local (pending review)
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0.1
+      high: 100
+  - name: 游离甲状腺素测定
     panel: thyroid
     aliases: [游离T4, FT4, 游离甲状腺素(FT4), F74]
-    units: [pmol/L, pmo1/L, ng/d1, pg/al]
-  - name: 抗甲状腺过氧化物酶抗体
+    synonyms:
+      - term: 游离甲状腺素
+        source: legacy printed name (pre-standardization dictionary)
+    code: 1201004A
+    loinc: 3024-7
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: pmol/L
+    unit_display: pmol/L
+    accepted_units:
+      - unit: ng/dL
+        ucum: ng/dL
+        conversion:
+          type: linear
+          factor: 12.87
+          from: ng/dL
+          to: pmol/L
+          source: local (pending review)
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0.1
+      high: 500
+  - name: 抗甲状腺过氧化物酶抗体测定
     panel: thyroid
     aliases: [甲状腺过氧化物酶抗体(TPOAb), TPOAb]
-    units: [IU/mL, IU/al, 1U/mL, U/ml]
-  - name: 抗甲状腺球蛋白抗体
+    synonyms:
+      - term: 抗甲状腺过氧化物酶抗体
+        source: legacy printed name (pre-standardization dictionary)
+    code: 2501504A
+    loinc: 8099-4
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: "[IU]/mL"
+    unit_display: IU/mL
+    accepted_units:
+      - unit: IU/mL
+        ucum: "[IU]/mL"
+        conversion:
+          type: exact
+          factor: 1
+          from: IU/mL
+          to: "[IU]/mL"
+          source: UCUM
+      - unit: U/mL
+        ucum: U/mL
+        conversion:
+          type: none
+          source: U 与 IU 不默认等价
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000
+  - name: 甲状腺球蛋白抗体测定
     panel: thyroid
     aliases: [抗甲状腺球蛋白抗体(Tg-Ab), TG-Ab, TGAb]
-    units: [IU/mL, 1U/mL, U/ml]
-  - name: 抗促甲状腺素受体抗体
+    synonyms:
+      - term: 抗甲状腺球蛋白抗体
+        source: legacy printed name (pre-standardization dictionary)
+    code: 2501404A
+    loinc: 8098-6
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: "[IU]/mL"
+    unit_display: IU/mL
+    accepted_units:
+      - unit: IU/mL
+        ucum: "[IU]/mL"
+        conversion:
+          type: exact
+          factor: 1
+          from: IU/mL
+          to: "[IU]/mL"
+          source: UCUM
+      - unit: U/mL
+        ucum: U/mL
+        conversion:
+          type: none
+          source: U 与 IU 不默认等价
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 100000
+  - name: 促甲状腺受体抗体测定
     panel: thyroid
     aliases: [抗促甲状腺素受体抗体(TRAb), 促甲状腺激素受体抗体, ATSHR]
-    units: [IU/L]
+    synonyms:
+      - term: 抗促甲状腺素受体抗体
+        source: legacy printed name (pre-standardization dictionary)
+    code: 2501604A
+    loinc: 57416-0
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: "[IU]/L"
+    unit_display: IU/L
+    accepted_units: []
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 1000
 
 # ==== proghcg_dict.yaml(原 孕酮与HCG;min=1;titles=['HCG（检验）', 'P（检验）']) ====
-  - name: 孕酮
+  - name: 孕酮测定
     panel: sex_hormone
     aliases: []
-    units: [ng/mL]
-  - name: 人绒毛膜促性腺激素及β亚单位
+    synonyms:
+      - term: 孕酮
+        source: legacy printed name (pre-standardization dictionary)
+    code: 1201304A
+    loinc: 2839-9
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: nmol/L
+    unit_display: nmol/L
+    accepted_units:
+      - unit: ng/mL
+        ucum: ng/mL
+        conversion:
+          type: linear
+          factor: 3.18
+          from: ng/mL
+          to: nmol/L
+          source: local (pending review)
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 10000
+  - name: 人绒毛膜促性腺激素测定
     panel: sex_hormone
     aliases: [人绒毛膜促性腺激, 素及β亚单位, "HCG+ β HCG"]
-    units: [mIU/ml]
+    synonyms:
+      - term: 人绒毛膜促性腺激素及β亚单位
+        source: legacy printed name (pre-standardization dictionary)
+    code: 1601304A
+    loinc: 19080-1
+    local_code:
+    source_status: primary
+    review_status: pending
+    result_kind: quantitative
+    canonical_unit: "[IU]/L"
+    unit_display: IU/L
+    accepted_units:
+      - unit: mIU/mL
+        ucum: m[IU]/mL
+        conversion:
+          type: exact
+          factor: 1
+          from: mIU/mL
+          to: "[IU]/L"
+          source: UCUM
+    ocr_unit_forms: []
+    plausible_range:
+      low: 0
+      high: 1000000
