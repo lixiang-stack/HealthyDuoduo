@@ -9,6 +9,7 @@ import lft06Json from '../../../../samples/expected/report/lft_06.json';
 import {
   chartLayout,
   defaultSelectedIndex,
+  displayTrendUnit,
   formatSeriesMeta,
   isAbnormalFlag,
   isFilledPoint,
@@ -24,6 +25,10 @@ type GoldenItem = {
   panel: ReportItem['panel'];
   value: string | null;
   unit: string | null;
+  unit_display: string | null;
+  unit_status: TrendPoint['unit_status'];
+  code: string | null;
+  loinc: string | null;
   ref_range: string | null;
   method: string | null;
   flag: ReportItem['flag'];
@@ -87,6 +92,9 @@ function pointOf(
     report_date: file.report_date,
     value: item.value,
     unit: item.unit,
+    // 趋势逻辑测试按已复核单位连接;未验证排除由专门用例覆盖。
+    unit_display: item.unit_display ?? null,
+    unit_status: 'verified',
     ref_range: item.ref_range,
     method: item.method,
     flag: item.flag,
@@ -230,6 +238,58 @@ describe('selectSeries', () => {
     expect(iu.listPoints).toEqual([]);
     expect(ul.otherUnitCount).toBe(1);
     expect(iu.otherUnitCount).toBe(3);
+  });
+
+  it('全部点未验证时仍用 unit_display 展示单位', () => {
+    const unverified = pointOf(cbc07, 'C反应蛋白测定', 'unverified', {
+      unit: 'mg/L',
+      unit_display: 'mg/L',
+      unit_status: 'unverified',
+    });
+    const point = { ...unverified, unit: '10*9/L', unit_display: '10^9/L' };
+    const series = selectSeries([point], '10*9/L', 'unverified');
+
+    expect(series.listPoints).toEqual([]);
+    expect(series.unverifiedCount).toBe(1);
+    expect(series.unitDisplay).toBe('10^9/L');
+  });
+
+  it('unit_status=unverified 默认不连接,display 单位用 unit_display', () => {
+    const verified = pointOf(lft02, '总胆红素测定', 'verified', {
+      unit: 'umol/L',
+      unit_display: 'μmol/L',
+      unit_status: 'verified',
+      report_date: '2021-08-02',
+    });
+    const unverified = pointOf(lft05, '总胆红素测定', 'unverified', {
+      unit: 'umol/L',
+      unit_display: 'μmol/L',
+      unit_status: 'unverified',
+      report_date: '2017-11-18',
+    });
+    const legacy = pointOf(lft04, '总胆红素测定', 'legacy', {
+      unit: 'umol/L',
+      unit_display: null,
+      unit_status: null,
+      report_date: '2011-07-02',
+    });
+    const series = selectSeries([verified, unverified, legacy], 'umol/L', 'verified');
+
+    expect(series.listPoints.map((point) => point.report_id)).toEqual(['legacy', 'verified']);
+    expect(series.unverifiedCount).toBe(1);
+    expect(series.unitDisplay).toBe('μmol/L');
+    expect(formatSeriesMeta(series, { reportDate: '2021-08-02' })).toContain(
+      '另有 1 份单位未验证（未连线）',
+    );
+  });
+});
+
+describe('displayTrendUnit', () => {
+  it('unit_display 优先,缺失回退 canonical unit,不回落 raw OCR 单位', () => {
+    const point = altHigh();
+    expect(displayTrendUnit({ ...point, unit: 'umol/L', unit_display: 'μmol/L' })).toBe('μmol/L');
+    expect(displayTrendUnit({ ...point, unit: 'umol/L', unit_display: null })).toBe('umol/L');
+    expect(displayTrendUnit({ ...point, unit: null, unit_display: null })).toBeNull();
   });
 });
 

@@ -116,19 +116,21 @@ func TestServePanelDetail(t *testing.T) {
 			ReportTypes: []string{"生化"},
 			Items: []pipeline.PanelItem{
 				{
-					Name: "丙氨酸转氨酶", Unit: &unit, RefRange: &ref,
+					Key: "1500104A", Name: "丙氨酸转氨酶", Unit: &unit, RefRange: &ref,
 					Latest: &pipeline.TrendPointRow{
 						ReportID: reportID, ReportDate: &date, Value: &value, Unit: &unit,
+						UnitDisplay: &unit, UnitStatus: str("verified"),
 						RefRange: &ref, Flag: "high", ReviewStatus: pipeline.ReviewStatusCorrected,
 					},
 					Points: []pipeline.TrendPointRow{{
 						ReportID: reportID, ReportDate: &date, Value: &value, Unit: &unit,
+						UnitDisplay: &unit, UnitStatus: str("verified"),
 						RefRange: &ref, Flag: "high", ReviewStatus: pipeline.ReviewStatusCorrected,
 					}},
 					ReportCount: 1,
 				},
 				{
-					Name: "前白蛋白", Unit: &unit,
+					Key: "1102904A", Name: "前白蛋白", Unit: &unit,
 					Points:                []pipeline.TrendPointRow{},
 					NotTestedCount:        1,
 					LatestReportNotTested: true,
@@ -151,8 +153,10 @@ func TestServePanelDetail(t *testing.T) {
 		t.Fatalf("panel detail = %+v", detail)
 	}
 	alt := detail.Items[0]
-	if alt.Latest == nil || alt.Latest.Value == nil || *alt.Latest.Value != "835" || !alt.Latest.Reviewed {
-		t.Errorf("ALT latest = %+v, want reviewed high point", alt.Latest)
+	if alt.Key != "1500104A" || alt.Latest == nil || alt.Latest.Value == nil || *alt.Latest.Value != "835" ||
+		alt.Latest.UnitDisplay == nil || *alt.Latest.UnitDisplay != "U/L" ||
+		alt.Latest.UnitStatus == nil || *alt.Latest.UnitStatus != "verified" || !alt.Latest.Reviewed {
+		t.Errorf("ALT = %+v, want key/unit_display/unit_status + reviewed high point", alt)
 	}
 	if len(alt.Points) != 1 || len(alt.Points[0].ReportID) != 64 {
 		t.Errorf("ALT points = %+v", alt.Points)

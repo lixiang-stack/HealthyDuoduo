@@ -207,17 +207,18 @@ func runList(out, errOut io.Writer, d *deps, args []string) int {
 	return twError(tw)
 }
 
-// runTrend hdd trend <指标名> [--type] [--all]:同一指标项跨报告时序对比(P3);
-// 行升序,delta 为相邻点差值(单位一致才计,否则 "-")。
-// 质量门:低置信(决策 #7)或 flag=unknown 的点默认排除——不可信点混入时序会拉歪
-// delta 比对;--all 关闭过滤全量展示,被滤行数注明到 stderr。
+// runTrend hdd trend <指标名/标准码> [--type] [--all]:同一分析物(趋势键 =
+// code > loinc > name)跨报告时序对比(P3);行升序,delta 为相邻点差值
+// (单位一致且单位已验证才计,否则 "-")。
+// 质量门:低置信(决策 #7)、flag=unknown 或 unit_status=unverified 的点默认排除
+// ——不可信点混入时序会拉歪 delta 比对;--all 关闭过滤全量展示并在 note 列标注原因。
 func runTrend(out, errOut io.Writer, d *deps, args []string) int {
 	trendFlags := flag.NewFlagSet("trend", flag.ContinueOnError)
 	trendFlags.SetOutput(errOut)
 	var reportType string
 	var showAll bool
 	trendFlags.StringVar(&reportType, "type", "", "filter by report type, e.g. CBC (= 血常规)")
-	trendFlags.BoolVar(&showAll, "all", false, "include low-confidence / unknown-flag points")
+	trendFlags.BoolVar(&showAll, "all", false, "include unverified-unit / low-confidence / unknown-flag points")
 	if err := trendFlags.Parse(args); err != nil {
 		return exitUsage
 	}
@@ -232,33 +233,44 @@ func runTrend(out, errOut io.Writer, d *deps, args []string) int {
 		return exitError
 	}
 	if !showAll {
-		kept := rows[:0]
+		kept := make([]pipeline.TrendRow, 0, len(rows))
+		lowQuality, unverified := 0, 0
 		for _, r := range rows {
-			if !low_quality(r) {
-				kept = append(kept, r)
+			if unverifiedUnit(r) {
+				unverified++
+				continue
 			}
+			if low_quality(r) {
+				lowQuality++
+				continue
+			}
+			kept = append(kept, r)
 		}
-		if dropped := len(rows) - len(kept); dropped > 0 {
-			fmt.Fprintf(errOut, "trend: %d low-quality point(s) hidden (--all to show)\n", dropped)
+		if unverified > 0 {
+			fmt.Fprintf(errOut, "trend: %d unverified-unit point(s) hidden (--all to show)\n", unverified)
+		}
+		if lowQuality > 0 {
+			fmt.Fprintf(errOut, "trend: %d low-quality point(s) hidden (--all to show)\n", lowQuality)
 		}
 		rows = kept
 	}
 	tw := tabwriter.NewWriter(out, 0, 4, 2, ' ', 0)
-	fmt.Fprintln(tw, "date\ttype\tvalue\tunit\tdelta\tflag\tsha256")
+	fmt.Fprintln(tw, "date\ttype\tvalue\tunit\tdelta\tflag\tsha256\tnote")
 	var prev *pipeline.TrendRow
 	for _, r := range rows {
 		delta := "-"
 		pv, ok1 := numOfTrend(prev)
 		cv, ok2 := numVal(r.Value)
-		if prev != nil && sameUnit(prev.Unit, r.Unit) && ok1 && ok2 {
+		if prev != nil && sameUnit(prev.Unit, r.Unit) && !unverifiedUnit(*prev) && !unverifiedUnit(r) && ok1 && ok2 {
 			diff := cv - pv
 			delta = strconv.FormatFloat(diff, 'f', -1, 64)
 			if diff > 0 {
 				delta = "+" + delta
 			}
 		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-			orDash(r.ReportDate), abbrType(r.ReportType), orDash(r.Value), orDash(r.Unit), delta, r.Flag, shortSha(r.Sha256))
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+			orDash(r.ReportDate), abbrType(r.ReportType), orDash(r.Value), orDash(r.Unit), delta, r.Flag,
+			shortSha(r.Sha256), trendNote(r))
 		prev = &r
 	}
 	return twError(tw)
@@ -302,6 +314,29 @@ func sameUnit(a, b *string) bool {
 // low_quality 项级质量门:trend 排除口径 = 低置信透传(决策 #7)或 flag=unknown。
 func low_quality(r pipeline.TrendRow) bool {
 	return r.LowConfidence || r.Flag == "unknown"
+}
+
+// unverifiedUnit 未验证单位点不参与趋势连接(票 12);NULL 为票 01 前旧行,按已验证。
+func unverifiedUnit(r pipeline.TrendRow) bool {
+	return r.UnitStatus != nil && *r.UnitStatus == "unverified"
+}
+
+// trendNote --all 行内原因标注(无原因输出 "-";供 e2e / 人工审计)。
+func trendNote(r pipeline.TrendRow) string {
+	notes := make([]string, 0, 3)
+	if unverifiedUnit(r) {
+		notes = append(notes, "unverified_unit")
+	}
+	if r.LowConfidence {
+		notes = append(notes, "low_confidence")
+	}
+	if r.Flag == "unknown" {
+		notes = append(notes, "unknown_flag")
+	}
+	if len(notes) == 0 {
+		return "-"
+	}
+	return strings.Join(notes, ",")
 }
 
 func twError(tw *tabwriter.Writer) int {

@@ -12,6 +12,7 @@ import { flagLabel, DATE_UNKNOWN_LABEL, refRangeLabel } from './status';
 import { TrendDetailChart } from './TrendChart';
 import {
   defaultSelectedIndex,
+  displayTrendUnit,
   formatSeriesMeta,
   isFilledPoint,
   trendPointRows,
@@ -102,7 +103,7 @@ export function TrendDetailSheet({
 
           <ScrollView contentContainerStyle={styles.content}>
             <Text style={styles.headerMeta}>
-              {`最新：${reportType} · ${series.unit ?? '无单位'}`}
+              {`最新：${reportType} · ${series.unitDisplay ?? '无单位'}`}
             </Text>
 
             {series.chartPoints.length > 0 ? (
@@ -137,7 +138,7 @@ export function TrendDetailSheet({
                     <Text style={styles.pointRowDate}>{dateLabel ?? ''}</Text>
                     <Text style={styles.pointRowValue}>
                       {point.value ?? '—'}
-                      {point.unit ? ` ${point.unit}` : ''}
+                      {displayTrendUnit(point) ? ` ${displayTrendUnit(point)}` : ''}
                     </Text>
                     <Text style={[styles.pointRowFlag, { color: FLAG_COLORS[point.flag] }]}>
                       {flagLabel(point.flag)}
@@ -188,7 +189,9 @@ function PointCard({
       <View style={styles.valueRow}>
         <Text style={[styles.value, { color }]}>
           {point.value ?? '—'}
-          {point.unit ? <Text style={styles.unit}> {point.unit}</Text> : null}
+          {displayTrendUnit(point) ? (
+            <Text style={styles.unit}> {displayTrendUnit(point)}</Text>
+          ) : null}
         </Text>
         <Text style={styles.ref}>{refRangeLabel(point.ref_range)}</Text>
       </View>

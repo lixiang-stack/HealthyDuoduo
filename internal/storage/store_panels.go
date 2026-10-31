@@ -15,8 +15,10 @@ import (
 // sqlPanelSummariesByMember 项目列表一次聚合(不逐报告 N+1):
 //   - 报告级 panels 为空(未回填存量)一律归 other,与 App ?panel= 筛选回退一致;
 //   - report_count = 非 failed 报告包含该项目的份数;
-//   - item_count = 该项目下 name+unit 去重后的指标数(含 not_tested);
-//   - abnormal_count = 每个 name+unit 取最近非 not_tested 值后 flag ∈ high/low/abnormal 的数量。
+//   - item_count = 该项目下趋势键(code > loinc > name)+ canonical unit 去重后的指标数
+//     (含 not_tested);
+//   - abnormal_count = 每个趋势键 + canonical unit 取最近非 not_tested 值后
+//     flag ∈ high/low/abnormal 的数量。
 //
 // 同日期报告的「最近」按 sha 降序取最后一份,与项目详情 trend 点升序的最后一点一致。
 const sqlPanelSummariesByMember = `
@@ -40,21 +42,22 @@ panel_headers AS (
     GROUP BY panel
 ),
 member_items AS (
-    SELECT DISTINCT i.panel, i.name, i.unit, i.flag, i.id, r.report_date, r.image_sha256
+    SELECT DISTINCT i.panel, COALESCE(NULLIF(i.code, ''), NULLIF(i.loinc, ''), i.name) AS trend_key,
+           i.unit, i.flag, i.id, r.report_date, r.image_sha256
     FROM report_items i JOIN reports r ON r.image_sha256 = i.report_sha256
     WHERE r.member_id = $1 AND r.status <> 'failed'
 ),
 item_groups AS (
-    SELECT DISTINCT panel, name, unit FROM member_items
+    SELECT DISTINCT panel, trend_key, unit FROM member_items
 ),
 item_stats AS (
     SELECT panel, COUNT(*) AS item_count FROM item_groups GROUP BY panel
 ),
 latest_items AS (
-    SELECT DISTINCT ON (panel, name, unit) panel, flag
+    SELECT DISTINCT ON (panel, trend_key, unit) panel, flag
     FROM member_items
     WHERE flag <> 'not_tested'
-    ORDER BY panel, name, unit, report_date DESC NULLS LAST, image_sha256 DESC, id ASC
+    ORDER BY panel, trend_key, unit, report_date DESC NULLS LAST, image_sha256 DESC, id ASC
 ),
 abnormal_stats AS (
     SELECT panel, COUNT(*) FILTER (WHERE flag IN ('high', 'low', 'abnormal')) AS abnormal_count
@@ -79,14 +82,23 @@ WHERE r.member_id = $1 AND r.status <> 'failed'
   )
 ORDER BY r.report_date ASC NULLS LAST, r.image_sha256 ASC, r.report_type ASC`
 
-// sqlPanelItemsByMemberPanel 项目详情指标来源:成员全部非 failed 报告里该项目组的
-// 指标项,按报告日期升序 / dateless 沉底 / sha / item id 稳定排序;not_tested 行
-// 用于 latest_report_not_tested 与 not_tested_count,不产生趋势点。
+// sqlPanelItemsByMemberPanel 项目详情指标来源:先取该项目组出现的趋势键
+// (code > loinc > name),再取成员全部非 failed 报告里同键指标项——同一分析物
+// 跨面板连接,趋势点不因项目分组差异断开。按报告日期升序 / dateless 沉底 / sha /
+// item id 稳定排序;not_tested 行用于 latest_report_not_tested 与 not_tested_count,
+// 不产生趋势点。
 const sqlPanelItemsByMemberPanel = `
+WITH panel_keys AS (
+    SELECT DISTINCT COALESCE(NULLIF(i.code, ''), NULLIF(i.loinc, ''), i.name) AS trend_key
+    FROM report_items i JOIN reports r ON r.image_sha256 = i.report_sha256
+    WHERE r.member_id = $1 AND r.status <> 'failed' AND i.panel = $2
+)
 SELECT r.image_sha256, to_char(r.report_date, 'YYYY-MM-DD'),
-       i.name, i.unit, i.value, i.ref_range, i.method, i.flag, i.low_confidence, i.review_status
+       i.name, i.code, i.loinc, i.unit, i.unit_display, i.unit_status,
+       i.value, i.ref_range, i.method, i.flag, i.low_confidence, i.review_status
 FROM report_items i JOIN reports r ON r.image_sha256 = i.report_sha256
-WHERE r.member_id = $1 AND r.status <> 'failed' AND i.panel = $2
+WHERE r.member_id = $1 AND r.status <> 'failed'
+  AND COALESCE(NULLIF(i.code, ''), NULLIF(i.loinc, ''), i.name) IN (SELECT trend_key FROM panel_keys)
 ORDER BY r.report_date ASC NULLS LAST, r.image_sha256 ASC, i.id ASC`
 
 type panelReportRef struct {
@@ -119,7 +131,7 @@ func (s *Store) PanelSummariesByMember(ctx context.Context, memberID int64) ([]p
 	return out, nil
 }
 
-// PanelItemsByMemberPanel 项目详情:头部来源 + 按 name+unit 分行的指标。
+// PanelItemsByMemberPanel 项目详情:头部来源 + 按趋势键 + canonical unit 分行的指标。
 // 成员存在但该项目没有报告时返回空详情(不报错;成员存在性由 HTTP 边界校验)。
 func (s *Store) PanelItemsByMemberPanel(ctx context.Context, memberID int64, panel string) (*pipeline.PanelDetail, error) {
 	reports, err := s.panelReports(ctx, memberID, panel)
@@ -158,7 +170,8 @@ func scanPanelItemPoints(rows pgx.Rows) ([]pipeline.PanelItemPoint, error) {
 	var points []pipeline.PanelItemPoint
 	for rows.Next() {
 		var point pipeline.PanelItemPoint
-		if err := rows.Scan(&point.ReportID, &point.ReportDate, &point.Name, &point.Unit,
+		if err := rows.Scan(&point.ReportID, &point.ReportDate, &point.Name, &point.Code,
+			&point.Loinc, &point.Unit, &point.UnitDisplay, &point.UnitStatus,
 			&point.Value, &point.RefRange, &point.Method, &point.Flag, &point.LowConfidence,
 			&point.ReviewStatus); err != nil {
 			return nil, err

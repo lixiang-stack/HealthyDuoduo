@@ -69,23 +69,29 @@ func TestTrendStoreSmoke(t *testing.T) {
 		t.Fatalf("seed reports: %v", err)
 	}
 	if _, err := pool.Exec(ctx, `INSERT INTO report_items
-			(report_sha256, name, value, unit, ref_range, method, flag, low_confidence, raw_text, review_status) VALUES
-			('trend-a-2017','丙氨酸转氨酶','27.40','U/L','7-40',NULL,'normal',false,'ALT 27.40 U/L','unreviewed'),
-			('trend-a-2020-iu','丙氨酸转氨酶','70','IU/L','9-50','速率法','high',true,'ALT 70 IU/L','confirmed'),
-			('trend-a-2021-aa','丙氨酸转氨酶','835','U/L','7-40',NULL,'high',false,'ALT 835 U/L','unreviewed'),
-			('trend-a-2021-aa','丙氨酸转氨酶','836','U/L','7-40',NULL,'high',false,'ALT 836 U/L','unreviewed'),
-			('trend-a-2021-ab','丙氨酸转氨酶','900','U/L','7-40','干化学','high',false,'ALT 900 U/L','corrected'),
-			('trend-a-null','丙氨酸转氨酶','30','U/L','7-40',NULL,'normal',false,'ALT 30 U/L','unreviewed'),
-			('trend-a-null-unit','丙氨酸转氨酶','40',NULL,'7-40',NULL,'normal',false,'ALT 40','unreviewed'),
-			('trend-a-unverified','丙氨酸转氨酶','900','U/L','7-40',NULL,'high',false,'ALT 900 U/L','unreviewed'),
-			('trend-a-other','天冬氨酸转氨酶','488','U/L','13-35',NULL,'high',false,'AST 488 U/L','unreviewed'),
-			('trend-b-2021','丙氨酸转氨酶','111','U/L','7-40',NULL,'high',false,'ALT 111 U/L','unreviewed')`); err != nil {
+			(report_sha256, name, code, loinc, value, unit, unit_display, unit_status, ref_range, method, flag, low_confidence, raw_text, review_status) VALUES
+			('trend-a-2017','丙氨酸转氨酶','1500104A','1742-6','27.40','U/L','U/L','verified','7-40',NULL,'normal',false,'ALT 27.40 U/L','unreviewed'),
+			('trend-a-2020-iu','丙氨酸转氨酶','1500104A','1742-6','70','IU/L','IU/L','verified','9-50','速率法','high',true,'ALT 70 IU/L','confirmed'),
+			('trend-a-2021-aa','丙氨酸转氨酶','1500104A','1742-6','835','U/L','U/L','verified','7-40',NULL,'high',false,'ALT 835 U/L','unreviewed'),
+			('trend-a-2021-aa','丙氨酸转氨酶','1500104A','1742-6','836','U/L','U/L','verified','7-40',NULL,'high',false,'ALT 836 U/L','unreviewed'),
+			('trend-a-2021-ab','丙氨酸转氨酶','1500104A','1742-6','900','U/L','U/L','verified','7-40','干化学','high',false,'ALT 900 U/L','corrected'),
+			('trend-a-null','丙氨酸转氨酶','1500104A','1742-6','30','U/L','U/L','verified','7-40',NULL,'normal',false,'ALT 30 U/L','unreviewed'),
+			('trend-a-null-unit','丙氨酸转氨酶','1500104A','1742-6','40',NULL,NULL,'verified','7-40',NULL,'normal',false,'ALT 40','unreviewed'),
+			('trend-a-unverified','丙氨酸转氨酶','1500104A','1742-6','900','U/L','U/L','unverified','7-40',NULL,'high',false,'ALT 900 U/L','unreviewed'),
+			('trend-a-other','天冬氨酸转氨酶','1500204A','1920-8','488','U/L','U/L','verified','13-35',NULL,'high',false,'AST 488 U/L','unreviewed'),
+			('trend-b-2021','丙氨酸转氨酶','1500104A','1742-6','111','U/L','U/L','verified','7-40',NULL,'high',false,'ALT 111 U/L','unreviewed')`); err != nil {
 		t.Fatalf("seed report_items: %v", err)
 	}
-	// 未验证单位点默认不进入趋势(票 03 起;票 12 将增加 code 键与 --all)。
+	// 未验证单位点默认不进入 HTTP 趋势(票 12);CLI 由消费侧过滤。
 	if _, err := pool.Exec(ctx, `UPDATE report_items SET unit_status='unverified'
 			WHERE report_sha256='trend-a-unverified'`); err != nil {
 		t.Fatalf("mark unverified: %v", err)
+	}
+	// 同一 code 出现在另一个 panel:趋势按 code 跨面板连接。
+	if _, err := pool.Exec(ctx, `INSERT INTO report_items
+			(report_sha256, name, panel, code, loinc, value, unit, unit_display, unit_status, ref_range, flag, low_confidence, raw_text, review_status)
+		VALUES ('trend-a-2021-ab','丙氨酸氨基转移酶测定','other','1500104A','1742-6','901','U/L','U/L','verified','7-40','high',false,'ALT 901 U/L','unreviewed')`); err != nil {
+		t.Fatalf("seed cross-panel item: %v", err)
 	}
 
 	// 全部单位:2017 → 2020(IU/L) → 2021 两份同日按 sha → dateless 沉底。
@@ -109,6 +115,7 @@ func TestTrendStoreSmoke(t *testing.T) {
 		{"trend-a-2021-aa", strPtr("2021-08-02"), "835", strPtr("U/L"), "7-40", nil, "high", false, "unreviewed"},
 		{"trend-a-2021-aa", strPtr("2021-08-02"), "836", strPtr("U/L"), "7-40", nil, "high", false, "unreviewed"},
 		{"trend-a-2021-ab", strPtr("2021-08-02"), "900", strPtr("U/L"), "7-40", strPtr("干化学"), "high", false, "corrected"},
+		{"trend-a-2021-ab", strPtr("2021-08-02"), "901", strPtr("U/L"), "7-40", nil, "high", false, "unreviewed"},
 		{"trend-a-null-unit", strPtr("2023-01-01"), "40", nil, "7-40", nil, "normal", false, "unreviewed"},
 		{"trend-a-null", nil, "30", strPtr("U/L"), "7-40", nil, "normal", false, "unreviewed"},
 	}
@@ -133,12 +140,12 @@ func TestTrendStoreSmoke(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(ul) != 5 {
-		t.Fatalf("U/L rows = %d, want 5: %+v", len(ul), ul)
+	if len(ul) != 6 {
+		t.Fatalf("U/L rows = %d, want 6: %+v", len(ul), ul)
 	}
 	if ul[0].ReportID != "trend-a-2017" || ul[1].ReportID != "trend-a-2021-aa" || ul[2].ReportID != "trend-a-2021-aa" ||
-		ul[3].ReportID != "trend-a-2021-ab" || ul[4].ReportID != "trend-a-null" {
-		t.Errorf("U/L rows = %v, want [trend-a-2017 trend-a-2021-aa trend-a-2021-aa trend-a-2021-ab trend-a-null]", trendIDs(ul))
+		ul[3].ReportID != "trend-a-2021-ab" || ul[4].ReportID != "trend-a-2021-ab" || ul[5].ReportID != "trend-a-null" {
+		t.Errorf("U/L rows = %v, want [trend-a-2017 trend-a-2021-aa trend-a-2021-aa trend-a-2021-ab trend-a-2021-ab trend-a-null]", trendIDs(ul))
 	}
 	if ul[1].Value == nil || *ul[1].Value != "835" || ul[2].Value == nil || *ul[2].Value != "836" {
 		t.Errorf("same-report rows = %v/%v, want i.id order 835 then 836", ul[1].Value, ul[2].Value)
@@ -149,6 +156,36 @@ func TestTrendStoreSmoke(t *testing.T) {
 	}
 	if got := trendIDs(iu); len(got) != 1 || got[0] != "trend-a-2020-iu" {
 		t.Errorf("IU/L rows = %v, want [trend-a-2020-iu]", got)
+	}
+
+	// 输入标准码 / LOINC 与规范名走同一趋势键;unit_display/unit_status 透传。
+	byCode, err := st.TrendPoints(ctx, memberA, "1500104A", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := trendIDs(byCode); len(got) != len(all) {
+		t.Errorf("code-key rows = %v, want same %d rows as name", got, len(all))
+	}
+	if all[0].UnitDisplay == nil || *all[0].UnitDisplay != "U/L" || all[0].UnitStatus == nil || *all[0].UnitStatus != "verified" {
+		t.Errorf("unit fields = %v/%v, want U/L/verified", all[0].UnitDisplay, all[0].UnitStatus)
+	}
+	// CLI 存储面返回 unverified 点(成员 B 的同码点也属于全局 CLI 视图),
+	// 由命令层决定默认隐藏(--all 可见)。
+	cliRows, err := st.TrendByName(ctx, "丙氨酸转氨酶", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cliRows) != len(all)+2 {
+		t.Errorf("CLI rows = %d, want %d (member B + unverified included)", len(cliRows), len(all)+2)
+	}
+	unverifiedSeen := false
+	for _, row := range cliRows {
+		if row.UnitStatus != nil && *row.UnitStatus == "unverified" {
+			unverifiedSeen = true
+		}
+	}
+	if !unverifiedSeen {
+		t.Error("CLI rows missing unverified unit point")
 	}
 
 	// 成员隔离与指标名隔离。

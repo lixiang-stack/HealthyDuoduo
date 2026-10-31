@@ -33,8 +33,11 @@ import {
 type GoldenItem = {
   name: string;
   panel: ReportItem['panel'];
+  code: string | null;
+  loinc: string | null;
   value: string | null;
   unit: string | null;
+  unit_display: string | null;
   ref_range: string | null;
   method: string | null;
   flag: ReportItem['flag'];
@@ -111,6 +114,8 @@ function panelItemOf(file: GoldenReport, index: number, reportId: string): Panel
     report_date: file.report_date,
     value: item.value,
     unit: item.unit,
+    unit_display: item.unit_display,
+    unit_status: 'verified' as const,
     ref_range: item.ref_range,
     method: item.method,
     flag: item.flag,
@@ -118,6 +123,7 @@ function panelItemOf(file: GoldenReport, index: number, reportId: string): Panel
     reviewed: false,
   };
   return {
+    key: item.code ?? item.loinc ?? item.name,
     name: item.name,
     unit: item.unit,
     ref_range: item.ref_range,
@@ -424,6 +430,8 @@ function panelItem({
     report_date: '2026-10-01',
     value: '1.0',
     unit: 'U/L',
+    unit_display: 'U/L',
+    unit_status: 'verified' as const,
     ref_range: null,
     method: null,
     flag,
@@ -431,6 +439,7 @@ function panelItem({
     reviewed: false,
   };
   return {
+    key: name,
     name,
     unit: 'U/L',
     ref_range: null,

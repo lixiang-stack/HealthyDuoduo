@@ -19,7 +19,7 @@ def test_coag_standard_fields_loaded() -> None:
     assert pt.canonical_unit == "s"
     assert pt.unit_display == "秒"
     assert pt.source_status == "primary"
-    assert pt.review_status == "pending"
+    assert pt.review_status == "approved"
     assert len(pt.accepted_units) == 1
     unit = pt.accepted_units[0]
     assert unit.unit == "秒"

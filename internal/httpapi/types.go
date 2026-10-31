@@ -189,6 +189,8 @@ type TrendPoint struct {
 	ReportDate    *string `json:"report_date"`
 	Value         *string `json:"value"`
 	Unit          *string `json:"unit"`
+	UnitDisplay   *string `json:"unit_display"`
+	UnitStatus    *string `json:"unit_status"`
 	RefRange      *string `json:"ref_range"`
 	Method        *string `json:"method"`
 	Flag          string  `json:"flag"`
@@ -224,11 +226,12 @@ type PanelsList struct {
 	Panels []PanelSummary `json:"panels"`
 }
 
-// PanelItem 项目详情中按 name+unit 分行的指标;Latest 是最近一个非 not_tested 点
-// (没有则 null),Points 为同组跨报告点(日期升序,不含 not_tested)。
+// PanelItem 项目详情中按趋势键 + canonical unit 分行的指标;Latest 是最近一个
+// 非 not_tested 点(没有则 null),Points 为同组跨报告点(日期升序,不含 not_tested)。
 // latest_report_not_tested=true 表示最近一份含该指标的报告中此项为未检测,
 // 数值是最近一次已知值,不冒充本次结果。
 type PanelItem struct {
+	Key                   string       `json:"key"`
 	Name                  string       `json:"name"`
 	Unit                  *string      `json:"unit"`
 	RefRange              *string      `json:"ref_range"`

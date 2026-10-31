@@ -51,6 +51,8 @@ func toAPITrendPoint(row pipeline.TrendPointRow) httpapi.TrendPoint {
 		ReportDate:    row.ReportDate,
 		Value:         row.Value,
 		Unit:          row.Unit,
+		UnitDisplay:   row.UnitDisplay,
+		UnitStatus:    row.UnitStatus,
 		RefRange:      row.RefRange,
 		Method:        row.Method,
 		Flag:          row.Flag,

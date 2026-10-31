@@ -32,7 +32,7 @@ items:
     loinc: 1742-6
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: U/L
     unit_display: U/L
@@ -51,7 +51,7 @@ items:
     loinc: 1920-8
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: U/L
     unit_display: U/L
@@ -70,7 +70,7 @@ items:
     loinc: 2324-2
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: U/L
     unit_display: U/L
@@ -86,7 +86,7 @@ items:
     loinc: 1916-6
     local_code:
     source_status: local
-    review_status: pending
+    review_status: approved
     result_kind: ratio
     canonical_unit: '1'
     unit_display: '1'
@@ -102,7 +102,7 @@ items:
     loinc: 6768-6
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: U/L
     unit_display: U/L
@@ -121,7 +121,7 @@ items:
     loinc: 2885-2
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: g/L
     unit_display: g/L
@@ -148,7 +148,7 @@ items:
     loinc: 1751-7
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: g/L
     unit_display: g/L
@@ -172,7 +172,7 @@ items:
     loinc: 10834-0
     local_code:
     source_status: local
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: g/L
     unit_display: g/L
@@ -196,7 +196,7 @@ items:
     loinc: 1759-0
     local_code:
     source_status: local
-    review_status: pending
+    review_status: approved
     result_kind: ratio
     canonical_unit: '1'
     unit_display: '1'
@@ -212,7 +212,7 @@ items:
     loinc: 1975-2
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: umol/L
     unit_display: μmol/L
@@ -239,7 +239,7 @@ items:
     loinc: 1968-7
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: umol/L
     unit_display: μmol/L
@@ -263,7 +263,7 @@ items:
     loinc: 1971-1
     local_code:
     source_status: local
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: umol/L
     unit_display: μmol/L
@@ -290,7 +290,7 @@ items:
     loinc: 14628-2
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: umol/L
     unit_display: μmol/L
@@ -309,7 +309,7 @@ items:
     loinc: 3091-6
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: mmol/L
     unit_display: mmol/L
@@ -336,7 +336,7 @@ items:
     loinc: 2160-0
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: umol/L
     unit_display: μmol/L
@@ -363,7 +363,7 @@ items:
     loinc: 3084-1
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: umol/L
     unit_display: μmol/L
@@ -398,12 +398,17 @@ items:
     loinc: 2028-9
     local_code: LOCAL-CHEM-CO2CP
     source_status: local
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: mmol/L
     unit_display: mmol/L
     accepted_units: []
     ocr_unit_forms: []
+    # 技术复核建议 10..40（成人常见参考约 22–29，放宽覆盖真实结果并挡数量级错误）。
+    # LOINC 2028-9 为 total CO2；实际测 CO2CP，已在 mapping notes 标注。
+    plausible_range:
+      low: 10
+      high: 40
   - name: 总胆固醇测定
     panel: lipid
     aliases: []
@@ -414,7 +419,7 @@ items:
     loinc: 2093-3
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: mmol/L
     unit_display: mmol/L
@@ -441,7 +446,7 @@ items:
     loinc: 2571-8
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: mmol/L
     unit_display: mmol/L
@@ -468,7 +473,7 @@ items:
     loinc: 2085-9
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: mmol/L
     unit_display: mmol/L
@@ -495,7 +500,7 @@ items:
     loinc: 2089-1
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: mmol/L
     unit_display: mmol/L
@@ -522,7 +527,7 @@ items:
     loinc: 2345-7
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: mmol/L
     unit_display: mmol/L
@@ -546,7 +551,7 @@ items:
     loinc: 62238-1
     local_code:
     source_status: local
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: mL/min/1.73m2
     unit_display: mL/min/1.73m²
@@ -570,7 +575,7 @@ items:
     loinc: 33863-2
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: mg/L
     unit_display: mg/L
@@ -589,7 +594,7 @@ items:
     loinc: 2098-2
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: U/L
     unit_display: U/L
@@ -608,7 +613,7 @@ items:
     loinc: 14338-8
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: mg/L
     unit_display: mg/L
@@ -627,7 +632,7 @@ items:
     loinc: 24045-7
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: U/L
     unit_display: U/L
@@ -646,7 +651,7 @@ items:
     loinc: 1834-1
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: ug/L
     unit_display: μg/L
@@ -670,7 +675,7 @@ items:
     loinc: 2187-3
     local_code:
     source_status: local
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: U/L
     unit_display: U/L
@@ -686,7 +691,7 @@ items:
     loinc: 15066-4
     local_code:
     source_status: local
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: mmol/L
     unit_display: mmol/L
@@ -702,7 +707,7 @@ items:
     loinc: 12918-9
     local_code:
     source_status: local
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: U/L
     unit_display: U/L
@@ -718,7 +723,7 @@ items:
     loinc: 2064-4
     local_code:
     source_status: local
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: g/L
     unit_display: g/L
@@ -747,7 +752,7 @@ items:
     loinc: 1558-6
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: mmol/L
     unit_display: mmol/L
@@ -771,7 +776,7 @@ items:
     loinc: 1527-1
     local_code:
     source_status: local
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: mmol/L
     unit_display: mmol/L
@@ -795,7 +800,7 @@ items:
     loinc: 1507-3
     local_code:
     source_status: local
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: mmol/L
     unit_display: mmol/L
@@ -819,7 +824,7 @@ items:
     loinc: 1518-0
     local_code:
     source_status: local
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: mmol/L
     unit_display: mmol/L
@@ -843,7 +848,7 @@ items:
     loinc: 1533-9
     local_code:
     source_status: local
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: mmol/L
     unit_display: mmol/L
@@ -870,7 +875,7 @@ items:
     loinc: 4548-4
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: mmol/mol
     unit_display: mmol/mol
@@ -898,7 +903,7 @@ items:
     loinc: 1986-9
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: pmol/L
     unit_display: pmol/L
@@ -925,7 +930,7 @@ items:
     loinc: 20448-7
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: pmol/L
     unit_display: pmol/L
@@ -962,7 +967,7 @@ items:
     loinc: 62292-8
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: nmol/L
     unit_display: nmol/L
@@ -989,7 +994,7 @@ items:
     loinc: 2276-4
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: ug/L
     unit_display: μg/L
@@ -1016,7 +1021,7 @@ items:
     loinc: 2284-8
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: nmol/L
     unit_display: nmol/L
@@ -1043,7 +1048,7 @@ items:
     loinc: 2132-9
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: pmol/L
     unit_display: pmol/L

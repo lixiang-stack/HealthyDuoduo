@@ -54,10 +54,12 @@ type PanelSummary struct {
 	Narrative        bool
 }
 
-// PanelItem 项目详情中按 name+unit 分行的指标(跨单位不合并、不换算)。
-// Latest 是最近一个非 not_tested 点(没有则 nil);Points 为同组跨报告点,日期升序,
-// 不含 not_tested。ReportCount 为有非 not_tested 点的报告数。
+// PanelItem 项目详情中按趋势键(code > loinc > name)+ canonical unit 分行的指标
+// (跨单位不合并、不换算;同分析物跨面板连接)。Latest 是最近一个非 not_tested 点
+// (没有则 nil);Points 为同组跨报告点,日期升序,不含 not_tested。
+// ReportCount 为有非 not_tested 点的报告数。
 type PanelItem struct {
+	Key                   string
 	Name                  string
 	Unit                  *string
 	RefRange              *string
@@ -69,12 +71,16 @@ type PanelItem struct {
 }
 
 // PanelItemPoint 项目详情分组前的平铺指标行(存储按报告日期升序 / sha / item id
-// 读出;领域层负责 name+unit 分组、最近点与 not_tested 口径)。
+// 读出;领域层负责趋势键 + canonical unit 分组、最近点与 not_tested 口径)。
 type PanelItemPoint struct {
 	ReportID      string
 	ReportDate    *string
 	Name          string
+	Code          *string
+	Loinc         *string
 	Unit          *string
+	UnitDisplay   *string
+	UnitStatus    *string
 	Value         *string
 	RefRange      *string
 	Method        *string
@@ -139,8 +145,8 @@ func panelRankOf(code string) int {
 }
 
 type panelItemKey struct {
-	name string
-	unit string
+	trendKey string
+	unit     string
 }
 
 func panelUnitKey(unit *string) string {
@@ -151,6 +157,7 @@ func panelUnitKey(unit *string) string {
 }
 
 type panelItemAccumulator struct {
+	trendKey                 string
 	name                     string
 	unit                     *string
 	points                   []TrendPointRow
@@ -163,9 +170,9 @@ type panelItemAccumulator struct {
 	latestOccurrenceFlag     string
 }
 
-// BuildPanelItems 将平铺的跨报告指标行按 name+unit 分组,并计算最近点 / 跨报告点 /
-// not_tested 口径。latestReportID 用于「其余项按最新报告内顺序」的排序。
-// 输入按报告日期升序 / dateless 沉底 / sha / item id 稳定排序。
+// BuildPanelItems 将平铺的跨报告指标行按趋势键(code > loinc > name)+ canonical unit
+// 分组,并计算最近点 / 跨报告点 / not_tested 口径。latestReportID 用于「其余项按最新
+// 报告内顺序」的排序。输入按报告日期升序 / dateless 沉底 / sha / item id 稳定排序。
 func BuildPanelItems(points []PanelItemPoint, latestReportID string) []PanelItem {
 	groups := make(map[panelItemKey]*panelItemAccumulator)
 	var order []panelItemKey
@@ -173,10 +180,12 @@ func BuildPanelItems(points []PanelItemPoint, latestReportID string) []PanelItem
 	nextLatestRank := 0
 
 	for _, point := range points {
-		key := panelItemKey{name: point.Name, unit: panelUnitKey(point.Unit)}
+		trendKey := TrendKey(pointerText(point.Code), pointerText(point.Loinc), point.Name)
+		key := panelItemKey{trendKey: trendKey, unit: panelUnitKey(point.Unit)}
 		group, ok := groups[key]
 		if !ok {
 			group = &panelItemAccumulator{
+				trendKey:             trendKey,
 				name:                 point.Name,
 				unit:                 point.Unit,
 				seenPointReports:     make(map[string]bool),
@@ -196,6 +205,8 @@ func BuildPanelItems(points []PanelItemPoint, latestReportID string) []PanelItem
 			ReportDate:    point.ReportDate,
 			Value:         point.Value,
 			Unit:          point.Unit,
+			UnitDisplay:   point.UnitDisplay,
+			UnitStatus:    point.UnitStatus,
 			RefRange:      point.RefRange,
 			Method:        point.Method,
 			Flag:          point.Flag,
@@ -218,6 +229,7 @@ func BuildPanelItems(points []PanelItemPoint, latestReportID string) []PanelItem
 			group.latestOccurrenceDate = point.ReportDate
 			group.latestOccurrenceReportID = point.ReportID
 			group.latestOccurrenceFlag = point.Flag
+			group.name = point.Name
 		}
 	}
 
@@ -225,6 +237,7 @@ func BuildPanelItems(points []PanelItemPoint, latestReportID string) []PanelItem
 	for _, key := range order {
 		group := groups[key]
 		item := PanelItem{
+			Key:                   group.trendKey,
 			Name:                  group.name,
 			Unit:                  group.unit,
 			ReportCount:           group.reportCount,
@@ -249,8 +262,8 @@ func BuildPanelItems(points []PanelItemPoint, latestReportID string) []PanelItem
 			}
 			return 1
 		}
-		aRank, aInLatest := latestOrder[panelItemKey{a.Name, panelUnitKey(a.Unit)}]
-		bRank, bInLatest := latestOrder[panelItemKey{b.Name, panelUnitKey(b.Unit)}]
+		aRank, aInLatest := latestOrder[panelItemKey{a.Key, panelUnitKey(a.Unit)}]
+		bRank, bInLatest := latestOrder[panelItemKey{b.Key, panelUnitKey(b.Unit)}]
 		if aInLatest != bInLatest {
 			if aInLatest {
 				return -1
@@ -263,6 +276,13 @@ func BuildPanelItems(points []PanelItemPoint, latestReportID string) []PanelItem
 		return cmp.Compare(a.Name, b.Name)
 	})
 	return items
+}
+
+func pointerText(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }
 
 // panelReportLater 报告新鲜度:日期降序、dateless 沉底;同日期取 sha 降序最后一份

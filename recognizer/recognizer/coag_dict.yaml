@@ -14,7 +14,7 @@ items:
     code: "0500103A"
     loinc: "5902-2"
     source_status: primary
-    review_status: pending
+    review_status: approved
     synonyms:
       - term: 凝血酶原时间
         source: "WS/T 886 0500103A"
@@ -35,7 +35,7 @@ items:
   - name: 凝血酶原时间比值
     loinc: "5894-1"
     source_status: secondary
-    review_status: pending
+    review_status: approved
     synonyms:
       - term: "凝血酶原时间比值(PTR)"
         source: "local"
@@ -53,7 +53,7 @@ items:
   - name: 国际标准化比值
     loinc: "6301-6"
     source_status: secondary
-    review_status: pending
+    review_status: approved
     synonyms:
       - term: INR
         source: "LOINC 6301-6"
@@ -69,7 +69,7 @@ items:
   - name: 凝血酶原活动度
     local_code: "LOCAL-PTA"
     source_status: local
-    review_status: pending
+    review_status: approved
     synonyms:
       - term: "凝血酶原活动度(PTA)"
         source: "local"
@@ -88,7 +88,7 @@ items:
     code: "0500203A"
     loinc: "3173-2"
     source_status: primary
-    review_status: pending
+    review_status: approved
     synonyms:
       - term: 活化部分凝血活酶时间
         source: "WS/T 886 0500203A"
@@ -110,7 +110,7 @@ items:
     code: "0500403A"
     loinc: "3255-7"
     source_status: primary
-    review_status: pending
+    review_status: approved
     synonyms:
       - term: 纤维蛋白原
         source: "WS/T 886 0500403A"
@@ -132,7 +132,7 @@ items:
     code: "0500303A"
     loinc: "3243-3"
     source_status: primary
-    review_status: pending
+    review_status: approved
     synonyms:
       - term: 凝血酶时间
         source: "WS/T 886 0500303A"
@@ -154,7 +154,7 @@ items:
     code: "0501703A"
     loinc: "48065-7"
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_basis: FEU
     synonyms:
       - term: D-二聚体
@@ -182,7 +182,7 @@ items:
     code: "0501803A"
     loinc: "30226-5"
     source_status: primary
-    review_status: pending
+    review_status: approved
     synonyms:
       - term: 纤维蛋白（原）降解产物
         source: "WS/T 886 0501803A"
