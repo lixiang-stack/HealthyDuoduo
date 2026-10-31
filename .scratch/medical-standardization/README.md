@@ -23,7 +23,8 @@ Status: in progress（2026-10-31）
 | 09 | `ua_dict.yaml` / urinalysis | `test_postprocess.py::test_urinalysis_result_kinds_and_count_units` | `ua_*` |
 | 10 | `immunology_dict.yaml` / infection、autoimmune | `test_postprocess.py::test_immunology_arbitrary_ratio_and_qualitative` | `ana_*`、`infectious_*`、`fibrosis_*` |
 | 11 | `special_dict.yaml`、`bloodtype_dict.yaml` / other | `test_postprocess.py::test_special_and_bloodtype_models`、`test_narrative_right_value_pairs_risk_ratios` | `bloodtype_*`；专项暂无 golden |
-| 12–15 | 趋势、全量收口、医学复核 | `recognizer/tools/golden_diff.py`、`recognizer/tools/e2e.py` | 全量 |
+| 12 | 趋势键 (Go/App) | `internal/pipeline/panels_test.go`、`internal/storage/store_{trend,panels}_test.go`、`cmd/hdd/main_test.go`、`apps/mobile/src/reports/trends.test.ts` | 全量趋势 |
+| 13 | 全量收口 | `recognizer/tools/e2e.py`、`recognizer/tools/golden_diff.py` | 全量 |
 
 **快速回路：**
 
@@ -44,13 +45,13 @@ uv run python -m recognizer.golden   # 只改词典/输出规则后
 - 票 01：`ReportItem` 标准层字段（code/loinc/unit_display/unit_status/raw_*/ref_kind/result_kind/result_basis）Python/JSON Schema/Go/DB/API/App 全链路透传；识别端产出留待 03+，旧 golden 不变。
 - 票 02：`unit_families.yaml` 拆为 `unit_conversions.yaml` + `ocr_forms.yaml`；loader 合并加载并门禁真实单位/OCR 形混放；单位输出不变。
 - 票 03–11：9 个词典 181 项全部标准输出；canonical/display、value/ref 同步换算、量级门、原文快照、result_kind/result_basis、定性 flag 策略全部落地；49 份 golden 重生成（status/item 数/flag 与迁移前一致）；趋势查询默认排除 unverified。
+- 票 12：趋势键改为 `code > loinc > name`，同分析物跨报告/跨面板连接；CLI `--all` 显示 unverified 并标注原因；App 趋势显示 `unit_display` 且默认不连接 unverified 点。
+- 票 13：全量 golden 零 diff；`hdd reparse` 70 份全成功；`e2e verify` / `verify --golden` 通过；未验证项 668 项（全部 pending 复核）数量与原因可审计。
 
-**Frontier：** `12`（趋势按 code + canonical unit 连接，依赖 03–11 完成）；之后 `13` 全量 reparse/e2e，`14`/`15` 医学复核。
+**Frontier：** `14`（医学复核 batch 1）；之后 `15` 复核 batch 2。复核前所有 `unit_status=unverified`、`review_status=pending`，默认趋势为空是预期。
 
 **下一步：**
 
-1. 票 12：趋势键改为 `code`（LOINC 兜底）→ canonical unit；`unit_status=unverified` 默认排除，`--all` 可见；App 趋势显示 `unit_display`。
-2. 票 13：全量 golden 收口、`hdd reparse`、e2e verify；记录未验证项数量与原因。
-3. 确认具名临床检验复核人；未确认前 `review_status=pending`，不得声称 `verified`。
-4. 票 14/15：逐项确认标准名/码、canonical unit、换算系数、`plausible_range`；PDW、D-二聚体基准、eGFR、U/L vs IU/L 四个争议项给出结论。
-5. 复核通过后将 `review_status` 翻 `approved`，重生成受影响 golden；`unit_status=verified` 才会出现。
+1. 确认具名临床检验复核人；未确认前 `review_status=pending`，不得声称 `verified`。
+2. 票 14/15：逐项确认标准名/码、canonical unit、换算系数、`plausible_range`；PDW、D-二聚体基准、eGFR、U/L vs IU/L 四个争议项给出结论。
+3. 复核通过后将 `review_status` 翻 `approved`，重生成受影响 golden；`unit_status=verified` 才会出现。
