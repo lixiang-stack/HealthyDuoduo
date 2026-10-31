@@ -47,8 +47,9 @@ uv run python -m recognizer.golden   # 只改词典/输出规则后
 - 票 03–11：9 个词典 181 项全部标准输出；canonical/display、value/ref 同步换算、量级门、原文快照、result_kind/result_basis、定性 flag 策略全部落地；49 份 golden 重生成（status/item 数/flag 与迁移前一致）；趋势查询默认排除 unverified。
 - 票 12：趋势键改为 `code > loinc > name`，同分析物跨报告/跨面板连接；CLI `--all` 显示 unverified 并标注原因；App 趋势显示 `unit_display` 且默认不连接 unverified 点。
 - 票 13：全量 golden 零 diff；`hdd reparse` 70 份全成功；`e2e verify` / `verify --golden` 通过；未验证项 668 项（全部 pending 复核）数量与原因可审计。
+- 票 14/15 工作包：`review/batch-1.csv`（95 项）、`review/batch-2.csv`（86 项）与 `review/summary.md`；逐项复核决策字段留空，仍全部 `pending`。
 
-**Frontier：** `14`（医学复核 batch 1）；之后 `15` 复核 batch 2。复核前所有 `unit_status=unverified`、`review_status=pending`，默认趋势为空是预期。
+**Frontier：** `14`（医学复核 batch 1，工作包已就绪，待具名复核人签核）；之后 `15` 复核 batch 2。复核前所有 `unit_status=unverified`、`review_status=pending`，默认趋势为空是预期。
 
 **下一步：**
 
