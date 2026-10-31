@@ -30,12 +30,16 @@ beforeEach(async () => {
     report_id: 'r2',
     report_date: '2026-09-01',
     value: '55.00',
+    unit: 'umol/L',
+    unit_display: 'μmol/L',
     flag: 'high',
   });
   const latestPoint = makeTrendPoint({
     report_id: 'r1',
     report_date: '2026-10-01',
     value: '70.00',
+    unit: 'umol/L',
+    unit_display: 'μmol/L',
     flag: 'high',
   });
 
@@ -56,6 +60,7 @@ beforeEach(async () => {
           makePanelDetail({
             items: [
               makePanelItem({
+                unit: 'umol/L',
                 latest: latestPoint,
                 points: [oldPoint, latestPoint],
                 report_count: 2,
@@ -76,6 +81,8 @@ describe('TrendsScreen', () => {
       '异常指标 1 项 · 1 个项目',
     );
     expect(screen.getByTestId('trend-indicator-0')).toHaveTextContent(/丙氨酸转氨酶/);
+    expect(screen.getByTestId('trend-indicator-0')).toHaveTextContent(/μmol\/L/);
+    expect(screen.getByTestId('trend-indicator-0')).not.toHaveTextContent(/umol\/L/);
 
     await fireEvent.press(screen.getByTestId('trend-indicator-0'));
 

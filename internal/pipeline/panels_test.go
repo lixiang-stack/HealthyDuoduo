@@ -158,7 +158,54 @@ func TestBuildPanelItemsSplitsUnits(t *testing.T) {
 	}
 	items := BuildPanelItems(points, "r1")
 	if len(items) != 2 {
-		t.Fatalf("items = %+v, want one row per name+unit", items)
+		t.Fatalf("items = %+v, want one row per trend key + unit", items)
+	}
+}
+
+func TestTrendKeyPriority(t *testing.T) {
+	tests := []struct {
+		code, loinc, name, want string
+	}{
+		{"1500104A", "1742-6", "丙氨酸氨基转移酶测定", "1500104A"},
+		{"", "1742-6", "丙氨酸氨基转移酶测定", "1742-6"},
+		{" ", " ", "丙氨酸氨基转移酶测定", "丙氨酸氨基转移酶测定"},
+		{"", "", "", ""},
+	}
+	for _, tt := range tests {
+		if got := TrendKey(tt.code, tt.loinc, tt.name); got != tt.want {
+			t.Errorf("TrendKey(%q, %q, %q) = %q, want %q", tt.code, tt.loinc, tt.name, got, tt.want)
+		}
+	}
+}
+
+func TestBuildPanelItemsJoinsByTrendKey(t *testing.T) {
+	// 同一 code 跨名称 / 跨面板聚合为一个趋势序列;无 code 时回退 LOINC;
+	// 不同 code 即使同名也不合并。
+	code, loinc, otherCode := "1500104A", "1742-6", "1500105A"
+	points := []PanelItemPoint{
+		{ReportID: "r1", ReportDate: strPtr("2020-01-01"), Name: "丙氨酸转氨酶", Code: &code, Unit: strPtr("U/L"), Value: strPtr("27.4"), Flag: FlagNormal},
+		{ReportID: "r2", ReportDate: strPtr("2021-01-01"), Name: "丙氨酸氨基转移酶测定", Code: &code, Unit: strPtr("U/L"), Value: strPtr("835"), Flag: FlagHigh},
+		{ReportID: "r1", ReportDate: strPtr("2020-01-01"), Name: "ALT-旧名", Loinc: &loinc, Unit: strPtr("U/L"), Value: strPtr("30"), Flag: FlagNormal},
+		{ReportID: "r2", ReportDate: strPtr("2021-01-01"), Name: "ALT-新名", Loinc: &loinc, Unit: strPtr("U/L"), Value: strPtr("40"), Flag: FlagNormal},
+		{ReportID: "r3", ReportDate: strPtr("2022-01-01"), Name: "另一个同名项", Code: &otherCode, Unit: strPtr("U/L"), Value: strPtr("1"), Flag: FlagNormal},
+	}
+	items := BuildPanelItems(points, "r2")
+	if len(items) != 3 {
+		t.Fatalf("items = %+v, want code-grouped ALT + LOINC ALT + other code", items)
+	}
+	alt := items[0]
+	if alt.Key != code || alt.Name != "丙氨酸氨基转移酶测定" || len(alt.Points) != 2 || alt.ReportCount != 2 {
+		t.Fatalf("ALT = %+v, want two points joined by code and latest name", alt)
+	}
+	if alt.Latest == nil || alt.Latest.Value == nil || *alt.Latest.Value != "835" {
+		t.Errorf("ALT latest = %+v, want 835", alt.Latest)
+	}
+	loincItem := items[1]
+	if loincItem.Key != loinc || len(loincItem.Points) != 2 || loincItem.Name != "ALT-新名" {
+		t.Errorf("LOINC item = %+v, want two points joined by LOINC", loincItem)
+	}
+	if items[2].Key != otherCode {
+		t.Errorf("third key = %q, want %q", items[2].Key, otherCode)
 	}
 }
 

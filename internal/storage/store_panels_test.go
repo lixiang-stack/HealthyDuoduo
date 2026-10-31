@@ -1,6 +1,6 @@
 // 项目组浏览存储冒烟(panel-browse 票 03):项目列表按成员聚合(报告级 panels /
 // 未回填存量 other 回退 / failed 排除 / 最近日期与固定优先级排序),项目详情按
-// name+unit 分行(跨报告点、not_tested 口径、最新报告内顺序、影像 narrative)。
+// 趋势键 + canonical unit 分行(跨报告点、not_tested 口径、最新报告内顺序、影像 narrative)。
 // 需要真库:设 HDD_TEST_DSN 后运行,未设整体 Skip(与 store_reports_test 同约定):
 // docker run --name hdd-panel-smoke-pg -e POSTGRES_PASSWORD=smoke -p 55437:5432 postgres:17-alpine
 package storage
@@ -302,4 +302,91 @@ func panelItemNames(items []pipeline.PanelItem) []string {
 		out = append(out, item.Name)
 	}
 	return out
+}
+
+// TestPanelStoreJoinsByCodeAcrossPanels 票 12:同一 code 跨报告 / 跨面板连接,
+// 名称变化不拆行;canonical unit 不同仍分行。
+func TestPanelStoreJoinsByCodeAcrossPanels(t *testing.T) {
+	dsn := os.Getenv("HDD_TEST_DSN")
+	if dsn == "" {
+		t.Skip("HDD_TEST_DSN not set: panel store smoke runs against a disposable PG container")
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	defer pool.Close()
+	if err := Migrate(ctx, dsn); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	st := NewStore(pool)
+	defer st.Close()
+
+	if _, err := pool.Exec(ctx, `DELETE FROM reports WHERE image_sha256 IN ('pt-a','pt-b','pt-c');
+		DELETE FROM ocr_results WHERE image_sha256 IN ('pt-a','pt-b','pt-c');
+		DELETE FROM images WHERE sha256 IN ('pt-a','pt-b','pt-c');
+		DELETE FROM members WHERE name = '趋势键成员'`); err != nil {
+		t.Fatalf("clean seed: %v", err)
+	}
+	var memberID int64
+	if err := pool.QueryRow(ctx, `INSERT INTO members (name, is_child) VALUES ('趋势键成员', false) RETURNING id`).Scan(&memberID); err != nil {
+		t.Fatalf("seed member: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO images (sha256, original_filename) VALUES
+			('pt-a','a.jpg'),('pt-b','b.jpg'),('pt-c','c.jpg');
+		INSERT INTO ocr_results (image_sha256, engine_output) VALUES
+			('pt-a','{}'),('pt-b','{}'),('pt-c','{}')`); err != nil {
+		t.Fatalf("seed images/ocr: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO reports (image_sha256, ocr_result_id, report_type, report_date, status, member_id, panels) VALUES
+			('pt-a',(SELECT id FROM ocr_results WHERE image_sha256='pt-a'),'生化','2021-01-01','success',$1,ARRAY['liver']),
+			('pt-b',(SELECT id FROM ocr_results WHERE image_sha256='pt-b'),'生化','2022-01-01','success',$1,ARRAY['other']),
+			('pt-c',(SELECT id FROM ocr_results WHERE image_sha256='pt-c'),'生化','2023-01-01','success',$1,ARRAY['liver','urinalysis'])`,
+		memberID); err != nil {
+		t.Fatalf("seed reports: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO report_items
+			(report_sha256, name, panel, code, loinc, value, unit, unit_display, unit_status, ref_range, flag, low_confidence, raw_text, review_status) VALUES
+			('pt-a','测试ALT','liver','TEST-PANEL-ALT','1742-6','30','U/L','U/L','verified','7-40','normal',false,'ALT 30 U/L','unreviewed'),
+			('pt-b','测试ALT新名','other','TEST-PANEL-ALT','1742-6','40','U/L','U/L','verified','7-40','high',false,'ALT 40 U/L','unreviewed'),
+			('pt-c','测试ALT最新名','liver','TEST-PANEL-ALT','1742-6','50','U/L','U/L','verified','7-40','high',false,'ALT 50 U/L','unreviewed'),
+			('pt-c','测试尿蛋白','urinalysis','TEST-PANEL-UA',NULL,'阴性',NULL,NULL,NULL,'阴性','normal',false,'尿蛋白 阴性','unreviewed')`); err != nil {
+		t.Fatalf("seed rows: %v", err)
+	}
+
+	liver, err := st.PanelItemsByMemberPanel(ctx, memberID, "liver")
+	if err != nil {
+		t.Fatalf("liver detail: %v", err)
+	}
+	if len(liver.Items) != 1 {
+		t.Fatalf("liver items = %+v, want one code-joined item", liver.Items)
+	}
+	alt := liver.Items[0]
+	if alt.Key != "TEST-PANEL-ALT" || alt.Name != "测试ALT最新名" {
+		t.Errorf("ALT key/name = %q/%q, want code + latest name", alt.Key, alt.Name)
+	}
+	if len(alt.Points) != 3 || alt.Latest == nil || alt.Latest.ReportID != "pt-c" || *alt.Latest.Value != "50" {
+		t.Errorf("ALT points = %+v, want 3 cross-panel points with latest pt-c", alt.Points)
+	}
+	if alt.Points[0].UnitDisplay == nil || *alt.Points[0].UnitDisplay != "U/L" ||
+		alt.Points[0].UnitStatus == nil || *alt.Points[0].UnitStatus != "verified" {
+		t.Errorf("ALT point unit fields = %+v, want U/L/verified", alt.Points[0])
+	}
+
+	// other 面板也连接同一 code(跨面板点的另一端),但尿常规面板不受影响。
+	other, err := st.PanelItemsByMemberPanel(ctx, memberID, "other")
+	if err != nil {
+		t.Fatalf("other detail: %v", err)
+	}
+	if len(other.Items) != 1 || other.Items[0].Key != "TEST-PANEL-ALT" || len(other.Items[0].Points) != 3 {
+		t.Errorf("other items = %+v, want same code with 3 points", other.Items)
+	}
+	urinalysis, err := st.PanelItemsByMemberPanel(ctx, memberID, "urinalysis")
+	if err != nil {
+		t.Fatalf("urinalysis detail: %v", err)
+	}
+	if len(urinalysis.Items) != 1 || urinalysis.Items[0].Key != "TEST-PANEL-UA" {
+		t.Errorf("urinalysis items = %+v, want only its own key", urinalysis.Items)
+	}
 }

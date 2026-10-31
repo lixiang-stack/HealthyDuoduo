@@ -24,6 +24,8 @@ export type ChartableTrendPoint = DatedTrendPoint & { value: string };
 
 export type TrendSeries = {
   unit: string | null;
+  /** 同单位序列的人类可读单位(unit_display 优先);无点时回退 canonical unit。 */
+  unitDisplay: string | null;
   /** 同单位、按 report_id 去重后的全部点(日期升序,dateless 沉底)。 */
   listPoints: TrendPoint[];
   /** listPoints 中有日期且值为标量的点,供绘图。 */
@@ -31,6 +33,8 @@ export type TrendSeries = {
   undatedCount: number;
   nonNumericCount: number;
   otherUnitCount: number;
+  /** unit_status=unverified 的报告数(默认不连线)。 */
+  unverifiedCount: number;
   totalCount: number;
   selectedPoint: TrendPoint | undefined;
 };
@@ -94,6 +98,13 @@ function normalizedUnit(unit: string | null | undefined): string | null {
   return trimmed === '' ? null : trimmed;
 }
 
+/** 展示单位:unit_display 优先,缺失回退 canonical unit;不显示 raw OCR 单位。 */
+export function displayTrendUnit(
+  point: Pick<TrendPoint, 'unit' | 'unit_display'>,
+): string | null {
+  return normalizedUnit(point.unit_display ?? point.unit);
+}
+
 function isDated(point: TrendPoint): point is DatedTrendPoint {
   return point.report_date !== null;
 }
@@ -115,8 +126,9 @@ function comparePoints(a: TrendPoint, b: TrendPoint): number {
 }
 
 /**
- * 按指标单位裁出趋势序列:同单位过滤(normalize null/空)→ report_id 去重 →
- * 日期升序 / dateless 沉底。跨单位只做计数,不连线。
+ * 按指标 canonical unit 裁出趋势序列:未验证单位点默认排除 → 同单位过滤
+ * (normalize null/空)→ report_id 去重 → 日期升序 / dateless 沉底。
+ * 跨单位只做计数,不连线;展示单位取 unit_display,不显示 raw OCR 单位。
  */
 export function selectSeries(
   points: TrendPoint[],
@@ -126,8 +138,13 @@ export function selectSeries(
   const targetUnit = normalizedUnit(unit);
   const sameUnit: TrendPoint[] = [];
   const otherUnitReports = new Set<string>();
+  const unverifiedReports = new Set<string>();
 
   for (const point of points) {
+    if (point.unit_status === 'unverified') {
+      unverifiedReports.add(point.report_id);
+      continue;
+    }
     if (normalizedUnit(point.unit) === targetUnit) {
       sameUnit.push(point);
     } else {
@@ -155,9 +172,16 @@ export function selectSeries(
     listPoints.find((point) => point.report_id === selectedReportId) ??
     dated[dated.length - 1] ??
     listPoints[listPoints.length - 1];
+  const unitDisplayPoint = listPoints.find(
+    (point) => normalizedUnit(point.unit_display) !== null,
+  );
+  const unitDisplay = unitDisplayPoint
+    ? normalizedUnit(unitDisplayPoint.unit_display)
+    : targetUnit;
 
   return {
     unit: targetUnit,
+    unitDisplay,
     listPoints,
     chartPoints,
     undatedCount: listPoints.length - dated.length,
@@ -165,6 +189,7 @@ export function selectSeries(
       (point) => parseNumericForm(point.value).kind !== 'scalar',
     ).length,
     otherUnitCount: otherUnitReports.size,
+    unverifiedCount: unverifiedReports.size,
     totalCount: points.length,
     selectedPoint: selected,
   };
@@ -415,8 +440,8 @@ function buildXLabels(
 }
 
 /**
- * 行元信息:日期范围 + 份数;追加缺日期 / 非数值指标项 / 单位不同(未连线),
- * 三项条件独立。份数按同单位去重后的报告数。
+ * 行元信息:日期范围 + 份数;追加缺日期 / 非数值指标项 / 单位不同(未连线) /
+ * 单位未验证(未连线),四项条件独立。份数按同单位去重后的报告数。
  */
 export function formatSeriesMeta(
   series: TrendSeries,
@@ -447,6 +472,9 @@ export function formatSeriesMeta(
   }
   if (series.otherUnitCount > 0) {
     parts.push(`另有 ${series.otherUnitCount} 份单位不同（未连线）`);
+  }
+  if (series.unverifiedCount > 0) {
+    parts.push(`另有 ${series.unverifiedCount} 份单位未验证（未连线）`);
   }
 
   return parts.join(' · ');

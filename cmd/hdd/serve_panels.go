@@ -97,6 +97,7 @@ func toAPIPanelDetail(detail pipeline.PanelDetail) httpapi.PanelDetail {
 			latest = &point
 		}
 		items = append(items, httpapi.PanelItem{
+			Key:                   item.Key,
 			Name:                  item.Name,
 			Unit:                  item.Unit,
 			RefRange:              item.RefRange,
