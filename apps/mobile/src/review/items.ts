@@ -7,9 +7,9 @@ import type {
   ReportItem,
   ReviewResult,
 } from '../api/reports';
-import { flagReasonText, isBackfillItem, reviewStatusLabel } from './rules';
+import { flagReasonText, isBackfillItem, reviewStatusLabel, unitStatusLabel } from './rules';
 
-export { flagReasonText, isBackfillItem, reviewStatusLabel };
+export { flagReasonText, isBackfillItem, reviewStatusLabel, unitStatusLabel };
 
 /** 核对触发条件(上传返回分岔与详情入口共用):partial、不可忽略的可操作未知项,
  *  或未核对的低置信项;干净 success(全量高置信、无可操作未知)免核对直落;
@@ -81,6 +81,13 @@ function sharesName(canonical: string, candidate: string): boolean {
     commonPrefixLength(canonical, candidate) >= 2 ||
     longestCommonSubstringLength(canonical, candidate) >= 3
   );
+}
+
+/** 展示单位:优先人类可读的 unit_display,缺失时回退归一单位 unit。 */
+export function displayItemUnit(
+  item: Pick<ReportItem, 'unit' | 'unit_display'>,
+): string | null {
+  return item.unit_display ?? item.unit;
 }
 
 /** 展示名:未修正时优先用 raw_text 里印出的中文名称(去掉序号/星号/互认后缀),

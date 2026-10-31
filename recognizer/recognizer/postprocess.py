@@ -17,7 +17,8 @@
 低置信:任一组成行 score < LOW_SCORE_THRESHOLD → 该项 low_confidence 标记保留;
 partial 触发(review 2026-10-12 收敛 + 低置信占比补丁):指标 value 缺失、日期缺失,
 或 **low_confidence 占比 ≥ 50%**(过半指标不可靠 → 整单降级,供人工甄别)。
-单位解析损耗(如 109/L、7/6.0)经单位族规范印形表(unit_families.yaml)归一:
+单位解析损耗(如 109/L、7/6.0)经 OCR 印形修复表(ocr_forms.yaml)归一,真实单位
+等价(如 umol/L、uIU/ml)经单位换算表(unit_conversions.yaml)归一:
 仅当该项词典 units 已注册 canonical 才替换 unit 字段(项上下文裁决),未注册
 印形保留原文;归一只改展示一致性(hdd trend sameUnit/delta),原文留痕在
 raw_text,不改变置信标记(决策 #7)。
@@ -61,8 +62,10 @@ from .dash_recovery import recover_dash_fields
 DICT_DIR = Path(__file__).parent
 DICT_GLOB = "*_dict.yaml"
 
-# 单位族规范印形表(数据文件注册表内,与类别 *_dict.yaml 平行;语义见文件头)
-UNIT_FAMILIES_FILE = DICT_DIR / "unit_families.yaml"
+# 单位归一数据源(与类别 *_dict.yaml 平行;语义见各文件头):真实单位换算表只收
+# 真实单位/等价/系数/方程,OCR 印形修复表只收字形损耗;同一 form 不得两表混放。
+UNIT_CONVERSIONS_FILE = DICT_DIR / "unit_conversions.yaml"
+OCR_FORMS_FILE = DICT_DIR / "ocr_forms.yaml"
 
 # 定性比较策略(与 Go 数据服务共读;只含比较规则,不含 OCR 别名/单位)
 FLAG_POLICY_FILE = DICT_DIR / "flag_policy.yaml"
@@ -890,21 +893,96 @@ def _numeric_candidate(raw_text: str, piece: "_RowPiece") -> bool:
     return False
 
 
-@lru_cache(maxsize=1)
-def load_unit_families() -> dict[str, tuple[str, ...]]:
-    """单位族规范印形表:单位字面(小写)→ 候选规范印形列表;载入一次缓存。
+# 已知真实单位原子:前缀 + 单位/分母;新增真实单位(含 UCUM 写法)时显式扩展。
+# OCR 损耗形(数字混入字母、~、)、空格、前导 *、未登记原子)不在此列。
+_UNIT_ATOM = (
+    r"(?:[fpnumcdkMμµ]?L|[fpnumcdkMμµ]?l|g|mg|ng|pg|ug|mol|mmol|umol|μmol|pmol|nmol|"
+    r"IU|mIU|uIU|U|s|min|h|%)"
+)
+_REAL_UNIT_RE = re.compile(rf"^(?:10[\^*]\d+/)?(?:{_UNIT_ATOM}|1)(?:/{_UNIT_ATOM})?$")
+_CONVERSION_TYPES = frozenset({"exact", "linear", "equation"})
 
-    数据文件 unit_families.yaml(证据规则见文件头);与 *_dict.yaml 类别注册表
-    相互独立——单位家族是跨类别的字形级事实(印形/损耗),类别词典只负责
-    「该项合法单位集」的注册与裁决。
+
+def _validate_conversion(unit: str, canonical: str, raw: dict | None) -> None:
+    """真实替代单位必须有可追溯的换算声明(exact/linear/equation)。
+
+    exact = spec §4.2 精确等值(直接归一);none 不是换算,不进入本表。
+    linear 方向固定为 accepted unit × factor = canonical,from/to 必须与数据一致。
     """
-    raw = yaml.safe_load(UNIT_FAMILIES_FILE.read_text(encoding="utf-8"))
+    if not raw:
+        raise ValueError(f"unit {unit!r}: missing conversion")
+    kind = raw.get("type")
+    if kind not in _CONVERSION_TYPES:
+        raise ValueError(f"unit {unit!r}: unknown conversion type {kind!r}")
+    if not raw.get("source"):
+        raise ValueError(f"unit {unit!r}: missing conversion source")
+    if kind == "linear":
+        if not isinstance(raw.get("factor"), (int, float)):
+            raise ValueError(f"unit {unit!r}: linear conversion missing factor")
+        if raw.get("from") != unit or raw.get("to") != canonical:
+            raise ValueError(
+                f"unit {unit!r}: linear conversion from/to must be"
+                f" {unit!r} → {canonical!r}"
+            )
+    if kind == "equation" and not (raw.get("id") and raw.get("formula")):
+        raise ValueError(f"unit {unit!r}: equation conversion missing id/formula")
+
+
+def _unit_form_map(
+    conversions: dict, ocr_forms: dict
+) -> dict[str, tuple[str, ...]]:
+    """合并两张职责单一的单位表:真实单位换算 + OCR 印形修复。
+
+    换算表只收真实单位(保守语法见 _REAL_UNIT_RE);OCR 表不得出现真实单位,
+    同一字符串不得同时出现在两表;OCR 族的 canonical 必须是已登记真实单位。
+    返回值:小写 form → canonical 列表(同一 form 可属多族,归一时由该项注册集
+    裁决,见 _normalize_unit)。
+    """
     out: dict[str, list[str]] = {}
-    for fam in raw["families"]:
-        canon = str(fam["canonical"])
-        for form in fam["forms"]:
-            out.setdefault(str(form).strip().lower(), []).append(canon)
-    return {k: tuple(v) for k, v in out.items()}
+    real_units: set[str] = set()
+    for entry in conversions["units"]:
+        canonical = str(entry["canonical"]).strip()
+        if not _REAL_UNIT_RE.fullmatch(canonical):
+            raise ValueError(f"not a real unit: {canonical!r}")
+        real_units.add(canonical.lower())
+        for equivalent in entry.get("equivalents") or ():
+            unit = str(equivalent["unit"]).strip()
+            if not _REAL_UNIT_RE.fullmatch(unit):
+                raise ValueError(f"not a real unit: {unit!r}")
+            _validate_conversion(unit, canonical, equivalent.get("conversion"))
+            real_units.add(unit.lower())
+            out.setdefault(unit.lower(), []).append(canonical)
+    for family in ocr_forms["families"]:
+        canonical = str(family["canonical"]).strip()
+        if canonical.lower() not in real_units:
+            raise ValueError(f"OCR canonical {canonical!r} is not a real unit")
+        for raw_form in family["forms"]:
+            form = str(raw_form).strip()
+            if form.lower() in real_units:
+                raise ValueError(
+                    f"OCR form {form!r} appears in both tables;"
+                    " real units belong in unit_conversions.yaml"
+                )
+            if _REAL_UNIT_RE.fullmatch(form):
+                raise ValueError(
+                    f"OCR form {form!r} is a real unit;"
+                    " real units belong in unit_conversions.yaml"
+                )
+            out.setdefault(form.lower(), []).append(canonical)
+    return {form: tuple(canonicals) for form, canonicals in out.items()}
+
+
+@lru_cache(maxsize=1)
+def load_unit_forms() -> dict[str, tuple[str, ...]]:
+    """单位归一表:单位字面(小写)→ 候选规范印形列表;载入一次缓存。
+
+    同时加载 unit_conversions.yaml(真实单位等价)与 ocr_forms.yaml(OCR 印形
+    修复);与 *_dict.yaml 类别注册表相互独立——单位表是跨类别的字形/量纲事实,
+    类别词典只负责「该项合法单位集」的注册与裁决。
+    """
+    conversions = yaml.safe_load(UNIT_CONVERSIONS_FILE.read_text(encoding="utf-8"))
+    ocr_forms = yaml.safe_load(OCR_FORMS_FILE.read_text(encoding="utf-8"))
+    return _unit_form_map(conversions, ocr_forms)
 
 
 def _clean_unit_text(text: str) -> str:
@@ -932,7 +1010,7 @@ def _unit_match(text: str, d: LabDict) -> str | None:
     lower = s.lower()
     registered = {u.lower() for u in d.unit_literals}
     candidates = set(d.unit_literals)
-    for form, canons in load_unit_families().items():
+    for form, canons in load_unit_forms().items():
         if any(canon.lower() in registered for canon in canons):
             candidates.add(form)
     for lit in sorted(candidates, key=len, reverse=True):
@@ -956,7 +1034,7 @@ def _unit_or_none(text: str, d: LabDict) -> str | None:
 
 
 def _normalize_unit(unit: str | None, item: DictItem | None) -> str | None:
-    """印刷单位 → 家族规范印形(unit_families.yaml;展示一致性归一)。
+    """印刷单位 → 单位归一表的规范印形(unit_conversions / ocr_forms;展示一致性归一)。
 
     仅当该项词典 units 已注册 canonical 才替换(如 f1 对 fL 注册项 → fL、
     对 10^9 家族注册项不生效);未注册印形或无词典项 → 原文保留,不猜。
@@ -965,7 +1043,7 @@ def _normalize_unit(unit: str | None, item: DictItem | None) -> str | None:
     if unit is None:
         return None
     unit = _clean_unit_text(unit)
-    cands = load_unit_families().get(unit.lower())
+    cands = load_unit_forms().get(unit.lower())
     if cands and item is not None:
         for canon in cands:
             if canon.lower() in item.units:

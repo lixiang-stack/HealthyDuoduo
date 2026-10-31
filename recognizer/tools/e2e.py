@@ -718,12 +718,12 @@ def verify(item: str, from_root: Path) -> None:
     from recognizer.postprocess import (
         BODY_SECTION_KINDS,
         load_dicts,
-        load_unit_families,
+        load_unit_forms,
     )
 
     families = (
-        load_unit_families()
-    )  # 表内同为注册印形与损耗形,归一目标见 unit_families.yaml
+        load_unit_forms()
+    )  # 表内含真实单位等价与 OCR/印刷损耗形,归一目标见 unit_conversions.yaml / ocr_forms.yaml
     registered = {
         it.name: {u.lower() for u in it.units} for d in load_dicts() for it in d.items
     }

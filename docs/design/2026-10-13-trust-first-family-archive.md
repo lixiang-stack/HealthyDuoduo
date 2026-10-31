@@ -21,7 +21,7 @@
 
 - [ ] **家长真的会核对**（灵魂假设）— M1 后观察自家第一次真实上传的核对行为；错了则降级为需求文档已有的「查看图像提醒」。
 - [ ] **大部分核对机会发生在纸还在手上时** — 回顾自家过去半年检查单的实际拍照场景（在家拍 vs 医院拍完当天回家）；错了则核对延迟数天，体验打折但不死。
-- [ ] **同名指标跨院可经单位门控/换算得到可信趋势** — 拿自家两个医院的真实同名指标实测 `unit_families` 覆盖度；错了则趋势分段不连线，只展示。
+- [ ] **同名指标跨院可经单位门控/换算得到可信趋势** — 拿自家两个医院的真实同名指标实测单位归一表（`unit_conversions` / `ocr_forms`）覆盖度；错了则趋势分段不连线，只展示。
 - [ ] **同步识别 <3s 在手机 Wi-Fi 上的等待体验可接受** — 机器侧 NF-04 已证，人侧在 M1 验证环境实测。
 - [ ] **成员最小模型（名字 + 排序 + 是否孩子）撑得起一期** — 上传归属与首页卡片够用即可。
 
@@ -62,6 +62,6 @@
 
 - **域规则**：空 `items` ⇒ `failed`（识别端保证的不变量）；`failed` 不进「待核对」计数，出口 = 重拍新报告、老报告留痕沉底。核对状态机 = 决策可重复（每次修正 append 修正对）、无撤销、报告状态派生单调（partial→success 单向，success/failed 恒定）；确认不产生记录。修正字段集 = value / unit / name / ref_range 四个纸面事实，`flag` 服务端按 value×ref_range 重算、不接受手改；详情页**任意项**可修正（免核对 ≠ 不可修改）；`report_items` 永远装最终生效值、修正对 append-only（ADR-0005）。成员最小模型 = 显示名 + 是否孩子；一份报告恰好归属一个成员；改归属/删除报告进 P0（并入 M1）。
 - **契约**：HTTP 契约载体 = OpenAPI 3.1（`schemas/openapi.yaml`，`$ref` 复用识别端 schema）；API 面 12 端点定稿（`/api/v1` 前缀、item 用 BIGSERIAL `item_id` 不透明句柄、sha256 命中幂等返回 `duplicate:true`、新增 `fail_reason` 列、`--force` 对已核对报告 409）；`ocr_lines` 内嵌详情响应。M0 收缩 = 新增 migrations（member / 核对状态 / 修正对 / `fail_reason`）+ OpenAPI + HTTP fixtures，**识别端契约与存量 golden 不动**。
-- **趋势与 B2**：连接键 = 规范名 + 归一单位；Δ 基线 = 同键内 `report_date` 严格更早的最近一份（无日期/仅同日不显示）；跨单位族点段本期不连线、不提示——印形归一（`unit_families`）在 ingest 已完成，无运行时换算、无系数表，留给未来真实需求驱动。新增风险登记：跨院 alias 覆盖率 M4 前实测（真实双院数据），低则补词典 alias，不做模糊匹配。
+- **趋势与 B2**：连接键 = 规范名 + 归一单位；Δ 基线 = 同键内 `report_date` 严格更早的最近一份（无日期/仅同日不显示）；跨单位族点段本期不连线、不提示——印形归一（`unit_conversions` / `ocr_forms`）在 ingest 已完成，无运行时换算、无系数表，留给未来真实需求驱动。新增风险登记：跨院 alias 覆盖率 M4 前实测（真实双院数据），低则补词典 alias，不做模糊匹配。
 - **部署与配对**：`hdd serve` 单二进制子命令（复用 `deps` 编排层；compose 已有 postgres/seaweedfs/recognizer，仅缺 hdd 服务）；**Mac（arm64）= 开发验证实例（M1）**、**NAS（amd64）= 家庭常驻实例（M2）**，同一份 compose 两处复用、镜像双架构；DHCP 保留 IP → 配对二维码 = 纯 URL 常量（ADR-0006）。Expo Go 只验「前台重试」语义，dev client 与后台静默续传为 M2 加分项非门禁。
 - **环境事实勘误（拷问中核实）**：`report_items.value` 已为 TEXT（`migrations/0002_item_value_to_text.sql`），`method` 列已存在（`0003_item_method.sql`）——需求文档对 value 字符串原样的依赖无存储障碍。

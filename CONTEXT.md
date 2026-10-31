@@ -33,7 +33,7 @@ _Avoid_: 报告类型、单据类型
 _Avoid_: 病理标签、系统标签、检查大项、分类标签
 
 **指标项**：
-报告中单个检验指标，属于一个项目组：名称、数值、单位、参考范围与标记（normal/high/low/abnormal/unknown/not_tested）。high/low 只表示有方向的数值异常，abnormal 只表示无方向的定性异常；单位取词典注册的规范印形（unit_families.yaml 归一；未注册印形保留原文）。识别端词典给出的名称是规范名；展示优先使用原文印名（raw_text 中的名称），规范名用于趋势连接；家长修正后以修正值为准。
+报告中单个检验指标，属于一个项目组：名称、数值、单位、参考范围与标记（normal/high/low/abnormal/unknown/not_tested）。high/low 只表示有方向的数值异常，abnormal 只表示无方向的定性异常；单位取词典注册的规范印形（`unit_conversions.yaml` / `ocr_forms.yaml` 归一；未注册印形保留原文）。识别端词典给出的名称是规范名；展示优先使用原文印名（raw_text 中的名称），规范名用于趋势连接；家长修正后以修正值为准。
 _Avoid_: 项目、字段
 
 **异常指标**：

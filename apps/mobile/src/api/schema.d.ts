@@ -392,8 +392,9 @@ export interface components {
         ReviewStatus: "unreviewed" | "confirmed" | "corrected";
         /**
          * @description 单个指标项的 HTTP 形状。name/value/unit/ref_range/method/flag/low_confidence/
-         *     raw_text 八字段与识别端 schemas/report.schema.json 的 reportItem 逐字段同源
-         *     (该 schema additionalProperties:false 已冻结,无法 allOf 扩展,故此处镜像;
+         *     raw_text 以及标准层字段 code/loinc/unit_display/unit_status/raw_*\/ref_kind/
+         *     result_kind/result_basis 与识别端 schemas/report.schema.json 的 reportItem 逐字段
+         *     同源(该 schema additionalProperties:false 已冻结,无法 allOf 扩展,故此处镜像;
          *     互证测试锁死共享字段子树逐字节相等,防两份定义漂移);后四项为 HTTP 侧扩展
          *     (item_id / review_status / ocr_lines / prev)。
          */
@@ -411,6 +412,38 @@ export interface components {
             ref_range: string | null;
             /** @description 检测方法/实验方法列原样(如 '化学发光法');无该列或解析失败为 null */
             method: string | null;
+            /** @description WS/T 886 标准码;未迁移/无标准码为 null */
+            code?: string | null;
+            /** @description LOINC 码;无 exact 码为 null */
+            loinc?: string | null;
+            /** @description 人类可读展示单位(UI 优先);缺失时回退 unit */
+            unit_display?: string | null;
+            /**
+             * @description 单位核验状态;verified 仅当词典项 review_status=approved
+             * @enum {unknown}
+             */
+            unit_status?: "verified" | "unverified" | null;
+            /** @description 单据原文数值(换算前);识别端未产出为 null */
+            raw_value?: string | null;
+            /** @description 单据原文单位(归一/换算前);识别端未产出为 null */
+            raw_unit?: string | null;
+            /** @description 单据原文参考范围(换算前);识别端未产出为 null */
+            raw_ref_range?: string | null;
+            /**
+             * @description 参考范围类型;本期未分类为 null
+             * @enum {unknown}
+             */
+            ref_kind?: "numeric" | "qualitative" | "ordinal" | "tiered" | "none" | null;
+            /**
+             * @description 结果类型;未迁移词典为 null
+             * @enum {unknown}
+             */
+            result_kind?: "quantitative" | "ratio" | "arbitrary" | "titer" | "qualitative" | "microscopy" | null;
+            /**
+             * @description 结果基准(D-二聚体 FEU/DDU);其他为 null
+             * @enum {unknown}
+             */
+            result_basis?: "FEU" | "DDU" | null;
             /**
              * @description 值 vs 参考范围比较结果;high/low 只用于有方向的数值异常,abnormal 只用于无方向的定性异常,unknown 表示本应能比较但失败/暂不支持,not_tested 表示本次检查未做该项(结果与参考均为裸短横)
              * @enum {unknown}

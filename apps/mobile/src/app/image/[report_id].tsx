@@ -20,7 +20,7 @@ import { colors } from '../../components/theme';
 import { FLAG_COLORS } from '../../reports/colors';
 import { itemFlagLabel, refRangeLabel } from '../../reports/status';
 import { useReportData } from '../../reports/useReportData';
-import { displayItemName } from '../../review/items';
+import { displayItemName, displayItemUnit } from '../../review/items';
 
 /** 原图定位视口高(px):约占半屏,行文可读到字级。 */
 const FOCUS_IMAGE_HEIGHT = 420;
@@ -47,6 +47,7 @@ export default function ReportImageScreen() {
         ) ?? report.items.find((candidate) => candidate.name === name))
       : undefined;
   const itemDisplayName = item ? displayItemName(item) : undefined;
+  const itemDisplayUnit = item ? displayItemUnit(item) : null;
   const hasFocus = item !== undefined && item.ocr_lines.length > 0;
   const focusItem = hasFocus ? item : undefined;
 
@@ -139,7 +140,7 @@ export default function ReportImageScreen() {
                 <View style={styles.valueRow}>
                   <Text style={[styles.value, { color: FLAG_COLORS[item.flag] }]}>
                     {item.value ?? '—'}
-                    {item.unit ? <Text style={styles.unit}> {item.unit}</Text> : null}
+                    {itemDisplayUnit ? <Text style={styles.unit}> {itemDisplayUnit}</Text> : null}
                   </Text>
                   <Text style={sharedStyles.muted}>{refRangeLabel(item.ref_range)}</Text>
                 </View>

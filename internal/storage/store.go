@@ -30,6 +30,11 @@ func (s *Store) SetFlagPolicy(policy *pipeline.FlagPolicy) { s.flagPolicy = poli
 // Close 关闭连接池。
 func (s *Store) Close() { s.pool.Close() }
 
+// reportItemStandardColumnsSQL 标准层列(票 01);三处读取与插入共用同一顺序,
+// 与 reportItemStandardDest 的扫描顺序一致。
+const reportItemStandardColumnsSQL = `code, loinc, unit_display, unit_status,
+	   raw_value, raw_unit, raw_ref_range, ref_kind, result_kind, result_basis`
+
 // 语义化 SQL 常量;占位仅传参,未拼接任何用户值(无注入面)。
 const (
 	sqlImageBySHA256 = `SELECT sha256, original_filename
@@ -74,7 +79,8 @@ const (
 		 WHERE r.report_type = $1 AND date_trunc('year', r.report_date) = date_trunc('year', $2::date)
 		 ORDER BY r.report_date DESC NULLS LAST, r.image_sha256 ASC`
 
-	sqlItemsByReport = `SELECT name, panel, value, unit, ref_range, method, flag, flag_reason, low_confidence, raw_text
+	sqlItemsByReport = `SELECT name, panel, value, unit, ref_range, method, flag, flag_reason, low_confidence, raw_text, ` +
+		reportItemStandardColumnsSQL + `
 		 FROM report_items WHERE report_sha256 = $1 ORDER BY id`
 
 	// trend:同一指标项名(report_items.name = 词典规范名)的跨报告时序点,升序;
@@ -117,7 +123,7 @@ const (
 	// 指标项含外部句柄与核对状态(上传响应回读;行序 = id 升序与写入序一致)。
 	// ocr_line_numbers 存量行可为 NULL(0005 前入库),COALESCE 归空数组。
 	sqlItemsWithReviewStatus = `SELECT id, name, panel, value, unit, ref_range, method, flag, flag_reason, low_confidence, raw_text, review_status,
-		   COALESCE(ocr_line_numbers, '{}')
+		   COALESCE(ocr_line_numbers, '{}'), ` + reportItemStandardColumnsSQL + `
 		 FROM report_items WHERE report_sha256 = $1 ORDER BY id`
 
 	// 报告所用 OCR 结果(详情行链接回读,票 07;reports.ocr_result_id 指向生成该报告的识别历史行)。
@@ -164,7 +170,7 @@ const (
 
 	// 单指标项按报告内身份取行(核对动作前读;id 与报告不匹配即不存在)。
 	sqlItemForReview = `SELECT id, name, panel, value, unit, ref_range, method, flag, flag_reason, low_confidence, raw_text, review_status,
-		   COALESCE(ocr_line_numbers, '{}')
+		   COALESCE(ocr_line_numbers, '{}'), ` + reportItemStandardColumnsSQL + `
 		 FROM report_items WHERE report_sha256 = $1 AND id = $2`
 
 	sqlItemReviewConfirm = `UPDATE report_items SET review_status = 'confirmed' WHERE id = $1`
@@ -173,7 +179,10 @@ const (
 		 WHERE id = $1`
 
 	sqlItemReviewCorrect = `UPDATE report_items SET name = $2, value = $3, unit = $4, ref_range = $5, flag = $6,
-		   flag_reason = $7, review_status = 'corrected' WHERE id = $1`
+		   flag_reason = $7,
+		   unit_display = CASE WHEN $8 THEN NULL ELSE unit_display END,
+		   unit_status = CASE WHEN $8 THEN NULL ELSE unit_status END,
+		   review_status = 'corrected' WHERE id = $1`
 
 	// 修正对 append-only(ADR-0005;before→after 四项纸面事实全集 + 原始行文 + OCR 行号)。
 	sqlCorrectionPairInsert = `INSERT INTO correction_pairs
@@ -219,8 +228,9 @@ const (
 	sqlItemsDeleteByReport = `DELETE FROM report_items WHERE report_sha256 = $1`
 
 	sqlItemInsert = `INSERT INTO report_items
-		 (report_sha256, name, panel, value, unit, ref_range, method, flag, flag_reason, low_confidence, raw_text, ocr_line_numbers)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`
+		 (report_sha256, name, panel, value, unit, ref_range, method, flag, flag_reason, low_confidence, raw_text, ocr_line_numbers,
+		  ` + reportItemStandardColumnsSQL + `)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)`
 
 	// 成员(迁移 0004;显示名 + 是否孩子两档):列表按 id 升序 = 创建序返回;
 	// 删除时先删该成员报告再删成员(单事务;原图与 OCR 历史保留)。
@@ -363,12 +373,22 @@ func (s *Store) ItemsByImage(ctx context.Context, reportSha string) ([]contract.
 	var items []contract.ReportItem
 	for rows.Next() {
 		var it contract.ReportItem
-		if err := rows.Scan(&it.Name, &it.Panel, &it.Value, &it.Unit, &it.RefRange, &it.Method, &it.Flag, &it.FlagReason, &it.LowConfidence, &it.RawText); err != nil {
+		dests := []any{&it.Name, &it.Panel, &it.Value, &it.Unit, &it.RefRange, &it.Method, &it.Flag, &it.FlagReason, &it.LowConfidence, &it.RawText}
+		if err := rows.Scan(append(dests, reportItemStandardDest(&it)...)...); err != nil {
 			return nil, err
 		}
 		items = append(items, it)
 	}
 	return items, rows.Err()
+}
+
+// reportItemStandardDest 标准层列扫描目标(顺序与 reportItemStandardColumnsSQL 一致)。
+func reportItemStandardDest(it *contract.ReportItem) []any {
+	return []any{
+		&it.Code, &it.Loinc, &it.UnitDisplay, &it.UnitStatus,
+		&it.RawValue, &it.RawUnit, &it.RawRefRange, &it.RefKind,
+		&it.ResultKind, &it.ResultBasis,
+	}
 }
 
 // AllReportsForBackfill 存量回填扫描(票 05):报告按日期降序、dateless 沉底、sha 升序;
@@ -559,8 +579,9 @@ func (s *Store) ItemsWithReviewStatus(ctx context.Context, reportSha string) ([]
 	var out []pipeline.ReportItemRow
 	for rows.Next() {
 		var it pipeline.ReportItemRow
-		if err := rows.Scan(&it.ItemID, &it.Name, &it.Panel, &it.Value, &it.Unit, &it.RefRange, &it.Method,
-			&it.Flag, &it.FlagReason, &it.LowConfidence, &it.RawText, &it.ReviewStatus, &it.OCRLineNumbers); err != nil {
+		dests := []any{&it.ItemID, &it.Name, &it.Panel, &it.Value, &it.Unit, &it.RefRange, &it.Method,
+			&it.Flag, &it.FlagReason, &it.LowConfidence, &it.RawText, &it.ReviewStatus, &it.OCRLineNumbers}
+		if err := rows.Scan(append(dests, reportItemStandardDest(&it.ReportItem)...)...); err != nil {
 			return nil, err
 		}
 		out = append(out, it)
@@ -646,9 +667,10 @@ func (s *Store) ReviewItem(ctx context.Context, reportSha string, itemID int64, 
 	}
 
 	var current pipeline.ReportItemRow
-	err = tx.QueryRow(ctx, sqlItemForReview, reportSha, itemID).Scan(
-		&current.ItemID, &current.Name, &current.Panel, &current.Value, &current.Unit, &current.RefRange, &current.Method,
-		&current.Flag, &current.FlagReason, &current.LowConfidence, &current.RawText, &current.ReviewStatus, &current.OCRLineNumbers)
+	dests := []any{&current.ItemID, &current.Name, &current.Panel, &current.Value, &current.Unit, &current.RefRange, &current.Method,
+		&current.Flag, &current.FlagReason, &current.LowConfidence, &current.RawText, &current.ReviewStatus, &current.OCRLineNumbers}
+	err = tx.QueryRow(ctx, sqlItemForReview, reportSha, itemID).
+		Scan(append(dests, reportItemStandardDest(&current.ReportItem)...)...)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil // 指标项不存在或不属于该报告
 	} else if err != nil {
@@ -665,7 +687,12 @@ func (s *Store) ReviewItem(ctx context.Context, reportSha string, itemID int64, 
 			return nil, fmt.Errorf("confirm item: %w", err)
 		}
 	} else {
-		if _, err := tx.Exec(ctx, sqlItemReviewCorrect, current.ItemID, next.Name, next.Value, next.Unit, next.RefRange, next.Flag, next.FlagReason); err != nil {
+		unitCorrected := action.Unit != nil
+		if unitCorrected {
+			next.UnitDisplay = nil
+			next.UnitStatus = nil
+		}
+		if _, err := tx.Exec(ctx, sqlItemReviewCorrect, current.ItemID, next.Name, next.Value, next.Unit, next.RefRange, next.Flag, next.FlagReason, unitCorrected); err != nil {
 			return nil, fmt.Errorf("correct item: %w", err)
 		}
 		if _, err := tx.Exec(ctx, sqlCorrectionPairInsert, current.ItemID,
@@ -752,9 +779,11 @@ func (s *Store) WriteReport(ctx context.Context, reportSha string, ocrID int64, 
 		if panel == "" {
 			panel = "other" // 与迁移默认一致:识别端缺失时不留空 code
 		}
-		if _, err := tx.Exec(ctx, sqlItemInsert,
+		if _, err := tx.Exec(ctx, sqlItemInsert, append([]any{
 			reportSha, it.Name, panel, it.Value, it.Unit, it.RefRange, it.Method, it.Flag, it.FlagReason,
-			it.LowConfidence, it.RawText, it.OCRLineNumbers); err != nil {
+			it.LowConfidence, it.RawText, it.OCRLineNumbers,
+		}, it.Code, it.Loinc, it.UnitDisplay, it.UnitStatus, it.RawValue, it.RawUnit,
+			it.RawRefRange, it.RefKind, it.ResultKind, it.ResultBasis)...); err != nil {
 			return fmt.Errorf("write report item %q: %w", it.Name, err)
 		}
 	}

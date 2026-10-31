@@ -15,8 +15,10 @@ Status: in progress（2026-10-31）
 - 新标准 schema 试点：`recognizer/recognizer/coag_dict.yaml` 9 项已迁移（WS/T 886 码 / LOINC / canonical UCUM / accepted units / result_kind / result_basis）。
 - `postprocess.py` loader 支持新字段；`test_dict_coverage.py` 区分 `synonyms`（来源门）与 `ocr_aliases`（语料门）；新增 `test_standard_schema.py`。
 - 非本地 golden 测试：335 passed / 27 skipped；本地 golden 未刷新（既有 panels 漂移）。
+- 票 01：`ReportItem` 标准层字段（code/loinc/unit_display/unit_status/raw_*/ref_kind/result_kind/result_basis）Python/JSON Schema/Go/DB/API/App 全链路透传；识别端产出留待 03+，旧 golden 不变。
+- 票 02：`unit_families.yaml` 拆为 `unit_conversions.yaml` + `ocr_forms.yaml`；loader 合并加载并门禁真实单位/OCR 形混放；单位输出不变。
 
-**Frontier：** `01`、`02`（无阻塞）。建议先做 `02`（单位层拆分，范围小），再做 `01`（契约贯穿），然后 `03`（凝血 tracer bullet）。
+**Frontier：** `03`（凝血 tracer bullet，依赖 01 + 02）；之后按 04–11 逐 panel，12 趋势，13 全量 golden/reparse。
 
 **下一步：**
 

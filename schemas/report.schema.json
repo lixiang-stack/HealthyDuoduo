@@ -102,6 +102,46 @@
           "type": ["string", "null"],
           "description": "检测方法/实验方法列原样(如 '化学发光法');无该列或解析失败为 null"
         },
+        "code": {
+          "type": ["string", "null"],
+          "description": "WS/T 886 标准码;未迁移/无标准码为 null"
+        },
+        "loinc": {
+          "type": ["string", "null"],
+          "description": "LOINC 码;无 exact 码为 null"
+        },
+        "unit_display": {
+          "type": ["string", "null"],
+          "description": "人类可读展示单位(UI 优先);缺失时回退 unit"
+        },
+        "unit_status": {
+          "enum": ["verified", "unverified", null],
+          "description": "单位核验状态;verified 仅当词典项 review_status=approved"
+        },
+        "raw_value": {
+          "type": ["string", "null"],
+          "description": "单据原文数值(换算前);识别端未产出为 null"
+        },
+        "raw_unit": {
+          "type": ["string", "null"],
+          "description": "单据原文单位(归一/换算前);识别端未产出为 null"
+        },
+        "raw_ref_range": {
+          "type": ["string", "null"],
+          "description": "单据原文参考范围(换算前);识别端未产出为 null"
+        },
+        "ref_kind": {
+          "enum": ["numeric", "qualitative", "ordinal", "tiered", "none", null],
+          "description": "参考范围类型;本期未分类为 null"
+        },
+        "result_kind": {
+          "enum": ["quantitative", "ratio", "arbitrary", "titer", "qualitative", "microscopy", null],
+          "description": "结果类型;未迁移词典为 null"
+        },
+        "result_basis": {
+          "enum": ["FEU", "DDU", null],
+          "description": "结果基准(D-二聚体 FEU/DDU);其他为 null"
+        },
         "flag": {
           "enum": ["normal", "high", "low", "abnormal", "unknown", "not_tested"],
           "description": "值 vs 参考范围比较结果;high/low 只用于有方向的数值异常,abnormal 只用于无方向的定性异常,unknown 表示本应能比较但失败/暂不支持,not_tested 表示本次检查未做该项(结果与参考均为裸短横)"

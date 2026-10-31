@@ -19,8 +19,8 @@
 #   items          指标项:name=规范名 aliases=别名与缩写 units=已知单位集
 #
 # units 为维护者核对用的已知单位字面量(大小写不敏感比较;匹配语义);
-# 印刷后的展示归一见 recognizer/unit_families.yaml(损耗形如 109/L、7/6.0
-# 经项注册集裁决收敛到规范印形;未注册印形保留原文,详见 postprocess)。
+# 印刷后的展示归一见 recognizer/unit_conversions.yaml / ocr_forms.yaml(损耗形如
+# 109/L、7/6.0 经项注册集裁决收敛到规范印形;未注册印形保留原文,详见 postprocess)。
 report_type: 临检
 category:
   title_keywords: ["血常规", "血细胞分析", "血液细胞"]

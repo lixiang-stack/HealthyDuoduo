@@ -86,6 +86,21 @@ func TestUnmarshalReportFixture(t *testing.T) {
 	if item.Method == nil || *item.Method != "化学发光法" {
 		t.Errorf("Item.Method = %v, want \"化学发光法\"", item.Method)
 	}
+	if item.Code == nil || *item.Code != "0100401A" || item.Loinc == nil || *item.Loinc != "718-7" {
+		t.Errorf("Item code/loinc = %v/%v", item.Code, item.Loinc)
+	}
+	if item.UnitDisplay == nil || *item.UnitDisplay != "g/L" || item.UnitStatus == nil || *item.UnitStatus != "verified" {
+		t.Errorf("Item unit_display/unit_status = %v/%v", item.UnitDisplay, item.UnitStatus)
+	}
+	if item.RawValue == nil || *item.RawValue != "128" || item.RawUnit == nil || *item.RawUnit != "g/L" || item.RawRefRange == nil || *item.RawRefRange != "115-150" {
+		t.Errorf("Item raw_* = %v/%v/%v", item.RawValue, item.RawUnit, item.RawRefRange)
+	}
+	if item.RefKind == nil || *item.RefKind != "numeric" || item.ResultKind == nil || *item.ResultKind != "quantitative" {
+		t.Errorf("Item ref_kind/result_kind = %v/%v", item.RefKind, item.ResultKind)
+	}
+	if item.ResultBasis != nil {
+		t.Errorf("Item.ResultBasis = %v, want nil (非 D-二聚体)", item.ResultBasis)
+	}
 	if item.RawText != "血红蛋白 128 g/L 115-150" {
 		t.Errorf("Item.RawText = %q", item.RawText)
 	}
@@ -156,6 +171,45 @@ func TestReportSchemaRequiredFieldsMirrorGoStructs(t *testing.T) {
 			t.Fatalf("%s: schema required list is empty (schema shape changed?)", c.name)
 		}
 		assertRequiredJSONFields(t, c.name, c.typ, c.required)
+	}
+}
+
+// TestReportItemJSONFieldsMatchSchema 字段集合双向锁定:Go struct 的 JSON 字段名
+// 必须与 report.schema.json reportItem.properties 完全一致(多/少/改名即失败)。
+func TestReportItemJSONFieldsMatchSchema(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "schemas", "report.schema.json"))
+	if err != nil {
+		t.Fatalf("read report schema: %v", err)
+	}
+	var schema struct {
+		Defs map[string]struct {
+			Properties map[string]any `json:"properties"`
+		} `json:"$defs"`
+	}
+	if err := json.Unmarshal(data, &schema); err != nil {
+		t.Fatalf("unmarshal report schema: %v", err)
+	}
+	want := make(map[string]bool, len(schema.Defs["reportItem"].Properties))
+	for name := range schema.Defs["reportItem"].Properties {
+		want[name] = true
+	}
+	typ := reflect.TypeOf(ReportItem{})
+	got := make(map[string]bool, typ.NumField())
+	for i := 0; i < typ.NumField(); i++ {
+		tag := strings.Split(typ.Field(i).Tag.Get("json"), ",")[0]
+		if tag != "" && tag != "-" {
+			got[tag] = true
+		}
+	}
+	for name := range want {
+		if !got[name] {
+			t.Errorf("ReportItem missing JSON field %q", name)
+		}
+	}
+	for name := range got {
+		if !want[name] {
+			t.Errorf("ReportItem has unmirrored JSON field %q", name)
+		}
 	}
 }
 
