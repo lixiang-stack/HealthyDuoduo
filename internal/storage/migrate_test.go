@@ -1,6 +1,6 @@
 package storage
 
-// 迁移冒烟:goose 链(0001..0011)应用后 schema 形状符合 M0 契约(票 02)。
+// 迁移冒烟:goose 链(0001..0012)应用后 schema 形状符合 M0 契约(票 02)。
 // 需要真库:设 HDD_TEST_DSN(如 postgres://postgres:smoke@127.0.0.1:55432/postgres)后运行;
 // 未设则整体 Skip——CI 门禁跑 go test ./... 时默认跳过,共享栈验证走 e2e 外环
 // (docs/agents/e2e.md「schemas/迁移」行)。冒烟姿势:一次性 PG 容器 + 本测试。
@@ -31,13 +31,13 @@ func TestMigrationSmokeM0Contract(t *testing.T) {
 		t.Fatalf("migrate: %v", err)
 	}
 
-	// goose 已升到 0011 且幂等(Open 内重复 Migrate 不报错)。
+	// goose 已升到 0012 且幂等(Open 内重复 Migrate 不报错)。
 	var latest int
 	if err := pool.QueryRow(ctx, `SELECT max(version_id) FROM goose_db_version`).Scan(&latest); err != nil {
 		t.Fatalf("read goose version: %v", err)
 	}
-	if latest != 11 {
-		t.Fatalf("goose version = %d, want 11", latest)
+	if latest != 12 {
+		t.Fatalf("goose version = %d, want 12", latest)
 	}
 
 	// reports.sections(0007,ADR-0008):可选报告段落 JSONB,可空(存量/非叙述型 NULL)。
@@ -76,6 +76,24 @@ func TestMigrationSmokeM0Contract(t *testing.T) {
 		}
 		if dataType != "text" || nullable != "YES" {
 			t.Fatalf("flag_reason = %s/%s, want text/YES(非 unknown 为 NULL)", dataType, nullable)
+		}
+	})
+
+	// 0012:标准层字段全部可空 text(旧行 NULL,读取不报错;本期只做透传)。
+	t.Run("report item standard fields columns", func(t *testing.T) {
+		for _, column := range []string{
+			"code", "loinc", "unit_display", "unit_status", "raw_value", "raw_unit",
+			"raw_ref_range", "ref_kind", "result_kind", "result_basis",
+		} {
+			var dataType, nullable string
+			if err := pool.QueryRow(ctx, `SELECT data_type, is_nullable FROM information_schema.columns
+				WHERE table_name='report_items' AND column_name=$1`, column).
+				Scan(&dataType, &nullable); err != nil {
+				t.Fatalf("%s: %v", column, err)
+			}
+			if dataType != "text" || nullable != "YES" {
+				t.Errorf("%s = %s/%s, want text/YES(未产出/存量行 NULL)", column, dataType, nullable)
+			}
 		}
 	})
 

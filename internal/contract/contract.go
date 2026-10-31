@@ -54,7 +54,19 @@ type ReportItem struct {
 	Unit     *string `json:"unit"`
 	RefRange *string `json:"ref_range"`
 	// Method 是检测方法/实验方法列原样(如 '化学发光法');无该列或解析失败为 null。
-	Method        *string `json:"method"`
+	Method *string `json:"method"`
+	// 标准层字段:本期只打通契约/存储/API/App 透传,识别端产出由票 03+ 逐 panel 启用;
+	// nil 时省略(旧 fixture / 未迁移报告逐字节兼容)。
+	Code          *string `json:"code,omitempty"`
+	Loinc         *string `json:"loinc,omitempty"`
+	UnitDisplay   *string `json:"unit_display,omitempty"`
+	UnitStatus    *string `json:"unit_status,omitempty"`
+	RawValue      *string `json:"raw_value,omitempty"`
+	RawUnit       *string `json:"raw_unit,omitempty"`
+	RawRefRange   *string `json:"raw_ref_range,omitempty"`
+	RefKind       *string `json:"ref_kind,omitempty"`
+	ResultKind    *string `json:"result_kind,omitempty"`
+	ResultBasis   *string `json:"result_basis,omitempty"`
 	Flag          string  `json:"flag"`
 	FlagReason    *string `json:"flag_reason,omitempty"`
 	LowConfidence bool    `json:"low_confidence"`

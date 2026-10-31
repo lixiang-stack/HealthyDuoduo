@@ -67,6 +67,46 @@ describe('ReportDetailScreen', () => {
     expect(screen.getByTestId('report-manage-delete')).toBeTruthy();
   });
 
+  it('prefers unit_display and exposes raw unit + unit status in the detail', async () => {
+    useReport(
+      makeReportDetail({
+        items: [
+          makeReportItem({
+            unit: null,
+            unit_display: 'μg/L',
+            raw_value: '440',
+            raw_unit: 'ng/mL',
+            raw_ref_range: '<500',
+            unit_status: 'unverified',
+            value: '440',
+            ref_range: '<500',
+            low_confidence: true,
+          }),
+        ],
+      }),
+    );
+
+    await renderScreen(<ReportDetailScreen />);
+
+    expect(await screen.findByText('μg/L')).toBeTruthy();
+    expect(screen.getByTestId('review-unit-meta-1')).toHaveTextContent(
+      '原文单位 ng/mL · 单位未验证',
+    );
+  });
+
+  it('falls back to unit when unit_display is absent', async () => {
+    useReport(
+      makeReportDetail({
+        items: [makeReportItem({ unit: 'U/L', unit_display: null, unit_status: null })],
+      }),
+    );
+
+    await renderScreen(<ReportDetailScreen />);
+
+    expect(await screen.findByText('U/L')).toBeTruthy();
+    expect(screen.queryByTestId('review-unit-meta-1')).toBeNull();
+  });
+
   it('renders a failed report with its reason and re-upload entry', async () => {
     useReport(
       makeReportDetail({

@@ -88,8 +88,9 @@ type PrevValue struct {
 }
 
 // ReportItem GET /reports/{report_id} 详情中的单个指标项。
-// name/value/unit/ref_range/method/flag/low_confidence/raw_text 与识别端
-// report.schema.json 的 reportItem 同源(互证测试锁死逐字段子树相等);
+// name/value/unit/ref_range/method/flag/low_confidence/raw_text 及标准层字段
+// (code/loinc/unit_display/unit_status/raw_*/ref_kind/result_kind/result_basis)
+// 与识别端 report.schema.json 的 reportItem 同源(互证测试锁死逐字段子树相等);
 // 后四项为 HTTP 侧扩展。
 type ReportItem struct {
 	ItemID        int64         `json:"item_id"` // BIGSERIAL 不透明句柄:重跑识别后全换,非持久主键
@@ -99,6 +100,16 @@ type ReportItem struct {
 	Unit          *string       `json:"unit"`
 	RefRange      *string       `json:"ref_range"`
 	Method        *string       `json:"method"`
+	Code          *string       `json:"code,omitempty"`
+	Loinc         *string       `json:"loinc,omitempty"`
+	UnitDisplay   *string       `json:"unit_display,omitempty"`
+	UnitStatus    *string       `json:"unit_status,omitempty"`
+	RawValue      *string       `json:"raw_value,omitempty"`
+	RawUnit       *string       `json:"raw_unit,omitempty"`
+	RawRefRange   *string       `json:"raw_ref_range,omitempty"`
+	RefKind       *string       `json:"ref_kind,omitempty"`
+	ResultKind    *string       `json:"result_kind,omitempty"`
+	ResultBasis   *string       `json:"result_basis,omitempty"`
 	Flag          string        `json:"flag"`
 	FlagReason    *string       `json:"flag_reason,omitempty"`
 	LowConfidence bool          `json:"low_confidence"`

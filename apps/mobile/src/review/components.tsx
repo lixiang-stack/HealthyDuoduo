@@ -15,11 +15,13 @@ import {
   buildCorrection,
   canMarkNoReference,
   displayItemName,
+  displayItemUnit,
   draftFromItem,
   flagReasonText,
   reviewActions,
   reviewStatusLabel,
   shouldShowZoom,
+  unitStatusLabel,
   type CorrectionDraft,
 } from './items';
 
@@ -54,6 +56,9 @@ export function ReviewItemCard({
   const showZoom = shouldShowZoom(item, { open: zoomOpen, editing });
   const actions = reviewActions(item);
   const displayName = displayItemName(item);
+  const displayUnit = displayItemUnit(item);
+  const rawUnit = item.raw_unit ? `原文单位 ${item.raw_unit}` : null;
+  const unitMeta = [rawUnit, unitStatusLabel(item.unit_status)].filter(Boolean).join(' · ');
 
   const submit = async (request: Parameters<typeof reviewItem>[3]) => {
     setBusy(true);
@@ -99,7 +104,7 @@ export function ReviewItemCard({
       <View style={styles.itemValueRow}>
         <Text style={[styles.itemValue, { color: flagColor }]}>
           {item.value ?? '—'}
-          {item.unit ? <Text style={styles.itemUnit}> {item.unit}</Text> : null}
+          {displayUnit ? <Text style={styles.itemUnit}> {displayUnit}</Text> : null}
         </Text>
         {item.ref_range ? (
           <Text style={styles.itemRef}>参考 {item.ref_range}</Text>
@@ -121,6 +126,11 @@ export function ReviewItemCard({
         />
       ) : null}
       <Text style={styles.itemRaw}>原文:{item.raw_text}</Text>
+      {unitMeta ? (
+        <Text testID={`review-unit-meta-${item.item_id}`} style={styles.itemRaw}>
+          {unitMeta}
+        </Text>
+      ) : null}
       {item.ocr_lines.length > 0 && !editing ? (
         <Pressable
           testID={`review-zoom-toggle-${item.item_id}`}

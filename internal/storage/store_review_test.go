@@ -54,6 +54,11 @@ func TestReviewItemSmoke(t *testing.T) {
 		t.Fatalf("seeded items = %+v, %v", items, err)
 	}
 	lowA, lowB, normal := items[0], items[1], items[2]
+	// 标准层展示/核验字段:未核验单位按 spec §3.2 置 unit=null + 原文保留;
+	// 修正纸面单位后必须清空,避免 App 继续显示旧 unit_display。
+	if _, err := pool.Exec(ctx, `UPDATE report_items SET unit=NULL, unit_display='g/L', unit_status='unverified' WHERE id=$1`, normal.ItemID); err != nil {
+		t.Fatalf("seed standard fields: %v", err)
+	}
 
 	// 确认低置信甲:报告仍 partial、计数 1;无修正对。
 	out, err := st.ReviewItem(ctx, "rev-a", lowA.ItemID, pipeline.ReviewAction{Confirm: true})
@@ -79,14 +84,18 @@ func TestReviewItemSmoke(t *testing.T) {
 		t.Errorf("confirm lowB outcome = %+v, want success/0", out)
 	}
 
-	// 修正高置信项(免核对 ≠ 不可修改):生效值 + flag 服务端重算 + 修正对内容。
+	// 修正高置信项(免核对 ≠ 不可修改):生效值 + 纸面单位 + flag 服务端重算 + 修正对内容。
 	newValue := "300"
-	out, err = st.ReviewItem(ctx, "rev-a", normal.ItemID, pipeline.ReviewAction{Value: &newValue})
+	newUnit := "g/L"
+	out, err = st.ReviewItem(ctx, "rev-a", normal.ItemID, pipeline.ReviewAction{Value: &newValue, Unit: &newUnit})
 	if err != nil || out == nil {
 		t.Fatalf("correct = %+v, %v", out, err)
 	}
 	if *out.Item.Value != "300" || out.Item.Flag != "high" || out.Item.ReviewStatus != pipeline.ReviewStatusCorrected {
 		t.Errorf("corrected outcome item = %+v, want 300/high/corrected", out.Item)
+	}
+	if out.Item.UnitDisplay != nil || out.Item.UnitStatus != nil {
+		t.Errorf("corrected outcome unit meta = %v/%v, want nil(本轮已清空)", out.Item.UnitDisplay, out.Item.UnitStatus)
 	}
 	if out.Status != "success" || out.UnreviewedLowConfidenceCount != 0 {
 		t.Errorf("correct outcome = %+v, want success 恒定", out)
@@ -98,6 +107,14 @@ func TestReviewItemSmoke(t *testing.T) {
 	}
 	if dbValue != "300" || dbFlag != "high" || dbStatus != "corrected" {
 		t.Errorf("db row = %s/%s/%s, want 300/high/corrected", dbValue, dbFlag, dbStatus)
+	}
+	var dbDisplay, dbUnitStatus *string
+	if err := pool.QueryRow(ctx, `SELECT unit_display, unit_status FROM report_items WHERE id=$1`, normal.ItemID).
+		Scan(&dbDisplay, &dbUnitStatus); err != nil {
+		t.Fatal(err)
+	}
+	if dbDisplay != nil || dbUnitStatus != nil {
+		t.Errorf("unit_display/unit_status after correction = %v/%v, want NULL(纸面修正后旧展示失效)", dbDisplay, dbUnitStatus)
 	}
 	pair := lastCorrectionPair(t, ctx, pool, normal.ItemID)
 	if pair.beforeValue != "128" || pair.afterValue != "300" || pair.beforeRef != "115-150" || pair.afterRef != "115-150" {

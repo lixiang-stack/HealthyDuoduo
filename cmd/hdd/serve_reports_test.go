@@ -380,7 +380,9 @@ func sampleUploadReport() *contract.Report {
 		Panels:     []string{"cbc"},
 		Items: []contract.ReportItem{
 			{Name: "单核细胞比率", Panel: "cbc", Value: &v1, Unit: &u1, RefRange: &r1, Flag: "high", LowConfidence: true,
-				RawText: "单核细胞百分比  10.8  ↑ %  3-10", OCRLineNumbers: []int32{1, 2, 3, 4}},
+				RawText: "单核细胞百分比  10.8  ↑ %  3-10", OCRLineNumbers: []int32{1, 2, 3, 4},
+				Loinc: str("5905-5"), UnitDisplay: str("%"),
+				RawValue: &v1, RawUnit: &u1, RawRefRange: &r1, RefKind: str("numeric"), ResultKind: str("quantitative")},
 			{Name: "血红蛋白", Panel: "cbc", Value: &v2, Unit: &u2, RefRange: &r2, Flag: "normal",
 				RawText: "血红蛋白  128  g/L  115-150", OCRLineNumbers: []int32{9, 10, 11, 12}},
 		},
@@ -1033,6 +1035,10 @@ func TestServeGetReportDetail(t *testing.T) {
 	}
 	if first.Prev != nil {
 		t.Errorf("prev = %+v, want null (M3 填充面)", first.Prev)
+	}
+	if first.Loinc == nil || *first.Loinc != "5905-5" || first.UnitDisplay == nil || *first.UnitDisplay != "%" ||
+		first.UnitStatus != nil || first.RawValue == nil || *first.RawValue != "10.8" {
+		t.Errorf("standard fields = %+v, want API 返回并透传", first)
 	}
 
 	// 图像地址:详情 report_id 即图像内容身份,同源可直出(契约 GET /images/{sha256})。

@@ -168,7 +168,11 @@ func TestOpenAPIMirrorsRecognitionItem(t *testing.T) {
 	doc := getOpenAPI(t)
 	httpProps := componentSchema(t, doc, "ReportItem")["properties"].(map[string]any)
 
-	shared := []string{"name", "value", "unit", "ref_range", "method", "flag", "low_confidence", "raw_text"}
+	shared := []string{
+		"name", "value", "unit", "ref_range", "method", "flag", "low_confidence", "raw_text",
+		"code", "loinc", "unit_display", "unit_status", "raw_value", "raw_unit",
+		"raw_ref_range", "ref_kind", "result_kind", "result_basis",
+	}
 	for _, field := range shared {
 		lookup, ok := props[field]
 		if !ok {

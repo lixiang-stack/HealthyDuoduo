@@ -6,6 +6,7 @@ import {
   canMarkNoReference,
   countFlagCounts,
   displayItemName,
+  displayItemUnit,
   draftFromItem,
   flagReasonText,
   isBackfillItem,
@@ -14,6 +15,7 @@ import {
   reviewActions,
   reviewStatusLabel,
   shouldShowZoom,
+  unitStatusLabel,
 } from './items';
 
 // 真实形状的指标项(字段取自 shared stack 样例报告:单核细胞比率低置信 high;
@@ -166,6 +168,24 @@ describe('pendingItems', () => {
     expect(
       pendingItems([item({ item_id: 1, flag: 'not_tested', low_confidence: true })]),
     ).toEqual([]);
+  });
+});
+
+describe('displayItemUnit', () => {
+  it('优先 unit_display,缺失/为 null 时回退 unit', () => {
+    expect(displayItemUnit(item({ unit: 'ng/mL', unit_display: 'μg/L' }))).toBe('μg/L');
+    expect(displayItemUnit(item({ unit: 'U/L', unit_display: null }))).toBe('U/L');
+    expect(displayItemUnit(item({ unit: 'U/L' }))).toBe('U/L');
+    expect(displayItemUnit(item({ unit: null, unit_display: null }))).toBeNull();
+  });
+});
+
+describe('unitStatusLabel', () => {
+  it('verified/unverified 有文案,未产出时为 undefined', () => {
+    expect(unitStatusLabel('verified')).toBe('单位已核验');
+    expect(unitStatusLabel('unverified')).toBe('单位未验证');
+    expect(unitStatusLabel(null)).toBeUndefined();
+    expect(unitStatusLabel(undefined)).toBeUndefined();
   });
 });
 

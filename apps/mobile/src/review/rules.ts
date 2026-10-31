@@ -17,6 +17,18 @@ export function reviewStatusLabel(status: ReportItem['review_status']): string |
   }
 }
 
+/** 单位核验状态文案;识别端未产出该字段时无标签。 */
+export function unitStatusLabel(status: ReportItem['unit_status']): string | undefined {
+  switch (status) {
+    case 'verified':
+      return '单位已核验';
+    case 'unverified':
+      return '单位未验证';
+    default:
+      return undefined;
+  }
+}
+
 /** unknown 卡片的可解释文案:说明发生了什么,并给出下一步提示。 */
 const FLAG_REASON_TEXT: Record<NonNullable<ReportItem['flag_reason']>, { text: string; hint: string }> = {
   ocr_miss: { text: 'OCR 输出里没有可直接配对的完整值/范围', hint: '可修正或查看原图定位' },

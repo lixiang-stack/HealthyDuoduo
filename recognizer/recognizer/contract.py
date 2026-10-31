@@ -198,6 +198,22 @@ class OCRResult(BaseModel):
         return self
 
 
+# ReportItem 可选且为 null 时省略的字段(旧 golden / 未迁移报告逐字节兼容)。
+_OPTIONAL_NULL_FIELDS = (
+    "flag_reason",
+    "code",
+    "loinc",
+    "unit_display",
+    "unit_status",
+    "raw_value",
+    "raw_unit",
+    "raw_ref_range",
+    "ref_kind",
+    "result_kind",
+    "result_basis",
+)
+
+
 class ReportItem(BaseModel):
     """指标项(实施计划 4.2)。"""
 
@@ -214,6 +230,34 @@ class ReportItem(BaseModel):
     unit: str | None = None
     ref_range: str | None = None
     method: str | None = Field(None, description="detection/experimental method as printed")
+    # 标准层字段:本期只打通契约/存储/API/App 透传,识别端输出由票 03+ 逐 panel 启用;
+    # 缺失时序列化省略(旧 golden / 旧报告逐字节兼容)。
+    code: str | None = Field(None, description="WS/T 886 标准码;未迁移/无标准码为 null")
+    loinc: str | None = Field(None, description="LOINC 码;无 exact 码为 null")
+    unit_display: str | None = Field(
+        None, description="人类可读展示单位(UI 优先);缺失时回退 unit"
+    )
+    unit_status: Literal["verified", "unverified"] | None = Field(
+        None, description="单位核验状态;verified 仅当词典项 review_status=approved"
+    )
+    raw_value: str | None = Field(
+        None, description="单据原文数值(换算前);识别端未产出为 null"
+    )
+    raw_unit: str | None = Field(
+        None, description="单据原文单位(归一/换算前);识别端未产出为 null"
+    )
+    raw_ref_range: str | None = Field(
+        None, description="单据原文参考范围(换算前);识别端未产出为 null"
+    )
+    ref_kind: Literal["numeric", "qualitative", "ordinal", "tiered", "none"] | None = Field(
+        None, description="参考范围类型;本期未分类为 null"
+    )
+    result_kind: Literal[
+        "quantitative", "ratio", "arbitrary", "titer", "qualitative", "microscopy"
+    ] | None = Field(None, description="结果类型;未迁移词典为 null")
+    result_basis: Literal["FEU", "DDU"] | None = Field(
+        None, description="结果基准(D-二聚体 FEU/DDU);其他为 null"
+    )
     flag: Flag
     flag_reason: FlagReason | None = Field(
         None, description="unknown 的原因;normal/high/low/abnormal 为 None"
@@ -226,12 +270,13 @@ class ReportItem(BaseModel):
     )
 
     @model_serializer(mode="wrap")
-    def _omit_null_flag_reason(self, handler):
-        # flag_reason 只对 unknown 有意义;normal/high/low/abnormal 不输出该键,
-        # 保持既有 golden/消费方逐字节兼容。
+    def _omit_null_optional_fields(self, handler):
+        # flag_reason 只对 unknown 有意义;标准层字段仅在识别端产出时出现。
+        # null 一律省略,确保未迁移报告/旧 golden 逐字节兼容。
         data = handler(self)
-        if data.get("flag_reason") is None:
-            data.pop("flag_reason", None)
+        for key in _OPTIONAL_NULL_FIELDS:
+            if data.get(key) is None:
+                data.pop(key, None)
         return data
 
 
