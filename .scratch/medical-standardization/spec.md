@@ -220,7 +220,8 @@ items:
 - `value` / `ref_range` 是 canonical；`raw_*` 是单据原文。
 - `unit` 是 UCUM 码；`unit_display` 是人类可读展示。UI 默认显示 `unit_display`。
 - `ref_kind`：`numeric` / `qualitative` / `ordinal` / `tiered` / `none`。
-- 未验证：`unit=null`、`unit_status="unverified"`、`low_confidence=true`；`raw_unit` 保留。
+- 未验证单位：`unit=null`、`unit_status="unverified"`、`low_confidence=true`；`raw_unit` 保留。
+- `review_status=pending` 但单位可可靠归一/换算时：仍输出 canonical `unit`/`unit_display`，`unit_status="unverified"`；`verified` 只在 `review_status=approved` 且单位解析成功后出现。只有单位无法解析、量级门拒绝或 `conversion:none` 时才 `unit=null` + `low_confidence=true`。
 - 趋势按 `code`（优先）/ `loinc` + canonical unit 连接；不再按 `name` 字符串连接。
 - App 的指标项展示使用**原文印名**（`raw_text` 中可辨识的名称，统一走 `displayItemName`）；趋势/聚合使用规范名 `name` 或标准 `code`。规范名变更不应替换报告详情里的原文印名。
 
