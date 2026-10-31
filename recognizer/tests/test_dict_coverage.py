@@ -2,11 +2,12 @@
 
 背景:cbc_dict.yaml 起初由人工构造规范名/别名,未逐一对照真实样本 OCR,
 出现过规范名与单据印法颠倒(红细胞平均体积 vs 平均红细胞体积)、
-无证据别名等错误。本测试把「每条别名必须能在 samples/expected/ocr 的
+无证据别名等错误。本测试把「每条 OCR 别名必须能在 samples/expected/ocr 的
 真实文本中出现(容忍星号/序号前缀与名称熔断数字尾)」固化为门禁:
-新增一条词典别名却未落样本证据时,测试失败,要求先补样本或核实印法再进词典。
-canonical(name)是面向报告的规范名,允许与单据印法不同(它是维护者的选择,
-不在此门禁内;但每一组 aliases∪{name} 必须整体有样本证据,防止孤儿词条)。
+新增一条 OCR 别名却未落样本证据时,测试失败,要求先补样本或核实印法再进词典。
+标准同义名/缩写(synonyms)不走语料门,由 test_synonyms_have_source 要求
+每条都有 source;canonical(name)是面向报告的规范名,允许与单据印法不同
+(它是维护者的选择,不在此门禁内;但每一组 terms 必须整体有样本证据,防止孤儿词条)。
 """
 
 import json
@@ -52,6 +53,19 @@ def _witnessed(term: str) -> set[str]:
     return seen
 
 
+def _ocr_terms(it: dict) -> list[str]:
+    """需要语料见证的别名:旧 aliases + 新 ocr_aliases(synonyms 只要求来源)。"""
+    return [*it.get("aliases", []), *(a["term"] for a in it.get("ocr_aliases") or [])]
+
+
+def _synonyms(it: dict) -> list[str]:
+    return [s["term"] for s in it.get("synonyms") or []]
+
+
+def _all_terms(it: dict) -> list[str]:
+    return [it["name"], *_synonyms(it), *_ocr_terms(it)]
+
+
 def _narrative(dict_path) -> bool:
     """叙述体词典(超声):别名内嵌于叙述行,门禁按子串见证,而非整行等值。"""
     d = yaml.safe_load(dict_path.read_text(encoding="utf-8"))
@@ -87,11 +101,23 @@ def test_every_alias_has_corpus_evidence(dict_path) -> None:
     d = yaml.safe_load(dict_path.read_text(encoding="utf-8"))
     problems = []
     for it in d.get("items") or []:
-        for a in set(it.get("aliases", [])):
+        for a in set(_ocr_terms(it)):
             ids = _witnessed_sub(a) if _narrative(dict_path) else _witnessed(a)
             if not ids:
                 problems.append(f"{it['name']}: alias {a!r} 无任何样本证据")
     assert not problems, "词典别名与真实样本脱钩:\n" + "\n".join(problems)
+
+
+@pytest.mark.parametrize("dict_path", _DICTS, ids=lambda p: p.stem)
+def test_synonyms_have_source(dict_path) -> None:
+    """标准同义名/缩写必须有来源;OCR 变体才走语料证据门。"""
+    d = yaml.safe_load(dict_path.read_text(encoding="utf-8"))
+    problems = []
+    for it in d.get("items") or []:
+        for s in it.get("synonyms") or []:
+            if not s.get("source"):
+                problems.append(f"{it['name']}: synonym {s.get('term')!r} 无 source")
+    assert not problems, "标准同义名缺来源:\n" + "\n".join(problems)
 
 
 @pytest.mark.skipif(not _DICTS, reason="no *_dict.yaml in recognizer package")
@@ -147,7 +173,7 @@ def test_every_item_has_witnessed_reference(dict_path) -> None:
     d = yaml.safe_load(dict_path.read_text(encoding="utf-8"))
     problems = []
     for it in d.get("items") or []:
-        terms = {it["name"], *it.get("aliases", [])}
+        terms = set(_all_terms(it))
         if not any(_witnessed_sub(t) if _narrative(dict_path) else _witnessed(t) for t in terms):
             problems.append(f"{it['name']}: 规范名与全部别名均无样本证据")
     assert not problems, "孤儿词条:\n" + "\n".join(problems)

@@ -230,6 +230,17 @@ describe('displayItemName', () => {
     }
   });
 
+  it('标准名改为 WS/T 名后仍优先显示原文印名', () => {
+    expect(
+      displayItemName(
+        item({
+          name: '凝血酶原时间检测',
+          raw_text: '凝血酶原时间测定(PT)  10.8  9.8-12.1  秒',
+        }),
+      ),
+    ).toBe('凝血酶原时间测定(PT)');
+  });
+
   it('原文只有缩写或首个中文格是方法时回落规范名;修正后以生效名为准', () => {
     expect(displayItemName(item({ name: '白细胞计数', raw_text: 'WBC' }))).toBe('白细胞计数');
     expect(displayItemName(item({ name: 'PH', raw_text: '7 PH(9-HR)  PH  8.00' }))).toBe('PH');

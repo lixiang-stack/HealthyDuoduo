@@ -20,6 +20,7 @@ import { colors } from '../../components/theme';
 import { FLAG_COLORS } from '../../reports/colors';
 import { itemFlagLabel, refRangeLabel } from '../../reports/status';
 import { useReportData } from '../../reports/useReportData';
+import { displayItemName } from '../../review/items';
 
 /** 原图定位视口高(px):约占半屏,行文可读到字级。 */
 const FOCUS_IMAGE_HEIGHT = 420;
@@ -45,6 +46,7 @@ export default function ReportImageScreen() {
           (candidate) => candidate.name === name && (candidate.unit ?? '') === unit,
         ) ?? report.items.find((candidate) => candidate.name === name))
       : undefined;
+  const itemDisplayName = item ? displayItemName(item) : undefined;
   const hasFocus = item !== undefined && item.ocr_lines.length > 0;
   const focusItem = hasFocus ? item : undefined;
 
@@ -81,7 +83,7 @@ export default function ReportImageScreen() {
         {state.status === 'ready' ? (
           <View style={styles.stack}>
             <Text testID="report-image-meta" style={sharedStyles.muted}>
-              {[reportDate ?? state.report.report_date, state.report.report_type, item?.name]
+              {[reportDate ?? state.report.report_date, state.report.report_type, itemDisplayName]
                 .filter(Boolean)
                 .join(' · ')}
             </Text>
@@ -129,7 +131,7 @@ export default function ReportImageScreen() {
             {item ? (
               <View testID="report-image-value" style={styles.valueCard}>
                 <View style={styles.valueHeader}>
-                  <Text style={styles.itemName}>{item.name}</Text>
+                  <Text style={styles.itemName}>{itemDisplayName}</Text>
                   <Text style={[styles.flag, { color: FLAG_COLORS[item.flag] }]}>
                     {itemFlagLabel(item)}
                   </Text>
