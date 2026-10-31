@@ -8,6 +8,33 @@ Status: in progress（2026-10-31）
 | `mapping.csv` | 181 项映射表；全部已填标准名/码/单位/结果类型，待医学复核（batch 2 已迁移） |
 | `issues/` | 15 张实施票（01–13 agent，14–15 human）；依赖顺序见每张票的 Blocked by |
 
+**事实源：** `spec.md`（决策/模型/验收）→ `issues/`（逐票实施）→ `mapping.csv`（逐项映射）。`docs/design/` 不重复记录本需求。
+
+**实现索引：**
+
+| 票 | 词典/panel | 聚焦测试 | golden |
+|---|---|---|---|
+| 03 | `coag_dict.yaml` / coag | `test_postprocess.py::test_coag_standard_output_golden` | `coag_*` |
+| 04 | `cbc_dict.yaml` / cbc | `test_postprocess.py::test_cbc_standard_output_conversions` | `cbc_*` |
+| 05 | `chemistry_dict.yaml` / liver | `test_postprocess.py::test_liver_bilirubin_protein_and_enzyme_units` | `lft_*` |
+| 06 | `chemistry_dict.yaml` / kidney、uric_acid、electrolyte | `test_postprocess.py::test_kidney_urate_gate_and_egfr_unverified` | `lft_02`、`lft_08` |
+| 07 | `chemistry_dict.yaml` / lipid、glucose、vitanemia | `test_postprocess.py::test_glucose_hba1c_equation_and_conversion`、`test_vitamin_d_tiered_reference_uses_normal_tier` | `glu_*`、`vitanemia_*`、`lft_06` |
+| 08 | `endocrine_dict.yaml` / thyroid、sex_hormone | `test_postprocess.py::test_endocrine_t3_gate_and_t4_ocr_form` | `tft_*`、`proghcg_*` |
+| 09 | `ua_dict.yaml` / urinalysis | `test_postprocess.py::test_urinalysis_result_kinds_and_count_units` | `ua_*` |
+| 10 | `immunology_dict.yaml` / infection、autoimmune | `test_postprocess.py::test_immunology_arbitrary_ratio_and_qualitative` | `ana_*`、`infectious_*`、`fibrosis_*` |
+| 11 | `special_dict.yaml`、`bloodtype_dict.yaml` / other | `test_postprocess.py::test_special_and_bloodtype_models`、`test_narrative_right_value_pairs_risk_ratios` | `bloodtype_*`；专项暂无 golden |
+| 12–15 | 趋势、全量收口、医学复核 | `recognizer/tools/golden_diff.py`、`recognizer/tools/e2e.py` | 全量 |
+
+**快速回路：**
+
+```bash
+cd recognizer
+uv run pytest -q tests/test_standard_schema.py tests/test_postprocess.py
+uv run python -m recognizer.golden   # 只改词典/输出规则后
+```
+
+提交前全量门禁由 lefthook 执行（pytest / go test / ruff / docs）。
+
 **已完成：**
 
 - 审计结论四问一因写入 `spec.md` §1。

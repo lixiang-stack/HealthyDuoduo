@@ -3,6 +3,7 @@
 ## When to write
 
 - 详细设计、契约变更、架构决策、跨团队方案：写文档。
+- 若 `.scratch/<feature>/spec.md` 与 `issues/` 已构成该需求的权威设计记录：更新它们，不在 `docs/design/` 另写复述。`docs/design/` 只用于跨 feature、长期契约或需要独立存档的决策。
 - 单文件 bug fix：commit message + 代码注释即可，不单独生成文档。
 - 总结 / 摘要：只讲结论与重点，不展开细节。
 
