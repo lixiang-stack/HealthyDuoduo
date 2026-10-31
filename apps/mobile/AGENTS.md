@@ -12,6 +12,8 @@ Expo ships breaking changes every SDK release. APIs you remember are likely rena
 
 Use `bunx` instead of `npx` if the project uses bun (`bun.lock` present).
 
+Worktrees do not share the main checkout's `node_modules`; run `npm ci` in `apps/mobile` before the first App command.
+
 ```bash
 npx expo install <package>  # ALWAYS use instead of npm/yarn/pnpm/bun add — resolves SDK-compatible versions
 npx expo start              # start the dev server

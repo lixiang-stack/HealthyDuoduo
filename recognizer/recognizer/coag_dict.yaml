@@ -28,6 +28,9 @@ items:
       - unit: "秒"
         ucum: "s"
         conversion: { type: linear, factor: 1, from: "秒", to: "s", source: "UCUM" }
+    plausible_range:
+      low: 5
+      high: 100
     ocr_unit_forms: []
   - name: 凝血酶原时间比值
     loinc: "5894-1"
@@ -43,6 +46,9 @@ items:
     canonical_unit: "1"
     unit_display: "1"
     accepted_units: []
+    plausible_range:
+      low: 0.1
+      high: 20
     ocr_unit_forms: []
   - name: 国际标准化比值
     loinc: "6301-6"
@@ -56,6 +62,9 @@ items:
     canonical_unit: "1"
     unit_display: "1"
     accepted_units: []
+    plausible_range:
+      low: 0.1
+      high: 20
     ocr_unit_forms: []
   - name: 凝血酶原活动度
     local_code: "LOCAL-PTA"
@@ -71,6 +80,9 @@ items:
     canonical_unit: "%"
     unit_display: "%"
     accepted_units: []
+    plausible_range:
+      low: 0
+      high: 150
     ocr_unit_forms: []
   - name: 活化部分凝血活酶时间检测
     code: "0500203A"
@@ -90,6 +102,9 @@ items:
       - unit: "秒"
         ucum: "s"
         conversion: { type: linear, factor: 1, from: "秒", to: "s", source: "UCUM" }
+    plausible_range:
+      low: 10
+      high: 150
     ocr_unit_forms: []
   - name: 纤维蛋白原检测
     code: "0500403A"
@@ -109,6 +124,9 @@ items:
       - unit: "mg/dL"
         ucum: "mg/dL"
         conversion: { type: linear, factor: 0.01, from: "mg/dL", to: "g/L", source: "UCUM" }
+    plausible_range:
+      low: 0.5
+      high: 10
     ocr_unit_forms: []
   - name: 凝血酶时间检测
     code: "0500303A"
@@ -128,6 +146,9 @@ items:
       - unit: "秒"
         ucum: "s"
         conversion: { type: linear, factor: 1, from: "秒", to: "s", source: "UCUM" }
+    plausible_range:
+      low: 5
+      high: 60
     ocr_unit_forms: []
   - name: D-二聚体检测
     code: "0501703A"
@@ -153,6 +174,9 @@ items:
       - unit: "mg/L"
         ucum: "mg/L"
         conversion: { type: linear, factor: 1000, from: "mg/L", to: "ug/L", source: "WS/T 477—2026" }
+    plausible_range:
+      low: 0
+      high: 100000
     ocr_unit_forms: []
   - name: 纤维蛋白（原）降解产物检测
     code: "0501803A"
@@ -174,4 +198,7 @@ items:
       - unit: "mg/L"
         ucum: "mg/L"
         conversion: { type: linear, factor: 1, from: "mg/L", to: "ug/mL", source: "UCUM" }
+    plausible_range:
+      low: 0
+      high: 1000
     ocr_unit_forms: []

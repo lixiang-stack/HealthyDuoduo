@@ -10,10 +10,37 @@ category:
 items:
   - name: ABO血型
     aliases: [ABO血型鉴定(ABO血型)]
-    units: []
+    code:
+    loinc:
+    local_code: LOCAL-BLOOD-01
+    source_status: local
+    review_status: pending
+    result_kind: qualitative
+    canonical_unit:
+    unit_display:
+    accepted_units: []
+    ocr_unit_forms: []
   - name: RH血型
     aliases: [RH血型鉴定(RH血型)]
-    units: []
+    code:
+    loinc:
+    local_code: LOCAL-BLOOD-02
+    source_status: local
+    review_status: pending
+    result_kind: qualitative
+    canonical_unit:
+    unit_display:
+    accepted_units: []
+    ocr_unit_forms: []
   - name: 抗体筛查
     aliases: []
-    units: []
+    code:
+    loinc:
+    local_code: LOCAL-BLOOD-03
+    source_status: local
+    review_status: pending
+    result_kind: qualitative
+    canonical_unit:
+    unit_display:
+    accepted_units: []
+    ocr_unit_forms: []

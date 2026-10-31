@@ -81,7 +81,18 @@ def row(y: float, name: str, value: str, unit: str = "", ref: str = "", score: f
 
 
 def item_of(r, name: str):
-    return next(i for i in r.items if i.name == name)
+    for item in r.items:
+        if item.name == name:
+            return item
+    # 标准名迁移后,旧测试仍用单据/旧规范名定位;按词典 synonyms/aliases 反查。
+    for d in _postprocess.load_dicts():
+        for dict_item in d.items:
+            legacy = {s["term"] for s in dict_item.synonyms} | set(dict_item.aliases)
+            if name in legacy:
+                for item in r.items:
+                    if item.name == dict_item.name:
+                        return item
+    raise StopIteration
 
 
 def _golden_report(sample_id: str, **kwargs: Any):
@@ -278,7 +289,8 @@ def test_fused_unit_ref_in_unit_cell() -> None:
     r = run_postprocess(ocr)
     it = item_of(r, "白细胞计数")
     assert it.value == "6.01"
-    assert it.unit == "10^9/L"
+    assert it.unit == "10*9/L"
+    assert it.unit_display == "10^9/L"
     assert it.ref_range == "3.5-9.5"
 
 
@@ -402,7 +414,8 @@ def test_garbled_unit_kept_raw_without_confidence_mark() -> None:
     r = run_postprocess(ocr)
     it = item_of(r, "血小板")
     assert it.value == "215"
-    assert it.unit == "10^9/L"  # 展示归一,原文留痕在 raw_text
+    assert it.unit == "10*9/L"  # canonical UCUM;展示印形见 unit_display
+    assert it.unit_display == "10^9/L"
     assert "109/L" in it.raw_text
     assert it.low_confidence is False
     assert r.status == "success"
@@ -738,6 +751,11 @@ def test_narrative_right_value_pairs_risk_ratios() -> None:
     assert item_of(r, "18-三体综合征").value == "1:19879"
     assert item_of(r, "开放性神经管缺陷").value == "2.5"
     assert item_of(r, "母龄风险").value == "33.25"
+    for name in ("唐氏综合征", "18-三体综合征", "开放性神经管缺陷", "母龄风险"):
+        risk = item_of(r, name)
+        assert risk.result_kind == "ratio"
+        assert risk.raw_value == risk.value
+        assert risk.unit_status == "unverified"
 
 
 def test_imaging_dict_has_no_measurement_items() -> None:
@@ -990,17 +1008,18 @@ def test_unit_form_map_rejects_linear_without_from_to() -> None:
 
 
 def test_loss_form_normalized_to_registered_canonical() -> None:
-    """cbc_01 真实形态:上标 9 拍平成 109/L → 归一为注册印形 10^9/L。"""
+    """cbc_01 真实形态:上标 9 拍平成 109/L → 归一为 canonical 10*9/L。"""
     ocr = mk_ocr(header_row() + row(30, "血小板", "136", unit="109/L", ref="125-350"))
     it = item_of(run_postprocess(ocr), "血小板")
-    assert it.unit == "10^9/L"
+    assert it.unit == "10*9/L"
+    assert it.unit_display == "10^9/L"
     assert "109/L" in it.raw_text
 
 
 def test_wechat_loss_form_normalized() -> None:
-    """cbc_05 真实形态:600px 截图把 10^9/L 读成 7/6.0 → 归一为 10^9/L。"""
+    """cbc_05 真实形态:600px 截图把 10^9/L 读成 7/6.0 → 归一为 canonical。"""
     ocr = mk_ocr(header_row() + row(30, "血小板", "184", unit="7/6.0", ref="100~300"))
-    assert item_of(run_postprocess(ocr), "血小板").unit == "10^9/L"
+    assert item_of(run_postprocess(ocr), "血小板").unit == "10*9/L"
 
 
 def test_loss_form_dispatched_by_item_registration() -> None:
@@ -1012,13 +1031,17 @@ def test_loss_form_dispatched_by_item_registration() -> None:
     )
     r = run_postprocess(ocr)
     assert item_of(r, "平均红细胞体积").unit == "fL"
-    assert item_of(r, "嗜碱性粒细胞数").unit == "10^9/L"
+    assert item_of(r, "嗜碱性粒细胞数").unit == "10*9/L"
 
 
-def test_unknown_unit_kept_as_printed() -> None:
-    """注册集与单位族之外的乱珠不归一,保留原文供人工核对。"""
+def test_unknown_unit_kept_raw_as_unverified() -> None:
+    """注册集与单位族之外的乱珠不归一:unit=null、raw_unit 留原文、标 unverified。"""
     ocr = mk_ocr(header_row() + row(30, "血红蛋白", "128", unit="xw/L", ref="115-150"))
-    assert item_of(run_postprocess(ocr), "血红蛋白").unit == "xw/L"
+    it = item_of(run_postprocess(ocr), "血红蛋白")
+    assert it.unit is None
+    assert it.raw_unit == "xw/L"
+    assert it.unit_status == "unverified"
+    assert it.low_confidence is True
 
 
 def test_vertical_fallback_rejects_prose_cells() -> None:
@@ -1077,7 +1100,7 @@ def test_vertical_fallback_accepts_leading_value() -> None:
 def test_family_map_chosen_by_item_membership() -> None:
     """同族损耗形跨类别生效:μ 家族(lft_03/05 证据)按生化词典项归一。"""
     chem = next(d for d in _postprocess.load_dicts() if d.report_type == "生化")
-    bilirubin = next(i for i in chem.items if i.name == "总胆红素")
+    bilirubin = next(i for i in chem.items if i.name.startswith("总胆红素"))
     assert _postprocess._normalize_unit("μmo1/L", bilirubin) == "μmol/L"
     assert _postprocess._normalize_unit("μnol/L", bilirubin) == "μmol/L"
 
@@ -1085,7 +1108,7 @@ def test_family_map_chosen_by_item_membership() -> None:
 def test_real_unit_equivalence_normalized_from_conversion_table() -> None:
     """换算表里的真实单位等价(umol/L → μmol/L)也参与展示归一。"""
     chem = next(d for d in _postprocess.load_dicts() if d.report_type == "生化")
-    creatinine = next(i for i in chem.items if i.name == "肌酐")
+    creatinine = next(i for i in chem.items if i.name.startswith("肌酐"))
     assert _postprocess._normalize_unit("umol/L", creatinine) == "μmol/L"
 
 
@@ -1097,7 +1120,7 @@ def test_trailing_unit_punctuation_and_ocr_loss_forms() -> None:
     """
     lft = _golden_report("lft_08")
     assert item_of(lft, "尿素").unit == "mmol/L"
-    assert item_of(lft, "肌酐").unit == "μmol/L"
+    assert item_of(lft, "肌酐").unit == "umol/L"
     assert item_of(lft, "白蛋白").unit == "g/L"
     assert item_of(lft, "二氧化碳").unit == "mmol/L"
     cbc = _golden_report("cbc_07")
@@ -1108,18 +1131,273 @@ def test_vitamin_d_tiered_reference_uses_normal_tier() -> None:
     """参考列的分级解读行(vitanemia_01/02)以「正常」档为比较基准。
 
     原行为只取首行 "<12ng/ml缺乏",把 5.70 判 normal、39.60 判 high;
-    正确口径:5.70 → low,39.60 → normal;单位只保留 ng/ml。
+    正确口径:5.70 → low,39.60 → normal;tiered 参考原文保留,值换算到 nmol/L。
     """
     may = _golden_report("vitanemia_01")
     sep = _golden_report("vitanemia_02")
-    for report, value, flag in ((may, "5.70", "low"), (sep, "39.60", "normal")):
+    for report, value, flag in ((may, "14.25", "low"), (sep, "99", "normal")):
         it = item_of(report, "总25羟基维生素D")
         assert it.value == value
-        assert it.unit == "ng/ml"
+        assert it.unit == "nmol/L"
+        assert it.raw_value in ("5.70", "39.60")
+        assert it.raw_unit in ("ng/ml", "ng/m1")
         assert it.ref_range == ">20ng/ml正常"
+        assert it.ref_kind == "tiered"
         assert it.flag == flag
         assert all(label in it.raw_text for label in ("缺乏", "不足", "正常"))
-    assert item_of(sep, "维生素B12").unit == "pg/mL"
+    assert item_of(sep, "维生素B12").unit == "pmol/L"
+
+
+# ---------- 标准输出层(票 03–11) ----------
+
+
+def report_header(title: str) -> list[dict[str, Any]]:
+    return [
+        {"x": 100, "y": -60, "text": title},
+        {"x": 600, "y": -60, "text": "报告时间：2026-10-01 09:00"},
+        {"x": 20, "y": 0, "text": "序号"},
+        {"x": 160, "y": 0, "text": "项目名称"},
+        {"x": 360, "y": 0, "text": "结果"},
+        {"x": 470, "y": 0, "text": "单位"},
+        {"x": 580, "y": 0, "text": "参考值"},
+    ]
+
+
+def test_coag_standard_output_golden() -> None:
+    """票 03:PT/APTT/TT → s/秒;PTR/INR → ratio 1;D-二聚体 → μg/L + FEU。"""
+    r = _golden_report("coag_01")
+    pt = item_of(r, "凝血酶原时间检测")
+    assert (pt.unit, pt.unit_display, pt.raw_unit) == ("s", "秒", "秒")
+    assert pt.code == "0500103A"
+    assert pt.result_kind == "quantitative"
+    assert pt.unit_status == "unverified"
+    assert pt.ref_kind == "numeric"
+
+    for name in ("凝血酶原时间比值", "国际标准化比值"):
+        ratio = item_of(r, name)
+        assert ratio.result_kind == "ratio"
+        assert ratio.unit == "1"
+        assert ratio.raw_unit is None
+
+    dd = item_of(r, "D-二聚体检测")
+    assert dd.value == "440.00"
+    assert dd.unit == "ug/L"
+    assert dd.unit_display == "μg/L"
+    assert dd.raw_unit == "ng/mL"
+    assert dd.result_basis == "FEU"
+    assert item_of(r, "纤维蛋白原检测").unit == "g/L"
+    assert item_of(r, "纤维蛋白（原）降解产物检测").unit == "ug/mL"
+
+
+def test_d_dimer_mg_l_converted_to_ug_l() -> None:
+    ocr = mk_ocr(
+        report_header("凝血功能报告单")
+        + row(30, "D-二聚体", "1.2", unit="mg/L", ref="0-1")
+        + row(50, "凝血酶原时间", "10.8", unit="秒", ref="9.8-12.1")
+    )
+    dd = item_of(run_postprocess(ocr), "D-二聚体检测")
+    assert dd.value == "1200"
+    assert dd.unit == "ug/L"
+    assert dd.raw_value == "1.2"
+    assert dd.raw_unit == "mg/L"
+    assert dd.result_basis == "FEU"
+
+
+def test_cbc_standard_output_conversions() -> None:
+    """票 04:HCT %→L/L(value+ref 同步)、计数等值替身、RDW 不混用。"""
+    ocr = mk_ocr(
+        header_row()
+        + row(30, "红细胞压积", "44.1", unit="%", ref="36-50")
+        + row(50, "白细胞", "7.33", unit="10^9/L", ref="4-10")
+        + row(70, "血小板", "215", unit="109/L", ref="100-300")
+        + row(90, "红细胞分布宽度-SD", "39.3", unit="fL", ref="37-54")
+    )
+    r = run_postprocess(ocr)
+    hct = item_of(r, "红细胞压积")
+    assert (hct.value, hct.unit, hct.ref_range) == ("0.441", "L/L", "0.36-0.5")
+    assert hct.raw_value == "44.1"
+    assert hct.raw_ref_range == "36-50"
+    assert item_of(r, "白细胞").unit == "10*9/L"
+    assert item_of(r, "血小板").unit == "10*9/L"
+    assert item_of(r, "红细胞分布宽度-SD").unit == "fL"
+
+
+def test_liver_bilirubin_protein_and_enzyme_units() -> None:
+    """票 05:胆红素/蛋白换算;U/L 与 IU/L 不默认等价。"""
+    ocr = mk_ocr(
+        report_header("肝功报告单")
+        + row(30, "总胆红素", "1.2", unit="mg/dL", ref="0.2-1.2")
+        + row(50, "总蛋白", "7.4", unit="g/dL", ref="6.0-8.0")
+        + row(70, "丙氨酸转氨酶", "70", unit="IU/L", ref="9-50")
+    )
+    r = run_postprocess(ocr)
+    tbil = item_of(r, "总胆红素")
+    assert tbil.value == "20.52"
+    assert tbil.unit == "umol/L"
+    assert tbil.ref_range == "3.42-20.52"
+    tp = item_of(r, "总蛋白")
+    assert tp.value == "74"
+    assert tp.unit == "g/L"
+    alt = item_of(r, "丙氨酸转氨酶")
+    assert alt.unit is None
+    assert alt.raw_unit == "IU/L"
+    assert alt.unit_status == "unverified"
+    assert alt.low_confidence is True
+
+
+def test_kidney_urate_gate_and_egfr_unverified() -> None:
+    """票 06:尿酸 mmol/L→μmol/L;eGFR mL/min 缺 BSA 归一不静默接受。"""
+    ocr = mk_ocr(
+        report_header("肾功能报告单")
+        + row(30, "尿酸", "0.246", unit="mmol/L", ref="0.100-0.420")
+        + row(50, "eGFR", "107.3", unit="ml/min", ref="≥90")
+        + row(70, "二氧化碳", "23.31", unit="mmol/L", ref="22-29")
+    )
+    r = run_postprocess(ocr)
+    ua = item_of(r, "尿酸")
+    assert (ua.value, ua.unit, ua.ref_range) == ("246", "umol/L", "100-420")
+    egfr = item_of(r, "eGFR")
+    assert egfr.unit is None
+    assert egfr.raw_unit == "ml/min"
+    assert egfr.low_confidence is True
+    assert item_of(r, "二氧化碳").name == "二氧化碳结合力"
+
+
+def test_glucose_hba1c_equation_and_conversion() -> None:
+    """票 07:HbA1c IFCC-NGSP 方程;血糖 mg/dL 线性换算。"""
+    ocr = mk_ocr(
+        report_header("糖化血红蛋白报告单")
+        + row(30, "糖化血红蛋白", "6.50", unit="%", ref="4-6")
+        + row(50, "空腹葡萄糖", "126", unit="mg/dL", ref="70-100")
+    )
+    r = run_postprocess(ocr)
+    hba1c = item_of(r, "糖化血红蛋白")
+    assert hba1c.value == "47.54"
+    assert hba1c.unit == "mmol/mol"
+    assert hba1c.raw_value == "6.50"
+    glu = item_of(r, "空腹葡萄糖")
+    assert glu.value == "6.993"
+    assert glu.unit == "mmol/L"
+    assert glu.ref_range == "3.885-5.55"
+
+
+def test_endocrine_t3_gate_and_t4_ocr_form() -> None:
+    """票 08:T3 mmol/L 换算后 2040 nmol/L 超量级门;T4 rmol/L OCR 形归一。"""
+    ocr = mk_ocr(
+        report_header("甲状腺报告单")
+        + row(30, "三碘甲状腺原氨酸", "2.04", unit="mmol/L", ref="1.01-2.48")
+        + row(50, "甲状腺素", "120.23", unit="rmol/L", ref="69.97-152.52")
+        + row(70, "抗甲状腺过氧化物酶抗体", "0.80", unit="U/mL", ref="<9")
+    )
+    r = run_postprocess(ocr)
+    t3 = item_of(r, "三碘甲状腺原氨酸")
+    assert t3.value == "2.04"
+    assert t3.unit is None
+    assert t3.raw_unit == "mmol/L"
+    assert t3.unit_status == "unverified"
+    t4 = item_of(r, "甲状腺素")
+    assert t4.value == "120.23"
+    assert t4.unit == "nmol/L"
+    tpo = item_of(r, "抗甲状腺过氧化物酶抗体")
+    assert tpo.unit is None
+    assert tpo.raw_unit == "U/mL"
+
+
+def test_urinalysis_result_kinds_and_count_units() -> None:
+    """票 09:干化学无 unit;沉渣计数 /uL;镜检 microscopy 不造伪单位。"""
+    r = _golden_report("ua_01")
+    dip = item_of(r, "潜血")
+    assert dip.result_kind == "qualitative"
+    assert dip.unit is None
+    assert dip.ref_kind == "qualitative"
+
+    count = item_of(r, "尿红细胞计数(镜检)")
+    assert count.result_kind == "quantitative"
+    assert count.unit == "/uL"
+    assert count.unit_display == "个/μL"
+    assert count.raw_unit == "个/uL"
+
+    micro = item_of(r, "镜检红细胞")
+    assert micro.result_kind == "microscopy"
+    assert micro.unit is None
+    assert micro.raw_unit == "/HP"
+
+    ph = item_of(r, "PH")
+    assert ph.unit == "1"
+    assert ph.result_kind == "quantitative"
+
+
+def test_immunology_arbitrary_ratio_and_qualitative() -> None:
+    """票 10:AU → [arb'U];S/CO → ratio 1;定性无 unit;IU/U 不互换。"""
+    ana = _golden_report("ana_02")
+    au = item_of(ana, "抗RNP抗体")
+    assert (au.unit, au.unit_display) == ("[arb'U]", "AU")
+    assert au.result_kind == "arbitrary"
+    assert item_of(ana, "抗C1q抗体").unit == "U/mL"
+    assert item_of(ana, "抗dsDNA抗体").unit == "[IU]/mL"
+
+    inf = _golden_report("infectious_01")
+    hbe = item_of(inf, "乙肝e抗原")
+    assert hbe.result_kind == "ratio"
+    assert hbe.unit == "1"
+    assert hbe.raw_unit in ("s/co", "S/CO")
+
+    qual = _golden_report("ana_01")
+    ana_iif = item_of(qual, "ANA(IIF)")
+    assert ana_iif.result_kind == "qualitative"
+    assert ana_iif.unit is None
+
+
+def test_special_and_bloodtype_models() -> None:
+    """票 11:风险比值按 ratio;血型定性无 unit。"""
+    special = next(d for d in _postprocess.load_dicts() if d.report_type == "其他专项")
+    risk = next(i for i in special.items if i.name == "母龄风险")
+    assert risk.result_kind == "ratio"
+    assert risk.canonical_unit == "1"
+    hcg_beta = next(i for i in special.items if "β亚单位" in i.name)
+    assert hcg_beta.result_kind == "quantitative"
+    assert hcg_beta.canonical_unit == "ug/L"
+
+    blood = _golden_report("bloodtype_01")
+    for item in blood.items:
+        assert item.result_kind == "qualitative"
+        assert item.unit is None
+
+
+def test_verified_only_after_approval() -> None:
+    """unit_status=verified 只在 review_status=approved 且单位解析成功时出现。"""
+    import dataclasses
+
+    from recognizer.postprocess import _standardize_item
+
+    chem = next(d for d in _postprocess.load_dicts() if d.report_type == "生化")
+    ua = next(i for i in chem.items if i.name == "尿酸测定")
+    pending = _standardize_item(ua, "0.246", "mmol/L", "0.1-0.42", False)
+    assert pending.unit_status == "unverified"
+    approved = _standardize_item(dataclasses.replace(ua, review_status="approved"),
+                                 "0.246", "mmol/L", "0.1-0.42", False)
+    assert approved.unit_status == "verified"
+
+
+def test_golden_standard_fields_are_canonical_and_pending() -> None:
+    """全量 golden:unit 只含 canonical;pending 项不得出现 verified;OCR 碎片为 0。"""
+    canonical = set()
+    for d in _postprocess.load_dicts():
+        for it in d.items:
+            if it.canonical_unit:
+                canonical.add(it.canonical_unit)
+    canonical |= {"1", "[arb'U]", "[IU]/mL", "[IU]/L", "m[IU]/L", "m[IU]/mL", "U/mL", "/uL"}
+    fragments = {"109/L", "7/6.0", "1/6.0", ".09/L", "~9/L", "f1", "10/a1",
+                 "IU/al", "ng/al", "ag/L", "rmol/L", "μno1/L", "pmo1/L"}
+    for sample_id in _sample_ids:
+        report = _golden_report(sample_id)
+        for item in report.items:
+            if item.unit is not None:
+                assert item.unit in canonical, f"{sample_id}/{item.name}: {item.unit!r}"
+            assert item.unit not in fragments, f"{sample_id}/{item.name}: OCR fragment"
+            assert item.unit_status != "verified", f"{sample_id}/{item.name}: pending verified"
+            if item.value is not None:
+                assert item.raw_value is not None, f"{sample_id}/{item.name}: raw_value 丢失"
 
 
 # ---------- golden(真实样本,OCR 结果来自 golden 文件,跨架构确定性) ----------

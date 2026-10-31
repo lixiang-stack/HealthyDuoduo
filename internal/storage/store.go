@@ -85,16 +85,19 @@ const (
 
 	// trend:同一指标项名(report_items.name = 词典规范名)的跨报告时序点,升序;
 	// low_confidence 为项级质量信号(决策 #7),CLI 默认排除不可信点(--all 关闭)。
+	// unit_status=unverified 的点默认不进入趋势(票 03);NULL 为票 01 前旧行。
 	sqlTrendByName = `SELECT r.image_sha256, r.report_type,
 		   COALESCE(to_char(r.report_date, 'YYYY-MM-DD'), ''), i.value, i.unit, i.flag, i.low_confidence
 		 FROM report_items i JOIN reports r ON r.image_sha256 = i.report_sha256
 		 WHERE i.name = $1 AND i.flag <> 'not_tested'
+		   AND (i.unit_status IS NULL OR i.unit_status = 'verified')
 		 ORDER BY r.report_date ASC, r.image_sha256 ASC`
 
 	sqlTrendByNameAndType = `SELECT r.image_sha256, r.report_type,
 		   COALESCE(to_char(r.report_date, 'YYYY-MM-DD'), ''), i.value, i.unit, i.flag, i.low_confidence
 		 FROM report_items i JOIN reports r ON r.image_sha256 = i.report_sha256
 		 WHERE i.name = $1 AND r.report_type = $2 AND i.flag <> 'not_tested'
+		   AND (i.unit_status IS NULL OR i.unit_status = 'verified')
 		 ORDER BY r.report_date ASC, r.image_sha256 ASC`
 
 	// trendPointsByMember:HTTP 成员维度趋势(票 02)。与 CLI 的 sqlTrendByName 是不同
@@ -106,6 +109,7 @@ const (
 		 FROM report_items i JOIN reports r ON r.image_sha256 = i.report_sha256
 		 WHERE r.member_id = $1 AND i.name = $2 AND i.flag <> 'not_tested'
 		   AND ($3 = '' OR i.unit = $3)
+		   AND (i.unit_status IS NULL OR i.unit_status = 'verified')
 		 ORDER BY r.report_date ASC NULLS LAST, r.image_sha256 ASC, i.id ASC`
 
 	// 报告摘要(serve 时间线/上传响应回读;票 06):flag 聚合与未核对低置信计数

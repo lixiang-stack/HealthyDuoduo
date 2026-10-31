@@ -25,17 +25,35 @@ units:
     equivalents:
       - unit: "mmol/l"        # 大小写漂移,同一物理单位
         conversion: {type: exact, source: "UCUM"}
-  - canonical: "g/L"
-    equivalents:
-      - unit: "g/l"           # 大小写漂移,同一物理单位
-        conversion: {type: exact, source: "UCUM"}
-  - canonical: "ng/ml"
+  - canonical: "nmol/L"
+  - canonical: "pmol/L"
   - canonical: "fL"
     equivalents:
       - unit: "fl"            # 大小写漂移,同一物理单位
         conversion: {type: exact, source: "UCUM"}
-  - canonical: "pmol/L"
+  - canonical: "pg"
+  - canonical: "g/L"
+    equivalents:
+      - unit: "g/l"           # 大小写漂移,同一物理单位
+        conversion: {type: exact, source: "UCUM"}
+  - canonical: "mg/L"
+  - canonical: "mg/dL"
+  - canonical: "ng/mL"
+  - canonical: "ng/ml"
+  - canonical: "ng/dL"
+  - canonical: "ug/dL"
+  - canonical: "ug/L"
+  - canonical: "ug/mL"
+  - canonical: "pg/mL"
+  - canonical: "U/L"
+  - canonical: "IU/L"
+  - canonical: "IU/mL"
   - canonical: "mIU/L"
     equivalents:
       - unit: "uIU/ml"        # µIU/mL 与 mIU/L 数值等价(×10³ 约分)
         conversion: {type: exact, source: "UCUM"}
+  - canonical: "s"
+  - canonical: "L/L"
+  - canonical: "mm/h"
+  - canonical: "%"
+  - canonical: "1"

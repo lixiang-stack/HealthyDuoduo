@@ -26,10 +26,10 @@ pre-commit:
       glob: "recognizer/**/*.py"
       run: cd recognizer && uv run pytest
     mobile-typecheck:
-      glob: "apps/mobile/**/*.{ts,tsx}"
+      glob: "{apps/mobile/**/*.{ts,tsx},samples/expected/report/*.json}"
       run: cd apps/mobile && npm run typecheck
     mobile-test:
-      glob: "apps/mobile/**/*.{ts,tsx}"
+      glob: "{apps/mobile/**/*.{ts,tsx},samples/expected/report/*.json}"
       run: cd apps/mobile && npm test -- --silent
     mobile-codegen-sync:
       glob: "{apps/mobile/**/*.{ts,tsx},schemas/openapi.yaml}"

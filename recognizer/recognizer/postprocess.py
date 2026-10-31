@@ -38,6 +38,7 @@ raw_text,不改变置信标记(决策 #7)。
 import re
 import unicodedata
 from dataclasses import dataclass, field
+from decimal import ROUND_HALF_UP, Decimal
 from functools import lru_cache
 from pathlib import Path
 
@@ -212,6 +213,8 @@ class UnitConversion:
     source: str | None = None
     from_unit: str | None = None
     to_unit: str | None = None
+    id: str | None = None
+    formula: str | None = None
 
 
 @dataclass(frozen=True)
@@ -241,6 +244,9 @@ class DictItem:
     synonyms: tuple[dict[str, str], ...] = ()
     ocr_aliases: tuple[str, ...] = ()
     result_basis: str | None = None
+    # 新标准 schema:输出层按 canonical/换算生成标准字段;旧 schema 保持原行为。
+    standard_schema: bool = False
+    plausible_range: tuple[float, float] | None = None
 
 
 @dataclass
@@ -304,6 +310,8 @@ def _accepted_units_of(it: dict) -> tuple[AcceptedUnit, ...]:
                 source=raw.get("source"),
                 from_unit=raw.get("from"),
                 to_unit=raw.get("to"),
+                id=raw.get("id"),
+                formula=raw.get("formula"),
             )
         out.append(
             AcceptedUnit(
@@ -315,6 +323,14 @@ def _accepted_units_of(it: dict) -> tuple[AcceptedUnit, ...]:
     return tuple(out)
 
 
+def _plausible_range_of(it: dict) -> tuple[float, float] | None:
+    """宽泛报告量级(spec §4.3);只用于单位/量级 sanity check,不做临床 flag。"""
+    raw = it.get("plausible_range")
+    if not raw:
+        return None
+    return (float(raw["low"]), float(raw["high"]))
+
+
 def _literals_of(it: DictItem) -> set[str]:
     """一项可参与匹配的单位字面量:canonical/display + 真实替代 + OCR 损耗形。"""
     out = {u for u in it.units if u and u != "1"}
@@ -322,8 +338,9 @@ def _literals_of(it: DictItem) -> set[str]:
         if u and u != "1":
             out.add(u)
     for au in it.accepted_units:
-        out.add(au.unit)
-        out.add(au.ucum)
+        for u in (au.unit, au.ucum):
+            if u and u != "1":
+                out.add(u)
     for form in it.ocr_unit_forms:
         if form.get("form"):
             out.add(str(form["form"]))
@@ -355,6 +372,8 @@ def _build_dict(path: Path) -> LabDict:
             synonyms=_synonyms_of(it),
             ocr_aliases=tuple(a["term"] for a in it.get("ocr_aliases") or ()),
             result_basis=it.get("result_basis"),
+            standard_schema="result_kind" in it,
+            plausible_range=_plausible_range_of(it),
         )
         for it in raw.get("items") or []
     )
@@ -897,7 +916,7 @@ def _numeric_candidate(raw_text: str, piece: "_RowPiece") -> bool:
 # OCR 损耗形(数字混入字母、~、)、空格、前导 *、未登记原子)不在此列。
 _UNIT_ATOM = (
     r"(?:[fpnumcdkMμµ]?L|[fpnumcdkMμµ]?l|g|mg|ng|pg|ug|mol|mmol|umol|μmol|pmol|nmol|"
-    r"IU|mIU|uIU|U|s|min|h|%)"
+    r"IU|mIU|uIU|U|s|min|h|mm|%)"
 )
 _REAL_UNIT_RE = re.compile(rf"^(?:10[\^*]\d+/)?(?:{_UNIT_ATOM}|1)(?:/{_UNIT_ATOM})?$")
 _CONVERSION_TYPES = frozenset({"exact", "linear", "equation"})
@@ -1049,6 +1068,211 @@ def _normalize_unit(unit: str | None, item: DictItem | None) -> str | None:
             if canon.lower() in item.units:
                 return canon
     return unit
+
+
+# ---------- 标准输出层(spec §3.2/§4;票 03–11) ----------
+
+# 标准字段只在已迁移 schema 的词典项上产出;旧 schema 保持原 unit 行为。
+_UNIT_BEARING_KINDS = frozenset({"quantitative", "ratio", "arbitrary"})
+# 方程换算按 id 实现,不 eval 词典里的 formula 字符串(数据可审计、代码可控)。
+_EQUATION_IFCC_NGSP = "IFCC-NGSP"
+_IFCC_NGSP_SLOPE = Decimal("10.929")
+_IFCC_NGSP_INTERCEPT = Decimal("2.15")
+
+
+@dataclass(frozen=True)
+class _StandardOutput:
+    value: str | None
+    ref_range: str | None
+    unit: str | None
+    unit_display: str | None
+    unit_status: str | None
+    raw_value: str | None
+    raw_unit: str | None
+    raw_ref_range: str | None
+    ref_kind: str | None
+    result_kind: str | None
+    result_basis: str | None
+    low_confidence: bool
+
+
+def _unit_key(text: str) -> str:
+    """单位比较键:micro 符号统一为 u、大小写不敏感(to 与 μ/µ 印形互通)。"""
+    return text.replace("μ", "u").replace("µ", "u").lower()
+
+
+def _format_decimal(value: Decimal, places: int | None = None) -> str:
+    if places is not None:
+        value = value.quantize(Decimal(1).scaleb(-places), rounding=ROUND_HALF_UP)
+    if value == value.to_integral_value():
+        return str(int(value))
+    return format(value.normalize(), "f")
+
+
+def _map_numbers(text: str, fn) -> str:
+    return re.sub(_NUM, lambda m: fn(m.group(0)), text)
+
+
+def _num_form_strict(text: str) -> _NumForm | None:
+    """参考范围的数值形态:整段必须是数值/范围/上下限(可带性别前缀)。
+
+    `_num_form(ref=True)` 允许尾随文字(用于 flag 抽取),但分级参考
+    (">20ng/ml正常")不是数值区间,换算时必须原样保留(spec §3.2 ref_kind=tiered)。
+    """
+    s = _SEX_PREFIX_RE.sub("", text.strip())
+    if (
+        _RANGE_RE.fullmatch(s)
+        or _CMP_RE.fullmatch(s)
+        or _NUMBER_RE.fullmatch(s)
+    ):
+        return _num_form(text, ref=True)
+    return None
+
+
+def _convert_text(text: str | None, conv: UnitConversion, ref: bool = False) -> str | None:
+    """换算字符串里的数值;非数值文本(定性/分级)原样保留。"""
+    if text is None:
+        return None
+    if conv.type == "exact" or (conv.type == "linear" and conv.factor == 1):
+        return text
+    if conv.type == "linear" and conv.factor is not None:
+        factor = Decimal(str(conv.factor))
+
+        def convert(token: str) -> str:
+            return _format_decimal(Decimal(token) * factor, places=4)
+
+    elif conv.type == "equation" and conv.id == _EQUATION_IFCC_NGSP:
+
+        def convert(token: str) -> str:
+            ngsp = Decimal(token)
+            return _format_decimal((ngsp - _IFCC_NGSP_INTERCEPT) * _IFCC_NGSP_SLOPE, places=2)
+
+    else:
+        return text
+    form = _num_form_strict(text) if ref else _num_form(text)
+    if form is None:
+        return text
+    return _map_numbers(text, convert)
+
+
+def _outside_plausible(text: str | None, bounds: tuple[float, float] | None) -> bool:
+    if text is None or bounds is None:
+        return False
+    form = _num_form_strict(text)
+    if form is None:
+        return False
+    interval = _value_interval(form)
+    if interval is None:
+        return False
+    low, high = bounds
+    return interval[1] < low or interval[0] > high
+
+
+def _resolve_standard_unit(
+    item: DictItem, printed: str | None
+) -> tuple[str, str, UnitConversion] | None:
+    """印形 → (canonical, unit_display, conversion);不可靠时不猜。"""
+    canonical = item.canonical_unit
+    if not canonical or not printed:
+        return None
+    key = _unit_key(printed)
+    display = item.unit_display or canonical
+    if key in {_unit_key(canonical), _unit_key(display)}:
+        return canonical, display, UnitConversion(type="exact", factor=1, source="UCUM")
+    for accepted in item.accepted_units:
+        if key in {_unit_key(accepted.unit), _unit_key(accepted.ucum)}:
+            if accepted.conversion is None or accepted.conversion.type == "none":
+                return None
+            return canonical, display, accepted.conversion
+    for candidate in load_unit_forms().get(printed.strip().lower(), ()):
+        if _unit_key(candidate) in {_unit_key(canonical), _unit_key(display)}:
+            return canonical, display, UnitConversion(type="exact", factor=1, source="UCUM")
+        for accepted in item.accepted_units:
+            if _unit_key(candidate) in {_unit_key(accepted.unit), _unit_key(accepted.ucum)}:
+                if accepted.conversion is None or accepted.conversion.type == "none":
+                    return None
+                return canonical, display, accepted.conversion
+    return None
+
+
+def _ref_kind_for(item: DictItem, ref: str | None) -> str:
+    if ref is None:
+        return "none"
+    if _num_form_strict(ref) is not None:
+        return "numeric"
+    if item.result_kind == "quantitative" and any(word in ref for word in ("缺乏", "不足", "正常")):
+        return "tiered"
+    return "qualitative"
+
+
+def _standardize_item(
+    item: DictItem,
+    value: str | None,
+    unit: str | None,
+    ref: str | None,
+    low_score: bool,
+) -> _StandardOutput:
+    """按 spec §3.2 生成标准字段;pending 仍输出 canonical,但 unit_status=unverified。"""
+    printed = _clean_unit_text(unit) if unit else None
+    kind = item.result_kind
+    out_value, out_ref = value, ref
+    out_unit: str | None = None
+    out_display: str | None = None
+    unresolved = False
+    numeric_value = value is not None and _num_form(value) is not None
+    numeric_ref = ref is not None and _num_form_strict(ref) is not None
+
+    if kind in _UNIT_BEARING_KINDS:
+        if kind == "ratio" and not printed:
+            # 计算项(PTR/INR/A/G)无印形单位;数值存在即按 ratio 的 UCUM 1 输出。
+            if numeric_value:
+                out_unit = item.canonical_unit or "1"
+                out_display = item.unit_display or "1"
+        elif item.canonical_unit == "1" and not printed:
+            # 无量纲定量项(pH/比重):1 本身就是该结果的定义,不依赖印形单位。
+            if numeric_value:
+                out_unit = "1"
+                out_display = item.unit_display or "1"
+            else:
+                unresolved = True
+        elif kind == "arbitrary" and not printed:
+            unresolved = numeric_value
+        else:
+            resolved = _resolve_standard_unit(item, printed)
+            if resolved is None:
+                unresolved = printed is not None or numeric_value
+            else:
+                out_unit, out_display, conversion = resolved
+                out_value = _convert_text(value, conversion)
+                if numeric_ref:
+                    out_ref = _convert_text(ref, conversion, ref=True)
+                if _outside_plausible(out_value, item.plausible_range) or _outside_plausible(
+                    out_ref, item.plausible_range
+                ):
+                    out_value, out_ref = value, ref
+                    out_unit, out_display = None, None
+                    unresolved = True
+
+    unit_status: str | None
+    if kind in _UNIT_BEARING_KINDS:
+        unit_status = "verified" if item.review_status == "approved" and out_unit else "unverified"
+    else:
+        unit_status = None
+
+    return _StandardOutput(
+        value=out_value,
+        ref_range=out_ref,
+        unit=out_unit,
+        unit_display=out_display if out_unit else None,
+        unit_status=unit_status,
+        raw_value=value,
+        raw_unit=unit,
+        raw_ref_range=ref,
+        ref_kind=_ref_kind_for(item, ref),
+        result_kind=kind,
+        result_basis=item.result_basis,
+        low_confidence=low_score or unresolved,
+    )
 
 
 def _undecorate(text: str) -> str:
@@ -1683,26 +1907,69 @@ def run_postprocess(
         else:
             flag_reason = None
         low_conf = piece.low_score
+        value, unit, ref_range = piece.value, None, piece.ref
+        standard: dict[str, object] = {}
+        if it.standard_schema:
+            out = _standardize_item(it, piece.value, piece.unit, piece.ref, low_conf)
+            value, unit, ref_range = out.value, out.unit, out.ref_range
+            low_conf = out.low_confidence
+            standard = {
+                "code": it.code or it.local_code,
+                "loinc": it.loinc,
+                "unit_display": out.unit_display,
+                "unit_status": out.unit_status,
+                "raw_value": out.raw_value,
+                "raw_unit": out.raw_unit,
+                "raw_ref_range": out.raw_ref_range,
+                "ref_kind": out.ref_kind,
+                "result_kind": out.result_kind,
+                "result_basis": out.result_basis,
+            }
+        else:
+            unit = _normalize_unit(piece.unit, piece.item)
         items.append(
             ReportItem(
                 name=it.name,
                 panel=it.panel,
-                value=piece.value,
-                unit=_normalize_unit(piece.unit, piece.item),
-                ref_range=piece.ref,
+                value=value,
+                unit=unit,
+                ref_range=ref_range,
                 method=piece.method,
                 flag=flag,
                 flag_reason=flag_reason,
                 low_confidence=low_conf,
                 raw_text=raw_text,
                 ocr_line_numbers=[c.line for c in raw_cells],
+                **standard,
             )
         )
 
     if image is not None and items:
+        dict_items = {it.name: it for it in d.items}
         for index, (value, ref_range) in recover_dash_fields(image, ocr, items).items():
             item = items[index]
             flag, reason = _compare(item.name, value, ref_range)
+            standard = dict_items.get(item.name)
+            if standard is not None and standard.standard_schema:
+                out = _standardize_item(
+                    standard, value, item.raw_unit, ref_range, item.low_confidence
+                )
+                items[index] = item.model_copy(
+                    update={
+                        "value": out.value,
+                        "ref_range": out.ref_range,
+                        "unit": out.unit,
+                        "unit_display": out.unit_display,
+                        "unit_status": out.unit_status,
+                        "raw_value": out.raw_value,
+                        "raw_ref_range": out.raw_ref_range,
+                        "ref_kind": out.ref_kind,
+                        "low_confidence": out.low_confidence,
+                        "flag": flag,
+                        "flag_reason": reason if flag is Flag.UNKNOWN else None,
+                    }
+                )
+                continue
             items[index] = item.model_copy(
                 update={
                     "value": value,

@@ -85,7 +85,7 @@ def test_report_bundle_contract() -> None:
     Draft202012Validator(json.loads(REPORT_SCHEMA.read_text(encoding="utf-8"))).validate(body["report"])
     assert body["report"]["report_type"] == "临检"
     names = {it["name"] for it in body["report"]["items"]}
-    assert "血红蛋白" in names
+    assert "血红蛋白测定" in names
 
 
 def test_report_rejects_non_image() -> None:

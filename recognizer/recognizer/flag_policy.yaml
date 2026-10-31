@@ -120,3 +120,18 @@ items:
   抗核抗体主荧光核型: informational
   ABO血型: informational
   RH血型: informational
+  # 标准名(2026-10-31 迁移);旧名保留用于存量行/核对修正口径。
+  干化学尿液隐血试验: negative_normal
+  干化学尿液白细胞测定: negative_normal
+  干化学尿液蛋白测定: negative_normal
+  干化学尿液葡萄糖测定: negative_normal
+  干化学尿液酮体测定: negative_normal
+  干化学尿液亚硝酸盐测定: negative_normal
+  干化学尿液胆红素测定: negative_normal
+  干化学尿液尿胆原测定: negative_normal
+  乙型肝炎病毒表面抗原测定: negative_normal
+  乙型肝炎病毒e 抗原测定: negative_normal
+  乙型肝炎病毒表面抗体测定: positive_normal
+  乙型肝炎病毒e 抗体检测: informational
+  乙型肝炎病毒核心抗体检测: informational
+  抗核抗体检测: negative_normal

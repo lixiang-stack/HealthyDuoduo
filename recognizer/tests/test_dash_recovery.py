@@ -66,7 +66,7 @@ def _image(value: str = "dash", ref: str = "dash", next_row_dash: bool = False, 
 
 
 def _item(report):
-    return next(item for item in report.items if item.name == "潜血")
+    return next(item for item in report.items if item.name == "干化学尿液隐血试验")
 
 
 def test_both_dash_cells_recover_as_not_tested() -> None:

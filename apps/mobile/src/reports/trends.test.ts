@@ -103,8 +103,8 @@ function latestOf(
   return { reportDate: file.report_date, value: itemOf(file, name).value };
 }
 
-const altLow = () => pointOf(lft05, '丙氨酸转氨酶', 'lft_05', { reviewed: false });
-const altHigh = () => pointOf(lft02, '丙氨酸转氨酶', 'lft_02', { reviewed: true });
+const altLow = () => pointOf(lft05, '丙氨酸氨基转移酶测定', 'lft_05', { reviewed: false });
+const altHigh = () => pointOf(lft02, '丙氨酸氨基转移酶测定', 'lft_02', { reviewed: true });
 
 describe('isAbnormalFlag', () => {
   it('只认 high / low / abnormal', () => {
@@ -120,7 +120,7 @@ describe('selectSeries', () => {
   it('同单位过滤,日期升序,dateless 沉底;跨单位只计数不混入', () => {
     const points = [
       altHigh(),
-      pointOf(lft06, '丙氨酸转氨酶', 'lft_06'),
+      pointOf(lft06, '丙氨酸氨基转移酶测定', 'lft_06'),
       altLow(),
     ];
     const series = selectSeries(points, 'U/L', 'lft_02');
@@ -147,8 +147,8 @@ describe('selectSeries', () => {
 
   it('按 report_id 去重,保留排序后的第一份', () => {
     const points = [
-      pointOf(lft02, '丙氨酸转氨酶', 'same', { report_date: '2021-08-02', value: '835' }),
-      pointOf(lft05, '丙氨酸转氨酶', 'same', { report_date: '2021-08-02', value: '27.40' }),
+      pointOf(lft02, '丙氨酸氨基转移酶测定', 'same', { report_date: '2021-08-02', value: '835' }),
+      pointOf(lft05, '丙氨酸氨基转移酶测定', 'same', { report_date: '2021-08-02', value: '27.40' }),
     ];
     const series = selectSeries(points, 'U/L', 'same');
     expect(series.listPoints).toHaveLength(1);
@@ -157,7 +157,7 @@ describe('selectSeries', () => {
   });
 
   it('缺日期计入 undatedCount 并沉底,仍留在 listPoints 与逐点数据里', () => {
-    const dateless = pointOf(lft02, '丙氨酸转氨酶', 'dateless', { report_date: null });
+    const dateless = pointOf(lft02, '丙氨酸氨基转移酶测定', 'dateless', { report_date: null });
     const series = selectSeries([altLow(), dateless, altHigh()], 'U/L', 'lft_02');
 
     expect(series.listPoints.map((point) => point.report_date)).toEqual([
@@ -171,12 +171,12 @@ describe('selectSeries', () => {
 
   it('区间 / 不等式 / 文本 / null 不进入 chartPoints,计入非数值', () => {
     const points = [
-      pointOf(lft02, '丙氨酸转氨酶', 'scalar', { report_date: '2021-08-02' }),
-      pointOf(lft05, '丙氨酸转氨酶', 'interval', {
+      pointOf(lft02, '丙氨酸氨基转移酶测定', 'scalar', { report_date: '2021-08-02' }),
+      pointOf(lft05, '丙氨酸氨基转移酶测定', 'interval', {
         report_date: '2017-11-18',
         value: '70-80',
       }),
-      pointOf(cbc07, 'C反应蛋白', 'bound', {
+      pointOf(cbc07, 'C反应蛋白测定', 'bound', {
         report_date: '2020-01-01',
         value: '<2.00',
         unit: 'U/L',
@@ -201,7 +201,7 @@ describe('selectSeries', () => {
 
   it('候选点缺失时回落到最新有日期点', () => {
     const series = selectSeries(
-      [altLow(), altHigh(), pointOf(lft04, '丙氨酸转氨酶', 'dateless', { report_date: null })],
+      [altLow(), altHigh(), pointOf(lft04, '丙氨酸氨基转移酶测定', 'dateless', { report_date: null })],
       'U/L',
       'missing',
     );
@@ -209,26 +209,27 @@ describe('selectSeries', () => {
   });
 
   it('单点序列:selectedPoint 即该点', () => {
-    const point = pointOf(lft04, '总胆红素', 'lft_04');
-    const series = selectSeries([point], 'μmol/L', 'lft_04');
+    const point = pointOf(lft04, '总胆红素测定', 'lft_04');
+    const series = selectSeries([point], 'umol/L', 'lft_04');
     expect(series.listPoints).toHaveLength(1);
     expect(series.chartPoints).toHaveLength(1);
     expect(series.selectedPoint).toBe(point);
   });
 
-  it('改单位后序列分裂:只接同单位点', () => {
+  it('改单位后序列分裂:只接同单位点;未验证单位不形成旧序列', () => {
     const points = [
       altLow(),
       altHigh(),
-      pointOf(lft06, '丙氨酸转氨酶', 'lft_06'),
+      pointOf(lft06, '丙氨酸氨基转移酶测定', 'lft_06'),
     ];
+    expect(pointOf(lft06, '丙氨酸氨基转移酶测定', 'lft_06').unit).toBeNull();
     const ul = selectSeries(points, 'U/L', 'lft_02');
     const iu = selectSeries(points, 'IU/L', 'lft_06');
 
     expect(ul.listPoints.map((point) => point.report_id)).toEqual(['lft_05', 'lft_02']);
-    expect(iu.listPoints.map((point) => point.report_id)).toEqual(['lft_06']);
+    expect(iu.listPoints).toEqual([]);
     expect(ul.otherUnitCount).toBe(1);
-    expect(iu.otherUnitCount).toBe(2);
+    expect(iu.otherUnitCount).toBe(3);
   });
 });
 
@@ -248,14 +249,14 @@ describe('defaultSelectedIndex', () => {
   });
 
   it('候选点缺失时回落最新点;空序列取 0', () => {
-    const dateless = pointOf(lft02, '丙氨酸转氨酶', 'dateless', { report_date: null });
+    const dateless = pointOf(lft02, '丙氨酸氨基转移酶测定', 'dateless', { report_date: null });
     const series = selectSeries([altLow(), altHigh(), dateless], 'U/L', 'missing');
     expect(defaultSelectedIndex(series)).toBe(1);
     expect(defaultSelectedIndex(selectSeries([], 'U/L', 'missing'))).toBe(0);
   });
 
   it('候选点是缺日期项时仍选它', () => {
-    const dateless = pointOf(lft02, '丙氨酸转氨酶', 'dateless', { report_date: null });
+    const dateless = pointOf(lft02, '丙氨酸氨基转移酶测定', 'dateless', { report_date: null });
     const series = selectSeries([altLow(), dateless], 'U/L', 'dateless');
     expect(defaultSelectedIndex(series)).toBe(1);
   });
@@ -287,7 +288,7 @@ describe('chartLayout', () => {
   });
 
   it('单点居中,不画线;参考带横跨绘图区', () => {
-    const series = selectSeries([pointOf(lft04, '总胆红素', 'lft_04')], 'μmol/L', 'lft_04');
+    const series = selectSeries([pointOf(lft04, '总胆红素测定', 'lft_04')], 'umol/L', 'lft_04');
     const layout = chartLayout(series, 320, 64, { axes: false });
 
     expect(layout.points).toHaveLength(1);
@@ -300,8 +301,8 @@ describe('chartLayout', () => {
   it('同日期点微偏移,不重叠', () => {
     const series = selectSeries(
       [
-        pointOf(lft02, '丙氨酸转氨酶', 'a'),
-        pointOf(lft02, '天冬氨酸转氨酶', 'b'),
+        pointOf(lft02, '丙氨酸氨基转移酶测定', 'a'),
+        pointOf(lft02, '天门冬氨酸氨基转移酶测定', 'b'),
       ],
       'U/L',
       'a',
@@ -323,7 +324,7 @@ describe('chartLayout', () => {
 
     const noRef = selectSeries(
       [
-        pointOf(lft05, '丙氨酸转氨酶', 'lft_05', { ref_range: null }),
+        pointOf(lft05, '丙氨酸氨基转移酶测定', 'lft_05', { ref_range: null }),
         altHigh(),
       ],
       'U/L',
@@ -335,10 +336,10 @@ describe('chartLayout', () => {
   it('单侧参考从 y 域底部起;标量参考退化为 1px 基准线', () => {
     const oneSided = selectSeries(
       [
-        pointOf(lft05, '总胆红素', 'lft_05'),
-        pointOf(lft02, '总胆红素', 'lft_02'),
+        pointOf(lft05, '总胆红素测定', 'lft_05'),
+        pointOf(lft02, '总胆红素测定', 'lft_02'),
       ],
-      'μmol/L',
+      'umol/L',
       'lft_02',
     );
     const bounded = chartLayout(oneSided, 320, 64, { axes: false });
@@ -347,7 +348,7 @@ describe('chartLayout', () => {
     expect(bounded.bands[1].height).toBeGreaterThan(1);
 
     const scalarRef = selectSeries(
-      [pointOf(lft05, '岩藻糖苷酶', 'lft_05', { ref_range: '18.40' })],
+      [pointOf(lft05, 'α-L-岩藻糖苷酶测定', 'lft_05', { ref_range: '18.40' })],
       'U/L',
       'lft_05',
     );
@@ -358,13 +359,13 @@ describe('chartLayout', () => {
   it('实心 = reviewed || !low_confidence;空心只用于未核对低置信', () => {
     const series = selectSeries(
       [
-        pointOf(lft05, '丙氨酸转氨酶', 'normal_high_confidence', { reviewed: false }),
-        pointOf(lft02, '丙氨酸转氨酶', 'hollow', {
+        pointOf(lft05, '丙氨酸氨基转移酶测定', 'normal_high_confidence', { reviewed: false }),
+        pointOf(lft02, '丙氨酸氨基转移酶测定', 'hollow', {
           reviewed: false,
           low_confidence: true,
           report_date: '2020-01-01',
         }),
-        pointOf(lft02, '丙氨酸转氨酶', 'reviewed', {
+        pointOf(lft02, '丙氨酸氨基转移酶测定', 'reviewed', {
           reviewed: true,
           low_confidence: true,
           report_date: '2021-08-02',
@@ -380,7 +381,7 @@ describe('chartLayout', () => {
 
   it('无可绘制点返回空几何', () => {
     const series = selectSeries(
-      [pointOf(cbc07, 'C反应蛋白', 'bound', { value: '<2.00', unit: 'U/L' })],
+      [pointOf(cbc07, 'C反应蛋白测定', 'bound', { value: '<2.00', unit: 'U/L' })],
       'U/L',
       'bound',
     );
@@ -413,7 +414,7 @@ describe('chartLayout detail mode', () => {
   });
 
   it('单点居中,只给一个居中日期标签', () => {
-    const series = selectSeries([pointOf(lft04, '总胆红素', 'lft_04')], 'μmol/L', 'lft_04');
+    const series = selectSeries([pointOf(lft04, '总胆红素测定', 'lft_04')], 'umol/L', 'lft_04');
     const layout = chartLayout(series, 320, 180, { axes: true });
 
     expect(layout.points[0].x).toBe(174);
@@ -423,7 +424,7 @@ describe('chartLayout detail mode', () => {
 
   it('同日期点微偏移', () => {
     const series = selectSeries(
-      [pointOf(lft02, '丙氨酸转氨酶', 'a'), pointOf(lft02, '天冬氨酸转氨酶', 'b')],
+      [pointOf(lft02, '丙氨酸氨基转移酶测定', 'a'), pointOf(lft02, '天门冬氨酸氨基转移酶测定', 'b')],
       'U/L',
       'a',
     );
@@ -449,8 +450,8 @@ describe('chartLayout detail mode', () => {
 
   it('详情模式同样按点分段参考带;单侧从绘图区底部起,标量参考退化为 1px', () => {
     const oneSided = selectSeries(
-      [pointOf(lft05, '总胆红素', 'lft_05'), pointOf(lft02, '总胆红素', 'lft_02')],
-      'μmol/L',
+      [pointOf(lft05, '总胆红素测定', 'lft_05'), pointOf(lft02, '总胆红素测定', 'lft_02')],
+      'umol/L',
       'lft_02',
     );
     const bounded = chartLayout(oneSided, 320, 180, { axes: true });
@@ -458,14 +459,14 @@ describe('chartLayout detail mode', () => {
     expect(bounded.bands[1].y + bounded.bands[1].height).toBeCloseTo(156, 6);
 
     const noRef = selectSeries(
-      [pointOf(lft05, '丙氨酸转氨酶', 'lft_05', { ref_range: null }), altHigh()],
+      [pointOf(lft05, '丙氨酸氨基转移酶测定', 'lft_05', { ref_range: null }), altHigh()],
       'U/L',
       'lft_02',
     );
     expect(chartLayout(noRef, 320, 180, { axes: true }).bands).toHaveLength(1);
 
     const scalarRef = selectSeries(
-      [pointOf(lft05, '岩藻糖苷酶', 'lft_05', { ref_range: '18.40' })],
+      [pointOf(lft05, 'α-L-岩藻糖苷酶测定', 'lft_05', { ref_range: '18.40' })],
       'U/L',
       'lft_05',
     );
@@ -475,13 +476,13 @@ describe('chartLayout detail mode', () => {
   it('实心 / 空心与迷你图同口径', () => {
     const series = selectSeries(
       [
-        pointOf(lft05, '丙氨酸转氨酶', 'normal_high_confidence', { reviewed: false }),
-        pointOf(lft02, '丙氨酸转氨酶', 'hollow', {
+        pointOf(lft05, '丙氨酸氨基转移酶测定', 'normal_high_confidence', { reviewed: false }),
+        pointOf(lft02, '丙氨酸氨基转移酶测定', 'hollow', {
           reviewed: false,
           low_confidence: true,
           report_date: '2020-01-01',
         }),
-        pointOf(lft02, '丙氨酸转氨酶', 'reviewed', {
+        pointOf(lft02, '丙氨酸氨基转移酶测定', 'reviewed', {
           reviewed: true,
           low_confidence: true,
           report_date: '2021-08-02',
@@ -497,7 +498,7 @@ describe('chartLayout detail mode', () => {
 });
 
 describe('trendUnavailableReason', () => {
-  const altLatest = latestOf(lft02, '丙氨酸转氨酶');
+  const altLatest = latestOf(lft02, '丙氨酸氨基转移酶测定');
 
   it('有可绘制点时不返回原因', () => {
     const series = selectSeries([altLow(), altHigh()], 'U/L', 'lft_02');
@@ -506,11 +507,11 @@ describe('trendUnavailableReason', () => {
 
   it('最近一次为非数值结果', () => {
     const series = selectSeries(
-      [pointOf(cbc07, 'C反应蛋白', 'cbc_07', { unit: 'U/L' })],
+      [pointOf(cbc07, 'C反应蛋白测定', 'cbc_07', { unit: 'U/L' })],
       'U/L',
       'cbc_07',
     );
-    expect(trendUnavailableReason(series, latestOf(cbc07, 'C反应蛋白'))).toBe(
+    expect(trendUnavailableReason(series, latestOf(cbc07, 'C反应蛋白测定'))).toBe(
       '最近一次为非数值结果',
     );
   });
@@ -529,7 +530,7 @@ describe('trendUnavailableReason', () => {
 });
 
 describe('formatSeriesMeta', () => {
-  const latest = latestOf(lft02, '丙氨酸转氨酶');
+  const latest = latestOf(lft02, '丙氨酸氨基转移酶测定');
 
   it('多点:日期范围 + 份数', () => {
     const series = selectSeries([altLow(), altHigh()], 'U/L', 'lft_02');
@@ -538,11 +539,11 @@ describe('formatSeriesMeta', () => {
 
   it('单点:日期 + 仅 1 份报告', () => {
     const series = selectSeries(
-      [pointOf(lft04, '总胆红素', 'lft_04')],
-      'μmol/L',
+      [pointOf(lft04, '总胆红素测定', 'lft_04')],
+      'umol/L',
       'lft_04',
     );
-    expect(formatSeriesMeta(series, latestOf(lft04, '总胆红素'))).toBe(
+    expect(formatSeriesMeta(series, latestOf(lft04, '总胆红素测定'))).toBe(
       '2011-07-02 · 仅 1 份报告',
     );
   });
@@ -550,8 +551,8 @@ describe('formatSeriesMeta', () => {
   it('无日期:日期未知 + 份数', () => {
     const series = selectSeries(
       [
-        pointOf(lft02, '丙氨酸转氨酶', 'a', { report_date: null }),
-        pointOf(lft05, '丙氨酸转氨酶', 'b', { report_date: null }),
+        pointOf(lft02, '丙氨酸氨基转移酶测定', 'a', { report_date: null }),
+        pointOf(lft05, '丙氨酸氨基转移酶测定', 'b', { report_date: null }),
       ],
       'U/L',
       'lft_02',
@@ -564,9 +565,9 @@ describe('formatSeriesMeta', () => {
       [
         altLow(),
         altHigh(),
-        pointOf(lft02, '丙氨酸转氨酶', 'undated', { report_date: null }),
-        pointOf(lft02, '丙氨酸转氨酶', 'bad', { value: '<2.00' }),
-        pointOf(lft06, '丙氨酸转氨酶', 'other-unit'),
+        pointOf(lft02, '丙氨酸氨基转移酶测定', 'undated', { report_date: null }),
+        pointOf(lft02, '丙氨酸氨基转移酶测定', 'bad', { value: '<2.00' }),
+        pointOf(lft06, '丙氨酸氨基转移酶测定', 'other-unit'),
       ],
       'U/L',
       'lft_02',
@@ -585,9 +586,9 @@ describe('formatSeriesMeta', () => {
 describe('trendPointRows', () => {
   it('同日多份报告:首行显示日期,后续行标「同日」', () => {
     const rows = trendPointRows([
-      pointOf(lft05, '丙氨酸转氨酶', 'a'),
-      pointOf(lft02, '丙氨酸转氨酶', 'b', { report_date: lft05.report_date }),
-      pointOf(lft02, '丙氨酸转氨酶', 'c'),
+      pointOf(lft05, '丙氨酸氨基转移酶测定', 'a'),
+      pointOf(lft02, '丙氨酸氨基转移酶测定', 'b', { report_date: lft05.report_date }),
+      pointOf(lft02, '丙氨酸氨基转移酶测定', 'c'),
     ]);
 
     expect(rows.map((row) => row.dateLabel)).toEqual([
@@ -600,15 +601,15 @@ describe('trendPointRows', () => {
 
   it('缺日期点只在首行显示「日期未知」,不重复标签', () => {
     const rows = trendPointRows([
-      pointOf(lft02, '丙氨酸转氨酶', 'a', { report_date: null }),
-      pointOf(lft02, '丙氨酸转氨酶', 'b', { report_date: null }),
+      pointOf(lft02, '丙氨酸氨基转移酶测定', 'a', { report_date: null }),
+      pointOf(lft02, '丙氨酸氨基转移酶测定', 'b', { report_date: null }),
     ]);
 
     expect(rows.map((row) => row.dateLabel)).toEqual(['日期未知', undefined]);
   });
 
   it('单点保留日期标签', () => {
-    const rows = trendPointRows([pointOf(lft04, '总胆红素', 'lft_04')]);
+    const rows = trendPointRows([pointOf(lft04, '总胆红素测定', 'lft_04')]);
     expect(rows.map((row) => row.dateLabel)).toEqual(['2011-07-02']);
   });
 });
