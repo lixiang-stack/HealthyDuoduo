@@ -78,8 +78,8 @@ batch,dict,report_type,panel,current_name,standard_name,wst886_code,loinc,loinc_
 1,chemistry_dict.yaml,生化,vitanemia,叶酸,维生素B9测定,1901504A,2284-8,confirmed,nmol/L,nmol/L,ng/mL=2.266 (待核),quantitative,primary,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,
 1,chemistry_dict.yaml,生化,vitanemia,维生素B12,维生素B12 测定,1901604A,2132-9,confirmed,pmol/L,pmol/L,pg/mL=0.7378 (待核),quantitative,primary,WS/T 886—2026 表1; WS/T 404 系列; UCUM,pending,
 1,coag_dict.yaml,临检,coag,凝血酶原时间,凝血酶原时间检测,0500103A,5902-2,confirmed,s,s,秒=1,quantitative,primary,WS/T 886—2026 表1; WS/T 406—2024; WS/T 477—2026 (D-二聚体); UCUM,pending,
-1,coag_dict.yaml,临检,coag,凝血酶原时间比值,凝血酶原时间比值,,5894-1,confirmed,1,1,,ratio,local,WS/T 886—2026 表1; WS/T 406—2024; WS/T 477—2026 (D-二聚体); UCUM,pending,计算项
-1,coag_dict.yaml,临检,coag,国际标准化比值,国际标准化比值,,6301-6,confirmed,1,1,,ratio,local,WS/T 886—2026 表1; WS/T 406—2024; WS/T 477—2026 (D-二聚体); UCUM,pending,计算项
+1,coag_dict.yaml,临检,coag,凝血酶原时间比值,凝血酶原时间比值,,5894-1,confirmed,1,1,,ratio,secondary,WS/T 886—2026 表1; WS/T 406—2024; WS/T 477—2026 (D-二聚体); UCUM,pending,计算项
+1,coag_dict.yaml,临检,coag,国际标准化比值,国际标准化比值,,6301-6,confirmed,1,1,,ratio,secondary,WS/T 886—2026 表1; WS/T 406—2024; WS/T 477—2026 (D-二聚体); UCUM,pending,计算项
 1,coag_dict.yaml,临检,coag,凝血酶原活动度,凝血酶原活动度,,,missing,%,%,,quantitative,local,WS/T 886—2026 表1; WS/T 406—2024; WS/T 477—2026 (D-二聚体); UCUM,pending,计算项
 1,coag_dict.yaml,临检,coag,活化部分凝血活酶时间,活化部分凝血活酶时间检测,0500203A,3173-2,confirmed,s,s,秒=1,quantitative,primary,WS/T 886—2026 表1; WS/T 406—2024; WS/T 477—2026 (D-二聚体); UCUM,pending,
 1,coag_dict.yaml,临检,coag,纤维蛋白原,纤维蛋白原检测,0500403A,3255-7,confirmed,g/L,g/L,mg/dL=0.01,quantitative,primary,WS/T 886—2026 表1; WS/T 406—2024; WS/T 477—2026 (D-二聚体); UCUM,pending,

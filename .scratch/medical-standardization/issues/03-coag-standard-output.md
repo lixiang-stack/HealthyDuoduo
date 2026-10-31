@@ -8,6 +8,7 @@
 
 - [ ] PT/APTT/TT 输出 `s`/展示 `秒`；PTR/INR 为 ratio，单位 `1`。
 - [ ] D-二聚体 canonical `μg/L` + `result_basis=FEU`，`ng/mL`/`mg/L` 按基准换算；FIB `g/L`，FDP `μg/mL`。
+- [ ] `accepted_units` 解析为类型化对象；linear 换算带 `from`/`to`/`factor`/`source`，方向 = accepted × factor = canonical。
 - [ ] 已复核项 `unit_status=verified`；未复核项 `unit=null` + `unverified`，`raw_value`/`raw_unit`/`raw_ref_range` 保留。
 - [ ] App 显示展示单位与未验证标记；趋势只连接 verified 的 canonical unit。
 - [ ] 凝血 golden 更新并逐项说明；contract/Go/App 测试全绿。

@@ -171,7 +171,7 @@ items:
     accepted_units:                 # 真实替代单位 + 换算；不含 canonical 与 OCR 形
       - unit: "10^3/uL"
         ucum: "10*3/uL"
-        conversion: { type: linear, factor: 1.0, source: "UCUM" }
+        conversion: { type: linear, factor: 1.0, from: "10^3/uL", to: "10*9/L", source: "UCUM" }
     ocr_unit_forms:                 # OCR 损耗形 → canonical；只做字形修复
       - form: "109/L"
         evidence: ["cbc_01"]
@@ -182,6 +182,12 @@ items:
 - `name`、`result_kind`、`source_status` 必填；`review_status` 默认 `pending`；`result_kind=quantitative` 时 `canonical_unit` 必填。
 - 代码优先级：`code`（WS/T 886）→ `loinc` → `local_code`。三者都没有时 `source_status` 必须是 `pending` 或 `local`；不允许伪造标准码。
 - `accepted_units` 只放**真实替代单位**；canonical 本身永远接受，不在 `accepted_units` 重复。`ocr_unit_forms` 只放**OCR 损耗形**。同一字符串不得同时出现在两处。
+- `canonical_unit` 必须是 **ASCII UCUM 码**：micro 用 `u`（如 `ug/L`），**禁止**希腊 `μ` 或 micro sign `µ`；`unit_display` 才允许 `μg/L`。
+- `source_status` 判定：
+  - `primary`：名称/代码来自 WS/T 886 或现行国家/行业标准；
+  - `secondary`：无 WS/T 代码，但有 LOINC 或其他权威标准码；
+  - `local`：无 exact 标准码，使用 `local_code` 并写清本地依据；
+  - `pending`：尚未找到来源或未复核；不得当作 `primary` 使用。
 - `conversion` 支持 `linear`、`equation`、`none`：
   - `linear`：`factor` + `source`，仅用于有权威换算的项；
   - `equation`：`id` / `formula` + `source`（如 IFCC-NGSP HbA1c）；
@@ -216,6 +222,7 @@ items:
 - `ref_kind`：`numeric` / `qualitative` / `ordinal` / `tiered` / `none`。
 - 未验证：`unit=null`、`unit_status="unverified"`、`low_confidence=true`；`raw_unit` 保留。
 - 趋势按 `code`（优先）/ `loinc` + canonical unit 连接；不再按 `name` 字符串连接。
+- App 的指标项展示使用**原文印名**（`raw_text` 中可辨识的名称，统一走 `displayItemName`）；趋势/聚合使用规范名 `name` 或标准 `code`。规范名变更不应替换报告详情里的原文印名。
 
 ## 4. 单位与换算规则
 
@@ -241,7 +248,7 @@ canonical 采用 **SI / WS/T 报告单位**，不是单据惯用单位：
 ### 4.2 换算严格度
 
 - **精确等值**（同一物理单位的不同印法）：直接归一，`source="UCUM"`。
-- **有权威系数的线性换算**：`factor` + `source`（WS/T、IFCC、LOINC）；必须医学复核。
+- **有权威系数的线性换算**：`factor` + `source`（WS/T、IFCC、LOINC）；`factor` 方向固定为 **accepted unit × factor = canonical unit**，数据中必须同时写 `from`/`to`（如 `mg/dL × 0.01 = g/L`）；必须医学复核。
 - **方程换算**：HbA1c `%` ↔ `mmol/mol` 用 IFCC-NGSP 方程，存 `conversion.id` + `formula`。
 - **不可换算**：D-二聚体 FEU/DDU（结果基准不同）、U/L vs IU/L（酶单位体系不同）、AU vs IU/mL（任意单位 vs 国际单位）→ `conversion: none`，保留 `result_basis` 或 `unit_status=unverified`。
 - 没有权威来源的系数，**宁可不换算**；不能猜。
@@ -302,6 +309,7 @@ canonical 采用 **SI / WS/T 报告单位**，不是单据惯用单位：
 6. 每条 golden 的 `unit` 必须是 UCUM 码或 `null`；不得是 OCR 碎片。
 7. `result_kind != quantitative` 的项不得有 `canonical_unit`（`ratio`/`arbitrary` 除外，按 §3.1）。
 8. 每个 `result_kind=quantitative` 且 `review_status=approved` 的项必须有 `plausible_range`（canonical unit）；换算结果超出范围时不得标 `verified`。
+9. `canonical_unit` 不得含希腊 `μ` / micro sign `µ`；`linear` 换算必须有 `from` / `to` / `factor` / `source`，且 `from == accepted.unit`、`to == canonical_unit`。
 
 ## 8. 验收
 
