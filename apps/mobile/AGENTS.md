@@ -45,6 +45,12 @@ Run lint and typecheck before declaring any task done.
 Use EAS to build, sign, and submit the app in the cloud (`eas build`, `eas submit`) and to ship over-the-air updates (`eas update`) — no local Xcode or Android Studio required. Run EAS CLI as `bunx eas-cli <command>` in Bun projects, or `npx eas-cli@latest <command>` otherwise; substitute that for bare `eas` in docs examples.
 Docs: https://docs.expo.dev/eas/index.md
 
+## Custom interaction controls
+
+- Gesture-driven wheels/sliders: do not call programmatic `scrollTo` during drag or momentum; commit the selected value on momentum end, with a short drag-end fallback for slow releases.
+- Custom pickers and toggles expose `accessibilityLabel` plus `accessibilityState.selected`; option rows are individually tappable and have testIDs.
+- Extract scroll/index math into a pure function and unit-test it; verify the actual feel and accessibility on a real device (`ANDROID.md`).
+
 ## Rules
 
 - If `ios/` and `android/` directories do not exist, they are generated (Continuous Native Generation). Never create or edit them by hand — configure native behavior in `app.json` and config plugins.

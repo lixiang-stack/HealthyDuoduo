@@ -44,6 +44,7 @@ scripts/          文档检查与 Git 策略脚本
 
 ```bash
 go test ./...
+bash scripts/test-db.sh   # 真库测试（需 Docker；每个测试独立数据库）
 ```
 
 识别服务：
