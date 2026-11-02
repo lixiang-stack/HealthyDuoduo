@@ -180,6 +180,46 @@ describe('ReportDetailScreen', () => {
     expect(screen.queryByTestId('report-items-title')).toBeNull();
   });
 
+  it('renders clinical note sections verbatim without items or review entry', async () => {
+    useReport(
+      makeReportDetail({
+        report_id: 'r1',
+        report_type: 'clinical_note',
+        panels: ['clinical_note'],
+        items: [],
+        sections: [
+          {
+            kind: 'chief_complaint',
+            text: '发热3天。',
+            ocr_lines: [],
+          },
+          {
+            kind: 'diagnosis',
+            text: '上呼吸道感染。',
+            ocr_lines: [],
+          },
+          {
+            kind: 'treatment',
+            text: '多饮水，对症退热。',
+            ocr_lines: [],
+          },
+        ],
+      }),
+    );
+
+    await renderScreen(<ReportDetailScreen />);
+
+    expect(await screen.findByTestId('report-section-0')).toHaveTextContent(/主诉/);
+    expect(screen.getByTestId('report-section-0')).toHaveTextContent(/发热3天。/);
+    expect(screen.getByTestId('report-section-1')).toHaveTextContent(/诊断/);
+    expect(screen.getByTestId('report-section-1')).toHaveTextContent(/上呼吸道感染。/);
+    expect(screen.getByTestId('report-section-2')).toHaveTextContent(/处理/);
+    expect(screen.getByTestId('report-section-2')).toHaveTextContent(/多饮水，对症退热。/);
+    expect(screen.queryByTestId('report-items-title')).toBeNull();
+    expect(screen.queryByTestId('report-pending-entry')).toBeNull();
+    expect(screen.getByText('查看病历原图')).toBeTruthy();
+  });
+
   it('shows the load error and retries the report request', async () => {
     let failing = true;
     mockedResolveApiClient.mockResolvedValue({

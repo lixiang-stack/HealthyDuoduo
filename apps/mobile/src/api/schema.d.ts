@@ -39,7 +39,7 @@ export interface paths {
         put?: never;
         /**
          * 建成员
-         * @description name + is_child 两档信息,几十秒配好全家档案;member_id/created_at 服务端产生。
+         * @description name/is_child/sex/birth_date 必填,birth_date_precision 缺省 day;member_id/created_at 服务端产生。
          */
         post: operations["createMember"];
         delete?: never;
@@ -267,6 +267,11 @@ export interface components {
         MembersList: {
             members: components["schemas"]["Member"][];
         };
+        /**
+         * @description 性别三选一;unspecified 用于不确定时，不强迫二选一。
+         * @enum {string}
+         */
+        MemberSex: "male" | "female" | "unspecified";
         Member: {
             /**
              * Format: int64
@@ -275,8 +280,16 @@ export interface components {
             member_id: number;
             /** @description 显示名(家庭真实称呼) */
             name: string;
-            /** @description 是否孩子(两档:孩子/成人) */
+            /** @description 是否孩子(两档:孩子/成人;保留历史字段,不按生日自动改写) */
             is_child: boolean;
+            sex: components["schemas"]["MemberSex"];
+            /** @description 出生日期(YYYY-MM-DD);只知年份时填当年 01-01 并标 precision=year */
+            birth_date: string;
+            /**
+             * @description 出生日期精度;year 表示只知出生年份
+             * @enum {string}
+             */
+            birth_date_precision: "day" | "year";
             /**
              * Format: date-time
              * @description 创建时间(RFC3339;列表按 member_id 升序返回,created_at 仅展示)
@@ -286,10 +299,21 @@ export interface components {
         MemberCreate: {
             name: string;
             is_child: boolean;
+            sex: components["schemas"]["MemberSex"];
+            birth_date: string;
+            /**
+             * @default day
+             * @enum {string}
+             */
+            birth_date_precision: "day" | "year";
         };
         MemberUpdate: {
             name?: string;
             is_child?: boolean;
+            sex?: components["schemas"]["MemberSex"];
+            birth_date?: string;
+            /** @enum {string} */
+            birth_date_precision?: "day" | "year";
         };
         ReportsList: {
             reports: components["schemas"]["ReportSummary"][];
@@ -306,7 +330,7 @@ export interface components {
          *     report_type 的允许集合,other 是唯一跨类别兜底。项目组是浏览入口,不是指标过滤器。
          * @enum {string}
          */
-        PanelCode: "cbc" | "urinalysis" | "liver" | "kidney" | "lipid" | "glucose" | "thyroid" | "sex_hormone" | "uric_acid" | "electrolyte" | "vitanemia" | "infection" | "autoimmune" | "coag" | "imaging" | "other";
+        PanelCode: "cbc" | "urinalysis" | "liver" | "kidney" | "lipid" | "glucose" | "thyroid" | "sex_hormone" | "uric_acid" | "electrolyte" | "vitanemia" | "infection" | "autoimmune" | "coag" | "imaging" | "clinical_note" | "other";
         /** @description 按 flag 异常计数徽标口径(时间线卡片);缺档即 0。unknown 只统计可操作/抽取失败原因,no_reference/信息项/叙述体不计数。 */
         FlagCounts: {
             high: number;
@@ -365,7 +389,7 @@ export interface components {
         };
         /** @description 报告级叙述段落(只读展示;与识别端 reportSection 同源,行号在 HTTP 侧映射为行链接)。 */
         ReportSection: {
-            /** @description 段落类别;当前已知值 exam_name / findings / impression,数组顺序即展示顺序 */
+            /** @description 段落类别;影像为 exam_name / findings / impression,病历为 chief_complaint / present_illness / diagnosis / treatment / note;数组顺序即展示顺序 */
             kind: string;
             /** @description 段落原文(OCR 行按序以换行拼接) */
             text: string;

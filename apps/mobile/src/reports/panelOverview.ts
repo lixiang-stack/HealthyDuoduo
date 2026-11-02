@@ -10,6 +10,7 @@ import type {
 } from '../api/reports';
 import { isActionableUnknown } from '../review/items';
 
+import { reportTypeLabel } from './category';
 import { PANEL_ORDER, panelLabel, type PanelCode } from './panels';
 import { isAbnormalFlag, selectSeries, type TrendSeries } from './trends';
 
@@ -25,7 +26,7 @@ export function reportPanelLabels(
   report: Pick<ReportSummary, 'panels' | 'report_type' | 'status'>,
 ): string {
   if (usesReportTypeFallback(report)) {
-    return report.report_type;
+    return reportTypeLabel(report.report_type);
   }
   return report.panels.map(panelLabel).join(' · ');
 }
@@ -37,7 +38,8 @@ export function reportTypeNote(
   if (usesReportTypeFallback(report)) {
     return undefined;
   }
-  return report.report_type === panelLabel(report.panels[0]) ? undefined : report.report_type;
+  const typeLabel = reportTypeLabel(report.report_type);
+  return typeLabel === panelLabel(report.panels[0]) ? undefined : typeLabel;
 }
 
 export type ReportItemGroup = {
@@ -76,7 +78,9 @@ export function reportItemGroups(
     return [];
   }
   if (report.panels.length === 0) {
-    return [{ panel: null, label: report.report_type, items: sortGroupItems(report.items) }];
+    return [
+      { panel: null, label: reportTypeLabel(report.report_type), items: sortGroupItems(report.items) },
+    ];
   }
   const byPanel = new Map<PanelCode, ReportItem[]>();
   for (const item of report.items) {

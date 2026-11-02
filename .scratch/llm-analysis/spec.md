@@ -107,7 +107,7 @@ Status: ready-for-agent
 
 `is_child` 保留，可由 `birth_date` 派生，但为兼容既有 UI 不删除、不自动改写。
 
-**迁移是破坏性的**：产品未上线，迁移脚本 `TRUNCATE members CASCADE`，同时把 `reports.member_id` 置空。迁移说明必须标注这是仅限未上线阶段的操作。
+**迁移是破坏性的**：产品未上线，迁移脚本先把 `reports.member_id` 置空，再清空 `members`（不用 `TRUNCATE members CASCADE`，避免连带清空 `reports`）。迁移说明必须标注这是仅限未上线阶段的操作。
 
 这与 `CONTEXT.md` 当前定义（「成员只有显示名与是否孩子两档信息」）和 `viz-and-client` spec 冲突。实施时必须同步更新 `CONTEXT.md` 并新增 ADR，记录成员模型扩展。
 

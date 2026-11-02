@@ -4,6 +4,9 @@ import type { components } from '../api/schema';
 
 export type PanelCode = components['schemas']['PanelCode'];
 
+/** 病历项目组:叙述型报告,与 report_type=clinical_note 同 wire 值但属不同概念。 */
+export const CLINICAL_NOTE_PANEL: PanelCode = 'clinical_note';
+
 /** 固定优先级(spec §5.3):只在项目列表同日期并列时裁决,不是医学优先级;other 兜底。
  *  唯一来源是 schemas/report.schema.json $defs.panel.x-panel-order;测试锁定三端同源。 */
 export const PANEL_ORDER: PanelCode[] = [
@@ -22,6 +25,7 @@ export const PANEL_ORDER: PanelCode[] = [
   'cbc',
   'urinalysis',
   'imaging',
+  'clinical_note',
   'other',
 ];
 
@@ -41,6 +45,7 @@ export const PANEL_LABELS: Record<PanelCode, string> = {
   autoimmune: '自身抗体',
   coag: '凝血',
   imaging: '影像',
+  clinical_note: '病历',
   other: '其他',
 };
 

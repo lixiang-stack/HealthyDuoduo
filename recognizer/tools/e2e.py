@@ -737,7 +737,7 @@ def verify(item: str, from_root: Path) -> None:
 
     importlib.invalidate_caches()
     from recognizer.postprocess import (
-        BODY_SECTION_KINDS,
+        NARRATIVE_BODY_SECTION_KINDS,
         load_dicts,
         load_unit_forms,
     )
@@ -778,7 +778,7 @@ def verify(item: str, from_root: Path) -> None:
         )
 
     verify_ocr_lines()
-    verify_narrative_reports(BODY_SECTION_KINDS)
+    verify_narrative_reports(NARRATIVE_BODY_SECTION_KINDS)
 
     rows_def = _trend_rows(item, False, from_root)
     rows_all = _trend_rows(item, True, from_root)

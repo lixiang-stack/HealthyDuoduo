@@ -29,43 +29,79 @@ func (f *optField[T]) UnmarshalJSON(data []byte) error {
 	return json.Unmarshal(data, &f.value)
 }
 
-// memberBody POST/PATCH 请求体解码形状:name/is_child 按「是否携带 + 值」两段读,
+// memberBody POST/PATCH 请求体解码形状:字段按「是否携带 + 值」两段读,
 // 用于执行契约的 required(建)与 minProperties: 1(改)约束。
 type memberBody struct {
-	Name    optField[string] `json:"name"`
-	IsChild optField[bool]   `json:"is_child"`
+	Name               optField[string] `json:"name"`
+	IsChild            optField[bool]   `json:"is_child"`
+	Sex                optField[string] `json:"sex"`
+	BirthDate          optField[string] `json:"birth_date"`
+	BirthDatePrecision optField[string] `json:"birth_date_precision"`
 }
 
-// create 建成员请求出口:传输校验(字段必带)与领域规则(名字非空白)在此收口,
+// create 建成员请求出口:传输校验(必填字段)与领域规则在此收口,
 // handler 只做 解码→取值→调用→映射错误;领域错误透传(中性说明)。
-func (b memberBody) create() (name string, isChild bool, err error) {
+func (b memberBody) create() (pipeline.MemberProfile, error) {
 	if !b.Name.set {
-		return "", false, errors.New("name is required")
-	}
-	if err := pipeline.ValidateMemberName(b.Name.value); err != nil {
-		return "", false, err
+		return pipeline.MemberProfile{}, errors.New("name is required")
 	}
 	if !b.IsChild.set {
-		return "", false, errors.New("is_child is required")
+		return pipeline.MemberProfile{}, errors.New("is_child is required")
 	}
-	return b.Name.value, b.IsChild.value, nil
+	if !b.Sex.set {
+		return pipeline.MemberProfile{}, errors.New("sex is required")
+	}
+	if !b.BirthDate.set {
+		return pipeline.MemberProfile{}, errors.New("birth_date is required")
+	}
+	precision := pipeline.BirthDatePrecisionDay
+	if b.BirthDatePrecision.set {
+		precision = b.BirthDatePrecision.value
+	}
+	profile := pipeline.MemberProfile{
+		Name: b.Name.value, IsChild: b.IsChild.value, Sex: b.Sex.value,
+		BirthDate: b.BirthDate.value, BirthDatePrecision: precision,
+	}
+	if err := pipeline.ValidateMemberProfile(profile); err != nil {
+		return pipeline.MemberProfile{}, err
+	}
+	return profile, nil
 }
 
-// patch 改成员请求出口:至少携带一项;所带 name 过领域规则,返回仅含所带字段的取值。
-func (b memberBody) patch() (name *string, isChild *bool, err error) {
-	if !b.Name.set && !b.IsChild.set {
-		return nil, nil, errors.New("at least one of name, is_child is required")
+// patch 改成员请求出口:至少携带一项;所带字段过领域规则,返回仅含所带字段的取值。
+func (b memberBody) patch() (pipeline.MemberPatch, error) {
+	if !b.Name.set && !b.IsChild.set && !b.Sex.set && !b.BirthDate.set && !b.BirthDatePrecision.set {
+		return pipeline.MemberPatch{}, errors.New("at least one of name, is_child, sex, birth_date, birth_date_precision is required")
 	}
+	var patch pipeline.MemberPatch
 	if b.Name.set {
 		if err := pipeline.ValidateMemberName(b.Name.value); err != nil {
-			return nil, nil, err
+			return pipeline.MemberPatch{}, err
 		}
-		name = &b.Name.value
+		patch.Name = &b.Name.value
 	}
 	if b.IsChild.set {
-		isChild = &b.IsChild.value
+		patch.IsChild = &b.IsChild.value
 	}
-	return name, isChild, nil
+	if b.Sex.set {
+		if err := pipeline.ValidateMemberSex(b.Sex.value); err != nil {
+			return pipeline.MemberPatch{}, err
+		}
+		patch.Sex = &b.Sex.value
+	}
+	if b.BirthDate.set {
+		if err := pipeline.ValidateMemberBirthDate(b.BirthDate.value); err != nil {
+			return pipeline.MemberPatch{}, err
+		}
+		patch.BirthDate = &b.BirthDate.value
+	}
+	if b.BirthDatePrecision.set {
+		if err := pipeline.ValidateMemberBirthDatePrecision(b.BirthDatePrecision.value); err != nil {
+			return pipeline.MemberPatch{}, err
+		}
+		patch.BirthDatePrecision = &b.BirthDatePrecision.value
+	}
+	return patch, nil
 }
 
 // handleListMembers GET /api/v1/members:全量成员,创建序(id 升序)。
@@ -84,7 +120,8 @@ func handleListMembers(ms pipeline.MemberStore) http.HandlerFunc {
 	}
 }
 
-// handleCreateMember POST /api/v1/members:name + is_child 必填;201 返回完整成员。
+// handleCreateMember POST /api/v1/members:name/is_child/sex/birth_date 必填;
+// 201 返回完整成员。
 func handleCreateMember(ms pipeline.MemberStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var body memberBody
@@ -92,12 +129,12 @@ func handleCreateMember(ms pipeline.MemberStore) http.HandlerFunc {
 			writeErrorJSON(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		name, isChild, err := body.create()
+		profile, err := body.create()
 		if err != nil {
 			writeErrorJSON(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		m, err := ms.CreateMember(r.Context(), name, isChild)
+		m, err := ms.CreateMember(r.Context(), profile)
 		if err != nil {
 			writeErrorJSON(w, http.StatusInternalServerError, "create member failed")
 			return
@@ -120,12 +157,12 @@ func handleUpdateMember(ms pipeline.MemberStore) http.HandlerFunc {
 			writeErrorJSON(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		name, isChild, err := body.patch()
+		patch, err := body.patch()
 		if err != nil {
 			writeErrorJSON(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		m, err := ms.UpdateMember(r.Context(), id, name, isChild)
+		m, err := ms.UpdateMember(r.Context(), id, patch)
 		if err != nil {
 			writeErrorJSON(w, http.StatusInternalServerError, "update member failed")
 			return
@@ -163,9 +200,12 @@ func handleDeleteMember(ms pipeline.MemberStore) http.HandlerFunc {
 // toAPIMember 业务视图 → 契约形状(created_at 统一 RFC3339 UTC)。
 func toAPIMember(m pipeline.Member) httpapi.Member {
 	return httpapi.Member{
-		MemberID:  m.MemberID,
-		Name:      m.Name,
-		IsChild:   m.IsChild,
-		CreatedAt: m.CreatedAt.UTC().Format(time.RFC3339),
+		MemberID:           m.MemberID,
+		Name:               m.Name,
+		IsChild:            m.IsChild,
+		Sex:                m.Sex,
+		BirthDate:          m.BirthDate,
+		BirthDatePrecision: m.BirthDatePrecision,
+		CreatedAt:          m.CreatedAt.UTC().Format(time.RFC3339),
 	}
 }

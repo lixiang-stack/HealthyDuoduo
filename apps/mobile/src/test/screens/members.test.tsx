@@ -69,6 +69,114 @@ describe('MembersScreen', () => {
     );
   });
 
+  it('requires sex and birth date, then submits year precision as January 1', async () => {
+    const createHandler = jest.fn((_options?: FakeApiOptions) =>
+      makeMember({ member_id: 2, name: '小虎' }),
+    );
+    useApi({
+      GET: {
+        '/members': () => ({ members: [] }),
+      },
+      POST: { '/members': createHandler },
+    });
+
+    await renderScreen(<MembersScreen />);
+    expect(await screen.findByText(/还没有家庭成员/)).toBeTruthy();
+
+    await fireEvent.changeText(screen.getByTestId('members-name-input'), '小虎');
+    await fireEvent.press(screen.getByTestId('members-create'));
+    expect(createHandler).not.toHaveBeenCalled();
+
+    await fireEvent.press(screen.getByTestId('members-sex-female'));
+    await fireEvent.press(screen.getByTestId('members-precision-year'));
+    await fireEvent.changeText(screen.getByTestId('members-birth-date'), '2020');
+    await fireEvent.press(screen.getByTestId('members-create'));
+
+    await waitFor(() => expect(createHandler).toHaveBeenCalledTimes(1));
+    expect(createHandler.mock.calls[0][0]).toMatchObject({
+      body: {
+        name: '小虎',
+        is_child: false,
+        sex: 'female',
+        birth_date: '2020-01-01',
+        birth_date_precision: 'year',
+      },
+    });
+  });
+
+  it('keeps the day-precision form invalid until a real YYYY-MM-DD date is entered', async () => {
+    const createHandler = jest.fn((_options?: FakeApiOptions) =>
+      makeMember({ member_id: 2, name: '小虎' }),
+    );
+    useApi({
+      GET: {
+        '/members': () => ({ members: [] }),
+      },
+      POST: { '/members': createHandler },
+    });
+
+    await renderScreen(<MembersScreen />);
+    expect(await screen.findByText(/还没有家庭成员/)).toBeTruthy();
+
+    await fireEvent.changeText(screen.getByTestId('members-name-input'), '小虎');
+    await fireEvent.press(screen.getByTestId('members-sex-male'));
+    await fireEvent.changeText(screen.getByTestId('members-birth-date'), '2020-02-30');
+    await fireEvent.press(screen.getByTestId('members-create'));
+
+    expect(createHandler).not.toHaveBeenCalled();
+  });
+
+  it('edits sex / birth date / precision through a partial PATCH', async () => {
+    let members = [
+      makeMember({
+        member_id: 1,
+        name: '小明',
+        sex: 'unspecified',
+        birth_date: '2020-01-01',
+        birth_date_precision: 'day',
+      }),
+    ];
+    const patchHandler = jest.fn((options?: FakeApiOptions) => {
+      const body = options?.body as Record<string, unknown>;
+      members = [
+        {
+          ...members[0],
+          name: String(body.name),
+          is_child: Boolean(body.is_child),
+          sex: body.sex as 'male' | 'female' | 'unspecified',
+          birth_date: String(body.birth_date),
+          birth_date_precision: body.birth_date_precision as 'day' | 'year',
+        },
+      ];
+      return members[0];
+    });
+    useApi({
+      GET: { '/members': () => ({ members }) },
+      PATCH: { '/members/{member_id}': patchHandler },
+    });
+
+    await renderScreen(<MembersScreen />);
+    expect(await screen.findByText('小明')).toBeTruthy();
+
+    await fireEvent.press(screen.getByText('编辑'));
+    await fireEvent.press(screen.getByTestId('member-edit-1-sex-female'));
+    await fireEvent.press(screen.getByTestId('member-edit-1-precision-year'));
+    await fireEvent.changeText(screen.getByTestId('member-edit-1-birth-date'), '2019');
+    await fireEvent.press(screen.getByTestId('member-edit-save-1'));
+
+    await waitFor(() => expect(patchHandler).toHaveBeenCalledTimes(1));
+    expect(patchHandler.mock.calls[0][0]).toMatchObject({
+      params: { path: { member_id: 1 } },
+      body: {
+        name: '小明',
+        is_child: true,
+        sex: 'female',
+        birth_date: '2019-01-01',
+        birth_date_precision: 'year',
+      },
+    });
+  });
+
   it('shows the generic irreversible confirmation when the member has no reports', async () => {
     useApi({
       GET: {

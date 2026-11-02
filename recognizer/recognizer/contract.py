@@ -72,6 +72,7 @@ class Panel(_Vocabulary):
     AUTOIMMUNE = "autoimmune"
     COAG = "coag"
     IMAGING = "imaging"
+    CLINICAL_NOTE = "clinical_note"
     OTHER = "other"
 
 
@@ -93,6 +94,7 @@ PANEL_ORDER: tuple[Panel, ...] = (
     Panel.CBC,
     Panel.URINALYSIS,
     Panel.IMAGING,
+    Panel.CLINICAL_NOTE,
     Panel.OTHER,
 )
 
@@ -113,11 +115,17 @@ PANEL_LABELS: dict[Panel, str] = {
     Panel.AUTOIMMUNE: "自身抗体",
     Panel.COAG: "凝血",
     Panel.IMAGING: "影像",
+    Panel.CLINICAL_NOTE: "病历",
     Panel.OTHER: "其他",
 }
 
-# 影像报告无指标项,报告级面板取该类别值(spec §5.1/§6.3)。
+# 叙述型报告无指标项,报告级面板取该类别值(spec §5.1/§6.3;病历见 llm-analysis §4.3)。
 IMAGING_REPORT_TYPE = "影像"
+CLINICAL_NOTE_REPORT_TYPE = "clinical_note"
+NARRATIVE_REPORT_PANELS: dict[str, Panel] = {
+    IMAGING_REPORT_TYPE: Panel.IMAGING,
+    CLINICAL_NOTE_REPORT_TYPE: Panel.CLINICAL_NOTE,
+}
 
 # 指标项 panel 的父类约束(spec §5.1);other 是唯一跨类别兜底。
 PANEL_ALLOWED_BY_REPORT_TYPE: dict[str, frozenset[Panel]] = {
@@ -129,6 +137,7 @@ PANEL_ALLOWED_BY_REPORT_TYPE: dict[str, frozenset[Panel]] = {
     "激素": frozenset({Panel.THYROID, Panel.SEX_HORMONE, Panel.OTHER}),
     "免疫": frozenset({Panel.INFECTION, Panel.AUTOIMMUNE, Panel.OTHER}),
     IMAGING_REPORT_TYPE: frozenset({Panel.IMAGING, Panel.OTHER}),
+    CLINICAL_NOTE_REPORT_TYPE: frozenset({Panel.CLINICAL_NOTE, Panel.OTHER}),
     "其他专项": frozenset({Panel.OTHER}),
 }
 
@@ -147,7 +156,7 @@ def aggregate_panels(panels: Iterable[Panel]) -> list[Panel]:
 def report_panels(
     report_type: str, status: Status, item_panels: Iterable[Panel]
 ) -> list[Panel]:
-    """报告级项目组:失败 → other;有指标项 → 排序聚合;无指标项 → 影像 / other。
+    """报告级项目组:失败 → other;有指标项 → 排序聚合;无指标项 → 叙述型 panel / other。
 
     postprocess 与 /classify 共用这一条规则,避免两套 fallback 漂移(spec §6.3/§6.4)。
     """
@@ -156,8 +165,8 @@ def report_panels(
         return [Panel.OTHER]
     if panels:
         return aggregate_panels(panels)
-    if report_type == IMAGING_REPORT_TYPE:
-        return [Panel.IMAGING]
+    if report_type in NARRATIVE_REPORT_PANELS:
+        return [NARRATIVE_REPORT_PANELS[report_type]]
     return [Panel.OTHER]
 
 
@@ -281,13 +290,14 @@ class ReportItem(BaseModel):
 
 
 class ReportSection(BaseModel):
-    """报告级叙述段落(仅叙述型报告,如影像单;只读展示,不参与指标项核对)。"""
+    """报告级叙述段落(仅叙述型报告,如影像单 / 病历;只读展示,不参与指标项核对)。"""
 
     model_config = ConfigDict(extra="forbid")
 
     kind: str = Field(
         min_length=1,
-        description="section kind; known values: exam_name / findings / impression",
+        description="section kind; imaging: exam_name / findings / impression; "
+        "clinical note: chief_complaint / present_illness / diagnosis / treatment / note",
     )
     text: str = Field(min_length=1, description="section text as printed (OCR lines joined by newline)")
     ocr_line_numbers: list[int] = Field(
@@ -318,7 +328,7 @@ class Report(BaseModel):
 
     @model_validator(mode="after")
     def _empty_items_must_be_failed_or_sectioned(self) -> "Report":
-        # 不变量(票 03/04):零指标项只允许 failed,或叙述型报告携带 sections(影像单
+        # 不变量(票 03/04):零指标项只允许 failed,或叙述型报告携带 sections(影像 / 病历
         # 以段落为主体);「成功/待核对且零指标项且无段落」仍连构造都不可能。
         if not self.items and not self.sections and self.status is not Status.FAILED:
             raise ValueError(

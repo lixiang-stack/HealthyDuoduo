@@ -95,7 +95,7 @@ func decodeReview(t *testing.T, status int, raw []byte, wantStatus int) httpapi.
 // 未核对低置信计数 = 1),返回报告详情。
 func uploadSample(t *testing.T, srv *httptest.Server) httpapi.ReportDetail {
 	t.Helper()
-	createOne(t, srv, `{"name":"小虎","is_child":true}`)
+	createOne(t, srv, memberCreateBody("小虎", true))
 	status, raw := doUpload(t, srv, []byte("fake-jpeg-review-bytes-01"), map[string]string{formMemberID: "1"})
 	return decodeUpload(t, status, raw, http.StatusCreated).Report
 }

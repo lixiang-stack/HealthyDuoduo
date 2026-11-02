@@ -15,15 +15,29 @@ const (
 	StatusFailed  = "failed"
 )
 
-// ReportTypeImaging 影像(超声)叙述型报告的 report_type 域值。
-const ReportTypeImaging = "影像"
+// 叙述型报告类别:影像(超声)与病历(llm-analysis 票 03);主体是报告段落,零指标项。
+const (
+	ReportTypeImaging      = "影像"
+	ReportTypeClinicalNote = "clinical_note"
+)
 
 // 报告段落类别(schemas/report.schema.json reportSection.kind)。
+// exam_name/findings/impression 属影像;其余属病历,note 是切不出标题时的整页兜底。
 const (
-	SectionKindExamName   = "exam_name"
-	SectionKindFindings   = "findings"
-	SectionKindImpression = "impression"
+	SectionKindExamName       = "exam_name"
+	SectionKindFindings       = "findings"
+	SectionKindImpression     = "impression"
+	SectionKindChiefComplaint = "chief_complaint"
+	SectionKindPresentIllness = "present_illness"
+	SectionKindDiagnosis      = "diagnosis"
+	SectionKindTreatment      = "treatment"
+	SectionKindNote           = "note"
 )
+
+// IsNarrativeReportType 该报告类别是否以段落为主体(零指标项合法;status 由正文派生)。
+func IsNarrativeReportType(reportType string) bool {
+	return reportType == ReportTypeImaging || reportType == ReportTypeClinicalNote
+}
 
 // ModelInfo 描述 OCR 使用的模型。
 type ModelInfo struct {
@@ -76,8 +90,8 @@ type ReportItem struct {
 	OCRLineNumbers []int32 `json:"ocr_line_numbers"`
 }
 
-// ReportSection 是报告级叙述段落(仅叙述型报告,如影像单;只读展示,不参与指标项核对)。
-// Kind 当前已知值 exam_name / findings / impression;数组顺序即展示顺序。
+// ReportSection 是报告级叙述段落(仅叙述型报告,如影像单 / 病历;只读展示,不参与指标项核对)。
+// Kind:影像 exam_name / findings / impression;病历 chief_complaint / present_illness / diagnosis / treatment / note。数组顺序即展示顺序。
 type ReportSection struct {
 	Kind           string  `json:"kind"`
 	Text           string  `json:"text"`

@@ -215,13 +215,13 @@ func seedPanelStore(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 		t.Fatalf("clean previous seed: %v", err)
 	}
 	var memberA, memberB int64
-	if err := pool.QueryRow(ctx, `INSERT INTO members (name, is_child) VALUES ('面板测试成员', true) RETURNING id`).Scan(&memberA); err != nil {
+	if err := pool.QueryRow(ctx, `INSERT INTO members (name, is_child, sex, birth_date, birth_date_precision) VALUES ('面板测试成员', true, 'unspecified', '2020-01-01', 'day') RETURNING id`).Scan(&memberA); err != nil {
 		t.Fatalf("seed member A: %v", err)
 	}
-	if err := pool.QueryRow(ctx, `INSERT INTO members (name, is_child) VALUES ('面板影像成员', false) RETURNING id`).Scan(&memberB); err != nil {
+	if err := pool.QueryRow(ctx, `INSERT INTO members (name, is_child, sex, birth_date, birth_date_precision) VALUES ('面板影像成员', false, 'unspecified', '2020-01-01', 'day') RETURNING id`).Scan(&memberB); err != nil {
 		t.Fatalf("seed member B: %v", err)
 	}
-	if _, err := pool.Exec(ctx, `INSERT INTO members (name, is_child) VALUES ('面板空成员', false)`); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO members (name, is_child, sex, birth_date, birth_date_precision) VALUES ('面板空成员', false, 'unspecified', '2020-01-01', 'day')`); err != nil {
 		t.Fatalf("seed member C: %v", err)
 	}
 	if _, err := pool.Exec(ctx, `INSERT INTO images (sha256, original_filename) VALUES
@@ -330,7 +330,7 @@ func TestPanelStoreJoinsByCodeAcrossPanels(t *testing.T) {
 		t.Fatalf("clean seed: %v", err)
 	}
 	var memberID int64
-	if err := pool.QueryRow(ctx, `INSERT INTO members (name, is_child) VALUES ('趋势键成员', false) RETURNING id`).Scan(&memberID); err != nil {
+	if err := pool.QueryRow(ctx, `INSERT INTO members (name, is_child, sex, birth_date, birth_date_precision) VALUES ('趋势键成员', false, 'unspecified', '2020-01-01', 'day') RETURNING id`).Scan(&memberID); err != nil {
 		t.Fatalf("seed member: %v", err)
 	}
 	if _, err := pool.Exec(ctx, `INSERT INTO images (sha256, original_filename) VALUES

@@ -124,7 +124,7 @@ export default function PanelDetailScreen() {
                 <Text testID="panel-detail-meta" style={sharedStyles.muted}>
                   {[
                     memberName,
-                    panelDateLabel(detail.latest_report_date, detail.narrative),
+                    panelDateLabel(detail.latest_report_date, detail.narrative, detail.panel),
                     `${detail.report_count} 份报告`,
                     `${groups.abnormal.length} 项异常`,
                   ]

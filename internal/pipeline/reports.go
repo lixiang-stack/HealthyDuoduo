@@ -31,13 +31,17 @@ func noReportError(sha string) error {
 // schemas/testdata/http/report.summary.failed.json)。
 const failReasonNoItems = "no metric items recognized"
 
-// failReasonNoBody 叙述型报告(影像)无正文段落失败的固定原因(票 04)。
+// failReasonNoBody 叙述型报告(影像 / 病历)无正文段落失败的固定原因(票 04/03)。
 const failReasonNoBody = "no report body recognized"
 
-// hasReportBody 报告段落中是否含叙述正文(findings/impression;exam_name 不算)。
+// hasReportBody 报告段落中是否含叙述正文:影像 findings/impression、病历四段与 note;
+// exam_name 只是影像头部信息,不算正文。
 func hasReportBody(sections []contract.ReportSection) bool {
 	for _, s := range sections {
-		if s.Kind == contract.SectionKindFindings || s.Kind == contract.SectionKindImpression {
+		switch s.Kind {
+		case contract.SectionKindFindings, contract.SectionKindImpression,
+			contract.SectionKindChiefComplaint, contract.SectionKindPresentIllness,
+			contract.SectionKindDiagnosis, contract.SectionKindTreatment, contract.SectionKindNote:
 			return true
 		}
 	}
@@ -55,7 +59,7 @@ func applyFailInvariant(report *contract.Report) *string {
 	}
 	if report.Status == contract.StatusFailed && len(report.Items) == 0 {
 		reason := failReasonNoItems
-		if report.ReportType == contract.ReportTypeImaging && !hasReportBody(report.Sections) {
+		if contract.IsNarrativeReportType(report.ReportType) && !hasReportBody(report.Sections) {
 			reason = failReasonNoBody
 		}
 		return &reason

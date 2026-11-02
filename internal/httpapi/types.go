@@ -3,24 +3,34 @@
 // 该镜像序列化响应,对账测试(internal/httpapi 的互证测试)锁死与 OpenAPI 的漂移。
 package httpapi
 
-// Member components/Member:成员最小模型 = 显示名 + 是否孩子(孩子/成人两档),仅此二字段。
+// Member components/Member:成员模型 = 显示名 + 是否孩子 + 性别 + 出生日期及精度。
 type Member struct {
-	MemberID  int64  `json:"member_id"`
-	Name      string `json:"name"`
-	IsChild   bool   `json:"is_child"`
-	CreatedAt string `json:"created_at"` // RFC3339 date-time
+	MemberID           int64  `json:"member_id"`
+	Name               string `json:"name"`
+	IsChild            bool   `json:"is_child"`
+	Sex                string `json:"sex"`                  // male | female | unspecified
+	BirthDate          string `json:"birth_date"`           // YYYY-MM-DD
+	BirthDatePrecision string `json:"birth_date_precision"` // day | year
+	CreatedAt          string `json:"created_at"`           // RFC3339 date-time
 }
 
-// MemberCreate POST /members 请求体:member_id/created_at 由服务端产生,不收。
+// MemberCreate POST /members 请求体:member_id/created_at 由服务端产生,不收;
+// sex/birth_date 必填,birth_date_precision 缺省 day。
 type MemberCreate struct {
-	Name    string `json:"name"`
-	IsChild bool   `json:"is_child"`
+	Name               string  `json:"name"`
+	IsChild            bool    `json:"is_child"`
+	Sex                string  `json:"sex"`
+	BirthDate          string  `json:"birth_date"`
+	BirthDatePrecision *string `json:"birth_date_precision,omitempty"`
 }
 
 // MemberUpdate PATCH /members/{member_id} 请求体:至少一项;删除成员见 DELETE。
 type MemberUpdate struct {
-	Name    *string `json:"name,omitempty"`
-	IsChild *bool   `json:"is_child,omitempty"`
+	Name               *string `json:"name,omitempty"`
+	IsChild            *bool   `json:"is_child,omitempty"`
+	Sex                *string `json:"sex,omitempty"`
+	BirthDate          *string `json:"birth_date,omitempty"`
+	BirthDatePrecision *string `json:"birth_date_precision,omitempty"`
 }
 
 // MembersList GET /members 响应信封;列表按 member_id 升序(创建序)返回。

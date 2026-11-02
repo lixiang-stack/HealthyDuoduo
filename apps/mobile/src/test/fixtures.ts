@@ -23,6 +23,9 @@ export function makeMember(overrides: Partial<Member> = {}): Member {
     member_id: 1,
     name: '小明',
     is_child: true,
+    sex: 'unspecified',
+    birth_date: '2020-01-01',
+    birth_date_precision: 'day',
     created_at: '2026-01-01T00:00:00Z',
     ...overrides,
   };

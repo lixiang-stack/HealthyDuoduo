@@ -248,7 +248,7 @@ func TestReparse_UsesStoredOCRAndReplaceItems(t *testing.T) {
 	}
 }
 
-// ---------- 空指标项不变量(viz-and-client 票 03)----------
+// ---------- 空指标项不变量(viz-and-client 票 03;病历见 llm-analysis 票 03)----------
 // 报告级别产出「成功且零指标项」不可能:items 为空一律判 failed,pipeline 产出失败原因,
 // 与识别端契约校验及存储镜像校验构成防线;直灌绕过识别端也在此挡住。
 
@@ -358,6 +358,48 @@ func TestIngestFailedImagingEmpty_SetsNoBodyReason(t *testing.T) {
 				t.Errorf("fail_reason = %v, want %q", got, want)
 			}
 		})
+	}
+}
+
+func TestIngestEmptyItemsClinicalNote_Success(t *testing.T) {
+	// 病历(llm-analysis 票 03):零指标项 + 段落是合法叙述型报告,不降级 failed。
+	rec := newFakeRecognizer()
+	rec.report = contract.Report{
+		ReportType: contract.ReportTypeClinicalNote,
+		Status:     contract.StatusSuccess,
+		Sections: []contract.ReportSection{
+			{Kind: contract.SectionKindDiagnosis, Text: "上呼吸道感染。", OCRLineNumbers: []int32{0}},
+		},
+	}
+	st, obj := newFakeStore(), newObjects()
+	path := writeImage(t, []byte("fake-note-1"))
+
+	oc := ingest(t, st, rec, obj, path, "", false)
+
+	if oc.Report.Status != contract.StatusSuccess {
+		t.Errorf("status = %q, want success untouched", oc.Report.Status)
+	}
+	if got := st.reports[oc.Sha256].failReason; got != nil {
+		t.Errorf("fail_reason = %v, want nil for clinical note with body", got)
+	}
+}
+
+func TestIngestFailedClinicalNoteNoBody_SetsNoBodyReason(t *testing.T) {
+	// 防御性:识别端显式给出 clinical_note + failed 且无正文时,固定原因 no report body recognized。
+	// 真实空白页通常分类为 unknown,走 no metric items recognized。
+	rec := newFakeRecognizer()
+	rec.report = contract.Report{ReportType: contract.ReportTypeClinicalNote, Status: contract.StatusFailed}
+	st, obj := newFakeStore(), newObjects()
+	path := writeImage(t, []byte("fake-note-empty"))
+
+	oc := ingest(t, st, rec, obj, path, "", false)
+
+	if oc.Report.Status != contract.StatusFailed {
+		t.Errorf("status = %q, want failed untouched", oc.Report.Status)
+	}
+	want := "no report body recognized"
+	if got := st.reports[oc.Sha256].failReason; got == nil || *got != want {
+		t.Errorf("fail_reason = %v, want %q", got, want)
 	}
 }
 

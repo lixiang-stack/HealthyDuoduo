@@ -178,7 +178,7 @@ func classifyItems(items []BackfillItem) []ClassifyItem {
 }
 
 // validateClassifyResult 防御跨服务契约漂移:长度不对、空 code、零指标项报告的
-// 影像 / other 兜底、报告级 panels 与指标项 panel 集合不一致(重复 / 漂移)时拒绝写入;
+// 叙述型面板(影像 / 病历) / other 兜底、报告级 panels 与指标项 panel 集合不一致(重复 / 漂移)时拒绝写入;
 // 排序仍以识别端为准,Go 不维护优先级表。
 func validateClassifyResult(reportType string, items []BackfillItem, panels, itemPanels []string) error {
 	if len(itemPanels) != len(items) {
@@ -189,8 +189,11 @@ func validateClassifyResult(reportType string, items []BackfillItem, panels, ite
 	}
 	if len(items) == 0 {
 		want := "other"
-		if reportType == contract.ReportTypeImaging {
-			want = "imaging"
+		switch reportType {
+		case contract.ReportTypeImaging:
+			want = PanelImaging
+		case contract.ReportTypeClinicalNote:
+			want = PanelClinicalNote
 		}
 		if len(panels) != 1 || panels[0] != want {
 			return fmt.Errorf("classify returned panels %v for zero-item %s report, want [%s]", panels, reportType, want)

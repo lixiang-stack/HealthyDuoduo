@@ -509,7 +509,7 @@ func decodeUpload(t *testing.T, status int, raw []byte, wantStatus int) httpapi.
 // 识别端返回转正图像 → 报告身份/对象存储使用转正后的 sha;再传原图按 duplicate 返回。
 func TestServeUploadNormalizedImage_UsesNormalizedIdentity(t *testing.T) {
 	srv, st, rec, _ := newReportsTestServer(t)
-	createOne(t, srv, `{"name":"小虎","is_child":true}`)
+	createOne(t, srv, memberCreateBody("小虎", true))
 	original := []byte("sideways-jpeg-bytes")
 	rec.normalized = []byte("upright-jpeg-bytes")
 
@@ -538,7 +538,7 @@ func TestServeUploadNormalizedImage_UsesNormalizedIdentity(t *testing.T) {
 // 指标项句柄与核对状态、ocr_lines 空数组与 prev null 的契约形状),识别只跑一次。
 func TestServeUploadNewReport(t *testing.T) {
 	srv, st, rec, _ := newReportsTestServer(t)
-	createOne(t, srv, `{"name":"小虎","is_child":true}`)
+	createOne(t, srv, memberCreateBody("小虎", true))
 
 	image := []byte("fake-jpeg-bytes-01")
 	status, raw := doUpload(t, srv, image, map[string]string{formMemberID: "1"})
@@ -614,8 +614,8 @@ func TestServeUploadNewReport(t *testing.T) {
 // 识别不重跑、item_id 不变;已有归属不被夺走;无主存量报告在重传时补齐归属(自愈)。
 func TestServeUploadDuplicate(t *testing.T) {
 	srv, st, rec, _ := newReportsTestServer(t)
-	createOne(t, srv, `{"name":"小虎","is_child":true}`)
-	createOne(t, srv, `{"name":"妈妈","is_child":false}`)
+	createOne(t, srv, memberCreateBody("小虎", true))
+	createOne(t, srv, memberCreateBody("妈妈", false))
 
 	image := []byte("fake-jpeg-bytes-02")
 	status, raw := doUpload(t, srv, image, map[string]string{formMemberID: "1"})
@@ -663,7 +663,7 @@ func TestServeUploadDuplicate(t *testing.T) {
 // 徽标计数全 0、无可核对项;同图再传仍 200(失败报告无核对决策,幂等返回同一失败报告)。
 func TestServeUploadFailedReport(t *testing.T) {
 	srv, _, rec, _ := newReportsTestServer(t)
-	createOne(t, srv, `{"name":"小虎","is_child":true}`)
+	createOne(t, srv, memberCreateBody("小虎", true))
 	rec.report = &contract.Report{ReportType: "其他专项", Status: contract.StatusFailed, Panels: []string{"other"}}
 
 	image := []byte("blank-or-blurry-photo")
@@ -697,7 +697,7 @@ func TestServeUploadFailedReport(t *testing.T) {
 // review_status 回 unreviewed、归属保持;无核对决策时 override 同样重跑(显式覆盖)。
 func TestServeUploadOverride(t *testing.T) {
 	srv, _, rec, _ := newReportsTestServer(t)
-	createOne(t, srv, `{"name":"小虎","is_child":true}`)
+	createOne(t, srv, memberCreateBody("小虎", true))
 
 	image := []byte("fake-jpeg-bytes-03")
 	status, raw := doUpload(t, srv, image, map[string]string{formMemberID: "1"})
@@ -773,7 +773,7 @@ func TestServeUploadValidation(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			srv, st, rec, _ := newReportsTestServer(t)
-			createOne(t, srv, `{"name":"小虎","is_child":true}`)
+			createOne(t, srv, memberCreateBody("小虎", true))
 			status, raw := doUpload(t, srv, c.image, c.fields)
 			if status != c.status {
 				t.Fatalf("status = %d, want %d; body = %s", status, c.status, raw)
@@ -793,7 +793,7 @@ func TestServeUploadValidation(t *testing.T) {
 
 	// 非 multipart 请求体(契约要求 form-data)。
 	srv, _, rec, _ := newReportsTestServer(t)
-	createOne(t, srv, `{"name":"小虎","is_child":true}`)
+	createOne(t, srv, memberCreateBody("小虎", true))
 	status, raw := doJSON(t, srv, http.MethodPost, "/api/v1/reports", `{"member_id":1}`)
 	if status != http.StatusBadRequest {
 		t.Fatalf("JSON body status = %d, want 400; body = %s", status, raw)
@@ -810,7 +810,7 @@ func TestServeUploadValidation(t *testing.T) {
 func TestServeUploadIgnoresURLQuery(t *testing.T) {
 	t.Run("query 不覆盖 body 归属", func(t *testing.T) {
 		srv, _, _, _ := newReportsTestServer(t)
-		createOne(t, srv, `{"name":"小虎","is_child":true}`)
+		createOne(t, srv, memberCreateBody("小虎", true))
 		status, raw := doUploadQuery(t, srv, []byte("img"), map[string]string{formMemberID: "1"}, "member_id=999")
 		got := decodeUpload(t, status, raw, http.StatusCreated)
 		if got.Report.MemberID == nil || *got.Report.MemberID != 1 {
@@ -820,7 +820,7 @@ func TestServeUploadIgnoresURLQuery(t *testing.T) {
 
 	t.Run("query 不满足必填", func(t *testing.T) {
 		srv, st, rec, _ := newReportsTestServer(t)
-		createOne(t, srv, `{"name":"小虎","is_child":true}`)
+		createOne(t, srv, memberCreateBody("小虎", true))
 		status, raw := doUploadQuery(t, srv, []byte("img"), map[string]string{}, "member_id=1")
 		if status != http.StatusBadRequest {
 			t.Fatalf("status = %d, want 400 (query 不能替代表单字段); body = %s", status, raw)
@@ -832,7 +832,7 @@ func TestServeUploadIgnoresURLQuery(t *testing.T) {
 
 	t.Run("空 query 不遮蔽 body 值", func(t *testing.T) {
 		srv, _, _, _ := newReportsTestServer(t)
-		createOne(t, srv, `{"name":"小虎","is_child":true}`)
+		createOne(t, srv, memberCreateBody("小虎", true))
 		status, raw := doUploadQuery(t, srv, []byte("img"), map[string]string{formMemberID: "1"}, "member_id=")
 		got := decodeUpload(t, status, raw, http.StatusCreated)
 		if got.Report.MemberID == nil || *got.Report.MemberID != 1 {
@@ -842,7 +842,7 @@ func TestServeUploadIgnoresURLQuery(t *testing.T) {
 
 	t.Run("query override 不放行 409", func(t *testing.T) {
 		srv, _, rec, _ := newReportsTestServer(t)
-		createOne(t, srv, `{"name":"小虎","is_child":true}`)
+		createOne(t, srv, memberCreateBody("小虎", true))
 		image := []byte("img")
 		status, raw := doUpload(t, srv, image, map[string]string{formMemberID: "1"})
 		first := decodeUpload(t, status, raw, http.StatusCreated)
@@ -864,7 +864,7 @@ func TestServeUploadIgnoresURLQuery(t *testing.T) {
 // TestServeUploadRecognizerFailure 识别服务硬故障:500 + 中性错误信息,零归档。
 func TestServeUploadRecognizerFailure(t *testing.T) {
 	srv, st, rec, _ := newReportsTestServer(t)
-	createOne(t, srv, `{"name":"小虎","is_child":true}`)
+	createOne(t, srv, memberCreateBody("小虎", true))
 	rec.err = errors.New("dial tcp recognizer: connection refused")
 
 	status, raw := doUpload(t, srv, []byte("img"), map[string]string{formMemberID: "1"})
@@ -987,7 +987,7 @@ func TestServeListReportsFilterAndCounts(t *testing.T) {
 // 未知与非法形态 404(契约只声明 404)。
 func TestServeGetReportDetail(t *testing.T) {
 	srv, st, _, _ := newReportsTestServer(t)
-	createOne(t, srv, `{"name":"小虎","is_child":true}`)
+	createOne(t, srv, memberCreateBody("小虎", true))
 
 	image := sampleImageBytes(t) // 真实样本图:图像直出断言按字节逐位比较
 	status, raw := doUpload(t, srv, image, map[string]string{formMemberID: "1"})
@@ -1075,7 +1075,7 @@ func TestServeGetReportDetail(t *testing.T) {
 // 同一投影返回,行号映射为行链接;非影像报告不输出 sections(上一用例)。
 func TestServeGetReportDetailSections(t *testing.T) {
 	srv, _, rec, _ := newReportsTestServer(t)
-	createOne(t, srv, `{"name":"小虎","is_child":true}`)
+	createOne(t, srv, memberCreateBody("小虎", true))
 	rec.report = &contract.Report{
 		ReportType: contract.ReportTypeImaging, ReportDate: str("2024-09-15"), Status: contract.StatusSuccess,
 		Sections: []contract.ReportSection{
@@ -1117,11 +1117,74 @@ func TestServeGetReportDetailSections(t *testing.T) {
 	checkSections("detail", detail)
 }
 
+// TestServeClinicalNoteUploadAndDetail 病历(llm-analysis 票 03):临床病历同样走既有
+// 上传链路,report_type/panel 为 clinical_note;上传响应与 GET 详情都逐段返回原文
+// (主诉 / 现病史 / 诊断 / 处理 / note)与 OCR 行链接。
+func TestServeClinicalNoteUploadAndDetail(t *testing.T) {
+	srv, _, rec, _ := newReportsTestServer(t)
+	createOne(t, srv, memberCreateBody("小虎", true))
+	rec.report = &contract.Report{
+		ReportType: contract.ReportTypeClinicalNote, ReportDate: str("2026-05-12"), Status: contract.StatusSuccess,
+		Panels: []string{"clinical_note"},
+		Sections: []contract.ReportSection{
+			{Kind: contract.SectionKindChiefComplaint, Text: "发热3天。", OCRLineNumbers: []int32{1}},
+			{Kind: contract.SectionKindPresentIllness, Text: "3天前出现发热，最高38.5℃。", OCRLineNumbers: []int32{3}},
+			{Kind: contract.SectionKindDiagnosis, Text: "上呼吸道感染。", OCRLineNumbers: []int32{5}},
+			{Kind: contract.SectionKindTreatment, Text: "多饮水，对症退热。", OCRLineNumbers: []int32{7}},
+			{Kind: contract.SectionKindNote, Text: "整页原文。", OCRLineNumbers: []int32{9}},
+		},
+	}
+
+	status, raw := doUpload(t, srv, []byte("fake-clinical-note-bytes"), map[string]string{formMemberID: "1"})
+	created := decodeUpload(t, status, raw, http.StatusCreated)
+	if created.Report.ReportType != contract.ReportTypeClinicalNote {
+		t.Errorf("upload report_type = %q, want %q", created.Report.ReportType, contract.ReportTypeClinicalNote)
+	}
+	if len(created.Report.Panels) != 1 || created.Report.Panels[0] != "clinical_note" {
+		t.Errorf("upload panels = %v, want [clinical_note]", created.Report.Panels)
+	}
+	checkClinicalSections := func(label string, detail httpapi.ReportDetail) {
+		t.Helper()
+		if len(detail.Sections) != 5 {
+			t.Fatalf("%s sections = %+v, want 5", label, detail.Sections)
+		}
+		wantKinds := []string{"chief_complaint", "present_illness", "diagnosis", "treatment", "note"}
+		wantLines := []int{1, 3, 5, 7, 9}
+		for i, want := range wantKinds {
+			section := detail.Sections[i]
+			if section.Kind != want {
+				t.Errorf("%s section[%d].kind = %q, want %q", label, i, section.Kind, want)
+			}
+			if len(section.OcrLines) != 1 || section.OcrLines[0].Line != wantLines[i] {
+				t.Errorf("%s section[%d].ocr_lines = %+v, want line %d", label, i, section.OcrLines, wantLines[i])
+			}
+		}
+		if detail.Sections[2].Text != "上呼吸道感染。" || detail.Sections[4].Text != "整页原文。" {
+			t.Errorf("%s diagnosis/note text = %q/%q", label, detail.Sections[2].Text, detail.Sections[4].Text)
+		}
+		if len(detail.Items) != 0 {
+			t.Errorf("%s items = %+v, want 0 (病历零指标项)", label, detail.Items)
+		}
+	}
+	checkClinicalSections("upload", created.Report)
+
+	sha := created.Report.ReportID
+	status, raw = doJSON(t, srv, http.MethodGet, "/api/v1/reports/"+sha, "")
+	if status != http.StatusOK {
+		t.Fatalf("GET clinical note detail = %d; body = %s", status, raw)
+	}
+	var detail httpapi.ReportDetail
+	if err := json.Unmarshal(raw, &detail); err != nil {
+		t.Fatal(err)
+	}
+	checkClinicalSections("detail", detail)
+}
+
 // TestServeGetReportDetailFailed failed 报告详情:图像与失败原因可见(无可核对项),
 // items 序列化为空数组、计数全 0、fail_reason 透传。
 func TestServeGetReportDetailFailed(t *testing.T) {
 	srv, _, rec, _ := newReportsTestServer(t)
-	createOne(t, srv, `{"name":"小虎","is_child":true}`)
+	createOne(t, srv, memberCreateBody("小虎", true))
 	rec.report = &contract.Report{ReportType: "其他专项", Status: contract.StatusFailed}
 
 	status, raw := doUpload(t, srv, []byte("blank-photo"), map[string]string{formMemberID: "1"})
@@ -1192,8 +1255,8 @@ func timelineShas(t *testing.T, srv *httptest.Server, memberID string) []string 
 // 报告内容零变化(状态/计数/指标项与核对状态原样);重复改派幂等;未知成员 404 零写入。
 func TestServeReassignReport(t *testing.T) {
 	srv, _, _, _ := newReportsTestServer(t)
-	createOne(t, srv, `{"name":"小虎","is_child":true}`)  // id 1
-	createOne(t, srv, `{"name":"妈妈","is_child":false}`) // id 2
+	createOne(t, srv, memberCreateBody("小虎", true))  // id 1
+	createOne(t, srv, memberCreateBody("妈妈", false)) // id 2
 
 	status, raw := doUpload(t, srv, []byte("fake-jpeg-reassign-bytes-01"), map[string]string{formMemberID: "1"})
 	created := decodeUpload(t, status, raw, http.StatusCreated)
@@ -1297,7 +1360,7 @@ func TestServeReassignConcurrentDelete(t *testing.T) {
 		rec: &fakeUploadRecognizer{}, obj: fakeObjectsCLI{objects: map[string][]byte{}}}
 	srv := httptest.NewServer(newServeHandler(d))
 	t.Cleanup(srv.Close)
-	createOne(t, srv, `{"name":"小虎","is_child":true}`)
+	createOne(t, srv, memberCreateBody("小虎", true))
 
 	status, raw := doReassign(t, srv, sha, `{"member_id":1}`)
 	if status != http.StatusNotFound {
@@ -1330,7 +1393,7 @@ func TestServeReassignValidation(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			srv, _, _, _ := newReportsTestServer(t)
-			createOne(t, srv, `{"name":"小虎","is_child":true}`)
+			createOne(t, srv, memberCreateBody("小虎", true))
 			status, raw := doUpload(t, srv, []byte("fake-jpeg-reassign-validation"), map[string]string{formMemberID: "1"})
 			sample := decodeUpload(t, status, raw, http.StatusCreated).Report
 			sha := sample.ReportID
@@ -1363,7 +1426,7 @@ func TestServeReassignValidation(t *testing.T) {
 // 指标项句柄全换、识别重跑且 OCR 历史追加);重复删除与非法形态 404。
 func TestServeDeleteReport(t *testing.T) {
 	srv, st, rec, _ := newReportsTestServer(t)
-	createOne(t, srv, `{"name":"小虎","is_child":true}`)
+	createOne(t, srv, memberCreateBody("小虎", true))
 
 	image := []byte("fake-jpeg-delete-bytes-01")
 	status, raw := doUpload(t, srv, image, map[string]string{formMemberID: "1"})

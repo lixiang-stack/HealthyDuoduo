@@ -174,6 +174,11 @@ def test_report_empty_items_must_be_failed_or_narrative() -> None:
         "sections": [{"kind": "findings", "text": "宫内单活胎。", "ocr_line_numbers": [3]}],
     }
     assert Report.model_validate(narrative) is not None
+    clinical_note = {
+        **_report("success", [], ["clinical_note"], "clinical_note"),
+        "sections": [{"kind": "diagnosis", "text": "上呼吸道感染。", "ocr_line_numbers": [3]}],
+    }
+    assert Report.model_validate(clinical_note) is not None
 
 
 def test_report_with_items_accepts_every_status() -> None:
@@ -213,7 +218,7 @@ def test_report_rejects_panel_outside_parent() -> None:
 
 
 def test_every_panel_has_label_and_parent() -> None:
-    """16 个 code 都有 UI 标签,且至少出现在一个父类的允许集合中。"""
+    """17 个 code 都有 UI 标签,且至少出现在一个父类的允许集合中。"""
     assert set(PANEL_LABELS) == set(Panel)
     parents = {p for allowed in PANEL_ALLOWED_BY_REPORT_TYPE.values() for p in allowed}
     assert set(Panel) == parents
@@ -221,7 +226,7 @@ def test_every_panel_has_label_and_parent() -> None:
         Panel.LIVER, Panel.KIDNEY, Panel.LIPID, Panel.GLUCOSE, Panel.URIC_ACID,
         Panel.ELECTROLYTE, Panel.VITANEMIA, Panel.THYROID, Panel.SEX_HORMONE,
         Panel.INFECTION, Panel.AUTOIMMUNE, Panel.COAG, Panel.CBC, Panel.URINALYSIS,
-        Panel.IMAGING, Panel.OTHER,
+        Panel.IMAGING, Panel.CLINICAL_NOTE, Panel.OTHER,
     )
 
 

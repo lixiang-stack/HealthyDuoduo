@@ -53,7 +53,7 @@ func newPanelsTestServer(t *testing.T) (*httptest.Server, *fakePanelStore) {
 
 func TestServePanelsList(t *testing.T) {
 	srv, ps := newPanelsTestServer(t)
-	member := createOne(t, srv, `{"name":"小虎","is_child":true}`)
+	member := createOne(t, srv, memberCreateBody("小虎", true))
 	date := "2021-08-02"
 	reportID := strings.Repeat("a", 64)
 	ps.summaries[member.MemberID] = []pipeline.PanelSummary{{
@@ -86,7 +86,7 @@ func TestServePanelsList(t *testing.T) {
 	}
 
 	// 没有可归类报告:200 + {"panels":[]}(不是 null)。
-	emptyMember := createOne(t, srv, `{"name":"妈妈","is_child":false}`)
+	emptyMember := createOne(t, srv, memberCreateBody("妈妈", false))
 	status, raw = doJSON(t, srv, http.MethodGet,
 		"/api/v1/members/"+strconv.FormatInt(emptyMember.MemberID, 10)+"/panels", "")
 	if status != http.StatusOK {
@@ -103,7 +103,7 @@ func TestServePanelsList(t *testing.T) {
 
 func TestServePanelDetail(t *testing.T) {
 	srv, ps := newPanelsTestServer(t)
-	member := createOne(t, srv, `{"name":"小虎","is_child":true}`)
+	member := createOne(t, srv, memberCreateBody("小虎", true))
 	date := "2021-08-02"
 	reportID := strings.Repeat("a", 64)
 	value := "835"

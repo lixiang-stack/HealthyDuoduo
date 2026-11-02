@@ -7,6 +7,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -30,12 +31,14 @@ type fakeMemberStore struct {
 
 var _ pipeline.MemberStore = (*fakeMemberStore)(nil)
 
-func (f *fakeMemberStore) CreateMember(ctx context.Context, name string, isChild bool) (*pipeline.Member, error) {
+func (f *fakeMemberStore) CreateMember(ctx context.Context, profile pipeline.MemberProfile) (*pipeline.Member, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.nextID++
 	m := pipeline.Member{
-		MemberID: f.nextID, Name: name, IsChild: isChild,
+		MemberID: f.nextID, Name: profile.Name, IsChild: profile.IsChild,
+		Sex: profile.Sex, BirthDate: normalizeMemberBirthDate(profile.BirthDate, profile.BirthDatePrecision),
+		BirthDatePrecision: profile.BirthDatePrecision,
 		// 确定性时钟:基准 + id 秒,断言 created_at 的 RFC3339 序列化。
 		CreatedAt: time.Date(2026, 10, 15, 8, 0, 0, 0, time.UTC).Add(time.Duration(f.nextID) * time.Second),
 	}
@@ -61,23 +64,41 @@ func (f *fakeMemberStore) MemberByID(ctx context.Context, id int64) (*pipeline.M
 	return nil, nil
 }
 
-func (f *fakeMemberStore) UpdateMember(ctx context.Context, id int64, name *string, isChild *bool) (*pipeline.Member, error) {
+func (f *fakeMemberStore) UpdateMember(ctx context.Context, id int64, patch pipeline.MemberPatch) (*pipeline.Member, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	for i := range f.rows {
 		if f.rows[i].MemberID != id {
 			continue
 		}
-		if name != nil {
-			f.rows[i].Name = *name
+		if patch.Name != nil {
+			f.rows[i].Name = *patch.Name
 		}
-		if isChild != nil {
-			f.rows[i].IsChild = *isChild
+		if patch.IsChild != nil {
+			f.rows[i].IsChild = *patch.IsChild
 		}
+		if patch.Sex != nil {
+			f.rows[i].Sex = *patch.Sex
+		}
+		if patch.BirthDate != nil {
+			f.rows[i].BirthDate = *patch.BirthDate
+		}
+		if patch.BirthDatePrecision != nil {
+			f.rows[i].BirthDatePrecision = *patch.BirthDatePrecision
+		}
+		f.rows[i].BirthDate = normalizeMemberBirthDate(f.rows[i].BirthDate, f.rows[i].BirthDatePrecision)
 		m := f.rows[i]
 		return &m, nil
 	}
 	return nil, nil
+}
+
+// normalizeMemberBirthDate 镜像 storage 的 year 精度归一(只留年份,存 01-01)。
+func normalizeMemberBirthDate(birthDate, precision string) string {
+	if precision == pipeline.BirthDatePrecisionYear && len(birthDate) >= 4 {
+		return birthDate[:4] + "-01-01"
+	}
+	return birthDate
 }
 
 func (f *fakeMemberStore) DeleteMember(ctx context.Context, id int64) (bool, error) {
@@ -129,6 +150,13 @@ func doJSON(t *testing.T, srv *httptest.Server, method, path, body string) (int,
 	return resp.StatusCode, raw
 }
 
+// memberCreateBody 合法建成员请求体(必填字段齐全;性别 unspecified / 生日 2020-01-01),
+// 供不关心成员字段的端点用例复用。
+func memberCreateBody(name string, isChild bool) string {
+	return fmt.Sprintf(`{"name":%q,"is_child":%t,"sex":"unspecified","birth_date":"2020-01-01"}`,
+		name, isChild)
+}
+
 // createOne 建一个成员并解码为契约镜像形状。
 func createOne(t *testing.T, srv *httptest.Server, body string) httpapi.Member {
 	t.Helper()
@@ -166,15 +194,21 @@ func memberIDs(t *testing.T, srv *httptest.Server) []int64 {
 func TestServeMembersCRUD(t *testing.T) {
 	srv, _ := newMembersTestServer(t)
 
-	child := createOne(t, srv, `{"name":"小虎","is_child":true}`)
+	child := createOne(t, srv, `{"name":"小虎","is_child":true,"sex":"male","birth_date":"2020-05-20"}`)
 	if child.MemberID != 1 || child.Name != "小虎" || !child.IsChild {
 		t.Fatalf("created child = %+v", child)
+	}
+	if child.Sex != "male" || child.BirthDate != "2020-05-20" || child.BirthDatePrecision != "day" {
+		t.Errorf("created child profile = %+v, want male/2020-05-20/day", child)
 	}
 	if child.CreatedAt != "2026-10-15T08:00:01Z" {
 		t.Errorf("created_at = %q, want RFC3339 UTC timestamp", child.CreatedAt)
 	}
-	adult := createOne(t, srv, `{"name":"妈妈","is_child":false}`)
-	second := createOne(t, srv, `{"name":"妹妹","is_child":true}`)
+	adult := createOne(t, srv, memberCreateBody("妈妈", false))
+	second := createOne(t, srv, `{"name":"妹妹","is_child":true,"sex":"female","birth_date":"2022-01-01","birth_date_precision":"year"}`)
+	if second.Sex != "female" || second.BirthDatePrecision != "year" {
+		t.Errorf("created second profile = %+v, want female/year", second)
+	}
 	if adult.MemberID != 2 || second.MemberID != 3 {
 		t.Fatalf("created ids = %d/%d, want 2/3", adult.MemberID, second.MemberID)
 	}
@@ -198,7 +232,7 @@ func TestServeMembersCRUD(t *testing.T) {
 		t.Fatalf("renamed member = %+v, want name 母亲 / is_child false / created_at unchanged", renamed)
 	}
 
-	// 改档:只传 is_child,名字不动(孩子/成人两档只有这两个字段可改)。
+	// 改档:只传 is_child,名字与新增资料字段不动。
 	status, raw = doJSON(t, srv, http.MethodPatch, "/api/v1/members/2", `{"is_child":true}`)
 	if status != http.StatusOK {
 		t.Fatalf("PATCH is_child: status = %d, want 200; body = %s", status, raw)
@@ -211,6 +245,21 @@ func TestServeMembersCRUD(t *testing.T) {
 		t.Fatalf("updated member = %+v, want is_child true / name 母亲", rechiled)
 	}
 
+	// 改性别 / 生日精度:只覆盖所带字段,生日日期不动。
+	status, raw = doJSON(t, srv, http.MethodPatch, "/api/v1/members/2",
+		`{"sex":"female","birth_date":"2015-03-04","birth_date_precision":"year"}`)
+	if status != http.StatusOK {
+		t.Fatalf("PATCH profile: status = %d, want 200; body = %s", status, raw)
+	}
+	var reprofiled httpapi.Member
+	if err := json.Unmarshal(raw, &reprofiled); err != nil {
+		t.Fatal(err)
+	}
+	if reprofiled.Sex != "female" || reprofiled.BirthDate != "2015-01-01" ||
+		reprofiled.BirthDatePrecision != "year" || reprofiled.Name != "母亲" {
+		t.Fatalf("updated profile = %+v, want female/2015-01-01/year with name 母亲", reprofiled)
+	}
+
 	// 再列:改动落库、顺序不变。
 	if got := memberIDs(t, srv); !slices.Equal(got, []int64{1, 2, 3}) {
 		t.Fatalf("list after patches = %v, want [1 2 3]", got)
@@ -221,8 +270,8 @@ func TestServeMembersCRUD(t *testing.T) {
 // 非法 id 400,均走契约 Error 形状。
 func TestServeMembersDelete(t *testing.T) {
 	srv, _ := newMembersTestServer(t)
-	createOne(t, srv, `{"name":"小虎","is_child":true}`)
-	createOne(t, srv, `{"name":"妈妈","is_child":false}`)
+	createOne(t, srv, memberCreateBody("小虎", true))
+	createOne(t, srv, memberCreateBody("妈妈", false))
 
 	status, raw := doJSON(t, srv, http.MethodDelete, "/api/v1/members/1", "")
 	if status != http.StatusNoContent {
@@ -259,21 +308,29 @@ func TestServeMembersDelete(t *testing.T) {
 	}
 }
 
-// TestServeMembersCreateValidation 建成员校验:缺 name/is_child、空名/空白名、
-// 显式 null、类型不符、未知字段、畸形 JSON 一律 400 且不建出成员。
+// TestServeMembersCreateValidation 建成员校验:缺 name/is_child/sex/birth_date、
+// 空名/空白名、非法枚举/日期、显式 null、类型不符、未知字段、畸形 JSON
+// 一律 400 且不建出成员。
 func TestServeMembersCreateValidation(t *testing.T) {
 	cases := []struct {
 		name string
 		body string
 	}{
-		{"missing name", `{"is_child":true}`},
-		{"empty name", `{"name":"","is_child":false}`},
-		{"blank name", `{"name":"   ","is_child":true}`},
-		{"null name", `{"name":null,"is_child":true}`},
-		{"missing is_child", `{"name":"小虎"}`},
-		{"null is_child", `{"name":"小虎","is_child":null}`},
-		{"wrong name type", `{"name":123,"is_child":true}`},
-		{"unknown field", `{"name":"小虎","is_child":true,"age":3}`},
+		{"missing name", `{"is_child":true,"sex":"male","birth_date":"2020-01-01"}`},
+		{"empty name", `{"name":"","is_child":false,"sex":"male","birth_date":"2020-01-01"}`},
+		{"blank name", `{"name":"   ","is_child":true,"sex":"male","birth_date":"2020-01-01"}`},
+		{"null name", `{"name":null,"is_child":true,"sex":"male","birth_date":"2020-01-01"}`},
+		{"missing is_child", `{"name":"小虎","sex":"male","birth_date":"2020-01-01"}`},
+		{"null is_child", `{"name":"小虎","is_child":null,"sex":"male","birth_date":"2020-01-01"}`},
+		{"missing sex", `{"name":"小虎","is_child":true,"birth_date":"2020-01-01"}`},
+		{"null sex", `{"name":"小虎","is_child":true,"sex":null,"birth_date":"2020-01-01"}`},
+		{"invalid sex", `{"name":"小虎","is_child":true,"sex":"other","birth_date":"2020-01-01"}`},
+		{"missing birth_date", `{"name":"小虎","is_child":true,"sex":"male"}`},
+		{"null birth_date", `{"name":"小虎","is_child":true,"sex":"male","birth_date":null}`},
+		{"invalid birth_date", `{"name":"小虎","is_child":true,"sex":"male","birth_date":"2020-13-01"}`},
+		{"invalid precision", `{"name":"小虎","is_child":true,"sex":"male","birth_date":"2020-01-01","birth_date_precision":"month"}`},
+		{"wrong name type", `{"name":123,"is_child":true,"sex":"male","birth_date":"2020-01-01"}`},
+		{"unknown field", `{"name":"小虎","is_child":true,"sex":"male","birth_date":"2020-01-01","age":3}`},
 		{"malformed json", `{"name":`},
 		{"not an object", `["小虎"]`},
 		{"empty body", ``},
@@ -315,12 +372,17 @@ func TestServeMembersPatchValidation(t *testing.T) {
 		{"blank name", "/api/v1/members/1", `{"name":"  "}`, http.StatusBadRequest},
 		{"null name alongside is_child", "/api/v1/members/1", `{"name":null,"is_child":true}`, http.StatusBadRequest},
 		{"null is_child alongside name", "/api/v1/members/1", `{"name":"小虎","is_child":null}`, http.StatusBadRequest},
+		{"null sex", "/api/v1/members/1", `{"sex":null}`, http.StatusBadRequest},
+		{"null birth_date", "/api/v1/members/1", `{"birth_date":null}`, http.StatusBadRequest},
+		{"invalid sex", "/api/v1/members/1", `{"sex":"other"}`, http.StatusBadRequest},
+		{"invalid birth_date", "/api/v1/members/1", `{"birth_date":"2020-02-30"}`, http.StatusBadRequest},
+		{"invalid precision", "/api/v1/members/1", `{"birth_date_precision":"month"}`, http.StatusBadRequest},
 		{"unknown field", "/api/v1/members/1", `{"nickname":"小明"}`, http.StatusBadRequest},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			srv, _ := newMembersTestServer(t)
-			createOne(t, srv, `{"name":"小虎","is_child":true}`)
+			createOne(t, srv, memberCreateBody("小虎", true))
 			status, raw := doJSON(t, srv, http.MethodPatch, c.path, c.body)
 			if status != c.status {
 				t.Fatalf("status = %d, want %d; body = %s", status, c.status, raw)
@@ -353,7 +415,7 @@ func TestServeMembersListEmptyEnvelope(t *testing.T) {
 		t.Fatalf("members = %s, want [] (empty array, not null)", got)
 	}
 	// 建一个成员后依旧可独立增列。
-	createOne(t, srv, `{"name":"小虎","is_child":true}`)
+	createOne(t, srv, memberCreateBody("小虎", true))
 	if got := memberIDs(t, srv); !slices.Equal(got, []int64{1}) {
 		t.Fatalf("after create, list = %v, want [1]", got)
 	}
