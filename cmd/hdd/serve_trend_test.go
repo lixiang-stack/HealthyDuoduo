@@ -79,11 +79,13 @@ func TestHandleGetTrend(t *testing.T) {
 	rows := []pipeline.TrendPointRow{
 		{
 			ReportID: rep1, ReportDate: str("2017-11-18"), Value: str("27.40"),
-			Unit: str("U/L"), RefRange: str("7-40"), Flag: "normal", ReviewStatus: "unreviewed",
+			Unit: str("U/L"), UnitDisplay: str("U/L"), UnitStatus: str("verified"),
+			RefRange: str("7-40"), Flag: "normal", ReviewStatus: "unreviewed",
 		},
 		{
 			ReportID: rep2, ReportDate: str("2021-08-02"), Value: str("835"),
-			Unit: str("U/L"), RefRange: str("7-40"), Method: str("速率法"),
+			Unit: str("U/L"), UnitDisplay: str("U/L"), UnitStatus: str("verified"),
+			RefRange: str("7-40"), Method: str("速率法"),
 			Flag: "high", LowConfidence: true, ReviewStatus: "confirmed",
 		},
 	}
@@ -111,6 +113,8 @@ func TestHandleGetTrend(t *testing.T) {
 	first := got.Points[0]
 	if first.ReportID != rep1 || first.ReportDate == nil || *first.ReportDate != "2017-11-18" ||
 		first.Value == nil || *first.Value != "27.40" || first.Unit == nil || *first.Unit != "U/L" ||
+		first.UnitDisplay == nil || *first.UnitDisplay != "U/L" ||
+		first.UnitStatus == nil || *first.UnitStatus != "verified" ||
 		first.RefRange == nil || *first.RefRange != "7-40" || first.Method != nil ||
 		first.Flag != "normal" || first.LowConfidence || first.Reviewed {
 		t.Errorf("first point = %+v", first)

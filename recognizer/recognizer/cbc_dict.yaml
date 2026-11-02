@@ -36,7 +36,7 @@ items:
     loinc: 6690-2
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: 10*9/L
     unit_display: 10^9/L
@@ -59,7 +59,7 @@ items:
     loinc: 789-8
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: 10*12/L
     unit_display: 10^12/L
@@ -85,7 +85,7 @@ items:
     loinc: 718-7
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: g/L
     unit_display: g/L
@@ -111,7 +111,7 @@ items:
     loinc: 4544-3
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: L/L
     unit_display: L/L
@@ -137,7 +137,7 @@ items:
     loinc: 787-2
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: fL
     unit_display: fL
@@ -155,7 +155,7 @@ items:
     loinc: 785-6
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: pg
     unit_display: pg
@@ -173,7 +173,7 @@ items:
     loinc: 786-4
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: g/L
     unit_display: g/L
@@ -196,7 +196,7 @@ items:
     loinc: 788-0
     local_code:
     source_status: local
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: '%'
     unit_display: '%'
@@ -211,7 +211,7 @@ items:
     loinc: 21000-5
     local_code:
     source_status: local
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: fL
     unit_display: fL
@@ -229,7 +229,7 @@ items:
     loinc: 777-3
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: 10*9/L
     unit_display: 10^9/L
@@ -252,7 +252,7 @@ items:
     loinc: 51637-7
     local_code:
     source_status: local
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: '%'
     unit_display: '%'
@@ -269,13 +269,17 @@ items:
     plausible_range:
       low: 0
       high: 10
+  # 2026-10-31 技术复核结论:PDW-SD(fL)与 PDW-CV(%)定义不同,应拆为独立条目。
+  # 现有样本只有无后缀印名(fL),无 PDW-SD/CV 真实证据;按 corpus gate 暂保留
+  # legacy 条目,待新样本后拆分并重新复核。
   - name: 血小板分布宽度
     aliases: [PDW]
     code:
     loinc: 32207-3
     local_code: LOCAL-CBC-PDW
     source_status: local
-    review_status: pending
+    review_status: approved
+    notes: "legacy 兼容项。PDW-SD（fL）与 PDW-CV（%）为两种不同定义，优先使用带 SD/CV 后缀的条目（若后续拆分）。当前按 fL 建模。"
     result_kind: quantitative
     canonical_unit: fL
     unit_display: fL
@@ -290,7 +294,7 @@ items:
     loinc: 32623-1
     local_code:
     source_status: local
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: fL
     unit_display: fL
@@ -305,7 +309,7 @@ items:
     loinc: 48386-7
     local_code:
     source_status: local
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: '%'
     unit_display: '%'
@@ -320,7 +324,7 @@ items:
     loinc: 96354-6
     local_code:
     source_status: local
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: 10*9/L
     unit_display: 10^9/L
@@ -343,7 +347,7 @@ items:
     loinc: 736-9
     local_code:
     source_status: local
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: '%'
     unit_display: '%'
@@ -358,7 +362,7 @@ items:
     loinc: 770-8
     local_code:
     source_status: local
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: '%'
     unit_display: '%'
@@ -373,7 +377,7 @@ items:
     loinc: 5905-5
     local_code:
     source_status: local
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: '%'
     unit_display: '%'
@@ -388,7 +392,7 @@ items:
     loinc: 713-8
     local_code:
     source_status: local
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: '%'
     unit_display: '%'
@@ -403,7 +407,7 @@ items:
     loinc: 706-2
     local_code:
     source_status: local
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: '%'
     unit_display: '%'
@@ -418,7 +422,7 @@ items:
     loinc: 731-0
     local_code:
     source_status: local
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: 10*9/L
     unit_display: 10^9/L
@@ -442,7 +446,7 @@ items:
     loinc: 751-8
     local_code:
     source_status: local
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: 10*9/L
     unit_display: 10^9/L
@@ -465,10 +469,11 @@ items:
     loinc: 742-7
     local_code:
     source_status: local
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: 10*9/L
     unit_display: 10^9/L
+    default_unit: "10^9/L"
     accepted_units:
       - unit: 10^3/uL
         ucum: 10*3/uL
@@ -488,7 +493,7 @@ items:
     loinc: 711-2
     local_code:
     source_status: local
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: 10*9/L
     unit_display: 10^9/L
@@ -511,7 +516,7 @@ items:
     loinc: 704-7
     local_code:
     source_status: local
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: 10*9/L
     unit_display: 10^9/L
@@ -534,7 +539,7 @@ items:
     loinc: 30393-3
     local_code:
     source_status: local
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: '%'
     unit_display: '%'
@@ -549,7 +554,7 @@ items:
     loinc: 771-6
     local_code:
     source_status: local
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: 10*9/L
     unit_display: 10^9/L
@@ -575,7 +580,7 @@ items:
     loinc: 4537-7
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: mm/h
     unit_display: mm/h
@@ -593,7 +598,7 @@ items:
     loinc: 1988-5
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: mg/L
     unit_display: mg/L
@@ -619,10 +624,11 @@ items:
     loinc: 30522-7
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: mg/L
     unit_display: mg/L
+    default_unit: "mg/L"
     accepted_units:
       - unit: mg/dL
         ucum: mg/dL
@@ -645,7 +651,7 @@ items:
     loinc: 48498-0
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: mg/L
     unit_display: mg/L

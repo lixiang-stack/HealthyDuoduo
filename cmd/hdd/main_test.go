@@ -170,7 +170,7 @@ func TestRunTrendPrintsTrendRows(t *testing.T) {
 	if code := run(&out, &errOut, d, []string{"trend", "血红蛋白"}); code != 0 {
 		t.Fatalf("exit = %d, stderr = %q", code, errOut.String())
 	}
-	for _, col := range []string{"date", "type", "value", "unit", "delta", "flag", "sha256"} {
+	for _, col := range []string{"date", "type", "value", "unit", "delta", "flag", "sha256", "note"} {
 		if !strings.Contains(out.String(), col) {
 			t.Fatalf("stdout = %q, want header column %q", out.String(), col)
 		}
@@ -190,6 +190,36 @@ func TestRunTrendRequiresExactlyOneItemName(t *testing.T) {
 	}
 	if code := run(&out, &errOut, d, []string{"trend", "a", "b"}); code != 2 {
 		t.Fatalf("exit = %d, want 2", code)
+	}
+}
+
+func TestRunTrendExcludesUnverifiedUnitsByDefault(t *testing.T) {
+	// 票 12:未验证单位点默认不参与连接;--all 显示并在 note 列标注原因。
+	v1, v2, unit := "128", "136", "g/L"
+	unverified := "unverified"
+	verified := "verified"
+	d := &deps{store: fakeStoreCLI{trendRet: []pipeline.TrendRow{
+		{Sha256: strings.Repeat("a", 64), ReportType: "血常规", ReportDate: str("2026-01-02"), Value: &v1, Unit: &unit, UnitStatus: &unverified, Flag: "normal"},
+		{Sha256: strings.Repeat("b", 64), ReportType: "血常规", ReportDate: str("2026-03-01"), Value: &v2, Unit: &unit, UnitStatus: &verified, Flag: "high"},
+	}}, rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
+	var out, errOut bytes.Buffer
+	if code := run(&out, &errOut, d, []string{"trend", "血红蛋白"}); code != 0 {
+		t.Fatalf("exit = %d, stderr = %q", code, errOut.String())
+	}
+	if !strings.Contains(errOut.String(), "1 unverified-unit") {
+		t.Fatalf("stderr = %q, want unverified hidden note", errOut.String())
+	}
+	if body := out.String(); strings.Count(body, "g/L") != 1 || strings.Contains(body, "unverified_unit") {
+		t.Fatalf("stdout = %q, want only verified row without note", body)
+	}
+
+	out.Reset()
+	errOut.Reset()
+	if code := run(&out, &errOut, d, []string{"trend", "--all", "血红蛋白"}); code != 0 {
+		t.Fatalf("exit = %d, stderr = %q", code, errOut.String())
+	}
+	if body := out.String(); strings.Count(body, "g/L") != 2 || !strings.Contains(body, "unverified_unit") {
+		t.Fatalf("--all stdout = %q, want both rows and unverified_unit note", body)
 	}
 }
 

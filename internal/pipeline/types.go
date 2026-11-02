@@ -48,7 +48,9 @@ type Store interface {
 	// failReason 失败原因由 pipeline 产出(viz-and-client 票 03 空指标项不变量),
 	// nil = 非 failed 报告;随 upsert 全量写,重算复原时旧原因一并清除。
 	WriteReport(ctx context.Context, reportSha string, ocrID int64, report contract.Report, failReason *string) error
-	// TrendByName 同一指标项名的跨报告时序点(升序;reportType 空串 = 不过滤类别)。
+	// TrendByName 同一趋势键(code > loinc > name)的跨报告时序点(升序;
+	// reportType 空串 = 不过滤类别)。返回含 unverified 单位的全量点,
+	// 质量门/单位验证过滤由 CLI 消费面决定。
 	TrendByName(ctx context.Context, itemName, reportType string) ([]TrendRow, error)
 }
 
@@ -103,8 +105,9 @@ type ReportStore interface {
 // 与 CLI 的 Store.TrendByName 是不同消费面:成员维度 + 可选 unit + ref/method/review
 // 字段;独立窄接口,CLI fakes 不承担这些方法(ISP)。
 type TrendStore interface {
-	// TrendPoints 成员下同一指标项名称的时序点(unit 空 = 全部单位;日期升序、
-	// dateless 沉底、同日期按报告 sha 与指标项 id 升序)。
+	// TrendPoints 成员下同一趋势键的时序点(name 可为规范名 / code / LOINC;
+	// unit 空 = 全部 canonical unit;日期升序、dateless 沉底、同日期按报告 sha
+	// 与指标项 id 升序;unit_status=unverified 点不返回)。
 	TrendPoints(ctx context.Context, memberID int64, name, unit string) ([]TrendPointRow, error)
 }
 
@@ -181,6 +184,8 @@ type TrendRow struct {
 	ReportDate    *string
 	Value         *string
 	Unit          *string
+	UnitDisplay   *string
+	UnitStatus    *string
 	Flag          string // normal | high | low | abnormal | unknown(4.2)
 	LowConfidence bool   // 任一组成行 score < LOW_SCORE_THRESHOLD(决策 #7 透传)
 }
@@ -192,6 +197,8 @@ type TrendPointRow struct {
 	ReportDate    *string
 	Value         *string
 	Unit          *string
+	UnitDisplay   *string
+	UnitStatus    *string
 	RefRange      *string
 	Method        *string
 	Flag          string

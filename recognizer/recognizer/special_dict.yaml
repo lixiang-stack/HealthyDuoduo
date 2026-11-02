@@ -19,7 +19,7 @@ items:
     loinc:
     local_code: LOCAL-SPECIAL-01
     source_status: local
-    review_status: pending
+    review_status: approved
     result_kind: ratio
     canonical_unit: '1'
     unit_display: '1'
@@ -34,7 +34,7 @@ items:
     loinc:
     local_code: LOCAL-SPECIAL-02
     source_status: local
-    review_status: pending
+    review_status: approved
     result_kind: ratio
     canonical_unit: '1'
     unit_display: '1'
@@ -49,7 +49,7 @@ items:
     loinc:
     local_code: LOCAL-SPECIAL-03
     source_status: local
-    review_status: pending
+    review_status: approved
     result_kind: ratio
     canonical_unit: '1'
     unit_display: '1'
@@ -64,7 +64,7 @@ items:
     loinc:
     local_code: LOCAL-SPECIAL-04
     source_status: local
-    review_status: pending
+    review_status: approved
     result_kind: ratio
     canonical_unit: '1'
     unit_display: '1'
@@ -79,7 +79,7 @@ items:
     loinc:
     local_code: LOCAL-SPECIAL-05
     source_status: local
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: ug/L
     unit_display: μg/L

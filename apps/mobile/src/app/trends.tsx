@@ -18,6 +18,7 @@ import { flagLabel, panelDateLabel, refRangeLabel } from '../reports/status';
 import { TrendDetailSheet } from '../reports/TrendDetailSheet';
 import { TrendSparkline } from '../reports/TrendChart';
 import {
+  displayTrendUnit,
   formatSeriesMeta,
   TREND_UNAVAILABLE_LABEL,
 } from '../reports/trends';
@@ -262,7 +263,7 @@ function PanelGroups({
           </View>
           {group.items.map((item, index) => (
             <AbnormalIndicatorCard
-              key={`${group.panel}-${item.name}-${item.unit ?? ''}`}
+              key={`${group.panel}-${item.key}-${item.unit ?? ''}`}
               panel={group.panel}
               item={item}
               index={starts[groupIndex] + index}
@@ -311,7 +312,9 @@ function AbnormalIndicatorCard({
         <View style={styles.valueWithTag}>
           <Text style={[styles.value, { color: flagColor }]}>
             {latest.value ?? '—'}
-            {latest.unit ? <Text style={styles.unit}> {latest.unit}</Text> : null}
+            {displayTrendUnit(latest) ? (
+              <Text style={styles.unit}> {displayTrendUnit(latest)}</Text>
+            ) : null}
           </Text>
           {item.latest_report_not_tested ? (
             <Text testID={`trend-item-not-tested-${index}`} style={styles.notTestedTag}>

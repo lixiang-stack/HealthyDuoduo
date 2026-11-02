@@ -83,31 +83,47 @@ const (
 		reportItemStandardColumnsSQL + `
 		 FROM report_items WHERE report_sha256 = $1 ORDER BY id`
 
-	// trend:同一指标项名(report_items.name = 词典规范名)的跨报告时序点,升序;
+	// trend:同一趋势键(code > loinc > name)的跨报告时序点,升序;
 	// low_confidence 为项级质量信号(决策 #7),CLI 默认排除不可信点(--all 关闭)。
-	// unit_status=unverified 的点默认不进入趋势(票 03);NULL 为票 01 前旧行。
-	sqlTrendByName = `SELECT r.image_sha256, r.report_type,
-		   COALESCE(to_char(r.report_date, 'YYYY-MM-DD'), ''), i.value, i.unit, i.flag, i.low_confidence
-		 FROM report_items i JOIN reports r ON r.image_sha256 = i.report_sha256
-		 WHERE i.name = $1 AND i.flag <> 'not_tested'
-		   AND (i.unit_status IS NULL OR i.unit_status = 'verified')
-		 ORDER BY r.report_date ASC, r.image_sha256 ASC`
+	// unit_status=unverified 由 CLI 侧统一过滤(--all 可显示并标注原因);
+	// HTTP 成员趋势单独在 SQL 中过滤。NULL 为票 01 前旧行。
+	sqlTrendKeyByItem = `SELECT COALESCE(NULLIF(code, ''), NULLIF(loinc, ''), name)
+		 FROM report_items
+		 WHERE name = $1 OR code = $1 OR loinc = $1
+		 ORDER BY (NULLIF(code, '') IS NOT NULL) DESC, (NULLIF(loinc, '') IS NOT NULL) DESC, id DESC
+		 LIMIT 1`
 
-	sqlTrendByNameAndType = `SELECT r.image_sha256, r.report_type,
-		   COALESCE(to_char(r.report_date, 'YYYY-MM-DD'), ''), i.value, i.unit, i.flag, i.low_confidence
+	sqlTrendByKey = `SELECT r.image_sha256, r.report_type,
+		   COALESCE(to_char(r.report_date, 'YYYY-MM-DD'), ''), i.value, i.unit, i.unit_display, i.unit_status, i.flag, i.low_confidence
 		 FROM report_items i JOIN reports r ON r.image_sha256 = i.report_sha256
-		 WHERE i.name = $1 AND r.report_type = $2 AND i.flag <> 'not_tested'
-		   AND (i.unit_status IS NULL OR i.unit_status = 'verified')
-		 ORDER BY r.report_date ASC, r.image_sha256 ASC`
+		 WHERE COALESCE(NULLIF(i.code, ''), NULLIF(i.loinc, ''), i.name) = $1
+		   AND i.flag <> 'not_tested'
+		 ORDER BY r.report_date ASC, r.image_sha256 ASC, i.id ASC`
 
-	// trendPointsByMember:HTTP 成员维度趋势(票 02)。与 CLI 的 sqlTrendByName 是不同
+	sqlTrendByKeyAndType = `SELECT r.image_sha256, r.report_type,
+		   COALESCE(to_char(r.report_date, 'YYYY-MM-DD'), ''), i.value, i.unit, i.unit_display, i.unit_status, i.flag, i.low_confidence
+		 FROM report_items i JOIN reports r ON r.image_sha256 = i.report_sha256
+		 WHERE COALESCE(NULLIF(i.code, ''), NULLIF(i.loinc, ''), i.name) = $1
+		   AND r.report_type = $2 AND i.flag <> 'not_tested'
+		 ORDER BY r.report_date ASC, r.image_sha256 ASC, i.id ASC`
+
+	// trendPointsByMember:HTTP 成员维度趋势(票 02)。与 CLI 的 sqlTrendByKey 是不同
 	// 消费面(成员过滤 + 可选 unit + ref/method/review 字段);不合并,避免把 CLI 语义
-	// 耦合进 serve。unit 空串 = 全部单位。
-	sqlTrendPointsByMemberName = `SELECT r.image_sha256,
-		   COALESCE(to_char(r.report_date, 'YYYY-MM-DD'), ''),
-		   i.value, i.unit, i.ref_range, i.method, i.flag, i.low_confidence, i.review_status
+	// 耦合进 serve。unit 空串 = 全部单位;单位门控按 canonical unit,
+	// unit_status=unverified 的点默认不进入连接(票 12)。
+	sqlTrendMemberKeyByItem = `SELECT COALESCE(NULLIF(i.code, ''), NULLIF(i.loinc, ''), i.name)
 		 FROM report_items i JOIN reports r ON r.image_sha256 = i.report_sha256
-		 WHERE r.member_id = $1 AND i.name = $2 AND i.flag <> 'not_tested'
+		 WHERE r.member_id = $1 AND (i.name = $2 OR i.code = $2 OR i.loinc = $2)
+		 ORDER BY (NULLIF(i.code, '') IS NOT NULL) DESC, (NULLIF(i.loinc, '') IS NOT NULL) DESC, i.id DESC
+		 LIMIT 1`
+
+	sqlTrendPointsByMemberKey = `SELECT r.image_sha256,
+		   COALESCE(to_char(r.report_date, 'YYYY-MM-DD'), ''),
+		   i.value, i.unit, i.unit_display, i.unit_status, i.ref_range, i.method, i.flag, i.low_confidence, i.review_status
+		 FROM report_items i JOIN reports r ON r.image_sha256 = i.report_sha256
+		 WHERE r.member_id = $1
+		   AND COALESCE(NULLIF(i.code, ''), NULLIF(i.loinc, ''), i.name) = $2
+		   AND i.flag <> 'not_tested'
 		   AND ($3 = '' OR i.unit = $3)
 		   AND (i.unit_status IS NULL OR i.unit_status = 'verified')
 		 ORDER BY r.report_date ASC NULLS LAST, r.image_sha256 ASC, i.id ASC`
@@ -478,13 +494,29 @@ func (s *Store) OCRResultJSON(ctx context.Context, ocrID int64) ([]byte, error) 
 	return raw, err
 }
 
-// TrendByName hdd trend <指标名>:同一指标项名跨报告时序点(升序,--type 过滤类别,
-// 输入缩写经 CLI 的 domType 归一为域值);like list,组合均为常量 SQL。
+// TrendByName hdd trend <指标名/标准码>:同一趋势键(code > loinc > name)跨报告
+// 时序点(升序,--type 过滤类别,输入缩写经 CLI 的 domType 归一为域值);
+// 返回全量点(含 unverified 单位),质量门由 CLI 统一过滤。组合均为常量 SQL。
 func (s *Store) TrendByName(ctx context.Context, itemName, reportType string) ([]pipeline.TrendRow, error) {
-	if reportType != "" {
-		return s.trendRows(ctx, sqlTrendByNameAndType, itemName, reportType)
+	key, err := s.trendKeyByItem(ctx, itemName)
+	if err != nil || key == "" {
+		return nil, err
 	}
-	return s.trendRows(ctx, sqlTrendByName, itemName)
+	if reportType != "" {
+		return s.trendRows(ctx, sqlTrendByKeyAndType, key, reportType)
+	}
+	return s.trendRows(ctx, sqlTrendByKey, key)
+}
+
+// trendKeyByItem 把用户输入(规范名 / 标准码 / LOINC)解析为趋势键;
+// 无匹配返回空串(调用方返回空结果)。
+func (s *Store) trendKeyByItem(ctx context.Context, itemName string) (string, error) {
+	var key string
+	err := s.pool.QueryRow(ctx, sqlTrendKeyByItem, itemName).Scan(&key)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	return key, err
 }
 
 func (s *Store) trendRows(ctx context.Context, query string, args ...any) ([]pipeline.TrendRow, error) {
@@ -497,7 +529,8 @@ func (s *Store) trendRows(ctx context.Context, query string, args ...any) ([]pip
 	for rows.Next() {
 		var r pipeline.TrendRow
 		var date string
-		if err := rows.Scan(&r.Sha256, &r.ReportType, &date, &r.Value, &r.Unit, &r.Flag, &r.LowConfidence); err != nil {
+		if err := rows.Scan(&r.Sha256, &r.ReportType, &date, &r.Value, &r.Unit,
+			&r.UnitDisplay, &r.UnitStatus, &r.Flag, &r.LowConfidence); err != nil {
 			return nil, err
 		}
 		if date != "" {
@@ -509,9 +542,19 @@ func (s *Store) trendRows(ctx context.Context, query string, args ...any) ([]pip
 }
 
 // TrendPoints 成员维度趋势(serve GET /members/{id}/indicators/{name}/trend;票 02):
-// unit 空 = 全部单位;日期升序、dateless 沉底、同日期按报告 sha 与指标项 id 升序。
+// 输入可传规范名 / 标准码 / LOINC,按趋势键跨面板连接;unit 空 = 全部单位;
+// 日期升序、dateless 沉底、同日期按报告 sha 与指标项 id 升序;unit_status=unverified
+// 的点默认不返回。
 func (s *Store) TrendPoints(ctx context.Context, memberID int64, name, unit string) ([]pipeline.TrendPointRow, error) {
-	rows, err := s.pool.Query(ctx, sqlTrendPointsByMemberName, memberID, name, unit)
+	var key string
+	err := s.pool.QueryRow(ctx, sqlTrendMemberKeyByItem, memberID, name).Scan(&key)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.pool.Query(ctx, sqlTrendPointsByMemberKey, memberID, key, unit)
 	if err != nil {
 		return nil, err
 	}
@@ -520,7 +563,9 @@ func (s *Store) TrendPoints(ctx context.Context, memberID int64, name, unit stri
 	for rows.Next() {
 		var r pipeline.TrendPointRow
 		var date string
-		if err := rows.Scan(&r.ReportID, &date, &r.Value, &r.Unit, &r.RefRange, &r.Method, &r.Flag, &r.LowConfidence, &r.ReviewStatus); err != nil {
+		if err := rows.Scan(&r.ReportID, &date, &r.Value, &r.Unit, &r.UnitDisplay,
+			&r.UnitStatus, &r.RefRange, &r.Method, &r.Flag, &r.LowConfidence,
+			&r.ReviewStatus); err != nil {
 			return nil, err
 		}
 		if date != "" {

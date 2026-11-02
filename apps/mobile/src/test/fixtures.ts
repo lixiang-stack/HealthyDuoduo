@@ -88,6 +88,8 @@ export function makeTrendPoint(overrides: Partial<TrendPoint> = {}): TrendPoint 
     report_date: '2026-10-01',
     value: '27.40',
     unit: 'U/L',
+    unit_display: 'U/L',
+    unit_status: 'verified',
     ref_range: '7-40',
     method: null,
     flag: 'normal',
@@ -100,6 +102,7 @@ export function makeTrendPoint(overrides: Partial<TrendPoint> = {}): TrendPoint 
 export function makePanelItem(overrides: Partial<PanelItem> = {}): PanelItem {
   const latest = makeTrendPoint();
   return {
+    key: '1500104A',
     name: '丙氨酸转氨酶',
     unit: 'U/L',
     ref_range: '7-40',

@@ -27,7 +27,7 @@ items:
     loinc:
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: arbitrary
     canonical_unit: "[arb'U]"
     unit_display: AU
@@ -54,7 +54,7 @@ items:
     loinc:
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: arbitrary
     canonical_unit: "[arb'U]"
     unit_display: AU
@@ -81,7 +81,7 @@ items:
     loinc:
     local_code: LOCAL-IMM-03
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: arbitrary
     canonical_unit: "[arb'U]"
     unit_display: AU
@@ -108,7 +108,7 @@ items:
     loinc:
     local_code: LOCAL-IMM-04
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: arbitrary
     canonical_unit: "[arb'U]"
     unit_display: AU
@@ -135,7 +135,7 @@ items:
     loinc:
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: arbitrary
     canonical_unit: "[arb'U]"
     unit_display: AU
@@ -162,7 +162,7 @@ items:
     loinc:
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: arbitrary
     canonical_unit: "[arb'U]"
     unit_display: AU
@@ -185,8 +185,9 @@ items:
     code:
     loinc:
     local_code: LOCAL-IMM-07
-    source_status: pending
-    review_status: pending
+    source_status: local
+    review_status: approved
+    notes: "local。细分自身抗体/核型，WS/T 886 未单独赋码；结果多依赖试剂与方法，跨医院/跨试剂趋势不可直接比较。"
     result_kind: arbitrary
     canonical_unit: "[arb'U]"
     unit_display: AU
@@ -213,7 +214,7 @@ items:
     loinc:
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: arbitrary
     canonical_unit: "[arb'U]"
     unit_display: AU
@@ -236,8 +237,9 @@ items:
     code:
     loinc:
     local_code: LOCAL-IMM-09
-    source_status: pending
-    review_status: pending
+    source_status: local
+    review_status: approved
+    notes: "local。细分自身抗体/核型，WS/T 886 未单独赋码；结果多依赖试剂与方法，跨医院/跨试剂趋势不可直接比较。"
     result_kind: arbitrary
     canonical_unit: "[arb'U]"
     unit_display: AU
@@ -260,8 +262,9 @@ items:
     code:
     loinc:
     local_code: LOCAL-IMM-10
-    source_status: pending
-    review_status: pending
+    source_status: local
+    review_status: approved
+    notes: "local。细分自身抗体/核型，WS/T 886 未单独赋码；结果多依赖试剂与方法，跨医院/跨试剂趋势不可直接比较。"
     result_kind: arbitrary
     canonical_unit: "[arb'U]"
     unit_display: AU
@@ -284,8 +287,9 @@ items:
     code:
     loinc:
     local_code: LOCAL-IMM-11
-    source_status: pending
-    review_status: pending
+    source_status: local
+    review_status: approved
+    notes: "local。细分自身抗体/核型，WS/T 886 未单独赋码；结果多依赖试剂与方法，跨医院/跨试剂趋势不可直接比较。"
     result_kind: arbitrary
     canonical_unit: "[arb'U]"
     unit_display: AU
@@ -308,8 +312,9 @@ items:
     code:
     loinc:
     local_code: LOCAL-IMM-12
-    source_status: pending
-    review_status: pending
+    source_status: local
+    review_status: approved
+    notes: "local。细分自身抗体/核型，WS/T 886 未单独赋码；结果多依赖试剂与方法，跨医院/跨试剂趋势不可直接比较。"
     result_kind: arbitrary
     canonical_unit: "[arb'U]"
     unit_display: AU
@@ -332,8 +337,9 @@ items:
     code:
     loinc:
     local_code: LOCAL-IMM-13
-    source_status: pending
-    review_status: pending
+    source_status: local
+    review_status: approved
+    notes: "local。细分自身抗体/核型，WS/T 886 未单独赋码；结果多依赖试剂与方法，跨医院/跨试剂趋势不可直接比较。"
     result_kind: arbitrary
     canonical_unit: "[arb'U]"
     unit_display: AU
@@ -356,8 +362,9 @@ items:
     code:
     loinc:
     local_code: LOCAL-IMM-14
-    source_status: pending
-    review_status: pending
+    source_status: local
+    review_status: approved
+    notes: "local。细分自身抗体/核型，WS/T 886 未单独赋码；结果多依赖试剂与方法，跨医院/跨试剂趋势不可直接比较。"
     result_kind: arbitrary
     canonical_unit: "[arb'U]"
     unit_display: AU
@@ -380,8 +387,9 @@ items:
     code:
     loinc:
     local_code: LOCAL-IMM-15
-    source_status: pending
-    review_status: pending
+    source_status: local
+    review_status: approved
+    notes: "local。细分自身抗体/核型，WS/T 886 未单独赋码；结果多依赖试剂与方法，跨医院/跨试剂趋势不可直接比较。"
     result_kind: quantitative
     canonical_unit: U/mL
     unit_display: U/mL
@@ -408,7 +416,7 @@ items:
     loinc:
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: "[IU]/mL"
     unit_display: IU/mL
@@ -435,7 +443,7 @@ items:
     loinc:
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: qualitative
     canonical_unit:
     unit_display:
@@ -447,8 +455,9 @@ items:
     code:
     loinc:
     local_code: LOCAL-IMM-18
-    source_status: pending
-    review_status: pending
+    source_status: local
+    review_status: approved
+    notes: "local。细分自身抗体/核型，WS/T 886 未单独赋码；结果多依赖试剂与方法，跨医院/跨试剂趋势不可直接比较。"
     result_kind: qualitative
     canonical_unit:
     unit_display:
@@ -460,8 +469,9 @@ items:
     code:
     loinc:
     local_code: LOCAL-IMM-19
-    source_status: pending
-    review_status: pending
+    source_status: local
+    review_status: approved
+    notes: "local。细分自身抗体/核型，WS/T 886 未单独赋码；结果多依赖试剂与方法，跨医院/跨试剂趋势不可直接比较。"
     result_kind: qualitative
     canonical_unit:
     unit_display:
@@ -473,8 +483,9 @@ items:
     code:
     loinc:
     local_code: LOCAL-IMM-20
-    source_status: pending
-    review_status: pending
+    source_status: local
+    review_status: approved
+    notes: "local。细分自身抗体/核型，WS/T 886 未单独赋码；结果多依赖试剂与方法，跨医院/跨试剂趋势不可直接比较。"
     result_kind: qualitative
     canonical_unit:
     unit_display:
@@ -486,8 +497,9 @@ items:
     code:
     loinc:
     local_code: LOCAL-IMM-21
-    source_status: pending
-    review_status: pending
+    source_status: local
+    review_status: approved
+    notes: "local。细分自身抗体/核型，WS/T 886 未单独赋码；结果多依赖试剂与方法，跨医院/跨试剂趋势不可直接比较。"
     result_kind: arbitrary
     canonical_unit: "[arb'U]"
     unit_display: AU
@@ -510,8 +522,9 @@ items:
     code:
     loinc:
     local_code: LOCAL-IMM-22
-    source_status: pending
-    review_status: pending
+    source_status: local
+    review_status: approved
+    notes: "local。细分自身抗体/核型，WS/T 886 未单独赋码；结果多依赖试剂与方法，跨医院/跨试剂趋势不可直接比较。"
     result_kind: arbitrary
     canonical_unit: "[arb'U]"
     unit_display: AU
@@ -534,8 +547,9 @@ items:
     code:
     loinc:
     local_code: LOCAL-IMM-23
-    source_status: pending
-    review_status: pending
+    source_status: local
+    review_status: approved
+    notes: "local。细分自身抗体/核型，WS/T 886 未单独赋码；结果多依赖试剂与方法，跨医院/跨试剂趋势不可直接比较。"
     result_kind: arbitrary
     canonical_unit: "[arb'U]"
     unit_display: AU
@@ -558,8 +572,9 @@ items:
     code:
     loinc:
     local_code: LOCAL-IMM-24
-    source_status: pending
-    review_status: pending
+    source_status: local
+    review_status: approved
+    notes: "local。细分自身抗体/核型，WS/T 886 未单独赋码；结果多依赖试剂与方法，跨医院/跨试剂趋势不可直接比较。"
     result_kind: arbitrary
     canonical_unit: "[arb'U]"
     unit_display: AU
@@ -582,8 +597,9 @@ items:
     code:
     loinc:
     local_code: LOCAL-IMM-25
-    source_status: pending
-    review_status: pending
+    source_status: local
+    review_status: approved
+    notes: "local。细分自身抗体/核型，WS/T 886 未单独赋码；结果多依赖试剂与方法，跨医院/跨试剂趋势不可直接比较。"
     result_kind: quantitative
     canonical_unit: U/mL
     unit_display: U/mL
@@ -606,8 +622,9 @@ items:
     code:
     loinc:
     local_code: LOCAL-IMM-26
-    source_status: pending
-    review_status: pending
+    source_status: local
+    review_status: approved
+    notes: "local。细分自身抗体/核型，WS/T 886 未单独赋码；结果多依赖试剂与方法，跨医院/跨试剂趋势不可直接比较。"
     result_kind: arbitrary
     canonical_unit: "[arb'U]"
     unit_display: AU
@@ -636,7 +653,7 @@ items:
     loinc:
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: "[IU]/mL"
     unit_display: IU/mL
@@ -663,7 +680,7 @@ items:
     loinc:
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: m[IU]/mL
     unit_display: mIU/mL
@@ -690,7 +707,7 @@ items:
     loinc:
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: ratio
     canonical_unit: '1'
     unit_display: '1'
@@ -717,7 +734,7 @@ items:
     loinc:
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: ratio
     canonical_unit: '1'
     unit_display: '1'
@@ -744,7 +761,7 @@ items:
     loinc:
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: ratio
     canonical_unit: '1'
     unit_display: '1'
@@ -771,7 +788,7 @@ items:
     loinc:
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: ratio
     canonical_unit: '1'
     unit_display: '1'
@@ -798,7 +815,7 @@ items:
     loinc:
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: ratio
     canonical_unit: '1'
     unit_display: '1'
@@ -825,7 +842,7 @@ items:
     loinc:
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: ratio
     canonical_unit: '1'
     unit_display: '1'
@@ -854,7 +871,7 @@ items:
     loinc:
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: ug/L
     unit_display: μg/L
@@ -881,7 +898,7 @@ items:
     loinc:
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: ug/L
     unit_display: μg/L
@@ -908,7 +925,7 @@ items:
     loinc:
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: ug/L
     unit_display: μg/L
@@ -935,7 +952,7 @@ items:
     loinc:
     local_code:
     source_status: primary
-    review_status: pending
+    review_status: approved
     result_kind: quantitative
     canonical_unit: ug/L
     unit_display: μg/L

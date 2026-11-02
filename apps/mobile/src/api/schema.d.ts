@@ -185,11 +185,11 @@ export interface paths {
         };
         /**
          * B2 趋势时序(单位门控)
-         * @description 同成员下指定指标项(词典规范名,name URL 编码)的跨报告时序点,按
-         *     report_date 升序;日期为 null 的点排最后且不参与连线。unit 门控:?unit=
-         *     指定归一单位 → 只返回同单位点;缺省返回全部单位族的点(连接键 = 规范名 +
-         *     归一单位,跨单位族不连线不提示;不存在运行时换算与换算系数表)。
-         *     本端点 M4 消费、M0 冻结。
+         * @description 同成员下指定指标项的跨报告时序点,按趋势键(code 优先,缺失用 loinc,
+         *     再回退词典规范名)连接,可跨面板;按 report_date 升序;日期为 null 的点排
+         *     最后且不参与连线。unit 门控:?unit= 指定 canonical unit → 只返回同单位点;
+         *     缺省返回全部 canonical unit 的点(跨单位族不连线不提示;不存在运行时换算与
+         *     换算系数表)。unit_status=unverified 的点默认不返回。本端点 M4 消费、M0 冻结。
          */
         get: operations["getTrend"];
         put?: never;
@@ -232,8 +232,9 @@ export interface paths {
         };
         /**
          * 项目详情(按成员 + 项目组)
-         * @description 该项目组下全部指标的最新值与跨报告趋势,按 name+unit 分行(跨单位不合并、
-         *     不换算)。异常项在前,其余按最新报告内指标顺序;latest 为空且
+         * @description 该项目组下全部指标的最新值与跨报告趋势,按趋势键(code 优先,缺失用 loinc,
+         *     再回退词典规范名)+ canonical unit 分行(跨单位不合并、不换算);同一分析物
+         *     跨面板连接。异常项在前,其余按最新报告内指标顺序;latest 为空且
          *     not_tested_count > 0 表示「未检测」;latest_report_not_tested 表示最近一份
          *     含该指标的报告中此项未检测,数值是最近一次已知值。narrative=true(影像)
          *     时 items=[]。未知成员 404,非法 panel 400。
@@ -540,7 +541,15 @@ export interface components {
             report_date: string | null;
             /** @description 印刷原样数值(与指标项 value 同契约);Δ 自行 ParseFloat */
             value: string | null;
+            /** @description canonical UCUM 单位(连接/门控键) */
             unit: string | null;
+            /** @description 人类可读展示单位(UI 优先);缺失时回退 unit */
+            unit_display: string | null;
+            /**
+             * @description verified 才默认参与趋势连接;unverified 点 App 不连线
+             * @enum {string|null}
+             */
+            unit_status: "verified" | "unverified" | null;
             /** @description 参考范围淡带铺图依据 */
             ref_range: string | null;
             /** @description 解释跨院参考范围差异 */
@@ -562,9 +571,9 @@ export interface components {
             panel: components["schemas"]["PanelCode"];
             /** @description 当前成员非 failed 报告里包含该项目的份数 */
             report_count: number;
-            /** @description 该项目下 name+unit 去重后的指标数(含未检测项) */
+            /** @description 该项目下趋势键 + canonical unit 去重后的指标数(含未检测项) */
             item_count: number;
-            /** @description 每个 name+unit 取最近非 not_tested 值后 flag ∈ high/low/abnormal 的数量 */
+            /** @description 每个趋势键 + canonical unit 取最近非 not_tested 值后 flag ∈ high/low/abnormal 的数量 */
             abnormal_count: number;
             /** @description 包含该项目的最新报告日期;只有无日期报告时为 null */
             latest_report_date: string | null;
@@ -590,12 +599,16 @@ export interface components {
             items: components["schemas"]["PanelItem"][];
         };
         /**
-         * @description 项目详情中按 name+unit 分行的指标。latest 为最近一个非 not_tested 点
+         * @description 项目详情中按趋势键(code 优先,缺失用 loinc,再回退规范名)+ canonical unit
+         *     分行的指标。同一分析物跨面板连接。latest 为最近一个非 not_tested 点
          *     (没有则 null);points 为同组跨报告点,report_date 升序、不含 not_tested。
          */
         PanelItem: {
-            /** @description 词典规范名(修正后以修正值为准) */
+            /** @description 趋势连接键(code > loinc > name);App 用于跨面板同一分析物去重 */
+            key: string;
+            /** @description 词典规范名(修正后以修正值为准;取最近点名称) */
             name: string;
+            /** @description canonical UCUM 单位(跨单位分行不合并) */
             unit: string | null;
             /** @description 取 latest 点的参考范围 */
             ref_range: string | null;
@@ -639,7 +652,7 @@ export interface components {
         ReportID: string;
         /** @description 指标项不透明句柄(BIGSERIAL;重跑识别后全换) */
         ItemID: number;
-        /** @description 指标项名称(通常为词典规范名;修正后以修正值为准),URL 编码 */
+        /** @description 指标项名称或标准码(通常为词典规范名;也接受 code / LOINC 用于跨面板连接;修正后以修正值为准),URL 编码 */
         IndicatorName: string;
         /** @description 项目组稳定 code(与 PanelCode 枚举同源;非法 code 返回 400) */
         Panel: components["schemas"]["PanelCode"];
@@ -987,13 +1000,13 @@ export interface operations {
     getTrend: {
         parameters: {
             query?: {
-                /** @description 门控归一单位(如 g/L);缺省 = 全部单位族的点 */
+                /** @description 门控 canonical unit(如 g/L);缺省 = 全部 canonical unit 的点 */
                 unit?: string;
             };
             header?: never;
             path: {
                 member_id: components["parameters"]["MemberID"];
-                /** @description 指标项名称(通常为词典规范名;修正后以修正值为准),URL 编码 */
+                /** @description 指标项名称或标准码(通常为词典规范名;也接受 code / LOINC 用于跨面板连接;修正后以修正值为准),URL 编码 */
                 name: components["parameters"]["IndicatorName"];
             };
             cookie?: never;

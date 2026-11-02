@@ -25,6 +25,7 @@ import {
 import { TrendDetailSheet } from '../../reports/TrendDetailSheet';
 import { TrendSparkline } from '../../reports/TrendChart';
 import {
+  displayTrendUnit,
   formatSeriesMeta,
   TREND_UNAVAILABLE_LABEL,
 } from '../../reports/trends';
@@ -170,7 +171,7 @@ export default function PanelDetailScreen() {
                     ) : null}
                     {groups.abnormal.map((item, index) => (
                       <AbnormalItemCard
-                        key={`${item.name}-${item.unit ?? ''}`}
+                        key={`${item.key}-${item.unit ?? ''}`}
                         item={item}
                         index={index}
                         reportTypeById={reportTypeById}
@@ -197,7 +198,7 @@ export default function PanelDetailScreen() {
                         {!restCollapsed
                           ? groups.rest.map((item, index) => (
                               <CompactItemRow
-                                key={`${item.name}-${item.unit ?? ''}`}
+                                key={`${item.key}-${item.unit ?? ''}`}
                                 item={item}
                                 index={groups.abnormal.length + index}
                                 reportTypeById={reportTypeById}
@@ -293,7 +294,9 @@ function AbnormalItemCard({
         <View style={styles.valueWithTag}>
           <Text style={[styles.value, { color }]}>
             {latest.value ?? '—'}
-            {latest.unit ? <Text style={styles.unit}> {latest.unit}</Text> : null}
+            {latest && displayTrendUnit(latest) ? (
+              <Text style={styles.unit}> {displayTrendUnit(latest)}</Text>
+            ) : null}
           </Text>
           {item.latest_report_not_tested ? (
             <Text testID={`panel-item-not-tested-${index}`} style={styles.notTestedTag}>
@@ -348,7 +351,9 @@ function CompactItemRow({
         <View style={styles.valueWithTag}>
           <Text style={[styles.compactValue, { color }]}>
             {value}
-            {latest?.unit ? <Text style={styles.unit}> {latest.unit}</Text> : null}
+            {latest && displayTrendUnit(latest) ? (
+              <Text style={styles.unit}> {displayTrendUnit(latest)}</Text>
+            ) : null}
           </Text>
           {item.latest_report_not_tested && latest ? (
             <Text testID={`panel-item-not-tested-${index}`} style={styles.notTestedTag}>

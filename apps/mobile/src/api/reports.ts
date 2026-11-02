@@ -68,7 +68,7 @@ export async function listMemberPanels(
   ).panels;
 }
 
-/** 项目详情:该项目全部指标的最新值与跨报告点(按 name+unit 分行)。 */
+/** 项目详情:该项目全部指标的最新值与跨报告点(按趋势键 + canonical unit 分行)。 */
 export async function getPanelDetail(
   client: ApiClient,
   memberId: number,

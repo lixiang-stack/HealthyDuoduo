@@ -4,7 +4,9 @@
   "report_count": 3,
   "latest_report_date": "2021-08-02",
   "latest_report_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-  "report_types": ["生化"],
+  "report_types": [
+    "生化"
+  ],
   "narrative": false,
   "items": [
     {
@@ -16,6 +18,8 @@
         "report_date": "2021-08-02",
         "value": "835",
         "unit": "U/L",
+        "unit_display": "U/L",
+        "unit_status": "verified",
         "ref_range": "7-40",
         "method": null,
         "flag": "high",
@@ -28,6 +32,8 @@
           "report_date": "2020-01-01",
           "value": "27.4",
           "unit": "U/L",
+          "unit_display": "U/L",
+          "unit_status": "verified",
           "ref_range": "7-40",
           "method": null,
           "flag": "normal",
@@ -39,6 +45,8 @@
           "report_date": "2021-08-02",
           "value": "835",
           "unit": "U/L",
+          "unit_display": "U/L",
+          "unit_status": "verified",
           "ref_range": "7-40",
           "method": null,
           "flag": "high",
@@ -48,7 +56,8 @@
       ],
       "report_count": 2,
       "not_tested_count": 0,
-      "latest_report_not_tested": false
+      "latest_report_not_tested": false,
+      "key": "1500104A"
     },
     {
       "name": "白蛋白",
@@ -59,6 +68,8 @@
         "report_date": "2020-01-01",
         "value": "42",
         "unit": "g/L",
+        "unit_display": "g/L",
+        "unit_status": "verified",
         "ref_range": "40-55",
         "method": null,
         "flag": "normal",
@@ -71,6 +82,8 @@
           "report_date": "2020-01-01",
           "value": "42",
           "unit": "g/L",
+          "unit_display": "g/L",
+          "unit_status": "verified",
           "ref_range": "40-55",
           "method": null,
           "flag": "normal",
@@ -80,7 +93,8 @@
       ],
       "report_count": 1,
       "not_tested_count": 1,
-      "latest_report_not_tested": true
+      "latest_report_not_tested": true,
+      "key": "1100104A"
     },
     {
       "name": "前白蛋白",
@@ -90,7 +104,8 @@
       "points": [],
       "report_count": 0,
       "not_tested_count": 1,
-      "latest_report_not_tested": true
+      "latest_report_not_tested": true,
+      "key": "1102904A"
     }
   ]
 }
