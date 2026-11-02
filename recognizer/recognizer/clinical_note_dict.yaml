@@ -22,4 +22,7 @@ category:
     present_illness: [现病史]
     diagnosis: [初步诊断, 临床诊断, 诊断]
     treatment: [处理意见, 治疗意见, 处理, 医嘱]
+  # 页脚 / 页码 / 记录日期不是处理正文;命中即结束当前段落。
+  section_stop_prefixes: [请妥善保管, 记录日期, 记录时间, 初诊时间, 初诊日期, 就诊时间]
+  section_stop_patterns: ['^第\s*\d+\s*页$']
 items: []

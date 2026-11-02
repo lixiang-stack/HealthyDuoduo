@@ -33,10 +33,10 @@ func TestTrendStoreSmoke(t *testing.T) {
 
 	// 两个成员:趋势查询必须按成员隔离。
 	var memberA, memberB int64
-	if err := pool.QueryRow(ctx, `INSERT INTO members (name, is_child, sex, birth_date, birth_date_precision) VALUES ('趋势A', true, 'unspecified', '2020-01-01', 'day') RETURNING id`).Scan(&memberA); err != nil {
+	if err := pool.QueryRow(ctx, `INSERT INTO members (name, sex, birth_date) VALUES ('趋势A', 'female', '2020-01-01') RETURNING id`).Scan(&memberA); err != nil {
 		t.Fatalf("seed member A: %v", err)
 	}
-	if err := pool.QueryRow(ctx, `INSERT INTO members (name, is_child, sex, birth_date, birth_date_precision) VALUES ('趋势B', false, 'unspecified', '2020-01-01', 'day') RETURNING id`).Scan(&memberB); err != nil {
+	if err := pool.QueryRow(ctx, `INSERT INTO members (name, sex, birth_date) VALUES ('趋势B', 'female', '2020-01-01') RETURNING id`).Scan(&memberB); err != nil {
 		t.Fatalf("seed member B: %v", err)
 	}
 

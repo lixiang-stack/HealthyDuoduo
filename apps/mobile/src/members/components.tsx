@@ -1,26 +1,20 @@
 // 成员页展示组件(票 05):成员行、行内编辑、删除确认、添加成员表单。
 // 共享一份控件样式;成员行点按设为当前成员。
+import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import type { Member } from '../api/members';
 import { sharedStyles } from '../components/styles';
 import { colors } from '../components/theme';
-import {
-  BIRTH_DATE_PRECISION_OPTIONS,
-  SEX_OPTIONS,
-  memberProfileValid,
-  type BirthDatePrecision,
-  type MemberSex,
-} from './profile';
+import { memberFormErrors, type MemberSex } from './profile';
+import { BirthDateField, SexField } from './profilePickers';
 
 /** 行内编辑草稿;memberId 定位被编辑行。 */
 export type EditDraft = {
   memberId: number;
   name: string;
-  isChild: boolean;
   sex: MemberSex;
   birthDate: string;
-  birthDatePrecision: BirthDatePrecision;
 };
 
 // 成员行:点按设为当前成员,「编辑」进入行内改名/改档,「删除」进入确认面板。
@@ -69,7 +63,7 @@ export function MemberRow({
   );
 }
 
-// 行内编辑:改名 / 改档 / 改性别与出生日期,保存后由页面重载列表;取消不改动任何数据。
+// 行内编辑:改名 / 改性别与出生日期,保存后由页面重载列表;取消不改动任何数据。
 export function MemberEditRow({
   draft,
   busy,
@@ -83,29 +77,44 @@ export function MemberEditRow({
   onSave: () => void;
   onCancel: () => void;
 }) {
+  const [submitted, setSubmitted] = useState(false);
+  const errors = memberFormErrors(draft.name, draft.sex, draft.birthDate);
+  const valid = Object.keys(errors).length === 0;
+  const attemptSave = () => {
+    setSubmitted(true);
+    if (valid) {
+      onSave();
+    }
+  };
   return (
     <View style={styles.cardEditing}>
+      <RequiredLabel>称呼</RequiredLabel>
       <TextInput
+        testID={`member-edit-name-${draft.memberId}`}
         value={draft.name}
         onChangeText={(value) => onChange({ name: value })}
-        placeholder="显示名"
+        placeholder="如:小虎、妈妈"
         placeholderTextColor={colors.muted}
         style={styles.input}
       />
-      <ChildPicker isChild={draft.isChild} onChange={(value) => onChange({ isChild: value })} />
+      {submitted && errors.name ? (
+        <Text testID={`member-edit-name-error-${draft.memberId}`} style={styles.fieldError}>
+          {errors.name}
+        </Text>
+      ) : null}
       <MemberProfileFields
         prefix={`member-edit-${draft.memberId}`}
         sex={draft.sex}
         birthDate={draft.birthDate}
-        birthDatePrecision={draft.birthDatePrecision}
+        errors={submitted ? errors : undefined}
         onChange={onChange}
       />
       <View style={sharedStyles.horizontal}>
         <Pressable
           testID={`member-edit-save-${draft.memberId}`}
-          style={[styles.button, (busy || !memberDraftValid(draft)) && styles.buttonDisabled]}
-          onPress={onSave}
-          disabled={busy || !memberDraftValid(draft)}
+          style={[styles.button, busy && styles.buttonDisabled]}
+          onPress={attemptSave}
+          disabled={busy}
         >
           <Text style={styles.buttonText}>保存</Text>
         </Pressable>
@@ -208,60 +217,62 @@ export function MemberDeleteRow({
   );
 }
 
-// 添加成员表单:名字 + 是否孩子 + 性别 + 出生日期及精度;提交交给页面(状态在页面持有)。
+// 添加成员表单:名字 + 性别 + 出生日期;提交交给页面(状态在页面持有)。
 export function MemberCreateForm({
   name,
-  isChild,
   sex,
   birthDate,
-  birthDatePrecision,
   busy,
   onNameChange,
-  onIsChildChange,
   onProfileChange,
   onSubmit,
 }: {
   name: string;
-  isChild: boolean;
   sex: MemberSex | undefined;
   birthDate: string;
-  birthDatePrecision: BirthDatePrecision;
   busy: boolean;
   onNameChange: (value: string) => void;
-  onIsChildChange: (value: boolean) => void;
-  onProfileChange: (patch: {
-    sex?: MemberSex;
-    birthDate?: string;
-    birthDatePrecision?: BirthDatePrecision;
-  }) => void;
+  onProfileChange: (patch: { sex?: MemberSex; birthDate?: string }) => void;
   onSubmit: () => void;
 }) {
-  const valid = memberProfileValid(name, sex, birthDate, birthDatePrecision);
+  const [submitted, setSubmitted] = useState(false);
+  const errors = memberFormErrors(name, sex, birthDate);
+  const valid = Object.keys(errors).length === 0;
+  const attemptCreate = () => {
+    setSubmitted(true);
+    if (valid) {
+      onSubmit();
+    }
+  };
   return (
     <View style={styles.cardForm}>
       <Text style={styles.sectionTitle}>添加成员</Text>
+      <RequiredLabel>称呼</RequiredLabel>
       <TextInput
         testID="members-name-input"
         value={name}
         onChangeText={onNameChange}
-        placeholder="显示名(如:小虎、妈妈)"
+        placeholder="如:小虎、妈妈"
         placeholderTextColor={colors.muted}
         style={styles.input}
       />
-      <ChildPicker isChild={isChild} onChange={onIsChildChange} />
+      {submitted && errors.name ? (
+        <Text testID="members-name-error" style={styles.fieldError}>
+          {errors.name}
+        </Text>
+      ) : null}
       <MemberProfileFields
         prefix="members"
         sex={sex}
         birthDate={birthDate}
-        birthDatePrecision={birthDatePrecision}
+        errors={submitted ? errors : undefined}
         onChange={onProfileChange}
       />
-      <Text style={styles.hint}>性别与出生日期必填;只知出生年份时选「按年份」。</Text>
       <Pressable
         testID="members-create"
-        style={[styles.button, (busy || !valid) && styles.buttonDisabled]}
-        onPress={onSubmit}
-        disabled={busy || !valid}
+        style={[styles.button, busy && styles.buttonDisabled]}
+        onPress={attemptCreate}
+        disabled={busy}
       >
         <Text style={styles.buttonText}>创建</Text>
       </Pressable>
@@ -269,106 +280,45 @@ export function MemberCreateForm({
   );
 }
 
-/** 成员资料字段:性别三选一 + 出生日期 + 日期精度。 */
+/** 成员资料字段:性别下拉 + 出生日期滚轮。 */
 function MemberProfileFields({
   prefix,
   sex,
   birthDate,
-  birthDatePrecision,
+  errors,
   onChange,
 }: {
   prefix: string;
   sex: MemberSex | undefined;
   birthDate: string;
-  birthDatePrecision: BirthDatePrecision;
-  onChange: (patch: {
-    sex?: MemberSex;
-    birthDate?: string;
-    birthDatePrecision?: BirthDatePrecision;
-  }) => void;
+  errors?: { sex?: string; birthDate?: string };
+  onChange: (patch: { sex?: MemberSex; birthDate?: string }) => void;
 }) {
   return (
     <View style={styles.profileFields}>
-      <View style={sharedStyles.horizontal}>
-        {SEX_OPTIONS.map((option) => {
-          const active = option.value === sex;
-          return (
-            <Pressable
-              key={option.value}
-              testID={`${prefix}-sex-${option.value}`}
-              style={[styles.chip, active && styles.chipActive]}
-              onPress={() => onChange({ sex: option.value })}
-            >
-              <Text style={active ? styles.chipTextActive : styles.chipText}>{option.label}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
-      <View style={sharedStyles.horizontal}>
-        {BIRTH_DATE_PRECISION_OPTIONS.map((option) => {
-          const active = option.value === birthDatePrecision;
-          return (
-            <Pressable
-              key={option.value}
-              testID={`${prefix}-precision-${option.value}`}
-              style={[styles.chip, active && styles.chipActive]}
-              onPress={() =>
-                onChange({
-                  birthDatePrecision: option.value,
-                  birthDate: precisionSwitchDate(birthDate, option.value),
-                })
-              }
-            >
-              <Text style={active ? styles.chipTextActive : styles.chipText}>{option.label}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
-      <TextInput
-        testID={`${prefix}-birth-date`}
+      <SexField
+        prefix={prefix}
+        value={sex}
+        error={errors?.sex}
+        onChange={(value) => onChange({ sex: value })}
+      />
+      <BirthDateField
+        prefix={prefix}
         value={birthDate}
-        onChangeText={(value) => onChange({ birthDate: value })}
-        placeholder={birthDatePrecision === 'year' ? '出生年份(如 2020)' : '出生日期(YYYY-MM-DD)'}
-        placeholderTextColor={colors.muted}
-        keyboardType="numbers-and-punctuation"
-        style={styles.input}
+        error={errors?.birthDate}
+        onChange={(value) => onChange({ birthDate: value })}
       />
     </View>
   );
 }
 
-/** 切换精度时整理已输日期:切到 year 取已输日期的年份,切到 day 清掉纯年份,
- *  避免留下与当前精度不符的陈旧文本。 */
-function precisionSwitchDate(birthDate: string, precision: BirthDatePrecision): string {
-  const trimmed = birthDate.trim();
-  if (precision === 'year') {
-    const match = /^(\d{4})-\d{2}-\d{2}$/.exec(trimmed);
-    return match ? match[1] : trimmed;
-  }
-  return /^\d{4}$/.test(trimmed) ? '' : trimmed;
-}
-
-/** 编辑草稿是否可保存:名字 + 性别 + 合法出生日期。 */
-function memberDraftValid(draft: EditDraft): boolean {
-  return memberProfileValid(
-    draft.name,
-    draft.sex,
-    draft.birthDate,
-    draft.birthDatePrecision,
-  );
-}
-
-// 「孩子 / 成人」两档选择(保留的历史字段;成员另有性别与出生日期)。
-function ChildPicker({ isChild, onChange }: { isChild: boolean; onChange: (isChild: boolean) => void }) {
+/** 必填字段标签:红色星号比整句说明更贴近字段。 */
+function RequiredLabel({ children }: { children: string }) {
   return (
-    <View style={sharedStyles.horizontal}>
-      <Pressable style={[styles.chip, isChild && styles.chipActive]} onPress={() => onChange(true)}>
-        <Text style={isChild ? styles.chipTextActive : styles.chipText}>孩子</Text>
-      </Pressable>
-      <Pressable style={[styles.chip, !isChild && styles.chipActive]} onPress={() => onChange(false)}>
-        <Text style={!isChild ? styles.chipTextActive : styles.chipText}>成人</Text>
-      </Pressable>
-    </View>
+    <Text style={sharedStyles.label}>
+      {children}
+      <Text style={styles.required}> *</Text>
+    </Text>
   );
 }
 
@@ -456,7 +406,8 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 14, color: colors.text },
   chipTextActive: { fontSize: 14, color: colors.onAccent },
   profileFields: { gap: 8 },
-  hint: { fontSize: 12, color: colors.muted },
+  required: { color: colors.fail },
+  fieldError: { fontSize: 12, color: colors.fail },
   button: {
     alignSelf: 'flex-start',
     paddingVertical: 10,

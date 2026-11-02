@@ -1,17 +1,18 @@
 # 01: 成员模型扩展
 
-**What to build:** 建成员时必须填写性别和出生日期；性别提供「男 / 女 / 不确定」三选一；只知道出生年份时允许只填年份并标记精度；修改成员时可改这些字段。产品未上线，迁移时清空现有成员并解除报告归属。
+**What to build:** 建成员时必须填写性别和出生日期；性别用下拉框提供「男 / 女」二选一；出生日期统一用年月日滚轮选择完整日期；修改成员时可改这些字段。是否孩子由出生日期自动计算（未满 18 岁），不再手选。产品未上线，迁移时清空现有成员并解除报告归属。
 
 **Blocked by:** None (can start immediately)
 
 **Status:** resolved
 
 - [x] 建成员时缺性别或出生日期返回 400，错误信息指明缺哪个字段
-- [x] 性别接受 `male` / `female` / `unspecified`，其他值返回 400
-- [x] `birth_date_precision` 接受 `day` / `year`，默认 `day`
+- [x] 性别接受 `male` / `female`，其他值（含旧 `unspecified`）返回 400
+- [x] 出生日期统一为完整 `YYYY-MM-DD`，不再提供精度字段
+- [x] `is_child` 由服务端按出生日期实时计算（未满 18 岁），请求不可写
 - [x] 修改成员支持部分更新，必填字段显式 null 返回 400
 - [x] 迁移清空 `members` 并把 `reports.member_id` 置空，迁移说明标注仅限未上线阶段
-- [x] App 表单必填校验、性别三选一、日期精度切换
+- [x] App 表单必填校验、性别下拉、出生日期年月日滚轮
 - [x] HTTP 测试覆盖正常创建、缺字段、非法枚举、部分更新
 - [x] RNTL 覆盖表单校验与提交
 
@@ -19,6 +20,17 @@
 
 **实现（2026-11-02，分支 `llm-analysis-spec`）**
 
-- 迁移 `0013_member_sex_birth_date.sql`：先解除 `reports.member_id` 归属，再清空 `members`；新增 `sex` / `birth_date`（NOT NULL）与 `birth_date_precision`（默认 `day`）。报告与识别历史保留。
+- 迁移 `0013_member_sex_birth_date.sql`：先解除 `reports.member_id` 归属，再清空 `members`；新增 `sex` / `birth_date`（NOT NULL），移除手选的 `is_child` 列与日期精度。报告与识别历史保留。
 - 领域校验集中在 `internal/pipeline/members.go`；建成员与 PATCH 共用同一枚举 / 日期校验，存储边界再次镜像。
 - OpenAPI / Go 镜像 / App 表单 / RNTL 全链路同步；`CONTEXT.md` 成员定义与 `ADR-0015` 已更新。
+
+**产品体验修订（2026-11-02）**
+
+- 性别由三按钮改为下拉框，只保留男 / 女；`unspecified` 从契约与领域枚举移除。
+- 移除「按年份 / 按日期」精度切换与 `birth_date_precision` 请求/响应字段；生日统一为完整日期，App 用年月日滚轮选择。
+- 移除「孩子 / 成人」按钮；`is_child` 由服务端按出生日期实时计算，未满 18 岁为孩子。
+
+**UI 修订（2026-11-03）**
+
+- 家庭成员页字段名「显示名」改为「称呼」。
+- 必填交互改为字段级：称呼 / 性别 / 出生日期标签带红色 `*`；点击「创建」后逐字段显示「请填写称呼 / 请选择性别 / 请选择出生日期」，不再用整句「性别与出生日期必填」。

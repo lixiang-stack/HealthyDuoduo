@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -252,34 +253,23 @@ const (
 		  ` + reportItemStandardColumnsSQL + `)
 		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)`
 
-	// 成员(迁移 0004;0013 起显示名 + 是否孩子 + 性别 + 出生日期及精度):
+	// 成员(迁移 0004;0013 起显示名 + 性别 + 出生日期):
 	// 列表按 id 升序 = 创建序返回;删除时先删该成员报告再删成员(单事务;原图与 OCR 历史保留)。
 	sqlMemberDelete        = `DELETE FROM members WHERE id = $1`
 	sqlMemberReportsDelete = `DELETE FROM reports WHERE member_id = $1`
-	// birth_date 以文本入参转 date;year 精度统一归一到当年 1 月 1 日,
-	// 保证只知出生年份的成员不会落出「年份精度 + 月日」的混合数据。
-	sqlMemberColumnsSQL = `id, name, is_child, sex, to_char(birth_date, 'YYYY-MM-DD'), birth_date_precision, created_at`
+	sqlMemberColumnsSQL    = `id, name, sex, to_char(birth_date, 'YYYY-MM-DD'), created_at`
 
-	sqlMemberInsert = `INSERT INTO members (name, is_child, sex, birth_date, birth_date_precision)
-		 VALUES ($1,$2,$3,
-		   CASE WHEN $5 = 'year' THEN date_trunc('year', $4::date)::date ELSE $4::date END,
-		   $5)
+	sqlMemberInsert = `INSERT INTO members (name, sex, birth_date)
+		 VALUES ($1,$2,$3::date)
 		 RETURNING ` + sqlMemberColumnsSQL
 
 	sqlMembersList = `SELECT ` + sqlMemberColumnsSQL + ` FROM members ORDER BY id`
 
 	sqlMemberByID = `SELECT ` + sqlMemberColumnsSQL + ` FROM members WHERE id = $1`
 
-	// 改动用 COALESCE 只覆盖传入字段(nil = 保持不变);结果精度为 year 时
-	// 同步把出生日期归一到当年 1 月 1 日(包括只改精度、不改日期的路径)。
-	sqlMemberUpdate = `UPDATE members SET name = COALESCE($2, name), is_child = COALESCE($3, is_child),
-		 sex = COALESCE($4, sex),
-		 birth_date = CASE
-		   WHEN COALESCE($6, birth_date_precision) = 'year'
-		     THEN date_trunc('year', COALESCE($5::date, birth_date))::date
-		   ELSE COALESCE($5::date, birth_date)
-		 END,
-		 birth_date_precision = COALESCE($6, birth_date_precision)
+	// 改动用 COALESCE 只覆盖传入字段(nil = 保持不变)。
+	sqlMemberUpdate = `UPDATE members SET name = COALESCE($2, name), sex = COALESCE($3, sex),
+		 birth_date = COALESCE($4::date, birth_date)
 		 WHERE id = $1 RETURNING ` + sqlMemberColumnsSQL
 )
 
@@ -865,7 +855,7 @@ func (s *Store) CreateMember(ctx context.Context, profile pipeline.MemberProfile
 	}
 	var m pipeline.Member
 	if err := scanMember(s.pool.QueryRow(ctx, sqlMemberInsert,
-		profile.Name, profile.IsChild, profile.Sex, profile.BirthDate, profile.BirthDatePrecision,
+		profile.Name, profile.Sex, profile.BirthDate,
 	), &m); err != nil {
 		return nil, err
 	}
@@ -921,14 +911,9 @@ func (s *Store) UpdateMember(ctx context.Context, id int64, patch pipeline.Membe
 			return nil, err
 		}
 	}
-	if patch.BirthDatePrecision != nil {
-		if err := pipeline.ValidateMemberBirthDatePrecision(*patch.BirthDatePrecision); err != nil {
-			return nil, err
-		}
-	}
 	var m pipeline.Member
 	err := scanMember(s.pool.QueryRow(ctx, sqlMemberUpdate,
-		id, patch.Name, patch.IsChild, patch.Sex, patch.BirthDate, patch.BirthDatePrecision,
+		id, patch.Name, patch.Sex, patch.BirthDate,
 	), &m)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -939,10 +924,13 @@ func (s *Store) UpdateMember(ctx context.Context, id int64, patch pipeline.Membe
 	return &m, nil
 }
 
-// scanMember 统一成员行扫描列序(与 sqlMemberColumnsSQL 对齐)。
+// scanMember 统一成员行扫描列序(与 sqlMemberColumnsSQL 对齐);is_child 按生日实时计算。
 func scanMember(row pgx.Row, m *pipeline.Member) error {
-	return row.Scan(&m.MemberID, &m.Name, &m.IsChild, &m.Sex, &m.BirthDate,
-		&m.BirthDatePrecision, &m.CreatedAt)
+	if err := row.Scan(&m.MemberID, &m.Name, &m.Sex, &m.BirthDate, &m.CreatedAt); err != nil {
+		return err
+	}
+	m.IsChild = pipeline.IsChild(m.BirthDate, time.Now())
+	return nil
 }
 
 // DeleteMember 硬删成员及其全部报告(报告/指标项/修正对级联;原图与 OCR 历史保留)。

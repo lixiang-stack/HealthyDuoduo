@@ -3,34 +3,30 @@
 // 该镜像序列化响应,对账测试(internal/httpapi 的互证测试)锁死与 OpenAPI 的漂移。
 package httpapi
 
-// Member components/Member:成员模型 = 显示名 + 是否孩子 + 性别 + 出生日期及精度。
+// Member components/Member:成员模型 = 称呼 + 性别 + 出生日期;
+// is_child 由出生日期实时计算(未满 18 岁),不是可写字段。
 type Member struct {
-	MemberID           int64  `json:"member_id"`
-	Name               string `json:"name"`
-	IsChild            bool   `json:"is_child"`
-	Sex                string `json:"sex"`                  // male | female | unspecified
-	BirthDate          string `json:"birth_date"`           // YYYY-MM-DD
-	BirthDatePrecision string `json:"birth_date_precision"` // day | year
-	CreatedAt          string `json:"created_at"`           // RFC3339 date-time
+	MemberID  int64  `json:"member_id"`
+	Name      string `json:"name"`
+	IsChild   bool   `json:"is_child"`
+	Sex       string `json:"sex"`        // male | female
+	BirthDate string `json:"birth_date"` // YYYY-MM-DD
+	CreatedAt string `json:"created_at"` // RFC3339 date-time
 }
 
-// MemberCreate POST /members 请求体:member_id/created_at 由服务端产生,不收;
-// sex/birth_date 必填,birth_date_precision 缺省 day。
+// MemberCreate POST /members 请求体:member_id/created_at/is_child 由服务端产生,不收;
+// name/sex/birth_date 必填。
 type MemberCreate struct {
-	Name               string  `json:"name"`
-	IsChild            bool    `json:"is_child"`
-	Sex                string  `json:"sex"`
-	BirthDate          string  `json:"birth_date"`
-	BirthDatePrecision *string `json:"birth_date_precision,omitempty"`
+	Name      string `json:"name"`
+	Sex       string `json:"sex"`
+	BirthDate string `json:"birth_date"`
 }
 
 // MemberUpdate PATCH /members/{member_id} 请求体:至少一项;删除成员见 DELETE。
 type MemberUpdate struct {
-	Name               *string `json:"name,omitempty"`
-	IsChild            *bool   `json:"is_child,omitempty"`
-	Sex                *string `json:"sex,omitempty"`
-	BirthDate          *string `json:"birth_date,omitempty"`
-	BirthDatePrecision *string `json:"birth_date_precision,omitempty"`
+	Name      *string `json:"name,omitempty"`
+	Sex       *string `json:"sex,omitempty"`
+	BirthDate *string `json:"birth_date,omitempty"`
 }
 
 // MembersList GET /members 响应信封;列表按 member_id 升序(创建序)返回。

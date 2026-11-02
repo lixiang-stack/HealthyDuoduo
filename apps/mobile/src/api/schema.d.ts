@@ -39,7 +39,7 @@ export interface paths {
         put?: never;
         /**
          * 建成员
-         * @description name/is_child/sex/birth_date 必填,birth_date_precision 缺省 day;member_id/created_at 服务端产生。
+         * @description name/sex/birth_date 必填;is_child 由出生日期自动计算;member_id/created_at 服务端产生。
          */
         post: operations["createMember"];
         delete?: never;
@@ -67,7 +67,7 @@ export interface paths {
         options?: never;
         head?: never;
         /**
-         * 改名 / 改是否孩子
+         * 改名 / 改性别 / 改出生日期
          * @description 至少一项;删除成员见 DELETE。
          */
         patch: operations["updateMember"];
@@ -268,28 +268,23 @@ export interface components {
             members: components["schemas"]["Member"][];
         };
         /**
-         * @description 性别三选一;unspecified 用于不确定时，不强迫二选一。
+         * @description 性别二选一。
          * @enum {string}
          */
-        MemberSex: "male" | "female" | "unspecified";
+        MemberSex: "male" | "female";
         Member: {
             /**
              * Format: int64
              * @description 外部句柄(数据库自增);不重用
              */
             member_id: number;
-            /** @description 显示名(家庭真实称呼) */
+            /** @description 称呼(家庭真实称呼) */
             name: string;
-            /** @description 是否孩子(两档:孩子/成人;保留历史字段,不按生日自动改写) */
+            /** @description 是否孩子(由出生日期实时计算:未满 18 岁为 true;响应派生,不可写) */
             is_child: boolean;
             sex: components["schemas"]["MemberSex"];
-            /** @description 出生日期(YYYY-MM-DD);只知年份时填当年 01-01 并标 precision=year */
+            /** @description 出生日期(YYYY-MM-DD) */
             birth_date: string;
-            /**
-             * @description 出生日期精度;year 表示只知出生年份
-             * @enum {string}
-             */
-            birth_date_precision: "day" | "year";
             /**
              * Format: date-time
              * @description 创建时间(RFC3339;列表按 member_id 升序返回,created_at 仅展示)
@@ -298,22 +293,13 @@ export interface components {
         };
         MemberCreate: {
             name: string;
-            is_child: boolean;
             sex: components["schemas"]["MemberSex"];
             birth_date: string;
-            /**
-             * @default day
-             * @enum {string}
-             */
-            birth_date_precision: "day" | "year";
         };
         MemberUpdate: {
             name?: string;
-            is_child?: boolean;
             sex?: components["schemas"]["MemberSex"];
             birth_date?: string;
-            /** @enum {string} */
-            birth_date_precision?: "day" | "year";
         };
         ReportsList: {
             reports: components["schemas"]["ReportSummary"][];

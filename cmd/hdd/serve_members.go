@@ -32,11 +32,9 @@ func (f *optField[T]) UnmarshalJSON(data []byte) error {
 // memberBody POST/PATCH 请求体解码形状:字段按「是否携带 + 值」两段读,
 // 用于执行契约的 required(建)与 minProperties: 1(改)约束。
 type memberBody struct {
-	Name               optField[string] `json:"name"`
-	IsChild            optField[bool]   `json:"is_child"`
-	Sex                optField[string] `json:"sex"`
-	BirthDate          optField[string] `json:"birth_date"`
-	BirthDatePrecision optField[string] `json:"birth_date_precision"`
+	Name      optField[string] `json:"name"`
+	Sex       optField[string] `json:"sex"`
+	BirthDate optField[string] `json:"birth_date"`
 }
 
 // create 建成员请求出口:传输校验(必填字段)与领域规则在此收口,
@@ -45,22 +43,14 @@ func (b memberBody) create() (pipeline.MemberProfile, error) {
 	if !b.Name.set {
 		return pipeline.MemberProfile{}, errors.New("name is required")
 	}
-	if !b.IsChild.set {
-		return pipeline.MemberProfile{}, errors.New("is_child is required")
-	}
 	if !b.Sex.set {
 		return pipeline.MemberProfile{}, errors.New("sex is required")
 	}
 	if !b.BirthDate.set {
 		return pipeline.MemberProfile{}, errors.New("birth_date is required")
 	}
-	precision := pipeline.BirthDatePrecisionDay
-	if b.BirthDatePrecision.set {
-		precision = b.BirthDatePrecision.value
-	}
 	profile := pipeline.MemberProfile{
-		Name: b.Name.value, IsChild: b.IsChild.value, Sex: b.Sex.value,
-		BirthDate: b.BirthDate.value, BirthDatePrecision: precision,
+		Name: b.Name.value, Sex: b.Sex.value, BirthDate: b.BirthDate.value,
 	}
 	if err := pipeline.ValidateMemberProfile(profile); err != nil {
 		return pipeline.MemberProfile{}, err
@@ -70,8 +60,8 @@ func (b memberBody) create() (pipeline.MemberProfile, error) {
 
 // patch 改成员请求出口:至少携带一项;所带字段过领域规则,返回仅含所带字段的取值。
 func (b memberBody) patch() (pipeline.MemberPatch, error) {
-	if !b.Name.set && !b.IsChild.set && !b.Sex.set && !b.BirthDate.set && !b.BirthDatePrecision.set {
-		return pipeline.MemberPatch{}, errors.New("at least one of name, is_child, sex, birth_date, birth_date_precision is required")
+	if !b.Name.set && !b.Sex.set && !b.BirthDate.set {
+		return pipeline.MemberPatch{}, errors.New("at least one of name, sex, birth_date is required")
 	}
 	var patch pipeline.MemberPatch
 	if b.Name.set {
@@ -79,9 +69,6 @@ func (b memberBody) patch() (pipeline.MemberPatch, error) {
 			return pipeline.MemberPatch{}, err
 		}
 		patch.Name = &b.Name.value
-	}
-	if b.IsChild.set {
-		patch.IsChild = &b.IsChild.value
 	}
 	if b.Sex.set {
 		if err := pipeline.ValidateMemberSex(b.Sex.value); err != nil {
@@ -94,12 +81,6 @@ func (b memberBody) patch() (pipeline.MemberPatch, error) {
 			return pipeline.MemberPatch{}, err
 		}
 		patch.BirthDate = &b.BirthDate.value
-	}
-	if b.BirthDatePrecision.set {
-		if err := pipeline.ValidateMemberBirthDatePrecision(b.BirthDatePrecision.value); err != nil {
-			return pipeline.MemberPatch{}, err
-		}
-		patch.BirthDatePrecision = &b.BirthDatePrecision.value
 	}
 	return patch, nil
 }
@@ -120,8 +101,8 @@ func handleListMembers(ms pipeline.MemberStore) http.HandlerFunc {
 	}
 }
 
-// handleCreateMember POST /api/v1/members:name/is_child/sex/birth_date 必填;
-// 201 返回完整成员。
+// handleCreateMember POST /api/v1/members:name/sex/birth_date 必填;is_child
+// 由服务端按出生日期计算。201 返回完整成员。
 func handleCreateMember(ms pipeline.MemberStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var body memberBody
@@ -143,8 +124,8 @@ func handleCreateMember(ms pipeline.MemberStore) http.HandlerFunc {
 	}
 }
 
-// handleUpdateMember PATCH /api/v1/members/{member_id}:改名/改是否孩子,至少一项;
-// 未知成员 404。
+// handleUpdateMember PATCH /api/v1/members/{member_id}:改名/改性别/改生日,至少一项;
+// is_child 随生日重算;未知成员 404。
 func handleUpdateMember(ms pipeline.MemberStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id, err := strconv.ParseInt(r.PathValue("member_id"), 10, 64)
@@ -200,12 +181,11 @@ func handleDeleteMember(ms pipeline.MemberStore) http.HandlerFunc {
 // toAPIMember 业务视图 → 契约形状(created_at 统一 RFC3339 UTC)。
 func toAPIMember(m pipeline.Member) httpapi.Member {
 	return httpapi.Member{
-		MemberID:           m.MemberID,
-		Name:               m.Name,
-		IsChild:            m.IsChild,
-		Sex:                m.Sex,
-		BirthDate:          m.BirthDate,
-		BirthDatePrecision: m.BirthDatePrecision,
-		CreatedAt:          m.CreatedAt.UTC().Format(time.RFC3339),
+		MemberID:  m.MemberID,
+		Name:      m.Name,
+		IsChild:   m.IsChild,
+		Sex:       m.Sex,
+		BirthDate: m.BirthDate,
+		CreatedAt: m.CreatedAt.UTC().Format(time.RFC3339),
 	}
 }

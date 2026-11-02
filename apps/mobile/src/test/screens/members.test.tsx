@@ -69,7 +69,7 @@ describe('MembersScreen', () => {
     );
   });
 
-  it('requires sex and birth date, then submits year precision as January 1', async () => {
+  it('requires name, sex and a confirmed birth date, then submits the wheel date', async () => {
     const createHandler = jest.fn((_options?: FakeApiOptions) =>
       makeMember({ member_id: 2, name: '小虎' }),
     );
@@ -83,57 +83,43 @@ describe('MembersScreen', () => {
     await renderScreen(<MembersScreen />);
     expect(await screen.findByText(/还没有家庭成员/)).toBeTruthy();
 
-    await fireEvent.changeText(screen.getByTestId('members-name-input'), '小虎');
     await fireEvent.press(screen.getByTestId('members-create'));
     expect(createHandler).not.toHaveBeenCalled();
+    expect(screen.getByTestId('members-name-error')).toHaveTextContent('请填写称呼');
+    expect(screen.getByTestId('members-sex-error')).toHaveTextContent('请选择性别');
+    expect(screen.getByTestId('members-birth-date-error')).toHaveTextContent('请选择出生日期');
 
-    await fireEvent.press(screen.getByTestId('members-sex-female'));
-    await fireEvent.press(screen.getByTestId('members-precision-year'));
-    await fireEvent.changeText(screen.getByTestId('members-birth-date'), '2020');
+    await fireEvent.changeText(screen.getByTestId('members-name-input'), '小虎');
+    await fireEvent.press(screen.getByTestId('members-sex-field'));
+    await fireEvent.press(screen.getByTestId('members-sex-option-female'));
+    await fireEvent.press(screen.getByTestId('members-create'));
+    expect(createHandler).not.toHaveBeenCalled();
+    expect(screen.getByTestId('members-birth-date-error')).toHaveTextContent('请选择出生日期');
+
+    await fireEvent.press(screen.getByTestId('members-birth-date-field'));
+    await fireEvent.press(screen.getByTestId('members-birth-year-wheel-option-2019'));
+    await fireEvent.press(screen.getByTestId('members-birth-month-wheel-option-5'));
+    await fireEvent.press(screen.getByTestId('members-birth-day-wheel-option-20'));
+    await fireEvent.press(screen.getByTestId('members-birth-confirm'));
     await fireEvent.press(screen.getByTestId('members-create'));
 
     await waitFor(() => expect(createHandler).toHaveBeenCalledTimes(1));
     expect(createHandler.mock.calls[0][0]).toMatchObject({
       body: {
         name: '小虎',
-        is_child: false,
         sex: 'female',
-        birth_date: '2020-01-01',
-        birth_date_precision: 'year',
+        birth_date: '2019-05-20',
       },
     });
   });
 
-  it('keeps the day-precision form invalid until a real YYYY-MM-DD date is entered', async () => {
-    const createHandler = jest.fn((_options?: FakeApiOptions) =>
-      makeMember({ member_id: 2, name: '小虎' }),
-    );
-    useApi({
-      GET: {
-        '/members': () => ({ members: [] }),
-      },
-      POST: { '/members': createHandler },
-    });
-
-    await renderScreen(<MembersScreen />);
-    expect(await screen.findByText(/还没有家庭成员/)).toBeTruthy();
-
-    await fireEvent.changeText(screen.getByTestId('members-name-input'), '小虎');
-    await fireEvent.press(screen.getByTestId('members-sex-male'));
-    await fireEvent.changeText(screen.getByTestId('members-birth-date'), '2020-02-30');
-    await fireEvent.press(screen.getByTestId('members-create'));
-
-    expect(createHandler).not.toHaveBeenCalled();
-  });
-
-  it('edits sex / birth date / precision through a partial PATCH', async () => {
+  it('edits sex and birth date through a partial PATCH', async () => {
     let members = [
       makeMember({
         member_id: 1,
         name: '小明',
-        sex: 'unspecified',
+        sex: 'female',
         birth_date: '2020-01-01',
-        birth_date_precision: 'day',
       }),
     ];
     const patchHandler = jest.fn((options?: FakeApiOptions) => {
@@ -142,10 +128,8 @@ describe('MembersScreen', () => {
         {
           ...members[0],
           name: String(body.name),
-          is_child: Boolean(body.is_child),
-          sex: body.sex as 'male' | 'female' | 'unspecified',
+          sex: body.sex as 'male' | 'female',
           birth_date: String(body.birth_date),
-          birth_date_precision: body.birth_date_precision as 'day' | 'year',
         },
       ];
       return members[0];
@@ -159,9 +143,10 @@ describe('MembersScreen', () => {
     expect(await screen.findByText('小明')).toBeTruthy();
 
     await fireEvent.press(screen.getByText('编辑'));
-    await fireEvent.press(screen.getByTestId('member-edit-1-sex-female'));
-    await fireEvent.press(screen.getByTestId('member-edit-1-precision-year'));
-    await fireEvent.changeText(screen.getByTestId('member-edit-1-birth-date'), '2019');
+    await fireEvent.press(screen.getByTestId('member-edit-1-sex-field'));
+    await fireEvent.press(screen.getByTestId('member-edit-1-sex-option-male'));
+    await fireEvent.press(screen.getByTestId('member-edit-1-birth-date-field'));
+    await fireEvent.press(screen.getByTestId('member-edit-1-birth-confirm'));
     await fireEvent.press(screen.getByTestId('member-edit-save-1'));
 
     await waitFor(() => expect(patchHandler).toHaveBeenCalledTimes(1));
@@ -169,10 +154,8 @@ describe('MembersScreen', () => {
       params: { path: { member_id: 1 } },
       body: {
         name: '小明',
-        is_child: true,
-        sex: 'female',
-        birth_date: '2019-01-01',
-        birth_date_precision: 'year',
+        sex: 'male',
+        birth_date: '2020-01-01',
       },
     });
   });

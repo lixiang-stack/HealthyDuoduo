@@ -134,8 +134,8 @@ func TestMigrationSmokeM0Contract(t *testing.T) {
 	})
 
 	// 子测试共享种子:两份报告(一份有主、一份存量 CLI 时代无主)与图像/OCR 留痕。
-	if _, err := pool.Exec(ctx, `INSERT INTO members (id, name, is_child, sex, birth_date, birth_date_precision)
-		VALUES (1, 'user_test', true, 'male', '2020-01-01', 'day')`); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO members (id, name, sex, birth_date)
+		VALUES (1, 'user_test', 'male', '2020-01-01')`); err != nil {
 		t.Fatalf("seed member: %v", err)
 	}
 	if _, err := pool.Exec(ctx, `INSERT INTO images (sha256, original_filename) VALUES ('a', 'p.jpg'),
@@ -151,8 +151,8 @@ func TestMigrationSmokeM0Contract(t *testing.T) {
 		t.Fatalf("seed reports: %v (member ownership on new rows, NULL on unowned)", err)
 	}
 
-	// 成员模型(0013):显示名 + 是否孩子 + 性别 + 出生日期及精度;
-	// sex / birth_date 为 NOT NULL,精度默认 day。
+	// 成员模型(0013):显示名 + 性别 + 出生日期;is_child 改为服务端派生,
+	// 不再落列;sex / birth_date 为 NOT NULL。
 	t.Run("members profile columns", func(t *testing.T) {
 		rows, err := pool.Query(ctx, `SELECT column_name, is_nullable, column_default FROM information_schema.columns
 			WHERE table_name='members' ORDER BY column_name`)
@@ -177,8 +177,7 @@ func TestMigrationSmokeM0Contract(t *testing.T) {
 			t.Fatal(err)
 		}
 		want := map[string]bool{
-			"id": false, "name": false, "is_child": false, "sex": false,
-			"birth_date": false, "birth_date_precision": false, "created_at": false,
+			"id": false, "name": false, "sex": false, "birth_date": false, "created_at": false,
 		}
 		if len(cols) != len(want) {
 			t.Fatalf("members columns = %v, want %d profile columns", cols, len(want))
@@ -191,8 +190,8 @@ func TestMigrationSmokeM0Contract(t *testing.T) {
 		if cols["sex"][0] != "NO" || cols["birth_date"][0] != "NO" {
 			t.Fatalf("sex/birth_date nullable = %s/%s, want NO/NO", cols["sex"][0], cols["birth_date"][0])
 		}
-		if cols["birth_date_precision"][1] != "'day'::text" {
-			t.Fatalf("birth_date_precision default = %q, want 'day'::text", cols["birth_date_precision"][1])
+		if _, ok := cols["is_child"]; ok {
+			t.Fatal("is_child column still present, want derived-only")
 		}
 	})
 
@@ -533,6 +532,16 @@ func TestMigration0013ClearsMembersAndUnownedReports(t *testing.T) {
 	}
 	if images != 1 || ocrs != 1 {
 		t.Errorf("image/ocr rows = %d/%d, want 1/1 (history retained)", images, ocrs)
+	}
+	var isChildCols, precisionCols int
+	if err := db.QueryRowContext(ctx, `SELECT
+		(SELECT COUNT(*) FROM information_schema.columns WHERE table_name='members' AND column_name='is_child'),
+		(SELECT COUNT(*) FROM information_schema.columns WHERE table_name='members' AND column_name='birth_date_precision')`).
+		Scan(&isChildCols, &precisionCols); err != nil {
+		t.Fatal(err)
+	}
+	if isChildCols != 0 || precisionCols != 0 {
+		t.Errorf("legacy is_child/precision columns = %d/%d, want 0/0", isChildCols, precisionCols)
 	}
 
 	for _, query := range []string{

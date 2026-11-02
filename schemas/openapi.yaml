@@ -46,7 +46,7 @@ paths:
     post:
       operationId: createMember
       summary: 建成员
-      description: name/is_child/sex/birth_date 必填,birth_date_precision 缺省 day;member_id/created_at 服务端产生。
+      description: name/sex/birth_date 必填;is_child 由出生日期自动计算;member_id/created_at 服务端产生。
       requestBody:
         required: true
         content:
@@ -65,7 +65,7 @@ paths:
   /members/{member_id}:
     patch:
       operationId: updateMember
-      summary: 改名 / 改是否孩子
+      summary: 改名 / 改性别 / 改出生日期
       description: 至少一项;删除成员见 DELETE。
       parameters:
         - $ref: "#/components/parameters/MemberID"
@@ -424,12 +424,12 @@ components:
           items: { $ref: "#/components/schemas/Member" }
     MemberSex:
       type: string
-      enum: [male, female, unspecified]
-      description: 性别三选一;unspecified 用于不确定时，不强迫二选一。
+      enum: [male, female]
+      description: 性别二选一。
     Member:
       type: object
       additionalProperties: false
-      required: [member_id, name, is_child, sex, birth_date, birth_date_precision, created_at]
+      required: [member_id, name, is_child, sex, birth_date, created_at]
       properties:
         member_id:
           type: integer
@@ -438,20 +438,16 @@ components:
         name:
           type: string
           minLength: 1
-          description: 显示名(家庭真实称呼)
+          description: 称呼(家庭真实称呼)
         is_child:
           type: boolean
-          description: 是否孩子(两档:孩子/成人;保留历史字段,不按生日自动改写)
+          description: 是否孩子(由出生日期实时计算:未满 18 岁为 true;响应派生,不可写)
         sex:
           $ref: "#/components/schemas/MemberSex"
         birth_date:
           type: string
           pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
-          description: 出生日期(YYYY-MM-DD);只知年份时填当年 01-01 并标 precision=year
-        birth_date_precision:
-          type: string
-          enum: [day, year]
-          description: 出生日期精度;year 表示只知出生年份
+          description: 出生日期(YYYY-MM-DD)
         created_at:
           type: string
           format: date-time
@@ -459,37 +455,27 @@ components:
     MemberCreate:
       type: object
       additionalProperties: false
-      required: [name, is_child, sex, birth_date]
+      required: [name, sex, birth_date]
       properties:
         name:
           type: string
           minLength: 1
-        is_child:
-          type: boolean
         sex:
           $ref: "#/components/schemas/MemberSex"
         birth_date:
           type: string
           pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
-        birth_date_precision:
-          type: string
-          enum: [day, year]
-          default: day
     MemberUpdate:
       type: object
       additionalProperties: false
       minProperties: 1
       properties:
         name: { type: string, minLength: 1 }
-        is_child: { type: boolean }
         sex:
           $ref: "#/components/schemas/MemberSex"
         birth_date:
           type: string
           pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
-        birth_date_precision:
-          type: string
-          enum: [day, year]
     ReportsList:
       type: object
       additionalProperties: false

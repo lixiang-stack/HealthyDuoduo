@@ -909,6 +909,55 @@ def test_sections_status_ignores_report_date() -> None:
 # ---------- 病历(llm-analysis 票 03:叙述型报告,标题词切段 + 整页兜底) ----------
 
 
+def test_clinical_note_prefers_record_date_and_stops_treatment_at_footer() -> None:
+    """记录日期优先于初诊时间；页脚 / 页码 / 记录日期 / 底部杂字不并入处理段落。"""
+    cells = [
+        {"x": 100, "y": -40, "text": "门诊病历"},
+        {"x": 100, "y": 0, "text": "初诊时间：2026-02-1309:42"},
+        {"x": 100, "y": 15, "text": "主诉：发现转氨酶升高1周"},
+        {"x": 100, "y": 30, "text": "现病史：平时食欲可，无恶心呕吐。"},
+        {"x": 100, "y": 45, "text": "诊断：肝功能不全"},
+        {"x": 100, "y": 60, "text": "处理：服药治疗不适随诊"},
+        {"x": 100, "y": 75, "text": "请妥善保管门诊病历，以便以后就诊使用。"},
+        {"x": 900, "y": 90, "text": "第1页"},
+        {"x": 1000, "y": 105, "text": "记录日期：2026-02-1409:42"},
+        {"x": 250, "y": 120, "text": "LUUCKY"},
+    ]
+    r = run_postprocess(mk_ocr(cells))
+    assert r.report_type == "clinical_note"
+    assert r.report_date == "2026-02-14"
+    assert section_of(r, "treatment").text == "服药治疗不适随诊"
+    joined = "\n".join(section.text for section in r.sections or [])
+    assert "请妥善保管" not in joined
+    assert "第1页" not in joined
+    assert "记录日期" not in joined
+    assert "LUUCKY" not in joined
+
+
+def test_clinical_note_falls_back_to_initial_visit_time() -> None:
+    """没有记录日期时使用初诊时间。"""
+    cells = [
+        {"x": 100, "y": -40, "text": "门诊病历"},
+        {"x": 100, "y": 0, "text": "初诊时间：2026-02-1309:42"},
+        {"x": 100, "y": 15, "text": "主诉：发热3天。"},
+    ]
+    r = run_postprocess(mk_ocr(cells))
+    assert r.report_type == "clinical_note"
+    assert r.report_date == "2026-02-13"
+
+
+def test_clinical_note_does_not_use_unrelated_date_line() -> None:
+    """病历没有日期标签时不抓出生日期等独立日期行。"""
+    cells = [
+        {"x": 100, "y": -40, "text": "门诊病历"},
+        {"x": 100, "y": 0, "text": "出生日期：1993-02-26"},
+        {"x": 100, "y": 15, "text": "主诉：发热3天。"},
+    ]
+    r = run_postprocess(mk_ocr(cells))
+    assert r.report_type == "clinical_note"
+    assert r.report_date is None
+
+
 def test_clinical_note_sections_split_by_title_words() -> None:
     """病历按标题词切主诉 / 现病史 / 诊断 / 处理,原文与行号逐段留痕。"""
     cells = [

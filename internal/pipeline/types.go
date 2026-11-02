@@ -149,35 +149,30 @@ type ReportItemRow struct {
 	contract.ReportItem
 }
 
-// MemberProfile 成员可写资料(llm-analysis 票 01):性别与出生日期必填,
-// 出生日期精度默认 day。不存静态年龄,年龄按 BirthDate 实时计算。
+// MemberProfile 成员可写资料(llm-analysis 票 01):性别与出生日期必填。
+// 不存静态年龄,是否孩子与年龄都按 BirthDate 实时计算。
 type MemberProfile struct {
-	Name               string
-	IsChild            bool
-	Sex                string
-	BirthDate          string // YYYY-MM-DD
-	BirthDatePrecision string // day | year
+	Name      string
+	Sex       string
+	BirthDate string // YYYY-MM-DD
 }
 
 // MemberPatch 成员部分更新:非 nil 字段才覆盖;必填字段的显式 null 由 HTTP 边界拒绝。
 type MemberPatch struct {
-	Name               *string
-	IsChild            *bool
-	Sex                *string
-	BirthDate          *string
-	BirthDatePrecision *string
+	Name      *string
+	Sex       *string
+	BirthDate *string
 }
 
-// Member 成员业务视图:显示名 + 是否孩子 + 性别 + 出生日期及精度;
+// Member 成员业务视图:显示名 + 性别 + 出生日期;IsChild 由出生日期实时计算。
 // 可改名、可删除(删除会级联其全部报告)。CreatedAt 为库中创建时刻,HTTP 侧序列化为 RFC3339。
 type Member struct {
-	MemberID           int64
-	Name               string
-	IsChild            bool
-	Sex                string
-	BirthDate          string // YYYY-MM-DD
-	BirthDatePrecision string
-	CreatedAt          time.Time
+	MemberID  int64
+	Name      string
+	IsChild   bool
+	Sex       string
+	BirthDate string // YYYY-MM-DD
+	CreatedAt time.Time
 }
 
 // Image images 表一行的业务视图(identity=内容 sha256)。

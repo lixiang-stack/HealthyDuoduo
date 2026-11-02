@@ -45,6 +45,7 @@ from pathlib import Path
 import yaml
 
 from .contract import (
+    CLINICAL_NOTE_REPORT_TYPE,
     Flag,
     FlagReason,
     OCRResult,
@@ -98,6 +99,8 @@ _DATE_LABELS = (
     "采样时间", "采集时间", "标本采集时间",
     "核收时间", "报告时间", "报告日期", "打印时间", "申请时间",
 )
+# 病历日期:记录日期优先,其次初诊时间;不使用「独立日期行」兜底,避免抓到出生日期等无关日期。
+CLINICAL_NOTE_DATE_LABELS = ("记录日期", "记录时间", "初诊时间", "初诊日期", "就诊时间")
 _DATE_RE = re.compile(r"(\d{4})[-/.年](\d{1,2})[-/.月]?(\d{1,2})")
 # 独立日期行(行首锚定):分隔符与 _DATE_RE 同口径(破折号/斜杠/点/年月日);
 # 月日合法性由 _date_match 复核。
@@ -277,6 +280,9 @@ class LabDict:
     classification_section_kinds: tuple[str, ...] = BODY_SECTION_KINDS
     # 切不出锚词段落时的整页兜底 kind(病历 = note;影像为空 = 不兜底)。
     fallback_section: str | None = None
+    # 病历段落终止词:页脚 / 页码 / 记录日期等不并入上一段。
+    section_stop_prefixes: tuple[str, ...] = ()
+    section_stop_patterns: tuple[re.Pattern[str], ...] = ()
     # 标题词只在标题区匹配(病历:避免正文「病历号」抢类别);False = 全页兜底。
     title_region_only: bool = False
     # 标题词后紧跟这些后缀时不算命中(病历:「病历号」不是标题)。
@@ -427,6 +433,10 @@ def _build_dict(path: Path) -> LabDict:
             raw["category"].get("classification_section_kinds") or BODY_SECTION_KINDS
         ),
         fallback_section=raw["category"].get("fallback_section"),
+        section_stop_prefixes=tuple(raw["category"].get("section_stop_prefixes") or ()),
+        section_stop_patterns=tuple(
+            re.compile(pattern) for pattern in raw["category"].get("section_stop_patterns") or ()
+        ),
         title_region_only=bool(raw["category"].get("title_region_only", False)),
         title_blocked_suffixes=tuple(raw["category"].get("title_blocked_suffixes") or ()),
     )
@@ -1420,9 +1430,14 @@ def _date_match(text: str) -> str | None:
     return None
 
 
-def _find_date(cells: list[_Cell], date_hint: str | None) -> str | None:
+def _find_date(
+    cells: list[_Cell],
+    date_hint: str | None,
+    labels: tuple[str, ...] = _DATE_LABELS,
+    independent_fallback: bool = True,
+) -> str | None:
     """检查单日期:按标签优先级在行文本里搜日期;解析失败 → 用 date_hint 兜底。"""
-    for label in _DATE_LABELS:
+    for label in labels:
         for c in cells:
             if label in c.text:
                 d = _date_match(c.text)
@@ -1432,7 +1447,7 @@ def _find_date(cells: list[_Cell], date_hint: str | None) -> str | None:
     # 含日期格兜底。门限按图内容宽度/格高缩放——旧值 300px/10px 按小截图校准,
     # 大图字号同比放大(实测 3316px 照片盒间距 322px);max 单调放宽不引入更严判定。
     width = max((c.x1 for c in cells), default=0.0)
-    for label in _DATE_LABELS:
+    for label in labels:
         for c in cells:
             if label not in c.text:
                 continue
@@ -1450,11 +1465,12 @@ def _find_date(cells: list[_Cell], date_hint: str | None) -> str | None:
                 return d
     if date_hint:
         return date_hint
-    for c in cells:  # 独立日期行(标签与日期被 OCR 拆开时的兜底,如 cbc_05)
-        if _DATE_LINE_RE.match(c.text.strip()):
-            d = _date_match(c.text)
-            if d:
-                return d
+    if independent_fallback:
+        for c in cells:  # 独立日期行(标签与日期被 OCR 拆开时的兜底,如 cbc_05)
+            if _DATE_LINE_RE.match(c.text.strip()):
+                d = _date_match(c.text)
+                if d:
+                    return d
     return None
 
 
@@ -1870,6 +1886,8 @@ def _extract_sections(
     txts: list[str],
     anchors: dict[str, tuple[str, ...]],
     fallback_section: str | None = None,
+    stop_prefixes: tuple[str, ...] = (),
+    stop_patterns: tuple[re.Pattern[str], ...] = (),
 ) -> list[ReportSection]:
     """按行首锚词切报告级段落,整段原文 + OCR 行号留痕(不解析内容)。
 
@@ -1878,6 +1896,7 @@ def _extract_sections(
     - 「注：」不设终止锚,自然并入其前段;
     - exam_name 例外:只取锚行尾缀;尾缀为空时取紧随其后的一行(不吞患者信息/日期/图像);
     - 同类锚多次出现按 OCR 行序保留多个 section;空段不产出 section;
+    - stop_prefixes / stop_patterns 命中时结束当前段落(病历页脚、页码、记录日期等);
     - fallback_section 非空且切不出任何段落时,整页非空 OCR 行作为单个 section(病历兜底)。
     """
     present = [section for section in SECTION_FIELDS if anchors.get(section)]
@@ -1913,9 +1932,12 @@ def _extract_sections(
             else:
                 lines = []
         else:
-            lines = ([(start, tail)] if tail else []) + [
-                (idx, txts[idx].strip()) for idx in range(start + 1, end)
-            ]
+            lines = [(start, tail)] if tail else []
+            for idx in range(start + 1, end):
+                line = txts[idx].strip()
+                if _is_section_stop(line, stop_prefixes, stop_patterns):
+                    break
+                lines.append((idx, line))
         text = "\n".join(line for _, line in lines if line)
         if text:
             sections.append(
@@ -1926,6 +1948,16 @@ def _extract_sections(
                 )
             )
     return sections or _fallback_section(txts, fallback_section)
+
+
+def _is_section_stop(
+    line: str,
+    prefixes: tuple[str, ...],
+    patterns: tuple[re.Pattern[str], ...],
+) -> bool:
+    return any(line.startswith(prefix) for prefix in prefixes) or any(
+        pattern.match(line) for pattern in patterns
+    )
 
 
 def _fallback_section(txts: list[str], kind: str | None) -> list[ReportSection]:
@@ -1953,21 +1985,34 @@ def run_postprocess(
     结果/参考两格确实是短横线后补回 "-";/reparse 只有存库 OCR,无法恢复。
     """
     cells = _cells(ocr)
-    date = _find_date(cells, date_hint)
-
     header_bands = _header_bands(cells)
 
     selected = _select_category(cells, header_bands, ocr.txts)
     if selected is None:
         return Report(
             report_type=UNKNOWN_REPORT_TYPE,
-            report_date=date,
+            report_date=_find_date(cells, date_hint),
             status=Status.FAILED,
             panels=[Panel.OTHER],
             items=[],
         )
     d, pairs = selected
-    sections = _extract_sections(ocr.txts, d.section_anchors, d.fallback_section)
+    if d.report_type == CLINICAL_NOTE_REPORT_TYPE:
+        date = _find_date(
+            cells,
+            date_hint,
+            labels=CLINICAL_NOTE_DATE_LABELS,
+            independent_fallback=False,
+        )
+    else:
+        date = _find_date(cells, date_hint)
+    sections = _extract_sections(
+        ocr.txts,
+        d.section_anchors,
+        d.fallback_section,
+        d.section_stop_prefixes,
+        d.section_stop_patterns,
+    )
 
     items: list[ReportItem] = []
     for it, piece in pairs:
