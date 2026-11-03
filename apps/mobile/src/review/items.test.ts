@@ -229,7 +229,7 @@ describe('displayItemName', () => {
   });
 
   it('5be 报告:主名称优先取原文印名(含词序不同与百分比/绝对值写法)', () => {
-    const cases: Array<[string, string, string]> = [
+    const cases: [string, string, string][] = [
       ['中性细胞数', '中性粒细胞绝对值  NEUT#  6.56↑  1.80~6.30  *10~9/L', '中性粒细胞绝对值'],
       ['淋巴细胞数', '淋巴细胞绝对值  LYMPH#  1.55  1.10~3.20  *10^9/L', '淋巴细胞绝对值'],
       ['单核细胞数', '单核细胞绝对值  MONO#  0.31  0.10~0.60  *10^9/L', '单核细胞绝对值'],

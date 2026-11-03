@@ -113,7 +113,7 @@ type TrendStore interface {
 
 // ReviewStatusUnreviewed 指标项核对状态机(ADR-0005)的初始态;任一指标项
 // review_status ≠ 本值即视为报告已有核对决策(同图重传 409 的判定依据)。
-const ReviewStatusUnreviewed = "unreviewed"
+const ReviewStatusUnreviewed = contract.ReviewStatusUnreviewed
 
 // FlagCounts 「异常」计数徽标口径 = 偏高/偏低/异常/可操作未知四档;normal 不计(详情页逐项染色)。
 type FlagCounts struct {
@@ -166,13 +166,24 @@ type MemberPatch struct {
 
 // Member 成员业务视图:显示名 + 性别 + 出生日期;IsChild 由出生日期实时计算。
 // 可改名、可删除(删除会级联其全部报告)。CreatedAt 为库中创建时刻,HTTP 侧序列化为 RFC3339。
+// LatestGrowth 为最近一次生长记录(按测量日期降序,同日按 id 降序);无记录为 nil。
 type Member struct {
-	MemberID  int64
-	Name      string
-	IsChild   bool
-	Sex       string
-	BirthDate string // YYYY-MM-DD
-	CreatedAt time.Time
+	MemberID     int64
+	Name         string
+	IsChild      bool
+	Sex          string
+	BirthDate    string // YYYY-MM-DD
+	CreatedAt    time.Time
+	LatestGrowth *GrowthRecord
+}
+
+// GrowthStore 生长记录持久化边界(serve 成员生长端点;llm-analysis 票 02)。
+// 列表按测量日期降序、同日按 id 降序;BMI 由读取方用测量时点值实时计算。
+type GrowthStore interface {
+	// CreateGrowth 新增一条生长记录(member 不存在由外键拒绝,HTTP 边界先校验)。
+	CreateGrowth(ctx context.Context, memberID int64, profile GrowthProfile) (*GrowthRecord, error)
+	// ListGrowth 成员全部生长记录(测量日期降序、同日 id 降序)。
+	ListGrowth(ctx context.Context, memberID int64) ([]GrowthRecord, error)
 }
 
 // Image images 表一行的业务视图(identity=内容 sha256)。

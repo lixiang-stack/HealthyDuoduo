@@ -2,10 +2,15 @@ import { Link, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { AnalysisConsentModal } from '../../analysis/ConsentModal';
+import { TimeRangeModal } from '../../analysis/TimeRangeModal';
+import { useStartAnalysis } from '../../analysis/useStartAnalysis';
 import { sharedStyles } from '../../components/styles';
 import { colors } from '../../components/theme';
 import { useImageViewer } from '../../components/imageViewer/ImageViewerProvider';
+import { useCurrentMember } from '../../members/CurrentMemberContext';
 import { isClinicalNoteReport, isNarrativeReport } from '../../reports/category';
+import { CLINICAL_NOTE_PANEL } from '../../reports/panels';
 import { ReportCard, ReportManageCard, ReportSectionCard } from '../../reports/components';
 import { abnormalItemCount, reportItemGroups } from '../../reports/panelOverview';
 import { pendingItems } from '../../review/items';
@@ -25,11 +30,13 @@ export default function ReportDetailScreen() {
   const params = useLocalSearchParams();
   const reportId = typeof params.report_id === 'string' ? params.report_id : undefined;
   const { state, reload, applyReview, applyReassign } = useReportData(reportId);
+  const { currentMemberId } = useCurrentMember();
   const { open } = useImageViewer();
   // undefined = 按报告状态缺省(failed 展开、其余折叠);点按后由用户覆盖。
   const [imageOverride, setImageOverride] = useState<boolean>();
 
   const report = state.status === 'ready' ? state.report : undefined;
+  const analysis = useStartAnalysis(report?.member_id ?? currentMemberId, CLINICAL_NOTE_PANEL);
   // 影像单与病历是叙述文档:主体为段落 + 原图,不呈现检验单式指标项与核对入口(票 03)。
   const narrative = report !== undefined && isNarrativeReport(report);
   const imageNoun = report !== undefined && isClinicalNoteReport(report) ? '病历原图' : '检查单原图';
@@ -41,7 +48,8 @@ export default function ReportDetailScreen() {
     report !== undefined ? (imageOverride ?? report.status === 'failed') : false;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {state.status === 'loading' ? (
         <View style={sharedStyles.horizontal}>
           <ActivityIndicator />
@@ -82,6 +90,23 @@ export default function ReportDetailScreen() {
               imageUrl={state.imageUrl}
             />
           ))}
+
+          {report && isClinicalNoteReport(report) && report.member_id !== null ? (
+            <View style={styles.stack}>
+              <Pressable
+                testID="report-analyze-note"
+                accessibilityRole="button"
+                style={styles.button}
+                onPress={() => void analysis.start('clinical_note', undefined, report.report_id)}
+                disabled={analysis.starting}
+              >
+                <Text style={styles.buttonText}>
+                  {analysis.starting ? '正在分析…' : '分析这份病历'}
+                </Text>
+              </Pressable>
+              {analysis.error ? <Text style={styles.fail}>{analysis.error}</Text> : null}
+            </View>
+          ) : null}
 
           {report.status === 'failed' ? (
             <View style={styles.card}>
@@ -167,6 +192,20 @@ export default function ReportDetailScreen() {
         </View>
       ) : null}
     </ScrollView>
+      <TimeRangeModal
+        key={analysis.rangeOpen ? 'range-open' : 'range-closed'}
+        visible={analysis.rangeOpen}
+        busy={analysis.starting}
+        onConfirm={(months) => void analysis.confirmRange(months)}
+        onCancel={analysis.cancelRange}
+      />
+      <AnalysisConsentModal
+        visible={analysis.pendingConsent}
+        busy={analysis.starting}
+        onConfirm={() => void analysis.confirmConsent()}
+        onCancel={analysis.cancelConsent}
+      />
+    </>
   );
 }
 

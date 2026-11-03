@@ -23,9 +23,16 @@ function useFocusEffect(effect: React.EffectCallback) {
   React.useEffect(effect, [effect]);
 }
 
+/** Screen-level tests render a route component directly; the navigator's
+ * `Stack.Screen` options setter is inert without a route tree. */
+function Screen() {
+  return null;
+}
+
 export const routerModule = {
   router: mockRouter,
   Link,
   useLocalSearchParams: mockUseLocalSearchParams,
   useFocusEffect,
+  Stack: { Screen },
 };

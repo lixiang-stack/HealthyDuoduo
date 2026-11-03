@@ -101,6 +101,50 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "404":
           $ref: "#/components/responses/NotFound"
+  /members/{member_id}/growth:
+    get:
+      operationId: listGrowth
+      summary: 生长记录列表
+      description: |
+        按测量日期降序(同日按记录 id 降序)返回该成员全部生长记录。
+        BMI 由测量时点的身高体重实时计算,不缓存;weight_status 为超重 / 肥胖判定,
+        百分位规则落地前为 null。
+      parameters:
+        - $ref: "#/components/parameters/MemberID"
+      responses:
+        "200":
+          description: 生长记录列表(空数组而非 null)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GrowthList"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      operationId: createGrowth
+      summary: 新增生长记录
+      description: |
+        每次测量一行:measured_on 与 source 必填,height_cm / weight_kg 至少一项。
+        来源只记录实测 / 体检单,用于区分测量值可信度。
+      parameters:
+        - $ref: "#/components/parameters/MemberID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GrowthRecordCreate"
+      responses:
+        "201":
+          description: 已创建
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GrowthRecord"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /reports:
     get:
       operationId: listReports
@@ -356,6 +400,50 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "404":
           $ref: "#/components/responses/NotFound"
+  /analyses:
+    post:
+      operationId: createAnalysis
+      summary: 创建分析(事实层)
+      description: |
+        家长从项目详情页 / 单指标 / 病历进入分析。事实层永远输出:纳入范围、偏离项、
+        与本人历史比较、相关病历诊断与处理原文、未纳入项及原因。窗口默认最近 12 个月,
+        每趋势键最多 6 个有效点;稀疏时扩展至 24 个月 / 最多 4 个点并标注「历史数据较少」。
+        单指标入口自动扩展至所属 Panel,并在 facts.expanded_from_indicator 提示范围。
+        影像 / 叙述型 Panel 不进入分析(clinical_note 入口除外)。
+        本次分析永久保存快照(成员、Panel、窗口、有效点集合、病历引用、规则版本)。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnalysisRequest"
+      responses:
+        "201":
+          description: 已创建(含事实层、快照、来源与配额)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /analyses/{analysis_id}:
+    get:
+      operationId: getAnalysis
+      summary: 读取分析
+      description: 返回已保存的三层结果与快照;stale=true 表示数据已更新,仍可查看。
+      parameters:
+        - $ref: "#/components/parameters/AnalysisID"
+      responses:
+        "200":
+          description: 已保存分析
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisResult"
+        "404":
+          $ref: "#/components/responses/NotFound"
 components:
   parameters:
     MemberID:
@@ -387,6 +475,11 @@ components:
       required: true
       description: 项目组稳定 code(与 PanelCode 枚举同源;非法 code 返回 400)
       schema: { $ref: "#/components/schemas/PanelCode" }
+    AnalysisID:
+      name: analysis_id
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
   responses:
     BadRequest:
       description: 请求体或参数不合法(message 说明原因)
@@ -429,7 +522,7 @@ components:
     Member:
       type: object
       additionalProperties: false
-      required: [member_id, name, is_child, sex, birth_date, created_at]
+      required: [member_id, name, is_child, sex, birth_date, created_at, latest_growth]
       properties:
         member_id:
           type: integer
@@ -452,6 +545,76 @@ components:
           type: string
           format: date-time
           description: 创建时间(RFC3339;列表按 member_id 升序返回,created_at 仅展示)
+        latest_growth:
+          oneOf:
+            - $ref: "#/components/schemas/GrowthRecord"
+            - type: "null"
+          description: 最近一次生长记录(按测量日期降序);没有记录为 null
+    GrowthSource:
+      type: string
+      enum: [measured, report]
+      description: 生长记录来源:实测 / 体检单。
+    GrowthRecord:
+      type: object
+      additionalProperties: false
+      required: [growth_id, member_id, measured_on, height_cm, weight_kg, source, bmi, weight_status]
+      description: |
+        一条生长记录。BMI 由测量时点的身高体重实时计算,不缓存;weight_status 为超重 / 肥胖判定,
+        年龄性别百分位规则落地前为 null。
+      properties:
+        growth_id:
+          type: integer
+          format: int64
+        member_id:
+          type: integer
+          format: int64
+        measured_on:
+          type: string
+          pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+          description: 测量日期(YYYY-MM-DD)
+        height_cm:
+          type: [number, "null"]
+          description: 身高(cm);可单填体重
+        weight_kg:
+          type: [number, "null"]
+          description: 体重(kg);可单填身高
+        source:
+          $ref: "#/components/schemas/GrowthSource"
+        bmi:
+          type: [number, "null"]
+          description: BMI = 体重(kg) / 身高(m)²,保留一位小数;身高体重缺一时为 null
+        weight_status:
+          type: [string, "null"]
+          description: 超重 / 肥胖判定;百分位规则落地前为 null
+    GrowthRecordCreate:
+      type: object
+      additionalProperties: false
+      required: [measured_on, source]
+      anyOf:
+        - { required: [height_cm] }
+        - { required: [weight_kg] }
+      properties:
+        measured_on:
+          type: string
+          pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        height_cm:
+          type: number
+          exclusiveMinimum: 0
+          description: 身高(cm)
+        weight_kg:
+          type: number
+          exclusiveMinimum: 0
+          description: 体重(kg)
+        source:
+          $ref: "#/components/schemas/GrowthSource"
+    GrowthList:
+      type: object
+      additionalProperties: false
+      required: [records]
+      properties:
+        records:
+          type: array
+          items: { $ref: "#/components/schemas/GrowthRecord" }
     MemberCreate:
       type: object
       additionalProperties: false
@@ -1013,6 +1176,321 @@ components:
         latest_report_not_tested:
           type: boolean
           description: 最近一份含该指标的报告中此项是否为 not_tested
+    AnalysisEntry:
+      type: string
+      enum: [panel, indicator, clinical_note]
+      description: 分析入口:项目详情 / 单指标 / 病历详情。
+    AnalysisStatus:
+      type: string
+      enum: [success, insufficient_evidence]
+      description: |
+        事实层状态。success = 有至少一个有效点或病历;insufficient_evidence = 没有任何
+        通过信任门控的有效点,事实层降级为「证据不足,请先核对」,不输出偏离结论。
+    AnalysisChange:
+      type: string
+      enum: [up, down, flat, unknown]
+      description: 最近两个有效点的数值变化方向;无法解析数值时为 unknown。
+    AnalysisExclusionReason:
+      type: string
+      enum: [cross_member, wrong_panel, failed_report, narrative_report, no_date,
+             not_tested, unverified_unit, low_confidence, missing_value, unit_mismatch,
+             outside_window, point_cap, no_name, no_note_body]
+      description: 未纳入原因码;默认排除项不得作为任何结论依据。
+    AnalysisRequest:
+      type: object
+      additionalProperties: false
+      required: [member_id, panel, entry]
+      properties:
+        member_id:
+          type: integer
+          format: int64
+        panel:
+          $ref: "#/components/schemas/PanelCode"
+        entry:
+          $ref: "#/components/schemas/AnalysisEntry"
+        indicator_name:
+          type: string
+          minLength: 1
+          description: 单指标入口必填;服务端据此找到所属 Panel 并自动扩展。
+        report_sha:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+          description: 病历入口必填(目标病历报告 id);其他入口可选,当前不改变事实层范围。
+        window_months:
+          type: integer
+          enum: [6, 12, 24]
+          default: 12
+          description: 回溯窗口月数;缺省 12,用户可改为 6 / 24。
+    AnalysisResult:
+      type: object
+      additionalProperties: false
+      required: [analysis_id, status, layers, snapshot, sources, quota, stale]
+      properties:
+        analysis_id:
+          type: integer
+          format: int64
+        status:
+          $ref: "#/components/schemas/AnalysisStatus"
+        layers:
+          $ref: "#/components/schemas/AnalysisLayers"
+        snapshot:
+          $ref: "#/components/schemas/AnalysisSnapshot"
+        sources:
+          type: array
+          items: { $ref: "#/components/schemas/AnalysisSource" }
+        quota:
+          $ref: "#/components/schemas/AnalysisQuota"
+        stale:
+          type: boolean
+          description: 数据已更新;仍可查看,展示时标注「数据已更新」。
+    AnalysisLayers:
+      type: object
+      additionalProperties: false
+      required: [facts]
+      properties:
+        facts:
+          $ref: "#/components/schemas/AnalysisFacts"
+    AnalysisQuota:
+      type: object
+      additionalProperties: false
+      required: [used_today, limit_today, explanation_available]
+      properties:
+        used_today: { type: integer, minimum: 0 }
+        limit_today: { type: integer, minimum: 0 }
+        explanation_available: { type: boolean }
+    AnalysisFacts:
+      type: object
+      additionalProperties: false
+      required: [entry, panel, indicator_name, expanded_from_indicator, window, reports,
+                 notes, deviations, history, uncomparable, excluded, insufficient_evidence]
+      description: |
+        事实层只陈述数据与病历原文:纳入范围、偏离参考范围的指标项、与本人历史比较、
+        相关病历诊断与处理原文、未纳入项及原因。不生成医学判断。
+      properties:
+        entry:
+          $ref: "#/components/schemas/AnalysisEntry"
+        panel:
+          $ref: "#/components/schemas/PanelCode"
+        indicator_name:
+          type: [string, "null"]
+          description: 单指标入口的原始指标名;其他入口为 null。
+        expanded_from_indicator:
+          type: boolean
+          description: true = 从单指标自动扩展至所属 Panel,结果页需提示本次范围。
+        window:
+          $ref: "#/components/schemas/AnalysisWindow"
+        reports:
+          type: array
+          items: { $ref: "#/components/schemas/AnalysisReportRef" }
+        notes:
+          type: array
+          items: { $ref: "#/components/schemas/AnalysisNote" }
+        deviations:
+          type: array
+          items: { $ref: "#/components/schemas/AnalysisEvidencePoint" }
+        history:
+          type: array
+          items: { $ref: "#/components/schemas/AnalysisHistory" }
+        uncomparable:
+          type: array
+          items: { $ref: "#/components/schemas/AnalysisUncomparable" }
+        excluded:
+          type: array
+          items: { $ref: "#/components/schemas/AnalysisExclusion" }
+        insufficient_evidence:
+          type: boolean
+          description: 没有任何有效点 / 病历时的降级标记;此时不输出偏离结论。
+    AnalysisWindow:
+      type: object
+      additionalProperties: false
+      required: [months, from, to, sparse]
+      properties:
+        months:
+          type: integer
+          description: 用户选择的窗口月数(6 / 12 / 24)。
+        from:
+          type: string
+          pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+          description: 实际使用的窗口起点;稀疏扩展时向前到 24 个月。
+        to:
+          type: string
+          pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+          description: 窗口锚点 = 分析时刻当日。
+        sparse:
+          type: boolean
+          description: 任一趋势键在 12 个月内不足 2 个有效点并触发稀疏扩展。
+    AnalysisReportRef:
+      type: object
+      additionalProperties: false
+      required: [report_id, report_date, report_type]
+      properties:
+        report_id: { type: string, pattern: "^[0-9a-f]{64}$" }
+        report_date:
+          type: [string, "null"]
+          pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        report_type: { type: string, minLength: 1 }
+    AnalysisNote:
+      type: object
+      additionalProperties: false
+      required: [report_id, report_date, outside_window, sections]
+      properties:
+        report_id: { type: string, pattern: "^[0-9a-f]{64}$" }
+        report_date:
+          type: [string, "null"]
+          pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        outside_window:
+          type: boolean
+          description: true = 早于分析窗口的背景病历,不作为本次结论依据。
+        sections:
+          type: array
+          items: { $ref: "#/components/schemas/AnalysisNoteSection" }
+    AnalysisNoteSection:
+      type: object
+      additionalProperties: false
+      required: [kind, text]
+      properties:
+        kind:
+          type: string
+          minLength: 1
+          description: 诊断 / 处理原文;切不出标题时为 note(整页兜底)。
+        text: { type: string, minLength: 1 }
+    AnalysisEvidencePoint:
+      type: object
+      additionalProperties: false
+      required: [evidence_id, report_id, report_date, report_type, trend_key, name,
+                 unit, unit_display, value, ref_range, flag]
+      description: 事实层的一个证据点;每个数值绑定报告日期、趋势键、单位与 flag。
+      properties:
+        evidence_id: { type: string, minLength: 1 }
+        report_id: { type: string, pattern: "^[0-9a-f]{64}$" }
+        report_date:
+          type: [string, "null"]
+          pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        report_type: { type: string, minLength: 1 }
+        trend_key: { type: string, minLength: 1 }
+        name: { type: string, minLength: 1 }
+        unit: { type: [string, "null"] }
+        unit_display: { type: [string, "null"] }
+        value: { type: [string, "null"] }
+        ref_range: { type: [string, "null"] }
+        flag:
+          type: string
+          enum: [normal, high, low, abnormal, unknown, not_tested]
+    AnalysisHistory:
+      type: object
+      additionalProperties: false
+      required: [trend_key, name, unit, unit_display, points, latest, previous,
+                 change, highest, lowest, point_count, sparse, comparable]
+      properties:
+        trend_key: { type: string, minLength: 1 }
+        name: { type: string, minLength: 1 }
+        unit: { type: [string, "null"] }
+        unit_display: { type: [string, "null"] }
+        points:
+          type: array
+          items: { $ref: "#/components/schemas/AnalysisEvidencePoint" }
+        latest:
+          $ref: "#/components/schemas/AnalysisEvidencePoint"
+        previous:
+          oneOf:
+            - $ref: "#/components/schemas/AnalysisEvidencePoint"
+            - type: "null"
+        change:
+          $ref: "#/components/schemas/AnalysisChange"
+        highest: { type: boolean }
+        lowest: { type: boolean }
+        point_count: { type: integer, minimum: 1 }
+        sparse:
+          type: boolean
+          description: 该趋势键触发了稀疏扩展 / 历史数据较少。
+        comparable:
+          type: boolean
+          description: false = 最近点 flag=unknown,无法与参考范围比较。
+    AnalysisUncomparable:
+      type: object
+      additionalProperties: false
+      required: [trend_key, name, unit, latest, reason]
+      properties:
+        trend_key: { type: string, minLength: 1 }
+        name: { type: string, minLength: 1 }
+        unit: { type: [string, "null"] }
+        latest:
+          $ref: "#/components/schemas/AnalysisEvidencePoint"
+        reason: { type: string, minLength: 1 }
+    AnalysisExclusion:
+      type: object
+      additionalProperties: false
+      required: [report_id, report_date, trend_key, name, reason]
+      properties:
+        report_id: { type: [string, "null"] }
+        report_date:
+          type: [string, "null"]
+          pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        trend_key: { type: [string, "null"] }
+        name: { type: [string, "null"] }
+        reason:
+          $ref: "#/components/schemas/AnalysisExclusionReason"
+    AnalysisSnapshot:
+      type: object
+      additionalProperties: false
+      required: [member_id, member_name, panel, entry, indicator_name, window_months,
+                 window_from, window_to, rule_version, data_version, points, notes]
+      properties:
+        member_id: { type: integer, format: int64 }
+        member_name: { type: string, minLength: 1 }
+        panel:
+          $ref: "#/components/schemas/PanelCode"
+        entry:
+          $ref: "#/components/schemas/AnalysisEntry"
+        indicator_name: { type: [string, "null"] }
+        window_months: { type: integer }
+        window_from: { type: string, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
+        window_to: { type: string, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
+        rule_version: { type: string, minLength: 1 }
+        data_version:
+          type: string
+          minLength: 1
+          description: 生成快照时的成员数据指纹;当前数据不同即 stale=true。
+        points:
+          type: array
+          items: { $ref: "#/components/schemas/AnalysisSnapshotPoint" }
+        notes:
+          type: array
+          items: { $ref: "#/components/schemas/AnalysisSnapshotNote" }
+    AnalysisSnapshotPoint:
+      type: object
+      additionalProperties: false
+      required: [evidence_id, report_id, report_date, trend_key, unit, value, flag]
+      properties:
+        evidence_id: { type: string, minLength: 1 }
+        report_id: { type: string, pattern: "^[0-9a-f]{64}$" }
+        report_date: { type: string, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
+        trend_key: { type: string, minLength: 1 }
+        unit: { type: [string, "null"] }
+        value: { type: [string, "null"] }
+        flag: { type: string, minLength: 1 }
+    AnalysisSnapshotNote:
+      type: object
+      additionalProperties: false
+      required: [report_id, report_date, outside_window, section_kinds]
+      properties:
+        report_id: { type: string, pattern: "^[0-9a-f]{64}$" }
+        report_date:
+          type: [string, "null"]
+          pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        outside_window: { type: boolean }
+        section_kinds:
+          type: array
+          items: { type: string, minLength: 1 }
+    AnalysisSource:
+      type: object
+      additionalProperties: false
+      required: [standard, note, url]
+      description: 解释层引用的标准 / 指南;事实层当前为空数组。
+      properties:
+        standard: { type: string, minLength: 1 }
+        note: { type: string, minLength: 1 }
+        url: { type: [string, "null"] }
     Error:
       type: object
       additionalProperties: false

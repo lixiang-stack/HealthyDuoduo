@@ -43,7 +43,7 @@ func loadFixture(t *testing.T, name string) []byte {
 	return data
 }
 
-// TestOpenAPIFrozenPathSet 15 端点集合冻结:实现票不得多加、少删或改路径/方法
+// TestOpenAPIFrozenPathSet 19 端点集合冻结:实现票不得多加、少删或改路径/方法
 // (契约变更须先改本文件与 OpenAPI 再随 PR 提走)。
 func TestOpenAPIFrozenPathSet(t *testing.T) {
 	doc := getOpenAPI(t)
@@ -51,6 +51,7 @@ func TestOpenAPIFrozenPathSet(t *testing.T) {
 		"GET /health":  true,
 		"GET /members": true, "POST /members": true,
 		"PATCH /members/{member_id}": true, "DELETE /members/{member_id}": true,
+		"GET /members/{member_id}/growth": true, "POST /members/{member_id}/growth": true,
 		"GET /reports": true, "POST /reports": true,
 		"GET /reports/{report_id}": true, "PATCH /reports/{report_id}": true,
 		"DELETE /reports/{report_id}":                true,
@@ -59,6 +60,8 @@ func TestOpenAPIFrozenPathSet(t *testing.T) {
 		"GET " + trendPath:                           true,
 		"GET /members/{member_id}/panels":            true,
 		"GET /members/{member_id}/panels/{panel}":    true,
+		"POST /analyses":                             true,
+		"GET /analyses/{analysis_id}":                true,
 	}
 	got := map[string]bool{}
 	for path, item := range doc["paths"].(map[string]any) {
@@ -287,6 +290,9 @@ type fixtureCase struct {
 
 var reconcileCases = []fixtureCase{
 	{"member.json", "Member", unmarshal[Member]},
+	{"growth.record.json", "GrowthRecord", unmarshal[GrowthRecord]},
+	{"growth.create.json", "GrowthRecordCreate", unmarshal[GrowthRecordCreate]},
+	{"growth.list.json", "GrowthList", unmarshal[GrowthList]},
 	{"report.summary.json", "ReportSummary", unmarshal[ReportSummary]},
 	{"report.summary.failed.json", "ReportSummary", unmarshal[ReportSummary]},
 	{"report.detail.json", "ReportDetail", unmarshal[ReportDetail]},
@@ -301,6 +307,8 @@ var reconcileCases = []fixtureCase{
 	{"trend.json", "TrendResult", unmarshal[TrendResult]},
 	{"panel.list.json", "PanelsList", unmarshal[PanelsList]},
 	{"panel.detail.json", "PanelDetail", unmarshal[PanelDetail]},
+	{"analysis.request.json", "AnalysisRequest", unmarshal[AnalysisRequest]},
+	{"analysis.result.json", "AnalysisResult", unmarshal[AnalysisResult]},
 }
 
 // TestFixturesReconcileOpenAPI 每个 fixture 对其声明的 OpenAPI component 校验;
@@ -326,6 +334,15 @@ func TestFixturesReconcileOpenAPI(t *testing.T) {
 		}
 		if errs := validate(componentSchema(t, doc, "ReviewRequest"), body); len(errs) == 0 {
 			t.Error("flag correction was accepted — contract must not allow manual flag edits")
+		}
+	})
+	t.Run("growth.create.invalid.json rejected", func(t *testing.T) {
+		var body any
+		if err := json.Unmarshal(loadFixture(t, "growth.create.invalid.json"), &body); err != nil {
+			t.Fatal(err)
+		}
+		if errs := validate(componentSchema(t, doc, "GrowthRecordCreate"), body); len(errs) == 0 {
+			t.Error("growth record without height/weight was accepted — contract requires at least one")
 		}
 	})
 }

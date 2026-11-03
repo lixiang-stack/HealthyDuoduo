@@ -5,7 +5,7 @@ import { resolveApiClient } from '../../api/resolveClient';
 import MembersScreen from '../../app/members';
 import { CURRENT_MEMBER_STORAGE_KEY } from '../../members/currentMemberStore';
 import { createFakeApiClient, TEST_BASE_URL, type FakeApiOptions } from '../fakeApi';
-import { makeMember, makeReportSummary } from '../fixtures';
+import { makeGrowthRecord, makeMember, makeReportSummary } from '../fixtures';
 import { renderScreen } from '../renderScreen';
 
 jest.mock('../../api/resolveClient', () => ({
@@ -160,6 +160,21 @@ describe('MembersScreen', () => {
     });
   });
 
+  it('hides the add-member card while editing a member', async () => {
+    useApi({
+      GET: { '/members': () => ({ members: [makeMember({ member_id: 1, name: '小明' })] }) },
+    });
+
+    await renderScreen(<MembersScreen />);
+    expect(await screen.findByText('小明')).toBeTruthy();
+    expect(screen.getByTestId('members-create')).toBeTruthy();
+
+    fireEvent.press(screen.getByText('编辑'));
+    expect(await screen.findByTestId('member-edit-save-1')).toBeTruthy();
+
+    expect(screen.queryByTestId('members-create')).toBeNull();
+  });
+
   it('shows the generic irreversible confirmation when the member has no reports', async () => {
     useApi({
       GET: {
@@ -202,5 +217,70 @@ describe('MembersScreen', () => {
     fireEvent.press(screen.getByTestId('member-delete-retry-1'));
     expect(await screen.findByText('读取报告失败:backend down')).toBeTruthy();
     expect(screen.queryByTestId('member-delete-confirm-1')).toBeNull();
+  });
+
+  it('records a growth measurement and shows the latest record in the member row', async () => {
+    let members = [makeMember({ member_id: 1, name: '小明', latest_growth: null })];
+    const createGrowthHandler = jest.fn((options?: FakeApiOptions) => {
+      const body = options?.body as {
+        measured_on: string;
+        height_cm?: number;
+        weight_kg?: number;
+        source: 'measured' | 'report';
+      };
+      const bmi =
+        body.height_cm && body.weight_kg
+          ? Math.round((body.weight_kg / (body.height_cm / 100) ** 2) * 10) / 10
+          : null;
+      const record = makeGrowthRecord({
+        member_id: 1,
+        measured_on: body.measured_on,
+        height_cm: body.height_cm ?? null,
+        weight_kg: body.weight_kg ?? null,
+        source: body.source,
+        bmi,
+      });
+      members = [{ ...members[0], latest_growth: record }];
+      return record;
+    });
+    useApi({
+      GET: { '/members': () => ({ members }) },
+      POST: { '/members/{member_id}/growth': createGrowthHandler },
+    });
+
+    await renderScreen(<MembersScreen />);
+    expect(await screen.findByText('小明')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('member-growth-action-1'));
+    await screen.findByTestId('growth-measured-on');
+    await fireEvent.changeText(screen.getByTestId('growth-measured-on'), '');
+    await fireEvent.press(screen.getByTestId('growth-submit'));
+    expect(screen.getByTestId('growth-measured-on-error')).toHaveTextContent(
+      '请填写有效的测量日期（不晚于今天）',
+    );
+    expect(screen.getByTestId('growth-measurement-error')).toHaveTextContent(
+      '身高和体重至少填一项',
+    );
+    expect(createGrowthHandler).not.toHaveBeenCalled();
+
+    await fireEvent.changeText(screen.getByTestId('growth-measured-on'), '2026-10-01');
+    await fireEvent.changeText(screen.getByTestId('growth-height'), '118.5');
+    await fireEvent.changeText(screen.getByTestId('growth-weight'), '22.4');
+    await fireEvent.press(screen.getByTestId('growth-source-measured'));
+    await fireEvent.press(screen.getByTestId('growth-submit'));
+
+    await waitFor(() => expect(createGrowthHandler).toHaveBeenCalledTimes(1));
+    expect(createGrowthHandler.mock.calls[0][0]).toMatchObject({
+      params: { path: { member_id: 1 } },
+      body: {
+        measured_on: '2026-10-01',
+        height_cm: 118.5,
+        weight_kg: 22.4,
+        source: 'measured',
+      },
+    });
+    expect(await screen.findByTestId('member-growth-1')).toHaveTextContent(
+      '实测 · 身高 118.5 cm · 体重 22.4 kg · BMI 16.0 · 2026-10-01',
+    );
   });
 });

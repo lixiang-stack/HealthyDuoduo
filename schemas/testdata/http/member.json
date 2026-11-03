@@ -4,5 +4,15 @@
   "is_child": true,
   "sex": "male",
   "birth_date": "2020-05-20",
-  "created_at": "2026-10-13T08:00:00Z"
+  "created_at": "2026-10-13T08:00:00Z",
+  "latest_growth": {
+    "growth_id": 1,
+    "member_id": 1,
+    "measured_on": "2026-10-01",
+    "height_cm": 118.5,
+    "weight_kg": 22.4,
+    "source": "measured",
+    "bmi": 16,
+    "weight_status": null
+  }
 }

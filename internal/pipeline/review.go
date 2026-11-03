@@ -3,10 +3,12 @@
 // (决策可重复、无「撤销回未核对」);确认不产生修正对,修正 append 一条。
 package pipeline
 
+import "healthyduoduo/internal/contract"
+
 // 指标项核对状态(初始态 ReviewStatusUnreviewed 见 types.go)。
 const (
-	ReviewStatusConfirmed = "confirmed"
-	ReviewStatusCorrected = "corrected"
+	ReviewStatusConfirmed = contract.ReviewStatusConfirmed
+	ReviewStatusCorrected = contract.ReviewStatusCorrected
 )
 
 // ReviewAction 核对动作:确认(Confirm=true)或修正(至少一项纸面事实非 nil)。

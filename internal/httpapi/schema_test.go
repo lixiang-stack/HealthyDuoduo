@@ -158,6 +158,11 @@ func checkSchema(schema map[string]any, value any, errs []string) []string {
 			errs = append(errs, "below minimum")
 		}
 	}
+	if n, ok := num(schema["exclusiveMinimum"]); ok {
+		if f, isNum := value.(float64); isNum && f <= float64(n) {
+			errs = append(errs, "not above exclusiveMinimum")
+		}
+	}
 	if branches, ok := schema["oneOf"].([]any); ok && !matchesOneBranch(branches, value) {
 		errs = append(errs, "no oneOf branch matched")
 	}

@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+
+	"healthyduoduo/internal/contract"
 )
 
 func strPtr(s string) *string { return &s }
@@ -175,7 +177,7 @@ func TestTrendKeyPriority(t *testing.T) {
 		{"", "", "", ""},
 	}
 	for _, tt := range tests {
-		if got := TrendKey(tt.code, tt.loinc, tt.name); got != tt.want {
+		if got := contract.TrendKey(tt.code, tt.loinc, tt.name); got != tt.want {
 			t.Errorf("TrendKey(%q, %q, %q) = %q, want %q", tt.code, tt.loinc, tt.name, got, tt.want)
 		}
 	}

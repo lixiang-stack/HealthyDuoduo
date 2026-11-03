@@ -1,3 +1,10 @@
+import type {
+  AnalysisEvidencePoint,
+  AnalysisFacts,
+  AnalysisHistory,
+  AnalysisResult,
+} from '../api/analyses';
+import type { GrowthRecord } from '../api/growth';
 import type { Member } from '../api/members';
 import type {
   FlagCounts,
@@ -26,6 +33,21 @@ export function makeMember(overrides: Partial<Member> = {}): Member {
     sex: 'female',
     birth_date: '2020-01-01',
     created_at: '2026-01-01T00:00:00Z',
+    latest_growth: null,
+    ...overrides,
+  };
+}
+
+export function makeGrowthRecord(overrides: Partial<GrowthRecord> = {}): GrowthRecord {
+  return {
+    growth_id: 1,
+    member_id: 1,
+    measured_on: '2026-10-01',
+    height_cm: 118.5,
+    weight_kg: 22.4,
+    source: 'measured',
+    bmi: 16,
+    weight_status: null,
     ...overrides,
   };
 }
@@ -154,6 +176,123 @@ export function makeReviewResult(
     status: 'success',
     unreviewed_low_confidence_count: 0,
     item,
+    ...overrides,
+  };
+}
+
+export function makeAnalysisEvidencePoint(
+  overrides: Partial<AnalysisEvidencePoint> = {},
+): AnalysisEvidencePoint {
+  return {
+    evidence_id: 'ev-aaaaaaaaaaaa-1',
+    report_id: 'a'.repeat(64),
+    report_date: '2026-10-01',
+    report_type: '生化',
+    trend_key: '1500104A',
+    name: '丙氨酸转氨酶测定',
+    unit: 'U/L',
+    unit_display: 'U/L',
+    value: '83.5',
+    ref_range: '7-40',
+    flag: 'high',
+    ...overrides,
+  };
+}
+
+export function makeAnalysisHistory(overrides: Partial<AnalysisHistory> = {}): AnalysisHistory {
+  const latest = makeAnalysisEvidencePoint();
+  return {
+    trend_key: '1500104A',
+    name: '丙氨酸转氨酶测定',
+    unit: 'U/L',
+    unit_display: 'U/L',
+    points: [latest],
+    latest,
+    previous: null,
+    change: 'unknown',
+    highest: true,
+    lowest: false,
+    point_count: 1,
+    sparse: false,
+    comparable: true,
+    ...overrides,
+  };
+}
+
+export function makeAnalysisFacts(overrides: Partial<AnalysisFacts> = {}): AnalysisFacts {
+  return {
+    entry: 'panel',
+    panel: 'liver',
+    indicator_name: null,
+    expanded_from_indicator: false,
+    window: {
+      months: 12,
+      from: '2025-11-03',
+      to: '2026-11-03',
+      sparse: false,
+    },
+    reports: [
+      { report_id: 'a'.repeat(64), report_date: '2026-10-01', report_type: '生化' },
+    ],
+    notes: [
+      {
+        report_id: 'b'.repeat(64),
+        report_date: '2026-09-20',
+        outside_window: false,
+        sections: [
+          { kind: 'diagnosis', text: '缺铁性贫血' },
+          { kind: 'treatment', text: '补铁治疗，一个月后复查。' },
+        ],
+      },
+    ],
+    deviations: [makeAnalysisEvidencePoint()],
+    history: [makeAnalysisHistory()],
+    uncomparable: [],
+    excluded: [],
+    insufficient_evidence: false,
+    ...overrides,
+  };
+}
+
+export function makeAnalysisResult(overrides: Partial<AnalysisResult> = {}): AnalysisResult {
+  return {
+    analysis_id: 12,
+    status: 'success',
+    layers: { facts: makeAnalysisFacts() },
+    snapshot: {
+      member_id: 1,
+      member_name: '小明',
+      panel: 'liver',
+      entry: 'panel',
+      indicator_name: null,
+      window_months: 12,
+      window_from: '2025-11-03',
+      window_to: '2026-11-03',
+      rule_version: 'llm-analysis-facts-v1',
+      data_version: 'v1',
+      points: [
+        {
+          evidence_id: 'ev-aaaaaaaaaaaa-1',
+          report_id: 'a'.repeat(64),
+          report_date: '2026-10-01',
+          trend_key: '1500104A',
+          unit: 'U/L',
+          value: '83.5',
+          flag: 'high',
+        },
+      ],
+      notes: [
+        {
+          report_id: 'b'.repeat(64),
+          report_date: '2026-09-20',
+          outside_window: false,
+          section_kinds: ['diagnosis', 'treatment'],
+        },
+      ],
+    },
+    sources: [],
+    quota: { used_today: 0, limit_today: 20, explanation_available: false },
+    stale: false,
     ...overrides,
   };
 }

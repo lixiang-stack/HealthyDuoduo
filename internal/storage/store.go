@@ -263,15 +263,31 @@ const (
 		 VALUES ($1,$2,$3::date)
 		 RETURNING ` + sqlMemberColumnsSQL
 
-	sqlMembersList = `SELECT ` + sqlMemberColumnsSQL + ` FROM members ORDER BY id`
+	// 列表 / 单成员带上最近一次生长记录(测量日期降序,同日 id 降序);无记录时列全 NULL。
+	sqlMembersList = `SELECT ` + memberWithGrowthColumnsSQL + ` FROM members m
+		 LEFT JOIN LATERAL (` + latestGrowthSQL + `) g ON TRUE
+		 ORDER BY m.id`
 
-	sqlMemberByID = `SELECT ` + sqlMemberColumnsSQL + ` FROM members WHERE id = $1`
+	sqlMemberByID = `SELECT ` + memberWithGrowthColumnsSQL + ` FROM members m
+		 LEFT JOIN LATERAL (` + latestGrowthSQL + `) g ON TRUE
+		 WHERE m.id = $1`
 
 	// 改动用 COALESCE 只覆盖传入字段(nil = 保持不变)。
 	sqlMemberUpdate = `UPDATE members SET name = COALESCE($2, name), sex = COALESCE($3, sex),
 		 birth_date = COALESCE($4::date, birth_date)
 		 WHERE id = $1 RETURNING ` + sqlMemberColumnsSQL
 )
+
+// memberWithGrowthColumnsSQL 成员行 + 最近一次生长记录(无记录时后五列为 NULL)。
+const memberWithGrowthColumnsSQL = `m.id, m.name, m.sex, to_char(m.birth_date, 'YYYY-MM-DD'), m.created_at,
+	   g.id, to_char(g.measured_on, 'YYYY-MM-DD'), g.height_cm, g.weight_kg, g.source`
+
+// latestGrowthSQL 最近一次生长记录:测量日期降序、同日 id 降序。
+const latestGrowthSQL = `SELECT id, measured_on, height_cm, weight_kg, source
+	   FROM growth_records
+	   WHERE member_id = m.id
+	   ORDER BY measured_on DESC, id DESC
+	   LIMIT 1`
 
 // reportColumnsSQL 报告行到业务视图(ReportRow)的标准投影;
 // report_date 序列化为 YYYY-MM-DD(缺失为空串),items 计数内联聚合,panels 有序数组。
@@ -862,7 +878,7 @@ func (s *Store) CreateMember(ctx context.Context, profile pipeline.MemberProfile
 	return &m, nil
 }
 
-// ListMembers 全量成员按创建序(id 升序;契约排序口径)。
+// ListMembers 全量成员按创建序(id 升序;契约排序口径),附带最近一次生长记录。
 func (s *Store) ListMembers(ctx context.Context) ([]pipeline.Member, error) {
 	rows, err := s.pool.Query(ctx, sqlMembersList)
 	if err != nil {
@@ -872,7 +888,7 @@ func (s *Store) ListMembers(ctx context.Context) ([]pipeline.Member, error) {
 	var out []pipeline.Member
 	for rows.Next() {
 		var m pipeline.Member
-		if err := scanMember(rows, &m); err != nil {
+		if err := scanMemberWithGrowth(rows, &m); err != nil {
 			return nil, err
 		}
 		out = append(out, m)
@@ -883,7 +899,7 @@ func (s *Store) ListMembers(ctx context.Context) ([]pipeline.Member, error) {
 // MemberByID 按 id 取成员(serve 上传归属校验,票 06);nil, nil = 不存在。
 func (s *Store) MemberByID(ctx context.Context, id int64) (*pipeline.Member, error) {
 	var m pipeline.Member
-	err := scanMember(s.pool.QueryRow(ctx, sqlMemberByID, id), &m)
+	err := scanMemberWithGrowth(s.pool.QueryRow(ctx, sqlMemberByID, id), &m)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -921,7 +937,15 @@ func (s *Store) UpdateMember(ctx context.Context, id int64, patch pipeline.Membe
 	if err != nil {
 		return nil, err
 	}
-	return &m, nil
+	// 最近一次生长记录不属于更新字段,回读一次带 growth 的成员视图。
+	full, err := s.MemberByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if full == nil {
+		return nil, nil
+	}
+	return full, nil
 }
 
 // scanMember 统一成员行扫描列序(与 sqlMemberColumnsSQL 对齐);is_child 按生日实时计算。
@@ -930,6 +954,34 @@ func scanMember(row pgx.Row, m *pipeline.Member) error {
 		return err
 	}
 	m.IsChild = pipeline.IsChild(m.BirthDate, time.Now())
+	return nil
+}
+
+// scanMemberWithGrowth 成员行 + 最近一次生长记录(与 memberWithGrowthColumnsSQL 对齐)。
+// 生长列全 NULL 表示该成员还没有记录。
+func scanMemberWithGrowth(row pgx.Row, m *pipeline.Member) error {
+	var growthID *int64
+	var measuredOn *string
+	var heightCm, weightKg *float64
+	var source *string
+	if err := row.Scan(&m.MemberID, &m.Name, &m.Sex, &m.BirthDate, &m.CreatedAt,
+		&growthID, &measuredOn, &heightCm, &weightKg, &source); err != nil {
+		return err
+	}
+	m.IsChild = pipeline.IsChild(m.BirthDate, time.Now())
+	if growthID == nil {
+		m.LatestGrowth = nil
+		return nil
+	}
+	m.LatestGrowth = &pipeline.GrowthRecord{
+		GrowthID:   *growthID,
+		MemberID:   m.MemberID,
+		MeasuredOn: derefString(measuredOn),
+		HeightCm:   heightCm,
+		WeightKg:   weightKg,
+		Source:     derefString(source),
+		BMI:        pipeline.BMI(heightCm, weightKg),
+	}
 	return nil
 }
 

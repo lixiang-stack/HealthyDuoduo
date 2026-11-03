@@ -1,0 +1,24 @@
+{
+  "records": [
+    {
+      "growth_id": 8,
+      "member_id": 1,
+      "measured_on": "2026-10-01",
+      "height_cm": 118.5,
+      "weight_kg": 22.4,
+      "source": "measured",
+      "bmi": 16,
+      "weight_status": null
+    },
+    {
+      "growth_id": 7,
+      "member_id": 1,
+      "measured_on": "2026-06-01",
+      "height_cm": 115,
+      "weight_kg": null,
+      "source": "report",
+      "bmi": null,
+      "weight_status": null
+    }
+  ]
+}

@@ -178,14 +178,20 @@ func handleDeleteMember(ms pipeline.MemberStore) http.HandlerFunc {
 	}
 }
 
-// toAPIMember 业务视图 → 契约形状(created_at 统一 RFC3339 UTC)。
+// toAPIMember 业务视图 → 契约形状(created_at 统一 RFC3339 UTC;无生长记录时 latest_growth 为 null)。
 func toAPIMember(m pipeline.Member) httpapi.Member {
+	var latest *httpapi.GrowthRecord
+	if m.LatestGrowth != nil {
+		record := toAPIGrowthRecord(*m.LatestGrowth)
+		latest = &record
+	}
 	return httpapi.Member{
-		MemberID:  m.MemberID,
-		Name:      m.Name,
-		IsChild:   m.IsChild,
-		Sex:       m.Sex,
-		BirthDate: m.BirthDate,
-		CreatedAt: m.CreatedAt.UTC().Format(time.RFC3339),
+		MemberID:     m.MemberID,
+		Name:         m.Name,
+		IsChild:      m.IsChild,
+		Sex:          m.Sex,
+		BirthDate:    m.BirthDate,
+		CreatedAt:    m.CreatedAt.UTC().Format(time.RFC3339),
+		LatestGrowth: latest,
 	}
 }

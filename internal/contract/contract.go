@@ -2,6 +2,8 @@
 // pydantic(py)与 Go struct 双语各一份,以同一份 schema 为源、互证防漂移(ADR-0002 / NF-06)。
 package contract
 
+import "strings"
+
 // Point 是文本框多边形顶点坐标 [x, y]。
 type Point [2]float64
 
@@ -13,6 +15,30 @@ const (
 	StatusSuccess = "success"
 	StatusPartial = "partial"
 	StatusFailed  = "failed"
+)
+
+// 指标项 flag 枚举(schemas/report.schema.json 同源;存储 CHECK 同值)。
+// high/low 只用于有方向的数值异常;abnormal 只用于无方向的定性异常。
+const (
+	FlagNormal    = "normal"
+	FlagHigh      = "high"
+	FlagLow       = "low"
+	FlagAbnormal  = "abnormal"
+	FlagUnknown   = "unknown"
+	FlagNotTested = "not_tested"
+)
+
+// 指标项核对状态(ADR-0005):未核对 → 已确认 / 已修正;单向,无撤销回未核对。
+const (
+	ReviewStatusUnreviewed = "unreviewed"
+	ReviewStatusConfirmed  = "confirmed"
+	ReviewStatusCorrected  = "corrected"
+)
+
+// 单位核验状态(OpenAPI unit_status):verified 才进入趋势连接与分析事实层。
+const (
+	UnitStatusVerified   = "verified"
+	UnitStatusUnverified = "unverified"
 )
 
 // 叙述型报告类别:影像(超声)与病历(llm-analysis 票 03);主体是报告段落,零指标项。
@@ -37,6 +63,18 @@ const (
 // IsNarrativeReportType 该报告类别是否以段落为主体(零指标项合法;status 由正文派生)。
 func IsNarrativeReportType(reportType string) bool {
 	return reportType == ReportTypeImaging || reportType == ReportTypeClinicalNote
+}
+
+// TrendKey 趋势连接键:标准 code 优先,缺失用 LOINC,再回退词典规范名。
+// 同一分析物跨报告 / 跨面板以该键连接;面板、事实层与存储共用同一口径。
+func TrendKey(code, loinc, name string) string {
+	if key := strings.TrimSpace(code); key != "" {
+		return key
+	}
+	if key := strings.TrimSpace(loinc); key != "" {
+		return key
+	}
+	return name
 }
 
 // ModelInfo 描述 OCR 使用的模型。

@@ -28,6 +28,9 @@ pre-commit:
     mobile-typecheck:
       glob: "{apps/mobile/**/*.{ts,tsx},samples/expected/report/*.json}"
       run: cd apps/mobile && npm run typecheck
+    mobile-lint:
+      glob: "{apps/mobile/**/*.{ts,tsx},apps/mobile/eslint.config.js}"
+      run: cd apps/mobile && npm run lint -- --max-warnings=0
     mobile-test:
       glob: "{apps/mobile/**/*.{ts,tsx},samples/expected/report/*.json}"
       run: cd apps/mobile && npm test -- --silent
@@ -59,3 +62,5 @@ pre-push:
     git-policy:
       run: bash scripts/git/check-push.sh {1}
       use_stdin: true
+    storage-tests:
+      run: bash scripts/pre-push-storage.sh

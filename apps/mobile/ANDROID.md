@@ -101,8 +101,10 @@ BT="$HOME/Library/Android/sdk/build-tools/36.0.0"
 用隔离栈脚本启动一次性 Postgres、worktree 识别服务、worktree hdd 与 worktree Metro；对象存储复用本机 `:8333` 的 SeaweedFS，但使用独立 bucket：
 
 ```bash
-bash scripts/android-acceptance.sh
+bash scripts/android-acceptance.sh --seed
 ```
+
+`--seed` 会创建一名成员、两条身高体重记录、两份肝功报告和一份合成病历，便于直接验收分析页；不加时数据库为空。
 
 脚本会：
 
@@ -210,6 +212,15 @@ scrcpy
 "$ADB" shell cat /sdcard/window.xml | tr '>' '>\n' | rg 'tab-family|tab-archive|trend-detail'
 ```
 
+也可用 `scripts/android-device.sh` 减少手算坐标：
+
+```bash
+bash scripts/android-device.sh screenshot /tmp/android.png
+bash scripts/android-device.sh tap-testid member-growth-action-1
+bash scripts/android-device.sh tap-text 设置
+bash scripts/android-device.sh reverse 8080
+```
+
 建议至少点检：
 
 - 底部「家庭 / 档案」图标：房子 / 三横线，激活蓝色、未激活灰色；不应出现倒三角或方块。
@@ -224,6 +235,8 @@ scrcpy
 - 设置：保存 Base URL 并通过健康检查；冷启动后地址仍生效。
 - 家庭页：成员卡待核对 / 异常文案、双 Tab、设置入口、上传 FAB 正常。
 - 成员：建 / 改名 / 改性别与生日（性别下拉、年月日滚轮）；孩子 / 成人由生日自动计算。删除无报告成员；删除有报告成员时确认面板显示「及其 N 份报告 · 不可恢复」，删除后当前成员清空且列表移除。
+- 身高体重：成员行「身高体重」展开表单，填测量日期 / 身高 / 体重（至少一项）/ 来源（实测 / 体检单）；保存后成员行显示最近一次记录、来源与日期。
+- 分析：项目详情「分析这个项目」先弹时间范围（6 / 12 / 24，默认 12），首次再弹数据去向确认，确认后进结果页（纳入范围、偏离项、历史比较、病历诊断与处理原文、未纳入原因、来源声明）；再次进入不再弹确认；单指标「分析这个指标」提示已扩展至所属项目。
 - 上传：单图、多图、重复图、failed 报告原因；相机 / 相册权限弹窗正常。
 - 时间线：新报告出现；待核对 / 识别失败 / 按项目筛选结果正确。
 - 报告详情：指标项分组、影像段落、原图展开 / 收起、failed 形态。
@@ -231,6 +244,9 @@ scrcpy
 - 核对：确认、修正、可补录未知、未检测；徽标与剩余项随之更新。
 - 趋势：异常分组、点行开详情、点选、原图定位、返回保留选中点。
 - 按项目：项目列表 / 详情 / `?panel=` 筛选、最新失败报告提示。
+- 成员交互态：编辑 / 身高体重 / 删除确认时，左上角返回先取消当前操作，不离开成员页；添加成员卡片隐藏；Android 硬件返回同样取消。
+- 分析入口时机：项目详情不常驻时间范围；点击「分析这个项目 / 指标 / 病历」后才弹时间范围；首次再弹数据去向确认，之后不再弹；单指标提示已扩展至所属项目。
+- 命名与来源：行内操作名「身高体重」；来源只有实测 / 体检单，手输不再出现。
 - 原生交互：Android 返回关闭 Modal / 返回上一屏；键盘不遮输入；safe area 正常。
 - 视觉：中文文案层级、颜色强调、长名称 / 空态 / 错误态；需要时用 `screencap` 留截图。
 

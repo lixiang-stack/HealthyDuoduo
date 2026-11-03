@@ -6,6 +6,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 
 import type { Member } from '../api/members';
 import { sharedStyles } from '../components/styles';
 import { colors } from '../components/theme';
+import { growthSummary } from './growth';
 import { memberFormErrors, type MemberSex } from './profile';
 import { BirthDateField, SexField } from './profilePickers';
 
@@ -17,12 +18,14 @@ export type EditDraft = {
   birthDate: string;
 };
 
-// 成员行:点按设为当前成员,「编辑」进入行内改名/改档,「删除」进入确认面板。
+// 成员行:点按设为当前成员,「身高体重」展开记录表单,「编辑」进入行内改名/改档,
+// 「删除」进入确认面板;有生长记录时显示最近一次测量与日期。
 export function MemberRow({
   member,
   selected,
   disabled,
   onSelect,
+  onGrowth,
   onEdit,
   onDelete,
 }: {
@@ -30,6 +33,7 @@ export function MemberRow({
   selected: boolean;
   disabled: boolean;
   onSelect: () => void;
+  onGrowth: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }) {
@@ -46,8 +50,16 @@ export function MemberRow({
           {member.is_child ? '孩子' : '成人'}
           {selected ? ' · 当前成员' : ''}
         </Text>
+        {member.latest_growth ? (
+          <Text testID={`member-growth-${member.member_id}`} style={styles.memberGrowth}>
+            {growthSummary(member.latest_growth)}
+          </Text>
+        ) : null}
       </Pressable>
       <View style={styles.cardActions}>
+        <Pressable testID={`member-growth-action-${member.member_id}`} onPress={onGrowth} disabled={disabled}>
+          <Text style={styles.cardAction}>身高体重</Text>
+        </Pressable>
         <Pressable onPress={onEdit} disabled={disabled}>
           <Text style={styles.cardAction}>编辑</Text>
         </Pressable>
@@ -393,6 +405,7 @@ const styles = StyleSheet.create({
   cardDangerText: { color: colors.fail, fontSize: 15 },
   memberName: { fontSize: 16, color: colors.text },
   memberMeta: { fontSize: 13, color: colors.muted },
+  memberGrowth: { fontSize: 12, color: colors.muted, lineHeight: 18 },
   deleteWarning: { fontSize: 13, color: colors.text, lineHeight: 20 },
   fail: { fontSize: 13, color: colors.fail, lineHeight: 20 },
   chip: {
