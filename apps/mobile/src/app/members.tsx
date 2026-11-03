@@ -3,6 +3,7 @@ import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { createMember, deleteMember, listMembers, updateMember, type Member } from '../api/members';
+import { createGrowth } from '../api/growth';
 import { listReports } from '../api/reports';
 import { resolveApiClient } from '../api/resolveClient';
 import { sharedStyles } from '../components/styles';
@@ -14,13 +15,16 @@ import {
   MemberRow,
   type EditDraft,
 } from '../members/components';
+import { GrowthForm } from '../members/growthComponents';
+import { growthCreateBody, todayISO, type GrowthDraft } from '../members/growth';
 import { useCurrentMember } from '../members/CurrentMemberContext';
 import { memberProfileValid, type MemberSex } from '../members/profile';
 
-// 成员页(票 05 / llm-analysis 票 01):建成员(称呼 + 性别 + 出生日期)、改称呼、改资料;
+// 成员页(票 05 / llm-analysis 票 01/02):建成员(称呼 + 性别 + 出生日期)、改资料、
+// 记录生长(测量日期 + 身高 / 体重 + 来源);成员列表显示最近一次生长记录与日期。
 // 是否孩子由后端按生日计算。点选当前成员(经 CurrentMemberContext 供时间线过滤与上传归属默认消费,
 // 票 06+)。
-// 列表按创建序;删除成员会一并删除其全部报告(原图与 OCR 历史保留),不可恢复。
+// 列表按创建序;删除成员会一并删除其全部报告与生长记录(原图与 OCR 历史保留),不可恢复。
 
 type ScreenState =
   | { status: 'loading' }
@@ -43,6 +47,8 @@ export default function MembersScreen() {
   const [sex, setSex] = useState<MemberSex>();
   const [birthDate, setBirthDate] = useState('');
   const [editing, setEditing] = useState<EditDraft>();
+  const [growthFor, setGrowthFor] = useState<number>();
+  const [growthDraft, setGrowthDraft] = useState<GrowthDraft>();
   const [deleting, setDeleting] = useState<DeleteState>();
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string>();
@@ -128,10 +134,39 @@ export default function MembersScreen() {
     });
   }, [editing, runAction, reload]);
 
+  const openGrowth = useCallback((memberId: number) => {
+    deleteRequestId.current++;
+    setDeleting(undefined);
+    setEditing(undefined);
+    setGrowthFor(memberId);
+    setGrowthDraft({ measuredOn: todayISO(), height: '', weight: '', source: 'measured' });
+    setActionError(undefined);
+  }, []);
+
+  const onCreateGrowth = useCallback(() => {
+    if (growthFor === undefined || !growthDraft) {
+      return;
+    }
+    const memberId = growthFor;
+    void runAction(async () => {
+      const resolved = await resolveApiClient();
+      if (!resolved) {
+        setState({ status: 'unconfigured' });
+        return;
+      }
+      await createGrowth(resolved.client, memberId, growthCreateBody(growthDraft));
+      setGrowthFor(undefined);
+      setGrowthDraft(undefined);
+      await reload();
+    });
+  }, [growthFor, growthDraft, runAction, reload]);
+
   // 删除前先取该成员报告数:确认文案要写清「及 N 份报告」;取不到就禁止确认。
   const loadDeleteCount = useCallback((member: Member) => {
     const request = ++deleteRequestId.current;
     setEditing(undefined);
+    setGrowthFor(undefined);
+    setGrowthDraft(undefined);
     setDeleting({ member, loading: true });
     setActionError(undefined);
     void (async () => {
@@ -248,24 +283,39 @@ export default function MembersScreen() {
                 );
               }
               return (
-                <MemberRow
-                  key={m.member_id}
-                  member={m}
-                  selected={m.member_id === currentMemberId}
-                  disabled={actionsDisabled}
-                  onSelect={() => selectMember(m.member_id)}
-                  onEdit={() => {
-                    deleteRequestId.current++;
-                    setDeleting(undefined);
-                    setEditing({
-                      memberId: m.member_id,
-                      name: m.name,
-                      sex: m.sex,
-                      birthDate: m.birth_date,
-                    });
-                  }}
-                  onDelete={() => loadDeleteCount(m)}
-                />
+                <View key={m.member_id} style={styles.stack}>
+                  <MemberRow
+                    member={m}
+                    selected={m.member_id === currentMemberId}
+                    disabled={actionsDisabled}
+                    onSelect={() => selectMember(m.member_id)}
+                    onGrowth={() => openGrowth(m.member_id)}
+                    onEdit={() => {
+                      deleteRequestId.current++;
+                      setDeleting(undefined);
+                      setGrowthFor(undefined);
+                      setEditing({
+                        memberId: m.member_id,
+                        name: m.name,
+                        sex: m.sex,
+                        birthDate: m.birth_date,
+                      });
+                    }}
+                    onDelete={() => loadDeleteCount(m)}
+                  />
+                  {growthFor === m.member_id && growthDraft ? (
+                    <GrowthForm
+                      draft={growthDraft}
+                      busy={busy}
+                      onChange={(patch) => setGrowthDraft({ ...growthDraft, ...patch })}
+                      onSubmit={() => void onCreateGrowth()}
+                      onCancel={() => {
+                        setGrowthFor(undefined);
+                        setGrowthDraft(undefined);
+                      }}
+                    />
+                  ) : null}
+                </View>
               );
             })
           )}

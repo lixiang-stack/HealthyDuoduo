@@ -31,13 +31,13 @@ func TestMigrationSmokeM0Contract(t *testing.T) {
 		t.Fatalf("migrate: %v", err)
 	}
 
-	// goose 已升到 0013 且幂等(Open 内重复 Migrate 不报错)。
+	// goose 已升到 0015 且幂等(Open 内重复 Migrate 不报错)。
 	var latest int
 	if err := pool.QueryRow(ctx, `SELECT max(version_id) FROM goose_db_version`).Scan(&latest); err != nil {
 		t.Fatalf("read goose version: %v", err)
 	}
-	if latest != 13 {
-		t.Fatalf("goose version = %d, want 13", latest)
+	if latest != 15 {
+		t.Fatalf("goose version = %d, want 15", latest)
 	}
 
 	// reports.sections(0007,ADR-0008):可选报告段落 JSONB,可空(存量/非叙述型 NULL)。
@@ -195,6 +195,113 @@ func TestMigrationSmokeM0Contract(t *testing.T) {
 		}
 	})
 
+	// 生长记录(0014):测量日期 / 身高体重至少一项 / 来源枚举;BMI 不落列。
+	t.Run("growth records columns", func(t *testing.T) {
+		want := map[string]bool{
+			"id": false, "member_id": false, "measured_on": false, "height_cm": true,
+			"weight_kg": true, "source": false, "created_at": false,
+		}
+		rows, err := pool.Query(ctx, `SELECT column_name, is_nullable FROM information_schema.columns
+			WHERE table_name='growth_records'`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer rows.Close()
+		cols := map[string]string{}
+		for rows.Next() {
+			var name, nullable string
+			if err := rows.Scan(&name, &nullable); err != nil {
+				t.Fatal(err)
+			}
+			cols[name] = nullable
+		}
+		if err := rows.Err(); err != nil {
+			t.Fatal(err)
+		}
+		if len(cols) != len(want) {
+			t.Fatalf("growth_records columns = %v, want %d", cols, len(want))
+		}
+		for name, nullable := range want {
+			got, ok := cols[name]
+			if !ok {
+				t.Fatalf("growth_records missing column %q", name)
+			}
+			wantNullable := "NO"
+			if nullable {
+				wantNullable = "YES"
+			}
+			if got != wantNullable {
+				t.Errorf("growth_records.%s nullable = %s, want %s", name, got, wantNullable)
+			}
+		}
+		if _, err := pool.Exec(ctx, `INSERT INTO growth_records (member_id, measured_on, source)
+			VALUES (1, '2026-10-01', 'measured')`); err == nil {
+			t.Fatal("growth record without height/weight accepted, want CHECK rejection")
+		} else if !strings.Contains(err.Error(), "growth_records_measurement_present") {
+			t.Fatalf("expected measurement check violation, got %v", err)
+		}
+		if _, err := pool.Exec(ctx, `INSERT INTO growth_records
+			(member_id, measured_on, height_cm, source) VALUES (1, '2026-10-01', 118.5, 'scale')`); err == nil {
+			t.Fatal("invalid growth source accepted, want CHECK rejection")
+		} else if !strings.Contains(err.Error(), "growth_records_source_check") {
+			t.Fatalf("expected source check violation, got %v", err)
+		}
+	})
+
+	// 分析快照(0015):事实层 / 快照 JSONB 永久保留;入口与窗口枚举受 CHECK 约束。
+	t.Run("analyses columns", func(t *testing.T) {
+		want := map[string]bool{
+			"id": false, "member_id": false, "panel": false, "entry": false,
+			"indicator_name": true, "window_months": false, "status": false,
+			"layers": false, "snapshot": false, "sources": false, "created_at": false,
+		}
+		rows, err := pool.Query(ctx, `SELECT column_name, is_nullable, data_type FROM information_schema.columns
+			WHERE table_name='analyses'`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer rows.Close()
+		cols := map[string][2]string{}
+		for rows.Next() {
+			var name, nullable, dataType string
+			if err := rows.Scan(&name, &nullable, &dataType); err != nil {
+				t.Fatal(err)
+			}
+			cols[name] = [2]string{nullable, dataType}
+		}
+		if err := rows.Err(); err != nil {
+			t.Fatal(err)
+		}
+		if len(cols) != len(want) {
+			t.Fatalf("analyses columns = %v, want %d", cols, len(want))
+		}
+		for name, nullable := range want {
+			got, ok := cols[name]
+			if !ok {
+				t.Fatalf("analyses missing column %q", name)
+			}
+			wantNullable := "NO"
+			if nullable {
+				wantNullable = "YES"
+			}
+			if got[0] != wantNullable {
+				t.Errorf("analyses.%s nullable = %s, want %s", name, got[0], wantNullable)
+			}
+		}
+		for _, jsonColumn := range []string{"layers", "snapshot", "sources"} {
+			if got := cols[jsonColumn][1]; got != "jsonb" {
+				t.Errorf("analyses.%s type = %s, want jsonb", jsonColumn, got)
+			}
+		}
+		if _, err := pool.Exec(ctx, `INSERT INTO analyses
+			(member_id, panel, entry, window_months, status, layers, snapshot)
+			VALUES (1, 'liver', 'report', 12, 'success', '{}', '{}')`); err == nil {
+			t.Fatal("invalid analysis entry accepted, want CHECK rejection")
+		} else if !strings.Contains(err.Error(), "analyses_entry_check") {
+			t.Fatalf("expected entry check violation, got %v", err)
+		}
+	})
+
 	// 报告表:成员归属可空(存量 CLI 时代报告无主)+ fail_reason。
 	t.Run("reports ownership and fail reason", func(t *testing.T) {
 		var failReasonNullable, memberNullable string
@@ -274,6 +381,31 @@ func TestMigrationSmokeM0Contract(t *testing.T) {
 		}
 		if items != 0 || pairs != 0 || images != 2 {
 			t.Fatalf("after report delete: items=%d pairs=%d images=%d, want 0/0/2 (image retained)", items, pairs, images)
+		}
+	})
+
+	// 成员删除级联生长记录与分析快照(0014/0015)。
+	t.Run("member delete cascades growth and analyses", func(t *testing.T) {
+		if _, err := pool.Exec(ctx, `INSERT INTO growth_records
+			(member_id, measured_on, height_cm, source) VALUES (1, '2026-10-01', 118.5, 'measured')`); err != nil {
+			t.Fatalf("seed growth: %v", err)
+		}
+		if _, err := pool.Exec(ctx, `INSERT INTO analyses
+			(member_id, panel, entry, window_months, status, layers, snapshot)
+			VALUES (1, 'liver', 'panel', 12, 'success', '{"facts":{}}', '{}')`); err != nil {
+			t.Fatalf("seed analysis: %v", err)
+		}
+		if _, err := pool.Exec(ctx, `DELETE FROM members WHERE id = 1`); err != nil {
+			t.Fatalf("delete member: %v", err)
+		}
+		var growth, analyses int
+		if err := pool.QueryRow(ctx, `SELECT
+			(SELECT count(*) FROM growth_records), (SELECT count(*) FROM analyses)`).
+			Scan(&growth, &analyses); err != nil {
+			t.Fatal(err)
+		}
+		if growth != 0 || analyses != 0 {
+			t.Fatalf("after member delete: growth=%d analyses=%d, want 0/0", growth, analyses)
 		}
 	})
 }

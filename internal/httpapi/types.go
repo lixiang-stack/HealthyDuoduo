@@ -5,13 +5,42 @@ package httpapi
 
 // Member components/Member:成员模型 = 称呼 + 性别 + 出生日期;
 // is_child 由出生日期实时计算(未满 18 岁),不是可写字段。
+// latest_growth 为最近一次生长记录(按测量日期降序),无记录为 null。
 type Member struct {
-	MemberID  int64  `json:"member_id"`
-	Name      string `json:"name"`
-	IsChild   bool   `json:"is_child"`
-	Sex       string `json:"sex"`        // male | female
-	BirthDate string `json:"birth_date"` // YYYY-MM-DD
-	CreatedAt string `json:"created_at"` // RFC3339 date-time
+	MemberID     int64         `json:"member_id"`
+	Name         string        `json:"name"`
+	IsChild      bool          `json:"is_child"`
+	Sex          string        `json:"sex"`        // male | female
+	BirthDate    string        `json:"birth_date"` // YYYY-MM-DD
+	CreatedAt    string        `json:"created_at"` // RFC3339 date-time
+	LatestGrowth *GrowthRecord `json:"latest_growth"`
+}
+
+// GrowthRecord components/GrowthRecord:一条生长记录。BMI 由测量时点的身高体重
+// 实时计算,不落库;weight_status 为超重 / 肥胖判定,手输来源与百分位不可用时为 null。
+type GrowthRecord struct {
+	GrowthID     int64    `json:"growth_id"`
+	MemberID     int64    `json:"member_id"`
+	MeasuredOn   string   `json:"measured_on"` // YYYY-MM-DD
+	HeightCm     *float64 `json:"height_cm"`
+	WeightKg     *float64 `json:"weight_kg"`
+	Source       string   `json:"source"` // measured | report | manual
+	BMI          *float64 `json:"bmi"`
+	WeightStatus *string  `json:"weight_status"`
+}
+
+// GrowthRecordCreate POST /members/{member_id}/growth 请求体:measured_on/source 必填,
+// height_cm/weight_kg 至少一项。
+type GrowthRecordCreate struct {
+	MeasuredOn string   `json:"measured_on"`
+	HeightCm   *float64 `json:"height_cm,omitempty"`
+	WeightKg   *float64 `json:"weight_kg,omitempty"`
+	Source     string   `json:"source"`
+}
+
+// GrowthList GET /members/{member_id}/growth 响应信封;按测量日期降序。
+type GrowthList struct {
+	Records []GrowthRecord `json:"records"`
 }
 
 // MemberCreate POST /members 请求体:member_id/created_at/is_child 由服务端产生,不收;

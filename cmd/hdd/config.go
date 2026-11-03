@@ -72,6 +72,8 @@ func openDeps(c config) (*deps, func(), error) {
 		reports:    st,
 		trends:     st,
 		panels:     st,
+		growth:     st,
+		analyses:   st,
 		backfill:   st,
 		classifier: rec,
 		rec:        rec,

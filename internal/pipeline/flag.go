@@ -10,17 +10,18 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"healthyduoduo/internal/contract"
 )
 
-// flag 枚举(schemas/report.schema.json 同源;storage CHECK 同值)。
-// high/low 只用于有方向的数值异常;abnormal 只用于无方向的定性异常。
+// flag 枚举复用 contract 的契约常量(单一来源)。
 const (
-	FlagNormal    = "normal"
-	FlagHigh      = "high"
-	FlagLow       = "low"
-	FlagAbnormal  = "abnormal"
-	FlagUnknown   = "unknown"
-	FlagNotTested = "not_tested"
+	FlagNormal    = contract.FlagNormal
+	FlagHigh      = contract.FlagHigh
+	FlagLow       = contract.FlagLow
+	FlagAbnormal  = contract.FlagAbnormal
+	FlagUnknown   = contract.FlagUnknown
+	FlagNotTested = contract.FlagNotTested
 )
 
 // flag_reason 枚举(schemas/report.schema.json 同源;只对 unknown 有意义)。

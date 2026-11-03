@@ -17,6 +17,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"healthyduoduo/internal/analysis"
 	"healthyduoduo/internal/contract"
 	"healthyduoduo/internal/pipeline"
 )
@@ -31,6 +32,8 @@ type deps struct {
 	reports    pipeline.ReportStore
 	trends     pipeline.TrendStore
 	panels     pipeline.PanelStore
+	growth     pipeline.GrowthStore
+	analyses   analysis.Store
 	backfill   pipeline.BackfillStore
 	classifier pipeline.PanelClassifier
 	rec        pipeline.Recognizer

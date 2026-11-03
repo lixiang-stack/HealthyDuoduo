@@ -16,12 +16,15 @@ This repo mirrors the same contract through several layers. Use this page as a n
 | Go HTTP | `internal/httpapi/types.go` | `internal/httpapi/contract_test.go` compares fixtures, required fields, panel enum |
 | App | `apps/mobile/src/api/schema.d.ts` | `npm run codegen`; pre-commit and CI fail on stale generated file |
 | HTTP fixtures | `schemas/testdata/http/*.json` | round-trip against Go mirrors and OpenAPI schemas |
+| Growth record | `schemas/openapi.yaml` `GrowthRecord` | `internal/httpapi/types.go`; App `src/api/growth.ts`; storage `growth_records` |
+| Analysis facts / snapshot | `schemas/openapi.yaml` `Analysis*` | `internal/httpapi/analysis.go` → `internal/analysis` types; App `src/api/analyses.ts`; storage `analyses.layers/snapshot` |
 
 ### Cross-cutting mirrors
 
 - Panel code / order: `schemas/report.schema.json` `$defs.panel` → `recognizer/recognizer/contract.py` → `internal/pipeline/panels.go` → `apps/mobile/src/reports/panels.ts`.
 - Narrative report kinds: `recognizer/recognizer/postprocess.py` (`NARRATIVE_BODY_SECTION_KINDS`) → `internal/pipeline/reports.go` (`hasReportBody`) → `recognizer/tools/e2e.py` (`verify_narrative_reports`) → App `sections.ts` / `status.ts`.
 - Report summary/detail projection: `internal/httpapi/types.go` ↔ `schemas/openapi.yaml` ↔ App `api/reports.ts`.
+- Analysis facts: `internal/analysis` (`Facts` / `Snapshot` JSON tags) ↔ `schemas/openapi.yaml` `AnalysisFacts` / `AnalysisSnapshot` ↔ App `api/analyses.ts`; facts window / gating changes must keep the snapshot rule version in sync.
 
 ## Change checklist
 

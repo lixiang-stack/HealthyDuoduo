@@ -2,7 +2,13 @@ import { Link, router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import {
+  ANALYSIS_DEFAULT_WINDOW_MONTHS,
+  type AnalysisWindowMonths,
+} from '../../api/analyses';
 import type { PanelItem } from '../../api/reports';
+import { AnalysisConsentModal } from '../../analysis/ConsentModal';
+import { useStartAnalysis } from '../../analysis/useStartAnalysis';
 import { sharedStyles } from '../../components/styles';
 import { colors } from '../../components/theme';
 import { useCurrentMember } from '../../members/CurrentMemberContext';
@@ -42,6 +48,10 @@ export default function PanelDetailScreen() {
   const panel = parsePanelParam(params.panel);
   const { currentMemberId } = useCurrentMember();
   const { state, reload } = usePanelDetail(currentMemberId, panel);
+  const [windowMonths, setWindowMonths] = useState<AnalysisWindowMonths>(
+    ANALYSIS_DEFAULT_WINDOW_MONTHS,
+  );
+  const analysis = useStartAnalysis(currentMemberId, panel, windowMonths);
   const [detailTrend, setDetailTrend] = useState<PanelTrend>();
   // 原图是独立路由;Modal 在跳转时隐藏但保持挂载,返回后原位恢复选中点。
   const [sheetHidden, setSheetHidden] = useState(false);
@@ -136,6 +146,39 @@ export default function PanelDetailScreen() {
                     {panelSourceLabel(detail.panel, detail.report_types)}
                   </Text>
                 ) : null}
+                <View style={styles.windowRow}>
+                  <Text style={styles.windowLabel}>时间范围</Text>
+                  {([6, 12, 24] as const).map((months) => {
+                    const active = months === windowMonths;
+                    return (
+                      <Pressable
+                        key={months}
+                        testID={`panel-window-${months}`}
+                        accessibilityRole="button"
+                        accessibilityLabel={`时间范围 ${months} 个月`}
+                        accessibilityState={{ selected: active }}
+                        onPress={() => setWindowMonths(months)}
+                        style={[styles.windowChip, active && styles.windowChipActive]}
+                      >
+                        <Text style={active ? styles.windowTextActive : styles.windowText}>
+                          {months} 个月
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                <Pressable
+                  testID="panel-analyze"
+                  accessibilityRole="button"
+                  style={[styles.analyzeButton, analysis.starting && styles.analyzeButtonDisabled]}
+                  onPress={() => void analysis.start('panel')}
+                  disabled={analysis.starting}
+                >
+                  <Text style={styles.analyzeButtonText}>
+                    {analysis.starting ? '正在分析…' : '分析这个项目'}
+                  </Text>
+                </Pressable>
+                {analysis.error ? <Text style={styles.fail}>{analysis.error}</Text> : null}
                 {latestFailedReportId ? (
                   <Link
                     asChild
@@ -176,6 +219,7 @@ export default function PanelDetailScreen() {
                         index={index}
                         reportTypeById={reportTypeById}
                         onOpen={openTrend}
+                        onAnalyze={(name) => void analysis.start('indicator', name)}
                       />
                     ))}
 
@@ -203,6 +247,7 @@ export default function PanelDetailScreen() {
                                 index={groups.abnormal.length + index}
                                 reportTypeById={reportTypeById}
                                 onOpen={openTrend}
+                                onAnalyze={(name) => void analysis.start('indicator', name)}
                               />
                             ))
                           : null}
@@ -257,8 +302,21 @@ export default function PanelDetailScreen() {
             setLastImageReportId(undefined);
             setDetailTrend(undefined);
           }}
+          onAnalyze={() => {
+            const name = detailTrend.name;
+            setSheetHidden(false);
+            setLastImageReportId(undefined);
+            setDetailTrend(undefined);
+            void analysis.start('indicator', name);
+          }}
         />
       ) : null}
+      <AnalysisConsentModal
+        visible={analysis.pendingConsent}
+        busy={analysis.starting}
+        onConfirm={() => void analysis.confirmConsent()}
+        onCancel={analysis.cancelConsent}
+      />
     </>
   );
 }
@@ -268,56 +326,67 @@ function AbnormalItemCard({
   index,
   reportTypeById,
   onOpen,
+  onAnalyze,
 }: {
   item: PanelItem;
   index: number;
   reportTypeById: Record<string, string>;
   onOpen: (trend: PanelTrend) => void;
+  onAnalyze: (name: string) => void;
 }) {
   const latest = item.latest!;
   const trend = panelTrendOf(item, reportTypeById)!;
   const color = FLAG_COLORS[latest.flag];
   const lowConfidence = latest.low_confidence && !latest.reviewed;
   return (
-    <Pressable
-      testID={`panel-item-${index}`}
-      accessibilityRole="button"
-      onPress={() => onOpen(trend)}
-      style={styles.card}
-    >
-      <View style={styles.cardHeader}>
-        <Text style={styles.itemName}>{item.name}</Text>
-        {lowConfidence ? <Text style={styles.lowTag}>低置信</Text> : null}
-        <Text style={[styles.flag, { color }]}>{flagLabel(latest.flag)}</Text>
-      </View>
-      <View style={styles.valueRow}>
-        <View style={styles.valueWithTag}>
-          <Text style={[styles.value, { color }]}>
-            {latest.value ?? '—'}
-            {latest && displayTrendUnit(latest) ? (
-              <Text style={styles.unit}> {displayTrendUnit(latest)}</Text>
-            ) : null}
-          </Text>
-          {item.latest_report_not_tested ? (
-            <Text testID={`panel-item-not-tested-${index}`} style={styles.notTestedTag}>
-              最近一次未检测
-            </Text>
-          ) : null}
+    <View style={styles.card}>
+      <Pressable
+        testID={`panel-item-${index}`}
+        accessibilityRole="button"
+        onPress={() => onOpen(trend)}
+        style={styles.cardBody}
+      >
+        <View style={styles.cardHeader}>
+          <Text style={styles.itemName}>{item.name}</Text>
+          {lowConfidence ? <Text style={styles.lowTag}>低置信</Text> : null}
+          <Text style={[styles.flag, { color }]}>{flagLabel(latest.flag)}</Text>
         </View>
-        <Text style={styles.ref}>{refRangeLabel(item.ref_range)}</Text>
-      </View>
-      {trend.series.chartPoints.length === 0 ? (
-        <Text style={styles.emptyChart}>{TREND_UNAVAILABLE_LABEL}</Text>
-      ) : (
-        <TrendSparkline
-          series={trend.series}
-          name={item.name}
-          testID={`panel-item-sparkline-${index}`}
-        />
-      )}
-      <Text style={styles.meta}>{formatSeriesMeta(trend.series, trend)}</Text>
-      <Text style={styles.detailLink}>查看趋势 ›</Text>
-    </Pressable>
+        <View style={styles.valueRow}>
+          <View style={styles.valueWithTag}>
+            <Text style={[styles.value, { color }]}>
+              {latest.value ?? '—'}
+              {latest && displayTrendUnit(latest) ? (
+                <Text style={styles.unit}> {displayTrendUnit(latest)}</Text>
+              ) : null}
+            </Text>
+            {item.latest_report_not_tested ? (
+              <Text testID={`panel-item-not-tested-${index}`} style={styles.notTestedTag}>
+                最近一次未检测
+              </Text>
+            ) : null}
+          </View>
+          <Text style={styles.ref}>{refRangeLabel(item.ref_range)}</Text>
+        </View>
+        {trend.series.chartPoints.length === 0 ? (
+          <Text style={styles.emptyChart}>{TREND_UNAVAILABLE_LABEL}</Text>
+        ) : (
+          <TrendSparkline
+            series={trend.series}
+            name={item.name}
+            testID={`panel-item-sparkline-${index}`}
+          />
+        )}
+        <Text style={styles.meta}>{formatSeriesMeta(trend.series, trend)}</Text>
+        <Text style={styles.detailLink}>查看趋势 ›</Text>
+      </Pressable>
+      <Pressable
+        testID={`panel-item-analyze-${index}`}
+        accessibilityRole="button"
+        onPress={() => onAnalyze(item.name)}
+      >
+        <Text style={styles.detailLink}>分析这个指标 ›</Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -326,11 +395,13 @@ function CompactItemRow({
   index,
   reportTypeById,
   onOpen,
+  onAnalyze,
 }: {
   item: PanelItem;
   index: number;
   reportTypeById: Record<string, string>;
   onOpen: (trend: PanelTrend) => void;
+  onAnalyze: (name: string) => void;
 }) {
   const latest = item.latest;
   const trend = panelTrendOf(item, reportTypeById);
@@ -372,23 +443,31 @@ function CompactItemRow({
     </>
   );
 
-  if (!trend) {
-    return (
-      <View testID={`panel-item-${index}`} style={styles.compactRow}>
-        {content}
-      </View>
-    );
-  }
   return (
-    <Pressable
-      testID={`panel-item-${index}`}
-      accessibilityRole="button"
-      onPress={() => onOpen(trend)}
-      style={styles.compactRow}
-    >
-      {content}
-      <Text style={styles.detailLink}>查看趋势 ›</Text>
-    </Pressable>
+    <View style={styles.compactRow}>
+      {trend ? (
+        <Pressable
+          testID={`panel-item-${index}`}
+          accessibilityRole="button"
+          onPress={() => onOpen(trend)}
+          style={styles.compactBody}
+        >
+          {content}
+          <Text style={styles.detailLink}>查看趋势 ›</Text>
+        </Pressable>
+      ) : (
+        <View testID={`panel-item-${index}`} style={styles.compactBody}>
+          {content}
+        </View>
+      )}
+      <Pressable
+        testID={`panel-item-analyze-${index}`}
+        accessibilityRole="button"
+        onPress={() => onAnalyze(item.name)}
+      >
+        <Text style={styles.detailLink}>分析这个指标 ›</Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -405,6 +484,7 @@ const styles = StyleSheet.create({
     padding: 12,
     gap: 6,
   },
+  cardBody: { gap: 6 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   compactRow: {
     borderWidth: 1,
@@ -413,6 +493,7 @@ const styles = StyleSheet.create({
     padding: 12,
     gap: 4,
   },
+  compactBody: { gap: 4 },
   compactHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   itemName: { flex: 1, fontSize: 15, color: colors.text },
   lowTag: {
@@ -440,6 +521,27 @@ const styles = StyleSheet.create({
   emptyChart: { fontSize: 12, color: colors.muted },
   meta: { fontSize: 12, color: colors.muted, lineHeight: 18 },
   detailLink: { alignSelf: 'flex-end', fontSize: 13, color: colors.accent },
+  windowRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  windowLabel: { fontSize: 13, color: colors.muted },
+  windowChip: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+  },
+  windowChipActive: { borderColor: colors.accent, backgroundColor: colors.accent },
+  windowText: { fontSize: 13, color: colors.text },
+  windowTextActive: { fontSize: 13, color: colors.onAccent },
+  analyzeButton: {
+    alignSelf: 'flex-start',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    backgroundColor: colors.accent,
+    borderRadius: 8,
+  },
+  analyzeButtonDisabled: { backgroundColor: colors.border },
+  analyzeButtonText: { color: colors.onAccent, fontSize: 15 },
   fail: { fontSize: 13, color: colors.fail },
   link: { color: colors.accent, fontSize: 15 },
   button: {

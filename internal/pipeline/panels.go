@@ -9,6 +9,8 @@ import (
 	"slices"
 	"sort"
 	"strings"
+
+	"healthyduoduo/internal/contract"
 )
 
 // 项目组 code(与识别端 / OpenAPI PanelCode 枚举同源;other 为唯一跨类别兜底)。
@@ -184,7 +186,7 @@ func BuildPanelItems(points []PanelItemPoint, latestReportID string) []PanelItem
 	nextLatestRank := 0
 
 	for _, point := range points {
-		trendKey := TrendKey(pointerText(point.Code), pointerText(point.Loinc), point.Name)
+		trendKey := contract.TrendKey(pointerText(point.Code), pointerText(point.Loinc), point.Name)
 		key := panelItemKey{trendKey: trendKey, unit: panelUnitKey(point.Unit)}
 		group, ok := groups[key]
 		if !ok {

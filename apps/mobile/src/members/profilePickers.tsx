@@ -325,7 +325,7 @@ const styles = StyleSheet.create({
   chevron: { fontSize: 14, color: colors.muted },
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(17, 24, 39, 0.45)',
+    backgroundColor: colors.backdrop,
     justifyContent: 'flex-end',
   },
   sheet: {

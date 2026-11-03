@@ -51,6 +51,7 @@ export function TrendDetailSheet({
   initialReportId,
   onClose,
   onOpenImage,
+  onAnalyze,
 }: {
   name: string;
   reportType: string;
@@ -63,6 +64,8 @@ export function TrendDetailSheet({
   initialReportId?: string;
   onClose: () => void;
   onOpenImage: (point: TrendPoint) => void;
+  /** 单指标分析入口;缺省不显示(例如没有成员上下文时)。 */
+  onAnalyze?: () => void;
 }) {
   const [selectedIndex, setSelectedIndex] = useState(() =>
     defaultSelectedIndex(series, initialReportId),
@@ -165,6 +168,17 @@ export function TrendDetailSheet({
             <Text style={styles.muted}>点按任一行切换选中点。</Text>
 
             <Text style={styles.meta}>{formatSeriesMeta(series, { reportDate })}</Text>
+
+            {onAnalyze ? (
+              <Pressable
+                testID="trend-analyze"
+                accessibilityRole="button"
+                onPress={onAnalyze}
+                style={styles.analyzeButton}
+              >
+                <Text style={styles.analyzeButtonText}>分析这个指标 ›</Text>
+              </Pressable>
+            ) : null}
           </ScrollView>
         </SafeAreaView>
       </SafeAreaProvider>
@@ -285,4 +299,13 @@ const styles = StyleSheet.create({
   legendDot: { borderColor: colors.text },
   legendBand: { width: 18, height: 8, borderRadius: 2, backgroundColor: colors.border, opacity: 0.45 },
   meta: { fontSize: 12, color: colors.muted, lineHeight: 18 },
+  analyzeButton: {
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    borderRadius: 8,
+    paddingVertical: 11,
+    alignItems: 'center',
+  },
+  analyzeButtonText: { color: colors.accent, fontSize: 14, fontWeight: '600' },
 });

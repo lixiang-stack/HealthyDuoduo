@@ -73,6 +73,33 @@ export interface paths {
         patch: operations["updateMember"];
         trace?: never;
     };
+    "/members/{member_id}/growth": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 生长记录列表
+         * @description 按测量日期降序(同日按记录 id 降序)返回该成员全部生长记录。
+         *     BMI 由测量时点的身高体重实时计算,不缓存;weight_status 为超重 / 肥胖判定,
+         *     手输来源(manual)与百分位不可用时为 null。
+         */
+        get: operations["listGrowth"];
+        put?: never;
+        /**
+         * 新增生长记录
+         * @description 每次测量一行:measured_on 与 source 必填,height_cm / weight_kg 至少一项。
+         *     source=manual 时只输出 BMI 数值,不输出超重 / 肥胖判定。
+         */
+        post: operations["createGrowth"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/reports": {
         parameters: {
             query?: never;
@@ -248,6 +275,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/analyses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 创建分析(事实层)
+         * @description 家长从项目详情页 / 单指标 / 病历进入分析。事实层永远输出:纳入范围、偏离项、
+         *     与本人历史比较、相关病历诊断与处理原文、未纳入项及原因。窗口默认最近 12 个月,
+         *     每趋势键最多 6 个有效点;稀疏时扩展至 24 个月 / 最多 4 个点并标注「历史数据较少」。
+         *     单指标入口自动扩展至所属 Panel,并在 facts.expanded_from_indicator 提示范围。
+         *     影像 / 叙述型 Panel 不进入分析(clinical_note 入口除外)。
+         *     本次分析永久保存快照(成员、Panel、窗口、有效点集合、病历引用、规则版本)。
+         */
+        post: operations["createAnalysis"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/analyses/{analysis_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 读取分析
+         * @description 返回已保存的三层结果与快照;stale=true 表示数据已更新,仍可查看。
+         */
+        get: operations["getAnalysis"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -290,6 +362,45 @@ export interface components {
              * @description 创建时间(RFC3339;列表按 member_id 升序返回,created_at 仅展示)
              */
             created_at: string;
+            /** @description 最近一次生长记录(按测量日期降序);没有记录为 null */
+            latest_growth: components["schemas"]["GrowthRecord"] | null;
+        };
+        /**
+         * @description 生长记录来源:实测 / 体检单 / 手输。
+         * @enum {string}
+         */
+        GrowthSource: "measured" | "report" | "manual";
+        /**
+         * @description 一条生长记录。BMI 由测量时点的身高体重实时计算,不缓存;weight_status 为超重 / 肥胖判定,
+         *     source=manual 或年龄性别百分位不可用时为 null。
+         */
+        GrowthRecord: {
+            /** Format: int64 */
+            growth_id: number;
+            /** Format: int64 */
+            member_id: number;
+            /** @description 测量日期(YYYY-MM-DD) */
+            measured_on: string;
+            /** @description 身高(cm);可单填体重 */
+            height_cm: number | null;
+            /** @description 体重(kg);可单填身高 */
+            weight_kg: number | null;
+            source: components["schemas"]["GrowthSource"];
+            /** @description BMI = 体重(kg) / 身高(m)²,保留一位小数;身高体重缺一时为 null */
+            bmi: number | null;
+            /** @description 超重 / 肥胖判定;source=manual 或百分位不可用时为 null */
+            weight_status: string | null;
+        };
+        GrowthRecordCreate: {
+            measured_on: string;
+            /** @description 身高(cm) */
+            height_cm?: number;
+            /** @description 体重(kg) */
+            weight_kg?: number;
+            source: components["schemas"]["GrowthSource"];
+        } | unknown | unknown;
+        GrowthList: {
+            records: components["schemas"]["GrowthRecord"][];
         };
         MemberCreate: {
             name: string;
@@ -631,6 +742,193 @@ export interface components {
             /** @description 最近一份含该指标的报告中此项是否为 not_tested */
             latest_report_not_tested: boolean;
         };
+        /**
+         * @description 分析入口:项目详情 / 单指标 / 病历详情。
+         * @enum {string}
+         */
+        AnalysisEntry: "panel" | "indicator" | "clinical_note";
+        /**
+         * @description 事实层状态。success = 有至少一个有效点或病历;insufficient_evidence = 没有任何
+         *     通过信任门控的有效点,事实层降级为「证据不足,请先核对」,不输出偏离结论。
+         * @enum {string}
+         */
+        AnalysisStatus: "success" | "insufficient_evidence";
+        /**
+         * @description 最近两个有效点的数值变化方向;无法解析数值时为 unknown。
+         * @enum {string}
+         */
+        AnalysisChange: "up" | "down" | "flat" | "unknown";
+        /**
+         * @description 未纳入原因码;默认排除项不得作为任何结论依据。
+         * @enum {string}
+         */
+        AnalysisExclusionReason: "cross_member" | "wrong_panel" | "failed_report" | "narrative_report" | "no_date" | "not_tested" | "unverified_unit" | "low_confidence" | "missing_value" | "unit_mismatch" | "outside_window" | "point_cap" | "no_name" | "no_note_body";
+        AnalysisRequest: {
+            /** Format: int64 */
+            member_id: number;
+            panel: components["schemas"]["PanelCode"];
+            entry: components["schemas"]["AnalysisEntry"];
+            /** @description 单指标入口必填;服务端据此找到所属 Panel 并自动扩展。 */
+            indicator_name?: string;
+            /** @description 病历入口必填(目标病历报告 id);其他入口可选,当前不改变事实层范围。 */
+            report_sha?: string;
+            /**
+             * @description 回溯窗口月数;缺省 12,用户可改为 6 / 24。
+             * @default 12
+             * @enum {integer}
+             */
+            window_months: 6 | 12 | 24;
+        };
+        AnalysisResult: {
+            /** Format: int64 */
+            analysis_id: number;
+            status: components["schemas"]["AnalysisStatus"];
+            layers: components["schemas"]["AnalysisLayers"];
+            snapshot: components["schemas"]["AnalysisSnapshot"];
+            sources: components["schemas"]["AnalysisSource"][];
+            quota: components["schemas"]["AnalysisQuota"];
+            /** @description 数据已更新;仍可查看,展示时标注「数据已更新」。 */
+            stale: boolean;
+        };
+        AnalysisLayers: {
+            facts: components["schemas"]["AnalysisFacts"];
+        };
+        AnalysisQuota: {
+            used_today: number;
+            limit_today: number;
+            explanation_available: boolean;
+        };
+        /**
+         * @description 事实层只陈述数据与病历原文:纳入范围、偏离参考范围的指标项、与本人历史比较、
+         *     相关病历诊断与处理原文、未纳入项及原因。不生成医学判断。
+         */
+        AnalysisFacts: {
+            entry: components["schemas"]["AnalysisEntry"];
+            panel: components["schemas"]["PanelCode"];
+            /** @description 单指标入口的原始指标名;其他入口为 null。 */
+            indicator_name: string | null;
+            /** @description true = 从单指标自动扩展至所属 Panel,结果页需提示本次范围。 */
+            expanded_from_indicator: boolean;
+            window: components["schemas"]["AnalysisWindow"];
+            reports: components["schemas"]["AnalysisReportRef"][];
+            notes: components["schemas"]["AnalysisNote"][];
+            deviations: components["schemas"]["AnalysisEvidencePoint"][];
+            history: components["schemas"]["AnalysisHistory"][];
+            uncomparable: components["schemas"]["AnalysisUncomparable"][];
+            excluded: components["schemas"]["AnalysisExclusion"][];
+            /** @description 没有任何有效点 / 病历时的降级标记;此时不输出偏离结论。 */
+            insufficient_evidence: boolean;
+        };
+        AnalysisWindow: {
+            /** @description 用户选择的窗口月数(6 / 12 / 24)。 */
+            months: number;
+            /** @description 实际使用的窗口起点;稀疏扩展时向前到 24 个月。 */
+            from: string;
+            /** @description 窗口锚点 = 分析时刻当日。 */
+            to: string;
+            /** @description 任一趋势键在 12 个月内不足 2 个有效点并触发稀疏扩展。 */
+            sparse: boolean;
+        };
+        AnalysisReportRef: {
+            report_id: string;
+            report_date: string | null;
+            report_type: string;
+        };
+        AnalysisNote: {
+            report_id: string;
+            report_date: string | null;
+            /** @description true = 早于分析窗口的背景病历,不作为本次结论依据。 */
+            outside_window: boolean;
+            sections: components["schemas"]["AnalysisNoteSection"][];
+        };
+        AnalysisNoteSection: {
+            /** @description 诊断 / 处理原文;切不出标题时为 note(整页兜底)。 */
+            kind: string;
+            text: string;
+        };
+        /** @description 事实层的一个证据点;每个数值绑定报告日期、趋势键、单位与 flag。 */
+        AnalysisEvidencePoint: {
+            evidence_id: string;
+            report_id: string;
+            report_date: string | null;
+            report_type: string;
+            trend_key: string;
+            name: string;
+            unit: string | null;
+            unit_display: string | null;
+            value: string | null;
+            ref_range: string | null;
+            /** @enum {string} */
+            flag: "normal" | "high" | "low" | "abnormal" | "unknown" | "not_tested";
+        };
+        AnalysisHistory: {
+            trend_key: string;
+            name: string;
+            unit: string | null;
+            unit_display: string | null;
+            points: components["schemas"]["AnalysisEvidencePoint"][];
+            latest: components["schemas"]["AnalysisEvidencePoint"];
+            previous: components["schemas"]["AnalysisEvidencePoint"] | null;
+            change: components["schemas"]["AnalysisChange"];
+            highest: boolean;
+            lowest: boolean;
+            point_count: number;
+            /** @description 该趋势键触发了稀疏扩展 / 历史数据较少。 */
+            sparse: boolean;
+            /** @description false = 最近点 flag=unknown,无法与参考范围比较。 */
+            comparable: boolean;
+        };
+        AnalysisUncomparable: {
+            trend_key: string;
+            name: string;
+            unit: string | null;
+            latest: components["schemas"]["AnalysisEvidencePoint"];
+            reason: string;
+        };
+        AnalysisExclusion: {
+            report_id: string | null;
+            report_date: string | null;
+            trend_key: string | null;
+            name: string | null;
+            reason: components["schemas"]["AnalysisExclusionReason"];
+        };
+        AnalysisSnapshot: {
+            /** Format: int64 */
+            member_id: number;
+            member_name: string;
+            panel: components["schemas"]["PanelCode"];
+            entry: components["schemas"]["AnalysisEntry"];
+            indicator_name: string | null;
+            window_months: number;
+            window_from: string;
+            window_to: string;
+            rule_version: string;
+            /** @description 生成快照时的成员数据指纹;当前数据不同即 stale=true。 */
+            data_version: string;
+            points: components["schemas"]["AnalysisSnapshotPoint"][];
+            notes: components["schemas"]["AnalysisSnapshotNote"][];
+        };
+        AnalysisSnapshotPoint: {
+            evidence_id: string;
+            report_id: string;
+            report_date: string;
+            trend_key: string;
+            unit: string | null;
+            value: string | null;
+            flag: string;
+        };
+        AnalysisSnapshotNote: {
+            report_id: string;
+            report_date: string | null;
+            outside_window: boolean;
+            section_kinds: string[];
+        };
+        /** @description 解释层引用的标准 / 指南;事实层当前为空数组。 */
+        AnalysisSource: {
+            standard: string;
+            note: string;
+            url: string | null;
+        };
         Error: {
             /** @description 中性事实侧错误说明(不诊断、不猜测) */
             message: string;
@@ -666,6 +964,7 @@ export interface components {
         IndicatorName: string;
         /** @description 项目组稳定 code(与 PanelCode 枚举同源;非法 code 返回 400) */
         Panel: components["schemas"]["PanelCode"];
+        AnalysisID: number;
     };
     requestBodies: never;
     headers: never;
@@ -782,6 +1081,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Member"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listGrowth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                member_id: components["parameters"]["MemberID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 生长记录列表(空数组而非 null) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrowthList"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createGrowth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                member_id: components["parameters"]["MemberID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GrowthRecordCreate"];
+            };
+        };
+        responses: {
+            /** @description 已创建 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrowthRecord"];
                 };
             };
             400: components["responses"]["BadRequest"];
@@ -1081,6 +1431,55 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createAnalysis: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnalysisRequest"];
+            };
+        };
+        responses: {
+            /** @description 已创建(含事实层、快照、来源与配额) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getAnalysis: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                analysis_id: components["parameters"]["AnalysisID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 已保存分析 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisResult"];
+                };
+            };
             404: components["responses"]["NotFound"];
         };
     };
