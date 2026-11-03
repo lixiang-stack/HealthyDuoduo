@@ -18,6 +18,8 @@ This repo mirrors the same contract through several layers. Use this page as a n
 | HTTP fixtures | `schemas/testdata/http/*.json` | round-trip against Go mirrors and OpenAPI schemas |
 | Growth record | `schemas/openapi.yaml` `GrowthRecord` | `internal/httpapi/types.go`; App `src/api/growth.ts`; storage `growth_records` |
 | Analysis facts / snapshot | `schemas/openapi.yaml` `Analysis*` | `internal/httpapi/analysis.go` → `internal/analysis` types; App `src/api/analyses.ts`; storage `analyses.layers/snapshot` |
+| Analysis framework / explanation / quota | `schemas/openapi.yaml` `AnalysisFramework`, `AnalysisExplanation`, `AnalysisQuota` | `internal/analysis/framework.go`, `explain.go`; App `src/analysis/components.tsx`, `framework.ts` |
+| Analysis feedback / metrics | `schemas/openapi.yaml` `AnalysisFeedback*`, `AnalysisMetrics` | `cmd/hdd/serve_analysis_feedback.go`; `internal/analysis/store.go`; storage `analysis_feedback`, `analysis_events`, `analysis_llm_calls`; App `src/analysis/FeedbackModal.tsx` |
 
 ### Cross-cutting mirrors
 
@@ -25,6 +27,7 @@ This repo mirrors the same contract through several layers. Use this page as a n
 - Narrative report kinds: `recognizer/recognizer/postprocess.py` (`NARRATIVE_BODY_SECTION_KINDS`) → `internal/pipeline/reports.go` (`hasReportBody`) → `recognizer/tools/e2e.py` (`verify_narrative_reports`) → App `sections.ts` / `status.ts`.
 - Report summary/detail projection: `internal/httpapi/types.go` ↔ `schemas/openapi.yaml` ↔ App `api/reports.ts`.
 - Analysis facts: `internal/analysis` (`Facts` / `Snapshot` JSON tags) ↔ `schemas/openapi.yaml` `AnalysisFacts` / `AnalysisSnapshot` ↔ App `api/analyses.ts`; facts window / gating changes must keep the snapshot rule version in sync.
+- Analysis degradation events: `internal/analysis/explain.go` `Event*` constants ↔ `internal/storage/migrations/0016_analysis_observability.sql` `analysis_events.kind` CHECK ↔ `AnalysisMetrics.degradation_kinds`. Add a kind in all three places or the insert fails.
 
 ## Change checklist
 

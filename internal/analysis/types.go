@@ -18,8 +18,8 @@ const (
 	StatusInsufficientEvidence = "insufficient_evidence"
 )
 
-// RuleVersion 事实层规则版本,随快照永久记录。
-const RuleVersion = "llm-analysis-facts-v1"
+// RuleVersion 事实层 + 框架层规则版本,随快照永久记录。
+const RuleVersion = "llm-analysis-v2"
 
 // 默认 / 稀疏扩展参数(spec §4.9)。
 const (
@@ -56,15 +56,18 @@ const (
 )
 
 // Request 分析入参;WindowMonths 为 0 时取默认 12 个月。
+// MemberSex / MemberBirthDate 只用于框架层的年龄性别规则,不进入事实层。
 type Request struct {
-	MemberID      int64
-	MemberName    string
-	Panel         string
-	Entry         string
-	IndicatorName string
-	ReportSHA     string
-	WindowMonths  int
-	Now           time.Time
+	MemberID        int64
+	MemberName      string
+	MemberSex       string
+	MemberBirthDate string
+	Panel           string
+	Entry           string
+	IndicatorName   string
+	ReportSHA       string
+	WindowMonths    int
+	Now             time.Time
 }
 
 // InputPoint 存储侧读出的一条指标点(尚未经过窗口 / 门控)。
@@ -87,6 +90,14 @@ type InputPoint struct {
 	Flag          string
 	LowConfidence bool
 	ReviewStatus  string
+}
+
+// InputGrowth 最近一次生长记录(框架层 BMI / 百分位用);Source 为 measured / report。
+type InputGrowth struct {
+	MeasuredOn string
+	HeightCm   *float64
+	WeightKg   *float64
+	Source     string
 }
 
 // InputNote 存储侧读出的一份病历报告。
@@ -199,20 +210,66 @@ type Exclusion struct {
 	Reason     string  `json:"reason"`
 }
 
+// Framework 框架层输出:代码算得出的判读标签 + 固定解释文案。
+// 没有可用规则时 labels 为空数组,不输出空状态。
+type Framework struct {
+	Labels []FrameworkLabel `json:"labels"`
+}
+
+// FrameworkLabel 一个判读标签;Value 为计算值展示,EvidenceIDs 绑定事实层证据点,
+// Sources 由代码渲染标准 / 指南来源。
+type FrameworkLabel struct {
+	Code        string   `json:"code"`
+	Label       string   `json:"label"`
+	Explanation string   `json:"explanation"`
+	Value       *string  `json:"value"`
+	EvidenceIDs []string `json:"evidence_ids"`
+	Sources     []Source `json:"sources"`
+}
+
+// KnowledgeEntry 已匹配的知识条目;医学原文由服务端从条目拼接,模型只写 bridge_text。
+type KnowledgeEntry struct {
+	ID              string
+	Explanation     string
+	CheckDirections []string
+	GeneralAdvice   []string
+	TrackItems      []string
+	Sources         []Source
+}
+
+// Explanation 解释层输出;07 只产出 bridge_text 与引用,四段式医学原文由 08 补齐。
+// Truncated = 模型输出达到 max_tokens 被截断,结果页需标注。
+type Explanation struct {
+	Sections  []ExplanationSection `json:"sections"`
+	Truncated bool                 `json:"truncated"`
+}
+
+// ExplanationSection 一条解释;EntryID / EvidenceIDs / BridgeText 来自模型并经服务端校验。
+// 四段式医学原文与「查看依据」由工单 08 追加;本工单只锁定引用与来源。
+type ExplanationSection struct {
+	EntryID     string   `json:"entry_id"`
+	EvidenceIDs []string `json:"evidence_ids"`
+	BridgeText  string   `json:"bridge_text"`
+	Sources     []Source `json:"source_ids,omitempty"`
+}
+
 // Snapshot 永久保留的分析快照:成员、Panel、窗口、有效点集合、病历引用与规则版本。
+// 成员性别 / 生日用于解释框架层输入,旧快照缺字段时省略。
 type Snapshot struct {
-	MemberID      int64           `json:"member_id"`
-	MemberName    string          `json:"member_name"`
-	Panel         string          `json:"panel"`
-	Entry         string          `json:"entry"`
-	IndicatorName *string         `json:"indicator_name"`
-	WindowMonths  int             `json:"window_months"`
-	WindowFrom    string          `json:"window_from"`
-	WindowTo      string          `json:"window_to"`
-	RuleVersion   string          `json:"rule_version"`
-	DataVersion   string          `json:"data_version"`
-	Points        []SnapshotPoint `json:"points"`
-	Notes         []SnapshotNote  `json:"notes"`
+	MemberID        int64           `json:"member_id"`
+	MemberName      string          `json:"member_name"`
+	MemberSex       string          `json:"member_sex,omitempty"`
+	MemberBirthDate string          `json:"member_birth_date,omitempty"`
+	Panel           string          `json:"panel"`
+	Entry           string          `json:"entry"`
+	IndicatorName   *string         `json:"indicator_name"`
+	WindowMonths    int             `json:"window_months"`
+	WindowFrom      string          `json:"window_from"`
+	WindowTo        string          `json:"window_to"`
+	RuleVersion     string          `json:"rule_version"`
+	DataVersion     string          `json:"data_version"`
+	Points          []SnapshotPoint `json:"points"`
+	Notes           []SnapshotNote  `json:"notes"`
 }
 
 // SnapshotPoint 快照中的有效点。

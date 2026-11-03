@@ -2,7 +2,7 @@ import { Link, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { getAnalysis, type AnalysisResult } from '../../api/analyses';
+import { getAnalysis, submitAnalysisFeedback, type AnalysisResult } from '../../api/analyses';
 import { resolveApiClient } from '../../api/resolveClient';
 import {
   INSUFFICIENT_EVIDENCE_TEXT,
@@ -22,7 +22,9 @@ import {
   scopeText,
   windowText,
 } from '../../analysis/facts';
-import { ScopeCard, Section } from '../../analysis/components';
+import { ExplanationCard, FrameworkCard, ScopeCard, Section } from '../../analysis/components';
+import { AnalysisFeedbackModal } from '../../analysis/FeedbackModal';
+import { explanationUnavailableText, hasFrameworkLabels } from '../../analysis/framework';
 import { ANALYSIS_SOURCE_STATEMENT } from '../../analysis/consent';
 import { sharedStyles } from '../../components/styles';
 import { colors } from '../../components/theme';
@@ -69,8 +71,47 @@ export default function AnalysisScreen() {
     }, [load]),
   );
 
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [feedbackReason, setFeedbackReason] = useState('');
+  const [feedbackBusy, setFeedbackBusy] = useState(false);
+  const [feedbackDone, setFeedbackDone] = useState(false);
+  const [feedbackError, setFeedbackError] = useState<string>();
+
+  const submitFeedback = useCallback(async () => {
+    if (feedbackReason.trim().length === 0) {
+      return;
+    }
+    setFeedbackBusy(true);
+    setFeedbackError(undefined);
+    const resolved = await resolveApiClient();
+    if (!resolved) {
+      setFeedbackBusy(false);
+      setFeedbackError('尚未配置后端地址。');
+      return;
+    }
+    try {
+      await submitAnalysisFeedback(resolved.client, analysisId, { reason: feedbackReason.trim() });
+      setFeedbackDone(true);
+      setFeedbackOpen(false);
+      setFeedbackReason('');
+    } catch (error) {
+      setFeedbackError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setFeedbackBusy(false);
+    }
+  }, [analysisId, feedbackReason]);
+
   const result = state.status === 'ready' ? state.result : undefined;
   const facts = result?.layers.facts;
+  const framework = result?.layers.framework;
+  const explanation = result?.layers.explanation;
+  const hasExplanation = Boolean(explanation);
+  const explanationUnavailable = result
+    ? explanationUnavailableText(result.quota.explanation_reason, result.quota.explanation_available)
+    : undefined;
+  const remainingQuota = result
+    ? Math.max(0, result.quota.limit_today - result.quota.used_today)
+    : 0;
   const heading = facts ? `${panelLabel(facts.panel as PanelCode)}分析` : '分析结果';
 
   return (
@@ -164,6 +205,8 @@ export default function AnalysisScreen() {
               </Section>
             ) : null}
 
+            {hasFrameworkLabels(framework) ? <FrameworkCard framework={framework} /> : null}
+
             <Section title={`与本人历史比较 ${facts.history.length} 项`} testID="analysis-history">
               {facts.history.length === 0 ? (
                 <Text style={sharedStyles.muted}>{NO_HISTORY_TEXT}</Text>
@@ -249,12 +292,49 @@ export default function AnalysisScreen() {
               )}
             </Section>
 
+            {explanation ? <ExplanationCard explanation={explanation} /> : null}
+            {!hasExplanation && explanationUnavailable ? (
+              <Section title="解读" testID="analysis-explanation-unavailable">
+                <Text style={styles.notice}>{explanationUnavailable}</Text>
+              </Section>
+            ) : null}
+            {result.quota.limit_today > 0 ? (
+              <Text testID="analysis-quota-remaining" style={styles.mutedSmall}>
+                今日剩余解读次数 {remainingQuota} 次
+              </Text>
+            ) : null}
+
+            <Pressable
+              testID="analysis-feedback-open"
+              style={styles.feedbackButton}
+              onPress={() => {
+                setFeedbackError(undefined);
+                setFeedbackOpen(true);
+              }}
+            >
+              <Text style={styles.feedbackButtonText}>这不对</Text>
+            </Pressable>
+            {feedbackDone ? (
+              <Text testID="analysis-feedback-done" style={styles.mutedSmall}>
+                已记录，谢谢反馈。
+              </Text>
+            ) : null}
+
             <Text testID="analysis-source-statement" style={styles.statement}>
               {ANALYSIS_SOURCE_STATEMENT}
             </Text>
           </View>
         ) : null}
       </ScrollView>
+      <AnalysisFeedbackModal
+        visible={feedbackOpen}
+        reason={feedbackReason}
+        busy={feedbackBusy}
+        error={feedbackError}
+        onChange={setFeedbackReason}
+        onSubmit={() => void submitFeedback()}
+        onClose={() => setFeedbackOpen(false)}
+      />
     </>
   );
 }
@@ -283,6 +363,15 @@ const styles = StyleSheet.create({
   outsideTag: { fontSize: 11, color: colors.muted },
   exclusionRow: { gap: 2 },
   notice: { fontSize: 13, color: colors.accent, lineHeight: 20 },
+  feedbackButton: {
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+  },
+  feedbackButtonText: { fontSize: 14, color: colors.text },
   insufficient: { fontSize: 15, color: colors.fail, fontWeight: '600' },
   statement: { fontSize: 12, color: colors.muted, lineHeight: 18, marginTop: 12 },
   fail: { fontSize: 13, color: colors.fail, lineHeight: 20 },

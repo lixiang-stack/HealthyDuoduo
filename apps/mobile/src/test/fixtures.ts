@@ -1,6 +1,7 @@
 import type {
   AnalysisEvidencePoint,
   AnalysisFacts,
+  AnalysisFramework,
   AnalysisHistory,
   AnalysisResult,
 } from '../api/analyses';
@@ -254,11 +255,34 @@ export function makeAnalysisFacts(overrides: Partial<AnalysisFacts> = {}): Analy
   };
 }
 
+
+export function makeAnalysisFramework(overrides: Partial<AnalysisFramework> = {}): AnalysisFramework {
+  return {
+    labels: [
+      {
+        code: 'liver_transaminase_grade',
+        label: '转氨酶升高：轻度',
+        explanation: '转氨酶升高 2–5×ULN，按 ACG 2016 为轻度。',
+        value: 'ALT 2.1×ULN',
+        evidence_ids: ['ev-aaaaaaaaaaaa-1'],
+        sources: [
+          {
+            standard: 'ACG 2016',
+            note: '转氨酶升高分级',
+            url: 'https://doi.org/10.1038/ajg.2016.517',
+          },
+        ],
+      },
+    ],
+    ...overrides,
+  };
+}
+
 export function makeAnalysisResult(overrides: Partial<AnalysisResult> = {}): AnalysisResult {
   return {
     analysis_id: 12,
     status: 'success',
-    layers: { facts: makeAnalysisFacts() },
+    layers: { facts: makeAnalysisFacts(), framework: makeAnalysisFramework() },
     snapshot: {
       member_id: 1,
       member_name: '小明',
@@ -268,7 +292,7 @@ export function makeAnalysisResult(overrides: Partial<AnalysisResult> = {}): Ana
       window_months: 12,
       window_from: '2025-11-03',
       window_to: '2026-11-03',
-      rule_version: 'llm-analysis-facts-v1',
+      rule_version: 'llm-analysis-v2',
       data_version: 'v1',
       points: [
         {
@@ -291,7 +315,7 @@ export function makeAnalysisResult(overrides: Partial<AnalysisResult> = {}): Ana
       ],
     },
     sources: [],
-    quota: { used_today: 0, limit_today: 20, explanation_available: false },
+    quota: { used_today: 0, limit_today: 20, explanation_available: true },
     stale: false,
     ...overrides,
   };

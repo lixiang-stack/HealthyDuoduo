@@ -31,13 +31,13 @@ func TestMigrationSmokeM0Contract(t *testing.T) {
 		t.Fatalf("migrate: %v", err)
 	}
 
-	// goose 已升到 0015 且幂等(Open 内重复 Migrate 不报错)。
+	// goose 已升到 0016 且幂等(Open 内重复 Migrate 不报错)。
 	var latest int
 	if err := pool.QueryRow(ctx, `SELECT max(version_id) FROM goose_db_version`).Scan(&latest); err != nil {
 		t.Fatalf("read goose version: %v", err)
 	}
-	if latest != 15 {
-		t.Fatalf("goose version = %d, want 15", latest)
+	if latest != 16 {
+		t.Fatalf("goose version = %d, want 16", latest)
 	}
 
 	// reports.sections(0007,ADR-0008):可选报告段落 JSONB,可空(存量/非叙述型 NULL)。
@@ -384,6 +384,41 @@ func TestMigrationSmokeM0Contract(t *testing.T) {
 		}
 	})
 
+	// 分析反馈 / 降级事件 / 配额(0016):CHECK 约束 + 成员删除级联。
+	t.Run("analysis observability tables", func(t *testing.T) {
+		var analysisID int64
+		if err := pool.QueryRow(ctx, `INSERT INTO analyses
+			(member_id, panel, entry, window_months, status, layers, snapshot)
+			VALUES (1, 'liver', 'panel', 12, 'success', '{"facts":{}}', '{}')
+			RETURNING id`).Scan(&analysisID); err != nil {
+			t.Fatalf("seed analysis: %v", err)
+		}
+		if _, err := pool.Exec(ctx, `INSERT INTO analysis_feedback
+			(analysis_id, reason) VALUES ($1, '解释和数值对不上')`, analysisID); err != nil {
+			t.Fatalf("seed feedback: %v", err)
+		}
+		if _, err := pool.Exec(ctx, `INSERT INTO analysis_feedback
+			(analysis_id, reason) VALUES ($1, '')`, analysisID); err == nil {
+			t.Fatal("empty feedback reason accepted, want CHECK rejection")
+		} else if !strings.Contains(err.Error(), "analysis_feedback_reason_check") {
+			t.Fatalf("expected feedback reason check violation, got %v", err)
+		}
+		if _, err := pool.Exec(ctx, `INSERT INTO analysis_events
+			(analysis_id, kind) VALUES ($1, 'llm_timeout')`, analysisID); err != nil {
+			t.Fatalf("seed event: %v", err)
+		}
+		if _, err := pool.Exec(ctx, `INSERT INTO analysis_events
+			(analysis_id, kind) VALUES ($1, 'bogus')`, analysisID); err == nil {
+			t.Fatal("unknown event kind accepted, want CHECK rejection")
+		} else if !strings.Contains(err.Error(), "analysis_events_kind_check") {
+			t.Fatalf("expected event kind check violation, got %v", err)
+		}
+		if _, err := pool.Exec(ctx, `INSERT INTO analysis_llm_calls
+			(analysis_id) VALUES ($1)`, analysisID); err != nil {
+			t.Fatalf("seed llm call: %v", err)
+		}
+	})
+
 	// 成员删除级联生长记录与分析快照(0014/0015)。
 	t.Run("member delete cascades growth and analyses", func(t *testing.T) {
 		if _, err := pool.Exec(ctx, `INSERT INTO growth_records
@@ -398,14 +433,17 @@ func TestMigrationSmokeM0Contract(t *testing.T) {
 		if _, err := pool.Exec(ctx, `DELETE FROM members WHERE id = 1`); err != nil {
 			t.Fatalf("delete member: %v", err)
 		}
-		var growth, analyses int
+		var growth, analyses, feedback, events, calls int
 		if err := pool.QueryRow(ctx, `SELECT
-			(SELECT count(*) FROM growth_records), (SELECT count(*) FROM analyses)`).
-			Scan(&growth, &analyses); err != nil {
+			(SELECT count(*) FROM growth_records), (SELECT count(*) FROM analyses),
+			(SELECT count(*) FROM analysis_feedback), (SELECT count(*) FROM analysis_events),
+			(SELECT count(*) FROM analysis_llm_calls)`).
+			Scan(&growth, &analyses, &feedback, &events, &calls); err != nil {
 			t.Fatal(err)
 		}
-		if growth != 0 || analyses != 0 {
-			t.Fatalf("after member delete: growth=%d analyses=%d, want 0/0", growth, analyses)
+		if growth != 0 || analyses != 0 || feedback != 0 || events != 0 || calls != 0 {
+			t.Fatalf("after member delete: growth=%d analyses=%d feedback=%d events=%d calls=%d, want all 0",
+				growth, analyses, feedback, events, calls)
 		}
 	})
 }

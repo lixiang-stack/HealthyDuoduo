@@ -5,6 +5,7 @@ package storage
 import (
 	"context"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -36,6 +37,19 @@ func TestAnalysisStoreSmoke(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("create member: %v", err)
+	}
+
+	height, weight := 118.5, 22.4
+	if _, err := st.CreateGrowth(ctx, member.MemberID, pipeline.GrowthProfile{
+		MeasuredOn: "2026-10-01", HeightCm: &height, WeightKg: &weight,
+		Source: pipeline.GrowthSourceMeasured,
+	}); err != nil {
+		t.Fatalf("create growth: %v", err)
+	}
+	growth, err := st.LatestGrowth(ctx, member.MemberID)
+	if err != nil || growth == nil || growth.MeasuredOn != "2026-10-01" ||
+		growth.HeightCm == nil || *growth.HeightCm != height {
+		t.Fatalf("latest growth = %+v, %v", growth, err)
 	}
 
 	const reportID = "analysis-report-1"
@@ -118,6 +132,7 @@ func TestAnalysisStoreSmoke(t *testing.T) {
 
 	req := analysis.Request{
 		MemberID: member.MemberID, MemberName: member.Name, Panel: "liver",
+		MemberSex: member.Sex, MemberBirthDate: member.BirthDate,
 		Entry: analysis.EntryPanel, WindowMonths: 12,
 		Now: time.Date(2026, 11, 3, 12, 0, 0, 0, time.UTC),
 	}
@@ -126,13 +141,14 @@ func TestAnalysisStoreSmoke(t *testing.T) {
 	if err != nil {
 		t.Fatalf("data version: %v", err)
 	}
+	framework := analysis.BuildFramework(req, facts, growth)
 	snapshot := analysis.BuildSnapshot(req, facts)
 	snapshot.DataVersion = version
 	record := analysis.Record{
 		MemberID: member.MemberID, Panel: "liver", Entry: analysis.EntryPanel,
 		WindowMonths: 12, Status: analysis.StatusSuccess, Facts: facts,
-		Snapshot: snapshot,
-		Sources:  []analysis.Source{},
+		Framework: framework, Snapshot: snapshot,
+		Sources: analysis.FrameworkSources(framework),
 	}
 	saved, err := st.SaveAnalysis(ctx, record)
 	if err != nil {
@@ -147,8 +163,78 @@ func TestAnalysisStoreSmoke(t *testing.T) {
 	}
 	if loaded == nil || loaded.Facts.Panel != "liver" || len(loaded.Facts.History) != 1 ||
 		len(loaded.Snapshot.Points) != 1 || len(loaded.Facts.Notes) != 1 ||
-		loaded.Snapshot.RuleVersion != analysis.RuleVersion || loaded.Snapshot.DataVersion == "" {
+		loaded.Snapshot.RuleVersion != analysis.RuleVersion || loaded.Snapshot.DataVersion == "" ||
+		len(loaded.Framework.Labels) == 0 || loaded.Snapshot.MemberSex != member.Sex ||
+		loaded.Snapshot.MemberBirthDate != member.BirthDate {
 		t.Fatalf("loaded analysis = %+v", loaded)
+	}
+
+	explanation := &analysis.Explanation{Sections: []analysis.ExplanationSection{{
+		EntryID: "liver-hepatocellular-mild", EvidenceIDs: []string{"ev-1"},
+		BridgeText: "先看本次数值。",
+	}}}
+	sources := analysis.MergeSources(analysis.FrameworkSources(framework), analysis.ExplanationSources(explanation))
+	if err := st.UpdateAnalysisExplanation(ctx, saved.AnalysisID, explanation, "", sources); err != nil {
+		t.Fatalf("update explanation: %v", err)
+	}
+	loaded, err = st.AnalysisByID(ctx, saved.AnalysisID)
+	if err != nil || loaded == nil || loaded.Explanation == nil ||
+		len(loaded.Explanation.Sections) != 1 || len(loaded.Sources) != len(sources) {
+		t.Fatalf("loaded explanation = %+v, %v", loaded, err)
+	}
+
+	used, allowed, err := st.ConsumeLLMQuota(ctx, saved.AnalysisID, 1)
+	if err != nil || !allowed || used != 1 {
+		t.Fatalf("first quota = (%d, %v, %v)", used, allowed, err)
+	}
+	used, allowed, err = st.ConsumeLLMQuota(ctx, saved.AnalysisID, 1)
+	if err != nil || allowed || used != 1 {
+		t.Fatalf("second quota = (%d, %v, %v)", used, allowed, err)
+	}
+	if usedToday, err := st.LLMUsedToday(ctx); err != nil || usedToday != 1 {
+		t.Fatalf("used today = (%d, %v)", usedToday, err)
+	}
+	// 并发占用同一配额:advisory lock 必须让 limit=3 时只再放行 2 次。
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	allowedCount := 0
+	for i := 0; i < 5; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, allowed, err := st.ConsumeLLMQuota(ctx, saved.AnalysisID, 3)
+			if err != nil {
+				t.Errorf("concurrent quota: %v", err)
+				return
+			}
+			if allowed {
+				mu.Lock()
+				allowedCount++
+				mu.Unlock()
+			}
+		}()
+	}
+	wg.Wait()
+	if allowedCount != 2 {
+		t.Fatalf("concurrent allowed = %d, want 2 (limit 3, already used 1)", allowedCount)
+	}
+	if usedToday, err := st.LLMUsedToday(ctx); err != nil || usedToday != 3 {
+		t.Fatalf("used today after concurrency = (%d, %v), want 3", usedToday, err)
+	}
+
+	if err := st.RecordAnalysisEvent(ctx, saved.AnalysisID, analysis.EventQuotaExhausted, "test"); err != nil {
+		t.Fatalf("record event: %v", err)
+	}
+	feedback, err := st.RecordFeedback(ctx, analysis.Feedback{
+		AnalysisID: saved.AnalysisID, Reason: "解释和数值对不上",
+	})
+	if err != nil || feedback.FeedbackID == 0 || feedback.CreatedAt.IsZero() {
+		t.Fatalf("feedback = %+v, %v", feedback, err)
+	}
+	metrics, err := st.AnalysisMetrics(ctx, time.Now().Add(-24*time.Hour), time.Now().Add(24*time.Hour))
+	if err != nil || metrics.Analyses != 1 || metrics.Feedback != 1 || metrics.Degradations != 1 ||
+		metrics.DegradationKinds[analysis.EventQuotaExhausted] != 1 {
+		t.Fatalf("metrics = %+v, %v", metrics, err)
 	}
 	before, err := st.DataVersion(ctx, member.MemberID)
 	if err != nil {
@@ -176,5 +262,16 @@ func TestAnalysisStoreSmoke(t *testing.T) {
 	}
 	if remaining != 0 {
 		t.Errorf("analyses after member delete = %d, want 0", remaining)
+	}
+	for table, want := range map[string]int{
+		"analysis_feedback": 0, "analysis_events": 0, "analysis_llm_calls": 0,
+	} {
+		var count int
+		if err := pool.QueryRow(ctx, `SELECT count(*) FROM `+table).Scan(&count); err != nil {
+			t.Fatal(err)
+		}
+		if count != want {
+			t.Errorf("%s after member delete = %d, want %d", table, count, want)
+		}
 	}
 }

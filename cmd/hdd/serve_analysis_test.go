@@ -7,9 +7,11 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -21,11 +23,18 @@ import (
 type fakeAnalysisStore struct {
 	points      []analysis.InputPoint
 	notes       []analysis.InputNote
+	growth      *analysis.InputGrowth
 	panel       string
 	panelErr    error
 	dataVersion string
 	saved       []analysis.Record
 	nextID      int64
+	usedToday   int
+	dailyLimit  int
+	quotaErr    error
+	events      []string
+	feedback    []analysis.Feedback
+	metrics     analysis.Metrics
 }
 
 var _ analysis.Store = (*fakeAnalysisStore)(nil)
@@ -67,10 +76,67 @@ func (f *fakeAnalysisStore) AnalysisByID(ctx context.Context, id int64) (*analys
 	return nil, nil
 }
 
+func (f *fakeAnalysisStore) LatestGrowth(ctx context.Context, memberID int64) (*analysis.InputGrowth, error) {
+	return f.growth, nil
+}
+
+func (f *fakeAnalysisStore) UpdateAnalysisExplanation(ctx context.Context, id int64, explanation *analysis.Explanation, reason string, sources []analysis.Source) error {
+	for index := range f.saved {
+		if f.saved[index].AnalysisID != id {
+			continue
+		}
+		f.saved[index].Explanation = explanation
+		f.saved[index].ExplanationReason = reason
+		f.saved[index].Sources = sources
+		return nil
+	}
+	return nil
+}
+
+func (f *fakeAnalysisStore) ConsumeLLMQuota(ctx context.Context, analysisID int64, limit int) (int, bool, error) {
+	if f.dailyLimit > 0 {
+		limit = f.dailyLimit
+	}
+	if f.usedToday >= limit {
+		return f.usedToday, false, nil
+	}
+	f.usedToday++
+	return f.usedToday, true, nil
+}
+
+func (f *fakeAnalysisStore) LLMUsedToday(ctx context.Context) (int, error) {
+	if f.quotaErr != nil {
+		return 0, f.quotaErr
+	}
+	return f.usedToday, nil
+}
+
+func (f *fakeAnalysisStore) RecordAnalysisEvent(ctx context.Context, analysisID int64, kind, detail string) error {
+	f.events = append(f.events, kind)
+	return nil
+}
+
+func (f *fakeAnalysisStore) RecordFeedback(ctx context.Context, feedback analysis.Feedback) (*analysis.Feedback, error) {
+	feedback.FeedbackID = int64(len(f.feedback) + 1)
+	feedback.CreatedAt = time.Date(2026, 11, 3, 12, 0, 0, 0, time.UTC)
+	f.feedback = append(f.feedback, feedback)
+	return &feedback, nil
+}
+
+func (f *fakeAnalysisStore) AnalysisMetrics(ctx context.Context, from, to time.Time) (analysis.Metrics, error) {
+	return f.metrics, nil
+}
+
 func newAnalysisTestServer(t *testing.T, store analysis.Store) (*httptest.Server, *fakeMemberStore) {
 	t.Helper()
 	ms := &fakeMemberStore{}
 	d := &deps{members: ms, analyses: store}
+	if quota, ok := store.(analysis.QuotaStore); ok {
+		d.quota = quota
+	}
+	if observability, ok := store.(analysis.ObservabilityStore); ok {
+		d.observability = observability
+	}
 	srv := httptest.NewServer(newServeHandler(d))
 	t.Cleanup(srv.Close)
 	return srv, ms
@@ -145,9 +211,12 @@ func TestServeAnalysisPanelFacts(t *testing.T) {
 		facts.Notes[0].Sections[0].Kind != "diagnosis" {
 		t.Fatalf("notes = %+v, want diagnosis/treatment only", facts.Notes)
 	}
-	if len(result.Sources) != 0 || result.Quota.LimitToday != analysisDailyLimitDefault ||
-		result.Quota.ExplanationAvailable {
+	if len(result.Sources) == 0 || result.Quota.LimitToday != analysisDailyLimitDefault ||
+		!result.Quota.ExplanationAvailable {
 		t.Fatalf("sources/quota = %+v / %+v", result.Sources, result.Quota)
+	}
+	if result.Layers.Framework == nil || len(result.Layers.Framework.Labels) == 0 {
+		t.Fatalf("framework = %+v, want at least one label", result.Layers.Framework)
 	}
 	if len(result.Snapshot.Points) != 2 || result.Snapshot.RuleVersion != analysis.RuleVersion ||
 		result.Snapshot.DataVersion != "v1" {
@@ -332,5 +401,163 @@ func TestServeAnalysisGetNotFound(t *testing.T) {
 	status, _ = doJSON(t, srv, http.MethodGet, "/api/v1/analyses/not-a-number", "")
 	if status != http.StatusBadRequest {
 		t.Fatalf("invalid id status = %d, want 400", status)
+	}
+}
+
+func TestServeAnalysisQuotaExhaustedStillReturnsFacts(t *testing.T) {
+	store := &fakeAnalysisStore{
+		points: []analysis.InputPoint{
+			analysisPoint(1, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "2026-10-01", "83.5", "high"),
+		},
+		usedToday:  20,
+		dailyLimit: 20,
+	}
+	srv, ms := newAnalysisTestServer(t, store)
+	memberID := createAnalysisMember(t, ms)
+	body := `{"member_id":` + strconv.FormatInt(memberID, 10) + `,"panel":"liver","entry":"panel"}`
+
+	status, raw := doJSON(t, srv, http.MethodPost, "/api/v1/analyses", body)
+	if status != http.StatusCreated {
+		t.Fatalf("status = %d, want 201; body=%s", status, raw)
+	}
+	var result httpapi.AnalysisResult
+	if err := json.Unmarshal(raw, &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.Layers.Facts.InsufficientEvidence {
+		t.Fatal("quota exhaustion must not degrade the facts layer")
+	}
+	if result.Quota.UsedToday != 20 || result.Quota.LimitToday != 20 ||
+		result.Quota.ExplanationAvailable {
+		t.Fatalf("quota = %+v, want exhausted", result.Quota)
+	}
+}
+
+func TestServeAnalysisQuotaReadFailureStillReturnsFacts(t *testing.T) {
+	store := &fakeAnalysisStore{
+		points: []analysis.InputPoint{
+			analysisPoint(1, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "2026-10-01", "83.5", "high"),
+		},
+		quotaErr: errors.New("db down"),
+	}
+	srv, ms := newAnalysisTestServer(t, store)
+	memberID := createAnalysisMember(t, ms)
+	body := `{"member_id":` + strconv.FormatInt(memberID, 10) + `,"panel":"liver","entry":"panel"}`
+
+	status, raw := doJSON(t, srv, http.MethodPost, "/api/v1/analyses", body)
+	if status != http.StatusCreated {
+		t.Fatalf("status = %d, want 201; body=%s", status, raw)
+	}
+	var result httpapi.AnalysisResult
+	if err := json.Unmarshal(raw, &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.Layers.Facts.InsufficientEvidence {
+		t.Fatal("quota read failure must not degrade the facts layer")
+	}
+	if result.Quota.ExplanationReason == nil || *result.Quota.ExplanationReason != "quota_unavailable" {
+		t.Fatalf("quota = %+v, want quota_unavailable", result.Quota)
+	}
+}
+
+func TestServeAnalysisTrustGateEvent(t *testing.T) {
+	store := &fakeAnalysisStore{}
+	srv, ms := newAnalysisTestServer(t, store)
+	memberID := createAnalysisMember(t, ms)
+	body := `{"member_id":` + strconv.FormatInt(memberID, 10) + `,"panel":"liver","entry":"panel"}`
+
+	status, raw := doJSON(t, srv, http.MethodPost, "/api/v1/analyses", body)
+	if status != http.StatusCreated {
+		t.Fatalf("status = %d, want 201; body=%s", status, raw)
+	}
+	if len(store.events) != 1 || store.events[0] != analysis.EventTrustGateFailed {
+		t.Fatalf("events = %v, want trust_gate_failed", store.events)
+	}
+	var result httpapi.AnalysisResult
+	if err := json.Unmarshal(raw, &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.Layers.Framework == nil || len(result.Layers.Framework.Labels) != 0 {
+		t.Fatalf("framework = %+v, want empty when trust gate fails", result.Layers.Framework)
+	}
+}
+
+func TestServeAnalysisFeedback(t *testing.T) {
+	store := &fakeAnalysisStore{saved: []analysis.Record{{AnalysisID: 5, MemberID: 1}}}
+	srv, _ := newAnalysisTestServer(t, store)
+	entryID := "liver-hepatocellular-mild"
+	body := `{"entry_id":"` + entryID + `","reason":"解释和数值对不上"}`
+
+	status, raw := doJSON(t, srv, http.MethodPost, "/api/v1/analyses/5/feedback", body)
+	if status != http.StatusCreated {
+		t.Fatalf("status = %d, want 201; body=%s", status, raw)
+	}
+	var result httpapi.AnalysisFeedbackResult
+	if err := json.Unmarshal(raw, &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.FeedbackID != 1 || result.CreatedAt == "" {
+		t.Fatalf("feedback result = %+v", result)
+	}
+	if len(store.feedback) != 1 || store.feedback[0].AnalysisID != 5 ||
+		store.feedback[0].EntryID == nil || *store.feedback[0].EntryID != entryID ||
+		store.feedback[0].Reason != "解释和数值对不上" {
+		t.Fatalf("stored feedback = %+v", store.feedback)
+	}
+}
+
+func TestServeAnalysisFeedbackValidation(t *testing.T) {
+	store := &fakeAnalysisStore{saved: []analysis.Record{{AnalysisID: 5, MemberID: 1}}}
+	srv, _ := newAnalysisTestServer(t, store)
+	cases := []struct {
+		name   string
+		path   string
+		body   string
+		status int
+	}{
+		{"missing analysis", "/api/v1/analyses/999/feedback", `{"reason":"x"}`, http.StatusNotFound},
+		{"empty reason", "/api/v1/analyses/5/feedback", `{"reason":"   "}`, http.StatusBadRequest},
+		{"too long reason", "/api/v1/analyses/5/feedback", `{"reason":"` + strings.Repeat("长", 501) + `"}`, http.StatusBadRequest},
+		{"unknown field", "/api/v1/analyses/5/feedback", `{"reason":"x","bogus":1}`, http.StatusBadRequest},
+		{"invalid analysis id", "/api/v1/analyses/nope/feedback", `{"reason":"x"}`, http.StatusBadRequest},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			status, raw := doJSON(t, srv, http.MethodPost, c.path, c.body)
+			if status != c.status {
+				t.Fatalf("status = %d, want %d; body=%s", status, c.status, raw)
+			}
+		})
+	}
+}
+
+func TestServeAnalysisMetrics(t *testing.T) {
+	store := &fakeAnalysisStore{metrics: analysis.Metrics{
+		From: "2026-10-28", To: "2026-11-03", Analyses: 10, Feedback: 2, FeedbackRate: 0.2,
+		Degradations: 3, DegradationRate: 0.3,
+		DegradationKinds: map[string]int{"llm_timeout": 2, "quota_exhausted": 1},
+	}}
+	srv, _ := newAnalysisTestServer(t, store)
+	status, raw := doJSON(t, srv, http.MethodGet,
+		"/api/v1/analyses/metrics?from=2026-10-28&to=2026-11-03", "")
+	if status != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%s", status, raw)
+	}
+	var result httpapi.AnalysisMetrics
+	if err := json.Unmarshal(raw, &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.Analyses != 10 || result.Feedback != 2 || result.Degradations != 3 ||
+		result.DegradationKinds["llm_timeout"] != 2 {
+		t.Fatalf("metrics = %+v", result)
+	}
+	for _, path := range []string{
+		"/api/v1/analyses/metrics?from=2026-11-03&to=2026-10-28",
+		"/api/v1/analyses/metrics?from=nope",
+	} {
+		status, raw = doJSON(t, srv, http.MethodGet, path, "")
+		if status != http.StatusBadRequest {
+			t.Fatalf("%s status = %d, want 400; body=%s", path, status, raw)
+		}
 	}
 }

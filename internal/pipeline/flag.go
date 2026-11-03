@@ -57,6 +57,25 @@ func ComputeFlag(value, refRange *string) string {
 	return flag
 }
 
+// RefRangeUpperBound 参考范围的数值上限(ULN):区间取上界,单侧 < / ≤ 取界值。
+// 单侧 > / ≥、标量与非数值范围没有可用的 ULN,返回 false。
+// 与 Compare 共用同一套范围解析,避免框架层另写一份格式判断。
+func RefRangeUpperBound(refRange *string) (float64, bool) {
+	form, ok := parseNumFormPtr(refRange, true)
+	if !ok {
+		return 0, false
+	}
+	switch form.kind {
+	case "interval":
+		return form.b, true
+	case "bound":
+		if form.op == "<" || form.op == "≤" {
+			return form.a, true
+		}
+	}
+	return 0, false
+}
+
 // Compare 指标项 name + value × ref_range → (flag, reason);reason 只对 unknown 非空。
 // policy 为 nil 时只做数值比较(定性值 → unknown/other)。
 func Compare(name string, value, refRange *string, policy *FlagPolicy) (string, string) {
