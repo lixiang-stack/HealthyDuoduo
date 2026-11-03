@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"healthyduoduo/internal/contract"
 	"healthyduoduo/internal/pipeline"
 )
 
@@ -292,6 +293,7 @@ func TestBackfillPanelsZeroItemReportRules(t *testing.T) {
 		wantErr    string
 	}{
 		{name: "imaging", reportType: "影像", panels: []string{"imaging"}, wantPanels: []string{"imaging"}},
+		{name: "clinical note", reportType: contract.ReportTypeClinicalNote, panels: []string{"clinical_note"}, wantPanels: []string{"clinical_note"}},
 		{name: "non-imaging other", reportType: "生化", panels: []string{"other"}, wantPanels: []string{"other"}},
 		{name: "empty report misclassified", reportType: "生化", panels: []string{"liver"}, wantErr: "zero-item"},
 	}

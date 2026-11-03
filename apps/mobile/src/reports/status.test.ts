@@ -1,6 +1,6 @@
 import type { ReportDetail, UploadResult } from '../api/reports';
 
-import { IMAGING_REPORT_TYPE } from './category';
+import { CLINICAL_NOTE_REPORT_TYPE, IMAGING_REPORT_TYPE } from './category';
 import {
   flagBadges,
   flagLabel,
@@ -30,6 +30,7 @@ const report: ReportDetail = {
 };
 
 const imaging = { ...report, report_type: IMAGING_REPORT_TYPE };
+const clinicalNote = { ...report, report_type: CLINICAL_NOTE_REPORT_TYPE };
 
 describe('reportStatusLabel', () => {
   it('检验单状态文案固定:success→识别完成、partial→待核对、failed→识别失败', () => {
@@ -62,10 +63,12 @@ describe('reportStatusLabel', () => {
     ).toBe('识别完成');
   });
 
-  it('影像单不显示没有对应动作的「待核对」;success/failed 仍给出状态', () => {
-    expect(reportStatusLabel({ ...imaging, status: 'partial' })).toBeUndefined();
-    expect(reportStatusLabel({ ...imaging, status: 'success' })).toBe('识别完成');
-    expect(reportStatusLabel({ ...imaging, status: 'failed' })).toBe('识别失败');
+  it('影像单与病历不显示没有对应动作的「待核对」;success/failed 仍给出状态', () => {
+    for (const narrative of [imaging, clinicalNote]) {
+      expect(reportStatusLabel({ ...narrative, status: 'partial' })).toBeUndefined();
+      expect(reportStatusLabel({ ...narrative, status: 'success' })).toBe('识别完成');
+      expect(reportStatusLabel({ ...narrative, status: 'failed' })).toBe('识别失败');
+    }
   });
 });
 
@@ -75,14 +78,18 @@ describe('reportDateLabel', () => {
     expect(reportDateLabel(report)).toBe('2026-10-01');
   });
 
-  it('影像单缺日期显示「检查单未印日期」,有日期照常显示', () => {
+  it('叙述型报告缺日期按类别显示「未印」,有日期照常显示', () => {
     expect(reportDateLabel({ ...imaging, report_date: null })).toBe('检查单未印日期');
-    expect(reportDateLabel({ ...imaging, report_date: '2024-09-15' })).toBe('2024-09-15');
+    expect(reportDateLabel({ ...clinicalNote, report_date: null })).toBe('病历未印日期');
+    for (const narrative of [imaging, clinicalNote]) {
+      expect(reportDateLabel({ ...narrative, report_date: '2024-09-15' })).toBe('2024-09-15');
+    }
   });
 
   it('项目列表 / 详情按 narrative 选择日期口径', () => {
     expect(panelDateLabel(null, false)).toBe('日期未知');
     expect(panelDateLabel(null, true)).toBe('检查单未印日期');
+    expect(panelDateLabel(null, true, 'clinical_note')).toBe('病历未印日期');
     expect(panelDateLabel('2021-08-02', false)).toBe('2021-08-02');
     expect(panelDateLabel('2024-09-15', true)).toBe('2024-09-15');
   });

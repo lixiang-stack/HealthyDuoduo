@@ -10,7 +10,7 @@
     "report_type": {
       "type": "string",
       "minLength": 1,
-      "description": "报告大类(临检/生化/免疫/激素/影像/其他专项;临检及后续按需为 logical merge——同大类可能由多个词典文件分发)"
+      "description": "报告大类(临检/生化/免疫/激素/影像/clinical_note 病历/其他专项;临检及后续按需为 logical merge——同大类可能由多个词典文件分发)"
     },
     "report_date": {
       "type": ["string", "null"],
@@ -37,7 +37,7 @@
       "type": ["array", "null"],
       "items": {"$ref": "#/$defs/reportSection"},
       "minItems": 1,
-      "description": "报告级叙述段落(影像等叙述型报告);缺省或 null 表示无段落,数组顺序即展示顺序"
+      "description": "报告级叙述段落(影像 / 病历等叙述型报告);缺省或 null 表示无段落,数组顺序即展示顺序"
     }
   },
   "$defs": {
@@ -49,7 +49,7 @@
         "kind": {
           "type": "string",
           "minLength": 1,
-          "description": "段落类别;当前已知值 exam_name / findings / impression,数组顺序即展示顺序"
+          "description": "段落类别;影像为 exam_name / findings / impression,病历为 chief_complaint / present_illness / diagnosis / treatment / note;数组顺序即展示顺序"
         },
         "text": {
           "type": "string",
@@ -67,10 +67,10 @@
     "panel": {
       "enum": ["cbc", "urinalysis", "liver", "kidney", "lipid", "glucose",
                "thyroid", "sex_hormone", "uric_acid", "electrolyte", "vitanemia",
-               "infection", "autoimmune", "coag", "imaging", "other"],
+               "infection", "autoimmune", "coag", "imaging", "clinical_note", "other"],
       "x-panel-order": ["liver", "kidney", "lipid", "glucose", "uric_acid", "electrolyte",
                         "vitanemia", "thyroid", "sex_hormone", "infection", "autoimmune",
-                        "coag", "cbc", "urinalysis", "imaging", "other"],
+                        "coag", "cbc", "urinalysis", "imaging", "clinical_note", "other"],
       "description": "项目组 code;指标项必须属于其 report_type 的允许集合,other 是唯一跨类别兜底。x-panel-order 是 spec §5.3 固定优先级的唯一来源,Python / Go / App 契约测试锁定同源"
     },
     "reportItem": {

@@ -57,12 +57,12 @@ type Store interface {
 // MemberStore 成员持久化边界(serve 成员端点;viz-and-client 票 05)。
 // 列表按创建序返回(契约排序口径);删除成员会一并删除其全部报告(原图与 OCR 历史保留)。
 type MemberStore interface {
-	// CreateMember 建成员(名 + 是否孩子两档;id/created_at 由存储产生)。
-	CreateMember(ctx context.Context, name string, isChild bool) (*Member, error)
+	// CreateMember 建成员(完整资料;id/created_at 由存储产生)。
+	CreateMember(ctx context.Context, profile MemberProfile) (*Member, error)
 	// ListMembers 全部成员(创建序:id 升序;BIGSERIAL 不重用,id 序即创建序)。
 	ListMembers(ctx context.Context) ([]Member, error)
-	// UpdateMember 改名/改是否孩子(至少一项非 nil);返回 nil = 成员不存在。
-	UpdateMember(ctx context.Context, id int64, name *string, isChild *bool) (*Member, error)
+	// UpdateMember 部分更新(nil = 保持不变);返回 nil = 成员不存在。
+	UpdateMember(ctx context.Context, id int64, patch MemberPatch) (*Member, error)
 	// DeleteMember 硬删成员及其全部报告(报告/指标项/修正对级联;原图与 OCR 历史保留)。
 	// 成员不存在返回 false, nil。
 	DeleteMember(ctx context.Context, id int64) (bool, error)
@@ -149,12 +149,29 @@ type ReportItemRow struct {
 	contract.ReportItem
 }
 
-// Member 成员最小模型的业务视图:显示名 + 是否孩子两档,仅此;无生日/头像,
+// MemberProfile 成员可写资料(llm-analysis 票 01):性别与出生日期必填。
+// 不存静态年龄,是否孩子与年龄都按 BirthDate 实时计算。
+type MemberProfile struct {
+	Name      string
+	Sex       string
+	BirthDate string // YYYY-MM-DD
+}
+
+// MemberPatch 成员部分更新:非 nil 字段才覆盖;必填字段的显式 null 由 HTTP 边界拒绝。
+type MemberPatch struct {
+	Name      *string
+	Sex       *string
+	BirthDate *string
+}
+
+// Member 成员业务视图:显示名 + 性别 + 出生日期;IsChild 由出生日期实时计算。
 // 可改名、可删除(删除会级联其全部报告)。CreatedAt 为库中创建时刻,HTTP 侧序列化为 RFC3339。
 type Member struct {
 	MemberID  int64
 	Name      string
 	IsChild   bool
+	Sex       string
+	BirthDate string // YYYY-MM-DD
 	CreatedAt time.Time
 }
 

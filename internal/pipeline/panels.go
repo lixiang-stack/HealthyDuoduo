@@ -12,7 +12,10 @@ import (
 )
 
 // 项目组 code(与识别端 / OpenAPI PanelCode 枚举同源;other 为唯一跨类别兜底)。
-const PanelImaging = "imaging"
+const (
+	PanelImaging      = "imaging"
+	PanelClinicalNote = "clinical_note"
+)
 
 // panelOrder spec §5.3 的固定优先级:命中项数降序后,同数按此顺序(数值小优先);
 // other 始终兜底。唯一来源是 schemas/report.schema.json $defs.panel.x-panel-order,
@@ -20,7 +23,7 @@ const PanelImaging = "imaging"
 var panelOrder = []string{
 	"liver", "kidney", "lipid", "glucose", "uric_acid", "electrolyte",
 	"vitanemia", "thyroid", "sex_hormone", "infection", "autoimmune",
-	"coag", "cbc", "urinalysis", "imaging", "other",
+	"coag", "cbc", "urinalysis", "imaging", "clinical_note", "other",
 }
 
 var panelRank = func() map[string]int {
@@ -37,9 +40,10 @@ func IsValidPanel(code string) bool {
 	return ok
 }
 
-// IsNarrativePanel 叙述型项目组(影像):项目列表直接进报告详情,不做项目详情 / 趋势。
+// IsNarrativePanel 叙述型项目组(影像 / 病历):项目列表直接进报告详情,
+// 不做项目详情 / 趋势。
 func IsNarrativePanel(code string) bool {
-	return code == PanelImaging
+	return code == PanelImaging || code == PanelClinicalNote
 }
 
 // PanelSummary 成员的单个项目组聚合(项目列表一行;只包含 report_count > 0 的项目)。

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -252,20 +253,24 @@ const (
 		  ` + reportItemStandardColumnsSQL + `)
 		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)`
 
-	// 成员(迁移 0004;显示名 + 是否孩子两档):列表按 id 升序 = 创建序返回;
-	// 删除时先删该成员报告再删成员(单事务;原图与 OCR 历史保留)。
+	// 成员(迁移 0004;0013 起显示名 + 性别 + 出生日期):
+	// 列表按 id 升序 = 创建序返回;删除时先删该成员报告再删成员(单事务;原图与 OCR 历史保留)。
 	sqlMemberDelete        = `DELETE FROM members WHERE id = $1`
 	sqlMemberReportsDelete = `DELETE FROM reports WHERE member_id = $1`
+	sqlMemberColumnsSQL    = `id, name, sex, to_char(birth_date, 'YYYY-MM-DD'), created_at`
+
+	sqlMemberInsert = `INSERT INTO members (name, sex, birth_date)
+		 VALUES ($1,$2,$3::date)
+		 RETURNING ` + sqlMemberColumnsSQL
+
+	sqlMembersList = `SELECT ` + sqlMemberColumnsSQL + ` FROM members ORDER BY id`
+
+	sqlMemberByID = `SELECT ` + sqlMemberColumnsSQL + ` FROM members WHERE id = $1`
+
 	// 改动用 COALESCE 只覆盖传入字段(nil = 保持不变)。
-	sqlMemberInsert = `INSERT INTO members (name, is_child) VALUES ($1,$2)
-		 RETURNING id, created_at`
-
-	sqlMembersList = `SELECT id, name, is_child, created_at FROM members ORDER BY id`
-
-	sqlMemberByID = `SELECT id, name, is_child, created_at FROM members WHERE id = $1`
-
-	sqlMemberUpdate = `UPDATE members SET name = COALESCE($2, name), is_child = COALESCE($3, is_child)
-		 WHERE id = $1 RETURNING id, name, is_child, created_at`
+	sqlMemberUpdate = `UPDATE members SET name = COALESCE($2, name), sex = COALESCE($3, sex),
+		 birth_date = COALESCE($4::date, birth_date)
+		 WHERE id = $1 RETURNING ` + sqlMemberColumnsSQL
 )
 
 // reportColumnsSQL 报告行到业务视图(ReportRow)的标准投影;
@@ -792,7 +797,7 @@ func dateGranularity(date string) dateGrain {
 // WriteReport 落/更一份报告(items 取自 report.Items,事务式全量替换;
 // 身份 = 图像 sha256,每图一行:首次插入/冲突原位更新,updated_at 恒刷新)。
 // 镜像校验(viz-and-client 票 03 双保险;票 04 叙事后开口):零 items + 空 sections
-// 只允许 failed;零 items + 非空 sections(影像单等叙述型报告)合法。绕过识别端直灌的
+// 只允许 failed;零 items + 非空 sections(影像 / 病历等叙述型报告)合法。绕过识别端直灌的
 // 违规形状(status=success/partial 且零 items 且无 sections)在此拒绝,不写库。
 func (s *Store) WriteReport(ctx context.Context, reportSha string, ocrID int64, report contract.Report, failReason *string) error {
 	if len(report.Items) == 0 && len(report.Sections) == 0 && report.Status != contract.StatusFailed {
@@ -842,14 +847,16 @@ func (s *Store) WriteReport(ctx context.Context, reportSha string, ocrID int64, 
 	return nil
 }
 
-// CreateMember 建成员(name + is_child 两档;id/created_at 由库产生,viz-and-client 票 05)。
-// 名字过领域规则镜像(HTTP 边界已校验;直连存储的路径在此兜底,票 03 双保险惯例)。
-func (s *Store) CreateMember(ctx context.Context, name string, isChild bool) (*pipeline.Member, error) {
-	if err := pipeline.ValidateMemberName(name); err != nil {
+// CreateMember 建成员(完整资料;id/created_at 由库产生,viz-and-client 票 05)。
+// 资料过领域规则镜像(HTTP 边界已校验;直连存储的路径在此兜底,票 03 双保险惯例)。
+func (s *Store) CreateMember(ctx context.Context, profile pipeline.MemberProfile) (*pipeline.Member, error) {
+	if err := pipeline.ValidateMemberProfile(profile); err != nil {
 		return nil, err
 	}
-	m := pipeline.Member{Name: name, IsChild: isChild}
-	if err := s.pool.QueryRow(ctx, sqlMemberInsert, name, isChild).Scan(&m.MemberID, &m.CreatedAt); err != nil {
+	var m pipeline.Member
+	if err := scanMember(s.pool.QueryRow(ctx, sqlMemberInsert,
+		profile.Name, profile.Sex, profile.BirthDate,
+	), &m); err != nil {
 		return nil, err
 	}
 	return &m, nil
@@ -865,7 +872,7 @@ func (s *Store) ListMembers(ctx context.Context) ([]pipeline.Member, error) {
 	var out []pipeline.Member
 	for rows.Next() {
 		var m pipeline.Member
-		if err := rows.Scan(&m.MemberID, &m.Name, &m.IsChild, &m.CreatedAt); err != nil {
+		if err := scanMember(rows, &m); err != nil {
 			return nil, err
 		}
 		out = append(out, m)
@@ -876,7 +883,7 @@ func (s *Store) ListMembers(ctx context.Context) ([]pipeline.Member, error) {
 // MemberByID 按 id 取成员(serve 上传归属校验,票 06);nil, nil = 不存在。
 func (s *Store) MemberByID(ctx context.Context, id int64) (*pipeline.Member, error) {
 	var m pipeline.Member
-	err := s.pool.QueryRow(ctx, sqlMemberByID, id).Scan(&m.MemberID, &m.Name, &m.IsChild, &m.CreatedAt)
+	err := scanMember(s.pool.QueryRow(ctx, sqlMemberByID, id), &m)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -887,16 +894,27 @@ func (s *Store) MemberByID(ctx context.Context, id int64) (*pipeline.Member, err
 }
 
 // UpdateMember 只更新传入字段(至少一项由 HTTP 层校验);nil,nil = 成员不存在
-// (与 ImageBySha256 的缺失口径一致)。名字过领域规则镜像(同 CreateMember)。
-func (s *Store) UpdateMember(ctx context.Context, id int64, name *string, isChild *bool) (*pipeline.Member, error) {
-	if name != nil {
-		if err := pipeline.ValidateMemberName(*name); err != nil {
+// (与 ImageBySha256 的缺失口径一致)。资料过领域规则镜像(同 CreateMember)。
+func (s *Store) UpdateMember(ctx context.Context, id int64, patch pipeline.MemberPatch) (*pipeline.Member, error) {
+	if patch.Name != nil {
+		if err := pipeline.ValidateMemberName(*patch.Name); err != nil {
+			return nil, err
+		}
+	}
+	if patch.Sex != nil {
+		if err := pipeline.ValidateMemberSex(*patch.Sex); err != nil {
+			return nil, err
+		}
+	}
+	if patch.BirthDate != nil {
+		if err := pipeline.ValidateMemberBirthDate(*patch.BirthDate); err != nil {
 			return nil, err
 		}
 	}
 	var m pipeline.Member
-	err := s.pool.QueryRow(ctx, sqlMemberUpdate, id, name, isChild).
-		Scan(&m.MemberID, &m.Name, &m.IsChild, &m.CreatedAt)
+	err := scanMember(s.pool.QueryRow(ctx, sqlMemberUpdate,
+		id, patch.Name, patch.Sex, patch.BirthDate,
+	), &m)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -904,6 +922,15 @@ func (s *Store) UpdateMember(ctx context.Context, id int64, name *string, isChil
 		return nil, err
 	}
 	return &m, nil
+}
+
+// scanMember 统一成员行扫描列序(与 sqlMemberColumnsSQL 对齐);is_child 按生日实时计算。
+func scanMember(row pgx.Row, m *pipeline.Member) error {
+	if err := row.Scan(&m.MemberID, &m.Name, &m.Sex, &m.BirthDate, &m.CreatedAt); err != nil {
+		return err
+	}
+	m.IsChild = pipeline.IsChild(m.BirthDate, time.Now())
+	return nil
 }
 
 // DeleteMember 硬删成员及其全部报告(报告/指标项/修正对级联;原图与 OCR 历史保留)。

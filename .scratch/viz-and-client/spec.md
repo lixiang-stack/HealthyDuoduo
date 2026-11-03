@@ -66,7 +66,7 @@ Status: ready-for-agent
 | --- | --- | --- |
 | GET health | 配对后连通性校验 | 返回 ok 与版本 |
 | GET members | 成员列表 | 返回是否孩子与创建时间；服务端按创建序返回 |
-| POST members | 建成员 | `name` + `is_child` |
+| POST members | 建成员 | `name` + `sex` + `birth_date`；`is_child` 服务端按生日计算 |
 | PATCH member | 改名/改是否孩子 | 至少一项 |
 | DELETE member | 删除成员 | 级联删除其全部报告；原图与 OCR 历史保留；不可恢复 |
 | POST reports | 上传（multipart：图像 + 成员） | 同步返回完整报告（NF-04 <3s）；图像内容哈希命中已有 → 200 + duplicate 标记 + 已有报告（幂等） |

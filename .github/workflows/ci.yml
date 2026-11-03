@@ -29,6 +29,18 @@ jobs:
       - run: go vet ./...
       - run: go test ./...
 
+  storage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      # 真库测试与内环 go test 分开：内部 storage 测试在无 HDD_TEST_DSN 时会 Skip。
+      # 脚本启动一次性 postgres，并为每个 Test* 建独立数据库。
+      - name: storage tests (disposable postgres)
+        run: bash scripts/test-db.sh
+
   python:
     runs-on: ubuntu-latest
     defaults:
@@ -71,3 +83,6 @@ jobs:
         run: python3 scripts/check-path-case.py
       - name: check markdown
         run: python3 scripts/check-docs.py
+      - name: check shell syntax
+        run: |
+          for f in scripts/*.sh scripts/git/*.sh; do bash -n "$f"; done

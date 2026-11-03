@@ -90,6 +90,23 @@ describe('reportSectionCards', () => {
     ]);
   });
 
+  it('病历段落按主诉 / 现病史 / 诊断 / 处理 / 原文给出标签', () => {
+    const clinical: ReportSection[] = [
+      { kind: 'chief_complaint', text: '发热3天。', ocr_lines: [] },
+      { kind: 'present_illness', text: '3天前出现发热。', ocr_lines: [] },
+      { kind: 'diagnosis', text: '上呼吸道感染。', ocr_lines: [] },
+      { kind: 'treatment', text: '多饮水。', ocr_lines: [] },
+      { kind: 'note', text: '整页原文。', ocr_lines: [] },
+    ];
+    expect(reportSectionCards(clinical).map((card) => [card.label, card.section.text])).toEqual([
+      ['主诉', '发热3天。'],
+      ['现病史', '3天前出现发热。'],
+      ['诊断', '上呼吸道感染。'],
+      ['处理', '多饮水。'],
+      ['原文', '整页原文。'],
+    ]);
+  });
+
   it('无段落返回空数组', () => {
     expect(reportSectionCards(undefined)).toEqual([]);
     expect(reportSectionCards(null)).toEqual([]);

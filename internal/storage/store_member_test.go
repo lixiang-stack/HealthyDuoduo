@@ -44,16 +44,33 @@ func TestMemberStoreSmoke(t *testing.T) {
 	st := NewStore(pool)
 	defer st.Close()
 
-	child, err := st.CreateMember(ctx, "小虎", true)
+	child, err := st.CreateMember(ctx, pipeline.MemberProfile{
+		Name: "小虎", Sex: pipeline.SexMale, BirthDate: "2020-05-20",
+	})
 	if err != nil {
 		t.Fatalf("create child: %v", err)
 	}
-	if child.MemberID == 0 || child.Name != "小虎" || !child.IsChild || child.CreatedAt.IsZero() {
-		t.Fatalf("created child = %+v, want id/name/is_child/created_at filled", child)
+	if child.MemberID == 0 || child.Name != "小虎" || !child.IsChild || child.CreatedAt.IsZero() ||
+		child.Sex != pipeline.SexMale || child.BirthDate != "2020-05-20" {
+		t.Fatalf("created child = %+v, want id/name/is_child/sex/birth_date/created_at filled", child)
 	}
-	adult, err := st.CreateMember(ctx, "妈妈", false)
+	adult, err := st.CreateMember(ctx, pipeline.MemberProfile{
+		Name: "妈妈", Sex: pipeline.SexFemale, BirthDate: "1988-01-01",
+	})
 	if err != nil {
 		t.Fatalf("create adult: %v", err)
+	}
+	if adult.Sex != pipeline.SexFemale || adult.IsChild {
+		t.Fatalf("created adult = %+v, want female/adult profile", adult)
+	}
+	teen, err := st.CreateMember(ctx, pipeline.MemberProfile{
+		Name: "青春期成员", Sex: pipeline.SexFemale, BirthDate: "2015-08-09",
+	})
+	if err != nil {
+		t.Fatalf("create teen: %v", err)
+	}
+	if teen.BirthDate != "2015-08-09" || !teen.IsChild {
+		t.Fatalf("created teen = %+v, want 2015-08-09/child", teen)
 	}
 
 	// 列表 = 创建序(id 升序),不因 is_child 重排。
@@ -61,42 +78,57 @@ func TestMemberStoreSmoke(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(members) != 2 || members[0].MemberID != child.MemberID || members[1].MemberID != adult.MemberID {
-		t.Fatalf("list = %+v, want [child, adult] in creation order", members)
+	if len(members) != 3 || members[0].MemberID != child.MemberID ||
+		members[1].MemberID != adult.MemberID || members[2].MemberID != teen.MemberID {
+		t.Fatalf("list = %+v, want [child, adult, teen] in creation order", members)
 	}
 
-	// 只改 name:is_child 与 created_at 保持原值。
+	// 只改 name:is_child / sex / birth_date / created_at 保持原值。
 	renamed := "母亲"
-	updated, err := st.UpdateMember(ctx, adult.MemberID, &renamed, nil)
+	updated, err := st.UpdateMember(ctx, adult.MemberID, pipeline.MemberPatch{Name: &renamed})
 	if err != nil {
 		t.Fatalf("update name: %v", err)
 	}
-	if updated.Name != "母亲" || updated.IsChild || !updated.CreatedAt.Equal(adult.CreatedAt) {
-		t.Fatalf("after name-only update = %+v, want name 母亲 / is_child false / created_at unchanged", updated)
+	if updated.Name != "母亲" || updated.IsChild || !updated.CreatedAt.Equal(adult.CreatedAt) ||
+		updated.Sex != adult.Sex || updated.BirthDate != adult.BirthDate {
+		t.Fatalf("after name-only update = %+v, want name 母亲 / other fields unchanged", updated)
 	}
 
-	// 只改 is_child:name 保持原值。
-	toChild := true
-	updated, err = st.UpdateMember(ctx, adult.MemberID, nil, &toChild)
+	// 改生日:is_child 按新生日实时重算(1988 → 2010 变为孩子)。
+	sex, birthDate := pipeline.SexMale, "2010-02-03"
+	updated, err = st.UpdateMember(ctx, adult.MemberID, pipeline.MemberPatch{
+		Sex: &sex, BirthDate: &birthDate,
+	})
 	if err != nil {
-		t.Fatalf("update is_child: %v", err)
+		t.Fatalf("update profile: %v", err)
 	}
-	if !updated.IsChild || updated.Name != "母亲" {
-		t.Fatalf("after is_child-only update = %+v, want is_child true / name 母亲", updated)
+	if updated.Sex != sex || updated.BirthDate != birthDate || !updated.IsChild {
+		t.Fatalf("after profile update = %+v, want male/2010-02-03/child", updated)
 	}
 
 	// 未知成员:nil, nil(HTTP 层转 404)。
-	missing, err := st.UpdateMember(ctx, 999, &renamed, nil)
+	missing, err := st.UpdateMember(ctx, 999, pipeline.MemberPatch{Name: &renamed})
 	if err != nil || missing != nil {
 		t.Fatalf("update unknown = (%v, %v), want (nil, nil)", missing, err)
 	}
 
-	// 领域规则镜像:纯空白名在存储边界(非 HTTP 路径)被拒,不落库。
-	if _, err := st.CreateMember(ctx, "   ", false); !errors.Is(err, pipeline.ErrMemberNameBlank) {
+	// 领域规则镜像:纯空白名 / 非法性别 / 非法日期在存储边界被拒,不落库。
+	if _, err := st.CreateMember(ctx, pipeline.MemberProfile{
+		Name: "   ", Sex: pipeline.SexMale, BirthDate: "2020-01-01",
+	}); !errors.Is(err, pipeline.ErrMemberNameBlank) {
 		t.Fatalf("create blank name err = %v, want ErrMemberNameBlank", err)
 	}
+	if _, err := st.CreateMember(ctx, pipeline.MemberProfile{
+		Name: "小虎", Sex: "unspecified", BirthDate: "2020-01-01",
+	}); !errors.Is(err, pipeline.ErrMemberSexInvalid) {
+		t.Fatalf("create invalid sex err = %v, want ErrMemberSexInvalid", err)
+	}
+	badDate := "2020-02-30"
+	if _, err := st.UpdateMember(ctx, child.MemberID, pipeline.MemberPatch{BirthDate: &badDate}); !errors.Is(err, pipeline.ErrMemberBirthDateInvalid) {
+		t.Fatalf("update invalid birth_date err = %v, want ErrMemberBirthDateInvalid", err)
+	}
 	blank := " "
-	if _, err := st.UpdateMember(ctx, child.MemberID, &blank, nil); !errors.Is(err, pipeline.ErrMemberNameBlank) {
+	if _, err := st.UpdateMember(ctx, child.MemberID, pipeline.MemberPatch{Name: &blank}); !errors.Is(err, pipeline.ErrMemberNameBlank) {
 		t.Fatalf("update blank name err = %v, want ErrMemberNameBlank", err)
 	}
 
@@ -129,11 +161,15 @@ func TestDeleteMemberCascadesReports(t *testing.T) {
 	st := NewStore(pool)
 	defer st.Close()
 
-	target, err := st.CreateMember(ctx, "待删成员", true)
+	target, err := st.CreateMember(ctx, pipeline.MemberProfile{
+		Name: "待删成员", Sex: pipeline.SexFemale, BirthDate: "2020-01-01",
+	})
 	if err != nil {
 		t.Fatalf("create target: %v", err)
 	}
-	keep, err := st.CreateMember(ctx, "保留成员", false)
+	keep, err := st.CreateMember(ctx, pipeline.MemberProfile{
+		Name: "保留成员", Sex: pipeline.SexFemale, BirthDate: "1988-01-01",
+	})
 	if err != nil {
 		t.Fatalf("create keep: %v", err)
 	}

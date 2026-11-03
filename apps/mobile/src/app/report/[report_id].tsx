@@ -5,7 +5,7 @@ import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View
 import { sharedStyles } from '../../components/styles';
 import { colors } from '../../components/theme';
 import { useImageViewer } from '../../components/imageViewer/ImageViewerProvider';
-import { isImagingReport } from '../../reports/category';
+import { isClinicalNoteReport, isNarrativeReport } from '../../reports/category';
 import { ReportCard, ReportManageCard, ReportSectionCard } from '../../reports/components';
 import { abnormalItemCount, reportItemGroups } from '../../reports/panelOverview';
 import { pendingItems } from '../../review/items';
@@ -30,10 +30,11 @@ export default function ReportDetailScreen() {
   const [imageOverride, setImageOverride] = useState<boolean>();
 
   const report = state.status === 'ready' ? state.report : undefined;
-  // 影像单是叙述文档:主体为段落 + 原图,不呈现检验单式指标项与核对入口(票 03)。
-  const imaging = report !== undefined && isImagingReport(report);
-  const pending = report && !imaging ? pendingItems(report.items) : [];
-  const itemGroups = report && !imaging ? reportItemGroups(report) : [];
+  // 影像单与病历是叙述文档:主体为段落 + 原图,不呈现检验单式指标项与核对入口(票 03)。
+  const narrative = report !== undefined && isNarrativeReport(report);
+  const imageNoun = report !== undefined && isClinicalNoteReport(report) ? '病历原图' : '检查单原图';
+  const pending = report && !narrative ? pendingItems(report.items) : [];
+  const itemGroups = report && !narrative ? reportItemGroups(report) : [];
   const examName = examNameText(report?.sections);
   const sectionCards = reportSectionCards(report?.sections);
   const imageVisible =
@@ -84,7 +85,7 @@ export default function ReportDetailScreen() {
 
           {report.status === 'failed' ? (
             <View style={styles.card}>
-              {!imaging ? (
+              {!narrative ? (
                 <Text style={sharedStyles.muted}>这张检查单没有识别出可核对的指标项。</Text>
               ) : null}
               <Link href="/upload" style={styles.link}>
@@ -104,7 +105,7 @@ export default function ReportDetailScreen() {
             </Link>
           ) : null}
 
-          {!imaging && report.items.length > 0 ? (
+          {!narrative && report.items.length > 0 ? (
             <Text testID="report-items-title" style={styles.sectionTitle}>
               指标项({report.items.length})
             </Text>
@@ -135,15 +136,15 @@ export default function ReportDetailScreen() {
           })}
 
           <Pressable testID="report-image-toggle" onPress={() => setImageOverride(!imageVisible)}>
-            <Text style={styles.link}>{imageVisible ? '收起检查单原图' : '查看检查单原图'}</Text>
+            <Text style={styles.link}>{imageVisible ? `收起${imageNoun}` : `查看${imageNoun}`}</Text>
           </Pressable>
           {imageVisible ? (
             <>
               <Pressable
                 testID="report-image-open"
                 accessibilityRole="button"
-                accessibilityLabel="放大查看检查单原图"
-                onPress={() => open(state.imageUrl, '检查单原图')}
+                accessibilityLabel={`放大查看${imageNoun}`}
+                onPress={() => open(state.imageUrl, imageNoun)}
               >
                 <Image
                   testID="report-image"

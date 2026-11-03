@@ -94,6 +94,36 @@ BT="$HOME/Library/Android/sdk/build-tools/36.0.0"
 
 也可以把 APK 传到手机直接安装。release 包没有 Metro，首次打开需到「设置」填后端地址（`http://<电脑局域网 IP>:8080/api/v1`）并点健康检查。
 
+## 隔离真机验收（涉及迁移 / 成员模型时必读）
+
+共享 `deploy` 栈的数据库可能含验收数据；成员/报告迁移可能是破坏性的（例如清空成员、解除报告归属）。**不要把 App 直接指向共享 `8080` 做这类验收。**
+
+用隔离栈脚本启动一次性 Postgres、worktree 识别服务、worktree hdd 与 worktree Metro；对象存储复用本机 `:8333` 的 SeaweedFS，但使用独立 bucket：
+
+```bash
+bash scripts/android-acceptance.sh
+```
+
+脚本会：
+
+- 启动一次性 `postgres:17` 与独立数据库；
+- 用当前 worktree 代码启动 recognizer / hdd / Metro（默认 18000 / 18080 / 18081）；
+- 建立 `adb reverse` 并尝试打开 Expo Go；
+- 打印 App 应填的 Base URL（`http://127.0.0.1:18080/api/v1`）；
+- 按 `Ctrl+C` 后停止服务、删除数据库与对象桶、移除 reverse。
+
+验收结束后，记得把 App「设置 → 后端 Base URL」恢复为原来的地址。
+
+### 手动排查已有环境
+
+```bash
+lsof -nP -iTCP:8081 -sTCP:LISTEN   # Metro 属于哪个检出
+lsof -nP -iTCP:18080 -iTCP:18081 -sTCP:LISTEN
+"$HOME/Library/Android/sdk/platform-tools/adb" reverse --list
+```
+
+---
+
 ## 真机体验（USB）
 
 目的：Android 手机通过数据线连 Mac，用 Expo Go 加载当前代码，直接体验 App。全程走 USB，不依赖 Wi-Fi。
@@ -193,7 +223,7 @@ scrcpy
 
 - 设置：保存 Base URL 并通过健康检查；冷启动后地址仍生效。
 - 家庭页：成员卡待核对 / 异常文案、双 Tab、设置入口、上传 FAB 正常。
-- 成员：建 / 改名 / 改档；删除无报告成员；删除有报告成员时确认面板显示「及其 N 份报告 · 不可恢复」，删除后当前成员清空且列表移除。
+- 成员：建 / 改名 / 改性别与生日（性别下拉、年月日滚轮）；孩子 / 成人由生日自动计算。删除无报告成员；删除有报告成员时确认面板显示「及其 N 份报告 · 不可恢复」，删除后当前成员清空且列表移除。
 - 上传：单图、多图、重复图、failed 报告原因；相机 / 相册权限弹窗正常。
 - 时间线：新报告出现；待核对 / 识别失败 / 按项目筛选结果正确。
 - 报告详情：指标项分组、影像段落、原图展开 / 收起、failed 形态。

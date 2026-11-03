@@ -46,7 +46,7 @@ paths:
     post:
       operationId: createMember
       summary: 建成员
-      description: name + is_child 两档信息,几十秒配好全家档案;member_id/created_at 服务端产生。
+      description: name/sex/birth_date 必填;is_child 由出生日期自动计算;member_id/created_at 服务端产生。
       requestBody:
         required: true
         content:
@@ -65,7 +65,7 @@ paths:
   /members/{member_id}:
     patch:
       operationId: updateMember
-      summary: 改名 / 改是否孩子
+      summary: 改名 / 改性别 / 改出生日期
       description: 至少一项;删除成员见 DELETE。
       parameters:
         - $ref: "#/components/parameters/MemberID"
@@ -422,10 +422,14 @@ components:
         members:
           type: array
           items: { $ref: "#/components/schemas/Member" }
+    MemberSex:
+      type: string
+      enum: [male, female]
+      description: 性别二选一。
     Member:
       type: object
       additionalProperties: false
-      required: [member_id, name, is_child, created_at]
+      required: [member_id, name, is_child, sex, birth_date, created_at]
       properties:
         member_id:
           type: integer
@@ -434,10 +438,16 @@ components:
         name:
           type: string
           minLength: 1
-          description: 显示名(家庭真实称呼)
+          description: 称呼(家庭真实称呼)
         is_child:
           type: boolean
-          description: 是否孩子(两档:孩子/成人)
+          description: 是否孩子(由出生日期实时计算:未满 18 岁为 true;响应派生,不可写)
+        sex:
+          $ref: "#/components/schemas/MemberSex"
+        birth_date:
+          type: string
+          pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+          description: 出生日期(YYYY-MM-DD)
         created_at:
           type: string
           format: date-time
@@ -445,20 +455,27 @@ components:
     MemberCreate:
       type: object
       additionalProperties: false
-      required: [name, is_child]
+      required: [name, sex, birth_date]
       properties:
         name:
           type: string
           minLength: 1
-        is_child:
-          type: boolean
+        sex:
+          $ref: "#/components/schemas/MemberSex"
+        birth_date:
+          type: string
+          pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
     MemberUpdate:
       type: object
       additionalProperties: false
       minProperties: 1
       properties:
         name: { type: string, minLength: 1 }
-        is_child: { type: boolean }
+        sex:
+          $ref: "#/components/schemas/MemberSex"
+        birth_date:
+          type: string
+          pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
     ReportsList:
       type: object
       additionalProperties: false
@@ -478,7 +495,7 @@ components:
       type: string
       enum: [cbc, urinalysis, liver, kidney, lipid, glucose,
              thyroid, sex_hormone, uric_acid, electrolyte, vitanemia,
-             infection, autoimmune, coag, imaging, other]
+             infection, autoimmune, coag, imaging, clinical_note, other]
       description: |
         项目组 code(与识别端 report.schema.json 的 panel 枚举同源):指标项必须属于其
         report_type 的允许集合,other 是唯一跨类别兜底。项目组是浏览入口,不是指标过滤器。
@@ -592,7 +609,7 @@ components:
         kind:
           type: string
           minLength: 1
-          description: 段落类别;当前已知值 exam_name / findings / impression,数组顺序即展示顺序
+          description: 段落类别;影像为 exam_name / findings / impression,病历为 chief_complaint / present_illness / diagnosis / treatment / note;数组顺序即展示顺序
         text:
           type: string
           minLength: 1

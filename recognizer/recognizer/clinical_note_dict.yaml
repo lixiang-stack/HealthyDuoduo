@@ -1,0 +1,28 @@
+# 病历词典(llm-analysis 票 03):家长上传病历照片,归档为 report_type=clinical_note 的
+# 叙述型报告。按标题词切主诉 / 现病史 / 诊断 / 处理,切不出标题时整页作为单个 note
+# 段落;不抽取指标项、不做诊断结构化,原文只读引用(spec §4.3)。
+# 分类由标题词兜底,只在标题区匹配且排除「病历号」;正文锚不参与类别判定
+# (避免检验单里的「诊断」行误抢类别)。
+
+report_type: clinical_note
+category:
+  title_keywords: [病历, 门诊病历, 急诊病历, 住院病历, 病历记录, 门诊记录, 诊断证明]
+  # 无标题的裁剪/近拍病历:四段标题命中 ≥2 也可分类;单条「诊断」行不足以抢检验单。
+  min_section_hits: 2
+  classification_section_kinds: [chief_complaint, present_illness, diagnosis, treatment]
+  mode: narrative
+  # 依据: spec §4.3 病历复用叙述型报告链路;ADR-0009 零指标项 + sections。
+  panel: clinical_note
+  fallback_section: note
+  # 标题词只在标题区匹配,且「病历号」不算标题(避免检验单被抢成病历)。
+  title_region_only: true
+  title_blocked_suffixes: ["号"]
+  section_anchors:
+    chief_complaint: [主诉]
+    present_illness: [现病史]
+    diagnosis: [初步诊断, 临床诊断, 诊断]
+    treatment: [处理意见, 治疗意见, 处理, 医嘱]
+  # 页脚 / 页码 / 记录日期不是处理正文;命中即结束当前段落。
+  section_stop_prefixes: [请妥善保管, 记录日期, 记录时间, 初诊时间, 初诊日期, 就诊时间]
+  section_stop_patterns: ['^第\s*\d+\s*页$']
+items: []

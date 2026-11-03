@@ -69,6 +69,97 @@ describe('MembersScreen', () => {
     );
   });
 
+  it('requires name, sex and a confirmed birth date, then submits the wheel date', async () => {
+    const createHandler = jest.fn((_options?: FakeApiOptions) =>
+      makeMember({ member_id: 2, name: '小虎' }),
+    );
+    useApi({
+      GET: {
+        '/members': () => ({ members: [] }),
+      },
+      POST: { '/members': createHandler },
+    });
+
+    await renderScreen(<MembersScreen />);
+    expect(await screen.findByText(/还没有家庭成员/)).toBeTruthy();
+
+    await fireEvent.press(screen.getByTestId('members-create'));
+    expect(createHandler).not.toHaveBeenCalled();
+    expect(screen.getByTestId('members-name-error')).toHaveTextContent('请填写称呼');
+    expect(screen.getByTestId('members-sex-error')).toHaveTextContent('请选择性别');
+    expect(screen.getByTestId('members-birth-date-error')).toHaveTextContent('请选择出生日期');
+
+    await fireEvent.changeText(screen.getByTestId('members-name-input'), '小虎');
+    await fireEvent.press(screen.getByTestId('members-sex-field'));
+    await fireEvent.press(screen.getByTestId('members-sex-option-female'));
+    await fireEvent.press(screen.getByTestId('members-create'));
+    expect(createHandler).not.toHaveBeenCalled();
+    expect(screen.getByTestId('members-birth-date-error')).toHaveTextContent('请选择出生日期');
+
+    await fireEvent.press(screen.getByTestId('members-birth-date-field'));
+    await fireEvent.press(screen.getByTestId('members-birth-year-wheel-option-2019'));
+    await fireEvent.press(screen.getByTestId('members-birth-month-wheel-option-5'));
+    await fireEvent.press(screen.getByTestId('members-birth-day-wheel-option-20'));
+    await fireEvent.press(screen.getByTestId('members-birth-confirm'));
+    await fireEvent.press(screen.getByTestId('members-create'));
+
+    await waitFor(() => expect(createHandler).toHaveBeenCalledTimes(1));
+    expect(createHandler.mock.calls[0][0]).toMatchObject({
+      body: {
+        name: '小虎',
+        sex: 'female',
+        birth_date: '2019-05-20',
+      },
+    });
+  });
+
+  it('edits sex and birth date through a partial PATCH', async () => {
+    let members = [
+      makeMember({
+        member_id: 1,
+        name: '小明',
+        sex: 'female',
+        birth_date: '2020-01-01',
+      }),
+    ];
+    const patchHandler = jest.fn((options?: FakeApiOptions) => {
+      const body = options?.body as Record<string, unknown>;
+      members = [
+        {
+          ...members[0],
+          name: String(body.name),
+          sex: body.sex as 'male' | 'female',
+          birth_date: String(body.birth_date),
+        },
+      ];
+      return members[0];
+    });
+    useApi({
+      GET: { '/members': () => ({ members }) },
+      PATCH: { '/members/{member_id}': patchHandler },
+    });
+
+    await renderScreen(<MembersScreen />);
+    expect(await screen.findByText('小明')).toBeTruthy();
+
+    await fireEvent.press(screen.getByText('编辑'));
+    await fireEvent.press(screen.getByTestId('member-edit-1-sex-field'));
+    await fireEvent.press(screen.getByTestId('member-edit-1-sex-option-male'));
+    await fireEvent.press(screen.getByTestId('member-edit-1-birth-date-field'));
+    await fireEvent.press(screen.getByTestId('member-edit-1-birth-confirm'));
+    await fireEvent.press(screen.getByTestId('member-edit-save-1'));
+
+    await waitFor(() => expect(patchHandler).toHaveBeenCalledTimes(1));
+    expect(patchHandler.mock.calls[0][0]).toMatchObject({
+      params: { path: { member_id: 1 } },
+      body: {
+        name: '小明',
+        sex: 'male',
+        birth_date: '2020-01-01',
+      },
+    });
+  });
+
   it('shows the generic irreversible confirmation when the member has no reports', async () => {
     useApi({
       GET: {

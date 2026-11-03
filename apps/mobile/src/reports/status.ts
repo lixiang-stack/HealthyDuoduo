@@ -1,12 +1,17 @@
 // 报告状态与徽标文案(纯逻辑,spec 固定映射):success→识别完成、partial→待核对、
 // failed→识别失败;检验单 success 含可操作未知项或未核对低置信项时也按待核对展示。
-// 影像单的 partial 没有对应核对动作,不显示状态文案。
-// 徽标按 flag 聚合计数 + 「待核对 N 项」;影像单不呈现指标项,未知与待核对徽标都关闭。
+// 影像单与病历的 partial 没有对应核对动作,不显示状态文案。
+// 徽标按 flag 聚合计数 + 「待核对 N 项」;叙述型报告不呈现指标项,未知与待核对徽标都关闭。
 // 文案中性事实侧,不做解读。
 import type { ReportItem, ReportSummary, UploadResult } from '../api/reports';
 import { pendingItems } from '../review/items';
 
-import { isImagingReport } from './category';
+import {
+  isClinicalNoteReport,
+  isImagingReport,
+  isNarrativeReport,
+} from './category';
+import { CLINICAL_NOTE_PANEL, type PanelCode } from './panels';
 
 export type ReportStatus = ReportSummary['status'];
 export type Flag = ReportItem['flag'];
@@ -18,7 +23,7 @@ const STATUS_LABELS: Record<ReportStatus, string> = {
 };
 
 /** 报告展示状态:检验单 success 但含可操作未知项或未核对低置信项时按待核对展示;
- *  影像单不因未知项降级(指标项不呈现)。 */
+ *  叙述型报告不因未知项降级(指标项不呈现)。 */
 export function reportStatusKind(
   report: Pick<
     ReportSummary,
@@ -26,7 +31,7 @@ export function reportStatusKind(
   >,
 ): ReportStatus {
   if (
-    !isImagingReport(report) &&
+    !isNarrativeReport(report) &&
     report.status === 'success' &&
     (report.flag_counts.unknown > 0 || report.unreviewed_low_confidence_count > 0)
   ) {
@@ -36,14 +41,14 @@ export function reportStatusKind(
 }
 
 /** 状态文案按报告类别取:检验单 partial、success+可操作未知、success+未核对低置信
- *  均为「待核对」;影像单 partial 无核对动作,不显示。 */
+ *  均为「待核对」;叙述型报告 partial 无核对动作,不显示。 */
 export function reportStatusLabel(
   report: Pick<
     ReportSummary,
     'status' | 'report_type' | 'flag_counts' | 'unreviewed_low_confidence_count'
   >,
 ): string | undefined {
-  if (isImagingReport(report) && report.status === 'partial') {
+  if (isNarrativeReport(report) && report.status === 'partial') {
     return undefined;
   }
   return STATUS_LABELS[reportStatusKind(report)];
@@ -51,6 +56,7 @@ export function reportStatusLabel(
 
 export const DATE_UNKNOWN_LABEL = '日期未知';
 const IMAGING_DATE_UNPRINTED_LABEL = '检查单未印日期';
+const CLINICAL_NOTE_DATE_UNPRINTED_LABEL = '病历未印日期';
 
 /** 参考范围缺失时的中性事实文案:只陈述数据事实,不推断是纸面未印还是抽取/OCR 漏掉。 */
 export const MISSING_REF_RANGE_LABEL = '无参考范围';
@@ -60,23 +66,35 @@ export function refRangeLabel(refRange: string | null | undefined): string {
   return refRange ? `参考 ${refRange}` : MISSING_REF_RANGE_LABEL;
 }
 
-/** 日期文案按报告类别取:影像单未印日期时明确说「未印」,不暗示识别失败。 */
+/** 日期文案按报告类别取:叙述型报告未印日期时明确说「未印」,不暗示识别失败。 */
 export function reportDateLabel(
   report: Pick<ReportSummary, 'report_date' | 'report_type'>,
 ): string {
   if (report.report_date) {
     return report.report_date;
   }
+  if (isClinicalNoteReport(report)) {
+    return CLINICAL_NOTE_DATE_UNPRINTED_LABEL;
+  }
   return isImagingReport(report) ? IMAGING_DATE_UNPRINTED_LABEL : DATE_UNKNOWN_LABEL;
 }
 
-/** 项目列表 / 详情日期文案:narrative(影像)项目未印日期用「未印」口径,
+/** 项目列表 / 详情日期文案:narrative(影像 / 病历)项目未印日期用「未印」口径,
  *  其余项目复用检验单「日期未知」;不伪造 report_type 字符串。 */
-export function panelDateLabel(date: string | null, narrative: boolean): string {
+export function panelDateLabel(
+  date: string | null,
+  narrative: boolean,
+  panel?: PanelCode,
+): string {
   if (date) {
     return date;
   }
-  return narrative ? IMAGING_DATE_UNPRINTED_LABEL : DATE_UNKNOWN_LABEL;
+  if (!narrative) {
+    return DATE_UNKNOWN_LABEL;
+  }
+  return panel === CLINICAL_NOTE_PANEL
+    ? CLINICAL_NOTE_DATE_UNPRINTED_LABEL
+    : IMAGING_DATE_UNPRINTED_LABEL;
 }
 
 const FLAG_LABELS: Record<Flag, string> = {
@@ -121,7 +139,7 @@ export type FlagBadgeKind = Exclude<Flag, 'normal'> | 'not_tested';
 export type FlagBadge = { kind: FlagBadgeKind; label: string };
 
 /** 异常徽标(偏高/偏低/异常/可操作未知;normal 不计,为 0 的档不出现)
- *  + 未检测信息徽标。影像单不呈现指标项,未知档按报告类别关闭。 */
+ *  + 未检测信息徽标。叙述型报告不呈现指标项,未知档按报告类别关闭。 */
 export function flagBadges(
   report: Pick<ReportSummary, 'report_type' | 'flag_counts' | 'not_tested_count'>,
 ): FlagBadge[] {
@@ -136,7 +154,7 @@ export function flagBadges(
   if (abnormal > 0) {
     badges.push({ kind: 'abnormal', label: `异常 ${abnormal}` });
   }
-  if (!isImagingReport(report) && unknown > 0) {
+  if (!isNarrativeReport(report) && unknown > 0) {
     badges.push({ kind: 'unknown', label: `未知 ${unknown}` });
   }
   if (report.not_tested_count > 0) {
@@ -153,7 +171,7 @@ export function unreviewedBadge(count: number): string | undefined {
 
 export type ReportBadgeLabels = { flags: FlagBadge[]; unreviewed?: string };
 
-/** 报告级徽标(时间线/详情共用):影像单不呈现指标项、没有核对入口,
+/** 报告级徽标(时间线/详情共用):叙述型报告不呈现指标项、没有核对入口,
  * 未知与待核对徽标都不显示;其余类别保持原口径。 */
 export function reportBadgeLabels(
   report: Pick<
@@ -163,7 +181,7 @@ export function reportBadgeLabels(
 ): ReportBadgeLabels {
   return {
     flags: flagBadges(report),
-    unreviewed: isImagingReport(report)
+    unreviewed: isNarrativeReport(report)
       ? undefined
       : unreviewedBadge(report.unreviewed_low_confidence_count),
   };

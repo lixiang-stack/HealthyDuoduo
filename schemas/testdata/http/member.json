@@ -2,5 +2,7 @@
   "member_id": 1,
   "name": "user_test",
   "is_child": true,
+  "sex": "male",
+  "birth_date": "2020-05-20",
   "created_at": "2026-10-13T08:00:00Z"
 }

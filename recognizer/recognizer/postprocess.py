@@ -11,7 +11,7 @@
   或「代号/缩写」列(名称列失败时用代号兜底,如 cbc_04 的 MCH/名称误写);
 - 熔断行按内容拆解:名熔值(平均血红蛋白浓度324)、单位熔范围(*10~9/L 3.5-9.5)、
   范围熔单位(130--175 g/L)、值熔范围熔单位(11.61|1.1--3.2|10^9/L→OCR 乱珠)。
-报告级段落(叙述型报告如影像单,词典 category.section_anchors):按行首锚词切
+报告级段落(叙述型报告如影像 / 病历,词典 category.section_anchors):按行首锚词切
 检查项目/检查所见/提示,整段原文 + OCR 行号留痕,不解析内容(见 _extract_sections)。
 
 低置信:任一组成行 score < LOW_SCORE_THRESHOLD → 该项 low_confidence 标记保留;
@@ -23,8 +23,8 @@ partial 触发(review 2026-10-12 收敛 + 低置信占比补丁):指标 value �
 印形保留原文;归一只改展示一致性(hdd trend sameUnit/delta),原文留痕在
 raw_text,不改变置信标记(决策 #7)。
 未解析日期且无兜底 → report_date=null+partial;类别失败或无产出 → failed。
-叙述型报告(影像;min_section_hits>0)只按正文段落派生 status:findings/impression
-至少一段 → success,否则 failed;不产出指标项,也不进入 partial(票 04)。
+叙述型报告(影像 / 病历;min_section_hits>0)只按正文段落派生 status:影像 findings/impression、
+病历四段或 note 至少一段 → success,否则 failed;不产出指标项,也不进入 partial(票 04/03)。
 
 样本收窄边界(review):规则与词典由已入库真实样本驱动;新样本若引入
 新版式/新指标名,预期行为是「未命中的行被跳过、指标缺失 → partial/failed」,
@@ -45,6 +45,7 @@ from pathlib import Path
 import yaml
 
 from .contract import (
+    CLINICAL_NOTE_REPORT_TYPE,
     Flag,
     FlagReason,
     OCRResult,
@@ -84,8 +85,13 @@ UNKNOWN_REPORT_TYPE = "unknown"
 
 # 报告级段落字段(识别端契约 ReportSection 与叙述型词典 category.section_anchors 的键)。
 # 正文锚 = 报告叙述主体;exam_name 只用于段落抽取,不参与类别判定(票 04)。
+# 病历(llm-analysis 票 03)按标题词切主诉 / 现病史 / 诊断 / 处理,note 是无标题时的整页兜底。
 BODY_SECTION_KINDS = ("findings", "impression")
-SECTION_FIELDS = ("exam_name", *BODY_SECTION_KINDS)
+CLINICAL_NOTE_SECTION_KINDS = (
+    "chief_complaint", "present_illness", "diagnosis", "treatment", "note",
+)
+SECTION_FIELDS = ("exam_name", *BODY_SECTION_KINDS, *CLINICAL_NOTE_SECTION_KINDS)
+NARRATIVE_BODY_SECTION_KINDS = (*BODY_SECTION_KINDS, *CLINICAL_NOTE_SECTION_KINDS)
 
 # 日期标签,按优先级降序取首个命中行里的日期(打印/申请最低;检验最高)
 _DATE_LABELS = (
@@ -93,6 +99,8 @@ _DATE_LABELS = (
     "采样时间", "采集时间", "标本采集时间",
     "核收时间", "报告时间", "报告日期", "打印时间", "申请时间",
 )
+# 病历日期:记录日期优先,其次初诊时间;不使用「独立日期行」兜底,避免抓到出生日期等无关日期。
+CLINICAL_NOTE_DATE_LABELS = ("记录日期", "记录时间", "初诊时间", "初诊日期", "就诊时间")
 _DATE_RE = re.compile(r"(\d{4})[-/.年](\d{1,2})[-/.月]?(\d{1,2})")
 # 独立日期行(行首锚定):分隔符与 _DATE_RE 同口径(破折号/斜杠/点/年月日);
 # 月日合法性由 _date_match 复核。
@@ -266,8 +274,19 @@ class LabDict:
     mode: str = "table"
     # 报告级段落锚(字段 → 行首锚词);非叙述体类别为空。
     section_anchors: dict[str, tuple[str, ...]] = field(default_factory=dict)
-    # 正文锚命中阈值(叙述型类别≥1;0 = 不按段落分类)。
+    # 分类锚与命中阈值(叙述型类别用;0 = 不按段落分类)。
+    # 影像用 findings/impression;病历用四段标题,要求 ≥2 命中,避免单条「诊断」行误抢检验单。
     min_section_hits: int = 0
+    classification_section_kinds: tuple[str, ...] = BODY_SECTION_KINDS
+    # 切不出锚词段落时的整页兜底 kind(病历 = note;影像为空 = 不兜底)。
+    fallback_section: str | None = None
+    # 病历段落终止词:页脚 / 页码 / 记录日期等不并入上一段。
+    section_stop_prefixes: tuple[str, ...] = ()
+    section_stop_patterns: tuple[re.Pattern[str], ...] = ()
+    # 标题词只在标题区匹配(病历:避免正文「病历号」抢类别);False = 全页兜底。
+    title_region_only: bool = False
+    # 标题词后紧跟这些后缀时不算命中(病历:「病历号」不是标题)。
+    title_blocked_suffixes: tuple[str, ...] = ()
 
 
 @lru_cache(maxsize=1)
@@ -410,6 +429,16 @@ def _build_dict(path: Path) -> LabDict:
         mode=str(raw["category"].get("mode", "table")),
         section_anchors=section_anchors,
         min_section_hits=int(raw["category"].get("min_section_hits", 0)),
+        classification_section_kinds=tuple(
+            raw["category"].get("classification_section_kinds") or BODY_SECTION_KINDS
+        ),
+        fallback_section=raw["category"].get("fallback_section"),
+        section_stop_prefixes=tuple(raw["category"].get("section_stop_prefixes") or ()),
+        section_stop_patterns=tuple(
+            re.compile(pattern) for pattern in raw["category"].get("section_stop_patterns") or ()
+        ),
+        title_region_only=bool(raw["category"].get("title_region_only", False)),
+        title_blocked_suffixes=tuple(raw["category"].get("title_blocked_suffixes") or ()),
     )
 
 
@@ -1401,9 +1430,14 @@ def _date_match(text: str) -> str | None:
     return None
 
 
-def _find_date(cells: list[_Cell], date_hint: str | None) -> str | None:
+def _find_date(
+    cells: list[_Cell],
+    date_hint: str | None,
+    labels: tuple[str, ...] = _DATE_LABELS,
+    independent_fallback: bool = True,
+) -> str | None:
     """检查单日期:按标签优先级在行文本里搜日期;解析失败 → 用 date_hint 兜底。"""
-    for label in _DATE_LABELS:
+    for label in labels:
         for c in cells:
             if label in c.text:
                 d = _date_match(c.text)
@@ -1413,7 +1447,7 @@ def _find_date(cells: list[_Cell], date_hint: str | None) -> str | None:
     # 含日期格兜底。门限按图内容宽度/格高缩放——旧值 300px/10px 按小截图校准,
     # 大图字号同比放大(实测 3316px 照片盒间距 322px);max 单调放宽不引入更严判定。
     width = max((c.x1 for c in cells), default=0.0)
-    for label in _DATE_LABELS:
+    for label in labels:
         for c in cells:
             if label not in c.text:
                 continue
@@ -1431,11 +1465,12 @@ def _find_date(cells: list[_Cell], date_hint: str | None) -> str | None:
                 return d
     if date_hint:
         return date_hint
-    for c in cells:  # 独立日期行(标签与日期被 OCR 拆开时的兜底,如 cbc_05)
-        if _DATE_LINE_RE.match(c.text.strip()):
-            d = _date_match(c.text)
-            if d:
-                return d
+    if independent_fallback:
+        for c in cells:  # 独立日期行(标签与日期被 OCR 拆开时的兜底,如 cbc_05)
+            if _DATE_LINE_RE.match(c.text.strip()):
+                d = _date_match(c.text)
+                if d:
+                    return d
     return None
 
 
@@ -1848,19 +1883,25 @@ def _right_value(
 
 
 def _extract_sections(
-    txts: list[str], anchors: dict[str, tuple[str, ...]]
+    txts: list[str],
+    anchors: dict[str, tuple[str, ...]],
+    fallback_section: str | None = None,
+    stop_prefixes: tuple[str, ...] = (),
+    stop_patterns: tuple[re.Pattern[str], ...] = (),
 ) -> list[ReportSection]:
     """按行首锚词切报告级段落,整段原文 + OCR 行号留痕(不解析内容)。
 
-    规则(影像单三段式):
+    规则(影像单三段式;病历四段式 + 整页 note 兜底):
     - 锚 = 去空白后行首命中锚词;段落 = 锚词后的同行尾缀 + 后续行,至下一锚行或页尾;
     - 「注：」不设终止锚,自然并入其前段;
     - exam_name 例外:只取锚行尾缀;尾缀为空时取紧随其后的一行(不吞患者信息/日期/图像);
-    - 同类锚多次出现按 OCR 行序保留多个 section;空段不产出 section。
+    - 同类锚多次出现按 OCR 行序保留多个 section;空段不产出 section;
+    - stop_prefixes / stop_patterns 命中时结束当前段落(病历页脚、页码、记录日期等);
+    - fallback_section 非空且切不出任何段落时,整页非空 OCR 行作为单个 section(病历兜底)。
     """
     present = [section for section in SECTION_FIELDS if anchors.get(section)]
     if not present:
-        return []
+        return _fallback_section(txts, fallback_section)
     words = sorted(
         ((word, section) for section in present for word in anchors[section]),
         key=lambda pair: len(pair[0]),
@@ -1870,10 +1911,15 @@ def _extract_sections(
     for idx, text in enumerate(txts):
         stripped = text.strip()
         for word, section in words:
-            if stripped.startswith(word):
-                tail = re.sub(r"^[\s:：]+", "", stripped[len(word):]).strip()
-                hits.append((idx, section, tail))
-                break
+            if not stripped.startswith(word):
+                continue
+            rest = stripped[len(word):]
+            # 病历标题词必须与正文分隔(主诉：/诊断：);「诊断医师」「处理医师」不是段落标题。
+            if section in CLINICAL_NOTE_SECTION_KINDS and rest and rest[0] not in " \t:：,，、;；":
+                continue
+            tail = re.sub(r"^[\s:：]+", "", rest).strip()
+            hits.append((idx, section, tail))
+            break
 
     sections: list[ReportSection] = []
     for pos, (start, section, tail) in enumerate(hits):
@@ -1886,9 +1932,12 @@ def _extract_sections(
             else:
                 lines = []
         else:
-            lines = ([(start, tail)] if tail else []) + [
-                (idx, txts[idx].strip()) for idx in range(start + 1, end)
-            ]
+            lines = [(start, tail)] if tail else []
+            for idx in range(start + 1, end):
+                line = txts[idx].strip()
+                if _is_section_stop(line, stop_prefixes, stop_patterns):
+                    break
+                lines.append((idx, line))
         text = "\n".join(line for _, line in lines if line)
         if text:
             sections.append(
@@ -1898,7 +1947,33 @@ def _extract_sections(
                     ocr_line_numbers=[idx for idx, line in lines if line],
                 )
             )
-    return sections
+    return sections or _fallback_section(txts, fallback_section)
+
+
+def _is_section_stop(
+    line: str,
+    prefixes: tuple[str, ...],
+    patterns: tuple[re.Pattern[str], ...],
+) -> bool:
+    return any(line.startswith(prefix) for prefix in prefixes) or any(
+        pattern.match(line) for pattern in patterns
+    )
+
+
+def _fallback_section(txts: list[str], kind: str | None) -> list[ReportSection]:
+    """整页兜底段落:所有非空 OCR 行按序拼接,行号原样留痕;kind 为空则不兜底。"""
+    if not kind:
+        return []
+    lines = [(idx, text.strip()) for idx, text in enumerate(txts) if text.strip()]
+    if not lines:
+        return []
+    return [
+        ReportSection(
+            kind=kind,
+            text="\n".join(line for _, line in lines),
+            ocr_line_numbers=[idx for idx, _ in lines],
+        )
+    ]
 
 
 def run_postprocess(
@@ -1910,21 +1985,34 @@ def run_postprocess(
     结果/参考两格确实是短横线后补回 "-";/reparse 只有存库 OCR,无法恢复。
     """
     cells = _cells(ocr)
-    date = _find_date(cells, date_hint)
-
     header_bands = _header_bands(cells)
 
     selected = _select_category(cells, header_bands, ocr.txts)
     if selected is None:
         return Report(
             report_type=UNKNOWN_REPORT_TYPE,
-            report_date=date,
+            report_date=_find_date(cells, date_hint),
             status=Status.FAILED,
             panels=[Panel.OTHER],
             items=[],
         )
     d, pairs = selected
-    sections = _extract_sections(ocr.txts, d.section_anchors)
+    if d.report_type == CLINICAL_NOTE_REPORT_TYPE:
+        date = _find_date(
+            cells,
+            date_hint,
+            labels=CLINICAL_NOTE_DATE_LABELS,
+            independent_fallback=False,
+        )
+    else:
+        date = _find_date(cells, date_hint)
+    sections = _extract_sections(
+        ocr.txts,
+        d.section_anchors,
+        d.fallback_section,
+        d.section_stop_prefixes,
+        d.section_stop_patterns,
+    )
 
     items: list[ReportItem] = []
     for it, piece in pairs:
@@ -2012,7 +2100,7 @@ def run_postprocess(
     if d.min_section_hits > 0:
         # 按正文段落分类的报告(影像)只反映叙述正文:至少一段 findings/impression →
         # success,否则 failed;日期未印、低置信都不再降级 partial(票 04)。
-        has_body = any(s.kind in BODY_SECTION_KINDS for s in sections)
+        has_body = any(s.kind in NARRATIVE_BODY_SECTION_KINDS for s in sections)
         status = Status.SUCCESS if has_body else Status.FAILED
     elif not items:
         status = Status.FAILED
@@ -2067,6 +2155,19 @@ def classify_items(
     return report_panels(report_type, Status.SUCCESS, item_panels), item_panels
 
 
+def _title_keyword_hit(d: LabDict, cells: list[_Cell]) -> bool:
+    """标题词命中:默认子串匹配;配置了 blocked suffix 时排除「病历号」这类派生词。"""
+    for cell in cells:
+        for keyword in d.title_keywords:
+            start = cell.text.find(keyword)
+            while start >= 0:
+                rest = cell.text[start + len(keyword):]
+                if not any(rest.startswith(suffix) for suffix in d.title_blocked_suffixes):
+                    return True
+                start = cell.text.find(keyword, start + 1)
+    return False
+
+
 def _title_region_cells(
     cells: list[_Cell],
     header_bands: list[list[_Cell]],
@@ -2094,8 +2195,8 @@ def _select_category(
 ) -> tuple[LabDict, list[tuple[DictItem, _RowPiece]]] | None:
     """多词典注册表分发(P3 A1 内容优先分类)。
 
-    判定由内容驱动:指标项命中 ≥ min_matched_items,或正文锚(findings/impression)
-    命中 ≥ min_section_hits 的词典「达标」。达标者按 (正文锚命中数, 指标项命中数,
+    判定由内容驱动:指标项命中 ≥ min_matched_items,或分类锚(classify_section_kinds;
+    影像 findings/impression,病历四段)命中 ≥ min_section_hits 的词典「达标」。达标者按 (正文锚命中数, 指标项命中数,
     标题区命中) 排序,再并列取注册表先者(文件名序)。仅当没有任何词典达标时,才回退
     到标题命中的词典——标题不再是「硬覆盖」,正文偶发提及无法把报告抢到不相干类别。
     exam_name 锚只用于段落抽取,不参与分类(票 04)。
@@ -2114,7 +2215,7 @@ def _select_category(
         body_anchors = {
             kind: words
             for kind, words in d.section_anchors.items()
-            if kind in BODY_SECTION_KINDS
+            if kind in d.classification_section_kinds
         }
         section_hits = len(_extract_sections(txts, body_anchors))
         qualified = (
@@ -2122,9 +2223,10 @@ def _select_category(
         ) or (
             d.min_section_hits > 0 and section_hits >= d.min_section_hits
         )
-        if not qualified and not any(kw in c.text for c in cells for kw in d.title_keywords):
+        title_scope = title_cells if d.title_region_only else cells
+        if not qualified and not _title_keyword_hit(d, title_scope):
             continue
-        title_region = any(kw in c.text for c in title_cells for kw in d.title_keywords)
+        title_region = _title_keyword_hit(d, title_cells)
         key = (qualified, section_hits, len(pairs), title_region)
         if best_key is not None and key <= best_key:
             continue

@@ -39,10 +39,10 @@ func TestReportStoreSmoke(t *testing.T) {
 
 	// 成员两个(脚本建,绕过 HTTP)。
 	var memberA, memberB int64
-	if err := pool.QueryRow(ctx, `INSERT INTO members (name, is_child) VALUES ('小虎', true) RETURNING id`).Scan(&memberA); err != nil {
+	if err := pool.QueryRow(ctx, `INSERT INTO members (name, sex, birth_date) VALUES ('小虎', 'female', '2020-01-01') RETURNING id`).Scan(&memberA); err != nil {
 		t.Fatalf("seed member A: %v", err)
 	}
-	if err := pool.QueryRow(ctx, `INSERT INTO members (name, is_child) VALUES ('妈妈', false) RETURNING id`).Scan(&memberB); err != nil {
+	if err := pool.QueryRow(ctx, `INSERT INTO members (name, sex, birth_date) VALUES ('妈妈', 'female', '1988-01-01') RETURNING id`).Scan(&memberB); err != nil {
 		t.Fatalf("seed member B: %v", err)
 	}
 

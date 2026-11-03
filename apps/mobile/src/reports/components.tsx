@@ -32,7 +32,7 @@ export const STATUS_COLORS: Record<ReportSummary['status'], string> = {
 };
 
 // ReportBadges 异常徽标(偏高/偏低/未知)+「待核对 N 项」;时间线与详情头部共用。
-// 徽标口径由报告类别派生(影像单无指标项、无核对入口:未知与待核对都不显示)。
+// 徽标口径由报告类别派生(叙述型报告无指标项、无核对入口:未知与待核对都不显示)。
 export function ReportBadges({ report }: { report: ReportSummary }) {
   const { flags, unreviewed } = reportBadgeLabels(report);
   if (flags.length === 0 && !unreviewed) {
@@ -97,7 +97,7 @@ export function ReportCard({
   );
 }
 
-// ReportSectionCard 报告段落卡(票 02;影像单检查所见 / 超声提示):整段原文按
+// ReportSectionCard 报告段落卡(票 02;影像检查所见 / 提示、病历段落):整段原文按
 // sections 数组序展示;点卡片在同位置展开 LineZoom,按该段 ocr_lines 缩放到原图
 // 对应区域(与核对项三方对照共用实现)。
 export function ReportSectionCard({

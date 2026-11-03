@@ -38,6 +38,10 @@ pre-commit:
       run: python3 scripts/check-docs.py --staged
     path-case:
       run: python3 scripts/check-path-case.py --staged
+    shell-syntax:
+      glob: "{scripts/*.sh,scripts/git/*.sh}"
+      run: |
+        for f in scripts/*.sh scripts/git/*.sh; do [ -f "$f" ] && bash -n "$f"; done
 
 pre-merge-commit:
   commands:

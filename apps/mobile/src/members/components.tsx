@@ -1,13 +1,21 @@
 // 成员页展示组件(票 05):成员行、行内编辑、删除确认、添加成员表单。
 // 共享一份控件样式;成员行点按设为当前成员。
+import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import type { Member } from '../api/members';
 import { sharedStyles } from '../components/styles';
 import { colors } from '../components/theme';
+import { memberFormErrors, type MemberSex } from './profile';
+import { BirthDateField, SexField } from './profilePickers';
 
 /** 行内编辑草稿;memberId 定位被编辑行。 */
-export type EditDraft = { memberId: number; name: string; isChild: boolean };
+export type EditDraft = {
+  memberId: number;
+  name: string;
+  sex: MemberSex;
+  birthDate: string;
+};
 
 // 成员行:点按设为当前成员,「编辑」进入行内改名/改档,「删除」进入确认面板。
 export function MemberRow({
@@ -55,7 +63,7 @@ export function MemberRow({
   );
 }
 
-// 行内编辑:改名 + 改是否孩子,保存后由页面重载列表;取消不改动任何数据。
+// 行内编辑:改名 / 改性别与出生日期,保存后由页面重载列表;取消不改动任何数据。
 export function MemberEditRow({
   draft,
   busy,
@@ -69,21 +77,44 @@ export function MemberEditRow({
   onSave: () => void;
   onCancel: () => void;
 }) {
+  const [submitted, setSubmitted] = useState(false);
+  const errors = memberFormErrors(draft.name, draft.sex, draft.birthDate);
+  const valid = Object.keys(errors).length === 0;
+  const attemptSave = () => {
+    setSubmitted(true);
+    if (valid) {
+      onSave();
+    }
+  };
   return (
     <View style={styles.cardEditing}>
+      <RequiredLabel>称呼</RequiredLabel>
       <TextInput
+        testID={`member-edit-name-${draft.memberId}`}
         value={draft.name}
         onChangeText={(value) => onChange({ name: value })}
-        placeholder="显示名"
+        placeholder="如:小虎、妈妈"
         placeholderTextColor={colors.muted}
         style={styles.input}
       />
-      <ChildPicker isChild={draft.isChild} onChange={(value) => onChange({ isChild: value })} />
+      {submitted && errors.name ? (
+        <Text testID={`member-edit-name-error-${draft.memberId}`} style={styles.fieldError}>
+          {errors.name}
+        </Text>
+      ) : null}
+      <MemberProfileFields
+        prefix={`member-edit-${draft.memberId}`}
+        sex={draft.sex}
+        birthDate={draft.birthDate}
+        errors={submitted ? errors : undefined}
+        onChange={onChange}
+      />
       <View style={sharedStyles.horizontal}>
         <Pressable
-          style={[styles.button, (busy || !draft.name.trim()) && styles.buttonDisabled]}
-          onPress={onSave}
-          disabled={busy || !draft.name.trim()}
+          testID={`member-edit-save-${draft.memberId}`}
+          style={[styles.button, busy && styles.buttonDisabled]}
+          onPress={attemptSave}
+          disabled={busy}
         >
           <Text style={styles.buttonText}>保存</Text>
         </Pressable>
@@ -186,39 +217,62 @@ export function MemberDeleteRow({
   );
 }
 
-// 添加成员表单:名字 + 是否孩子两档;提交交给页面(状态在页面持有)。
+// 添加成员表单:名字 + 性别 + 出生日期;提交交给页面(状态在页面持有)。
 export function MemberCreateForm({
   name,
-  isChild,
+  sex,
+  birthDate,
   busy,
   onNameChange,
-  onIsChildChange,
+  onProfileChange,
   onSubmit,
 }: {
   name: string;
-  isChild: boolean;
+  sex: MemberSex | undefined;
+  birthDate: string;
   busy: boolean;
   onNameChange: (value: string) => void;
-  onIsChildChange: (value: boolean) => void;
+  onProfileChange: (patch: { sex?: MemberSex; birthDate?: string }) => void;
   onSubmit: () => void;
 }) {
+  const [submitted, setSubmitted] = useState(false);
+  const errors = memberFormErrors(name, sex, birthDate);
+  const valid = Object.keys(errors).length === 0;
+  const attemptCreate = () => {
+    setSubmitted(true);
+    if (valid) {
+      onSubmit();
+    }
+  };
   return (
     <View style={styles.cardForm}>
       <Text style={styles.sectionTitle}>添加成员</Text>
+      <RequiredLabel>称呼</RequiredLabel>
       <TextInput
         testID="members-name-input"
         value={name}
         onChangeText={onNameChange}
-        placeholder="显示名(如:小虎、妈妈)"
+        placeholder="如:小虎、妈妈"
         placeholderTextColor={colors.muted}
         style={styles.input}
       />
-      <ChildPicker isChild={isChild} onChange={onIsChildChange} />
+      {submitted && errors.name ? (
+        <Text testID="members-name-error" style={styles.fieldError}>
+          {errors.name}
+        </Text>
+      ) : null}
+      <MemberProfileFields
+        prefix="members"
+        sex={sex}
+        birthDate={birthDate}
+        errors={submitted ? errors : undefined}
+        onChange={onProfileChange}
+      />
       <Pressable
         testID="members-create"
-        style={[styles.button, (busy || !name.trim()) && styles.buttonDisabled]}
-        onPress={onSubmit}
-        disabled={busy || !name.trim()}
+        style={[styles.button, busy && styles.buttonDisabled]}
+        onPress={attemptCreate}
+        disabled={busy}
       >
         <Text style={styles.buttonText}>创建</Text>
       </Pressable>
@@ -226,17 +280,45 @@ export function MemberCreateForm({
   );
 }
 
-// 「孩子 / 成人」两档选择(成员最小模型只有这两档)。
-function ChildPicker({ isChild, onChange }: { isChild: boolean; onChange: (isChild: boolean) => void }) {
+/** 成员资料字段:性别下拉 + 出生日期滚轮。 */
+function MemberProfileFields({
+  prefix,
+  sex,
+  birthDate,
+  errors,
+  onChange,
+}: {
+  prefix: string;
+  sex: MemberSex | undefined;
+  birthDate: string;
+  errors?: { sex?: string; birthDate?: string };
+  onChange: (patch: { sex?: MemberSex; birthDate?: string }) => void;
+}) {
   return (
-    <View style={sharedStyles.horizontal}>
-      <Pressable style={[styles.chip, isChild && styles.chipActive]} onPress={() => onChange(true)}>
-        <Text style={isChild ? styles.chipTextActive : styles.chipText}>孩子</Text>
-      </Pressable>
-      <Pressable style={[styles.chip, !isChild && styles.chipActive]} onPress={() => onChange(false)}>
-        <Text style={!isChild ? styles.chipTextActive : styles.chipText}>成人</Text>
-      </Pressable>
+    <View style={styles.profileFields}>
+      <SexField
+        prefix={prefix}
+        value={sex}
+        error={errors?.sex}
+        onChange={(value) => onChange({ sex: value })}
+      />
+      <BirthDateField
+        prefix={prefix}
+        value={birthDate}
+        error={errors?.birthDate}
+        onChange={(value) => onChange({ birthDate: value })}
+      />
     </View>
+  );
+}
+
+/** 必填字段标签:红色星号比整句说明更贴近字段。 */
+function RequiredLabel({ children }: { children: string }) {
+  return (
+    <Text style={sharedStyles.label}>
+      {children}
+      <Text style={styles.required}> *</Text>
+    </Text>
   );
 }
 
@@ -323,6 +405,9 @@ const styles = StyleSheet.create({
   chipActive: { borderColor: colors.accent, backgroundColor: colors.accent },
   chipText: { fontSize: 14, color: colors.text },
   chipTextActive: { fontSize: 14, color: colors.onAccent },
+  profileFields: { gap: 8 },
+  required: { color: colors.fail },
+  fieldError: { fontSize: 12, color: colors.fail },
   button: {
     alignSelf: 'flex-start',
     paddingVertical: 10,

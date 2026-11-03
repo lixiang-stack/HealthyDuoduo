@@ -1,6 +1,6 @@
 package storage
 
-// 迁移冒烟:goose 链(0001..0012)应用后 schema 形状符合 M0 契约(票 02)。
+// 迁移冒烟:goose 链(0001..0013)应用后 schema 形状符合契约(票 02 / llm-analysis 票 01)。
 // 需要真库:设 HDD_TEST_DSN(如 postgres://postgres:smoke@127.0.0.1:55432/postgres)后运行;
 // 未设则整体 Skip——CI 门禁跑 go test ./... 时默认跳过,共享栈验证走 e2e 外环
 // (docs/agents/e2e.md「schemas/迁移」行)。冒烟姿势:一次性 PG 容器 + 本测试。
@@ -31,13 +31,13 @@ func TestMigrationSmokeM0Contract(t *testing.T) {
 		t.Fatalf("migrate: %v", err)
 	}
 
-	// goose 已升到 0012 且幂等(Open 内重复 Migrate 不报错)。
+	// goose 已升到 0013 且幂等(Open 内重复 Migrate 不报错)。
 	var latest int
 	if err := pool.QueryRow(ctx, `SELECT max(version_id) FROM goose_db_version`).Scan(&latest); err != nil {
 		t.Fatalf("read goose version: %v", err)
 	}
-	if latest != 12 {
-		t.Fatalf("goose version = %d, want 12", latest)
+	if latest != 13 {
+		t.Fatalf("goose version = %d, want 13", latest)
 	}
 
 	// reports.sections(0007,ADR-0008):可选报告段落 JSONB,可空(存量/非叙述型 NULL)。
@@ -134,7 +134,8 @@ func TestMigrationSmokeM0Contract(t *testing.T) {
 	})
 
 	// 子测试共享种子:两份报告(一份有主、一份存量 CLI 时代无主)与图像/OCR 留痕。
-	if _, err := pool.Exec(ctx, `INSERT INTO members (id, name, is_child) VALUES (1, 'user_test', true)`); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO members (id, name, sex, birth_date)
+		VALUES (1, 'user_test', 'male', '2020-01-01')`); err != nil {
 		t.Fatalf("seed member: %v", err)
 	}
 	if _, err := pool.Exec(ctx, `INSERT INTO images (sha256, original_filename) VALUES ('a', 'p.jpg'),
@@ -150,27 +151,47 @@ func TestMigrationSmokeM0Contract(t *testing.T) {
 		t.Fatalf("seed reports: %v (member ownership on new rows, NULL on unowned)", err)
 	}
 
-	// 成员最小模型:仅 name + is_child 两档业务字段(+id/created_at),零扩展列。
-	t.Run("members minimal model", func(t *testing.T) {
-		rows, err := pool.Query(ctx, `SELECT column_name FROM information_schema.columns
+	// 成员模型(0013):显示名 + 性别 + 出生日期;is_child 改为服务端派生,
+	// 不再落列;sex / birth_date 为 NOT NULL。
+	t.Run("members profile columns", func(t *testing.T) {
+		rows, err := pool.Query(ctx, `SELECT column_name, is_nullable, column_default FROM information_schema.columns
 			WHERE table_name='members' ORDER BY column_name`)
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer rows.Close()
-		var cols []string
+		cols := map[string][2]string{}
 		for rows.Next() {
-			var c string
-			if err := rows.Scan(&c); err != nil {
+			var name, nullable string
+			var def *string
+			if err := rows.Scan(&name, &nullable, &def); err != nil {
 				t.Fatal(err)
 			}
-			cols = append(cols, c)
+			value := ""
+			if def != nil {
+				value = *def
+			}
+			cols[name] = [2]string{nullable, value}
 		}
 		if err := rows.Err(); err != nil {
 			t.Fatal(err)
 		}
-		if len(cols) != 4 || cols[0] != "created_at" || cols[1] != "id" || cols[2] != "is_child" || cols[3] != "name" {
-			t.Fatalf("members columns = %v, want exactly [created_at id is_child name]", cols)
+		want := map[string]bool{
+			"id": false, "name": false, "sex": false, "birth_date": false, "created_at": false,
+		}
+		if len(cols) != len(want) {
+			t.Fatalf("members columns = %v, want %d profile columns", cols, len(want))
+		}
+		for name := range want {
+			if _, ok := cols[name]; !ok {
+				t.Fatalf("members missing column %q", name)
+			}
+		}
+		if cols["sex"][0] != "NO" || cols["birth_date"][0] != "NO" {
+			t.Fatalf("sex/birth_date nullable = %s/%s, want NO/NO", cols["sex"][0], cols["birth_date"][0])
+		}
+		if _, ok := cols["is_child"]; ok {
+			t.Fatal("is_child column still present, want derived-only")
 		}
 	})
 
@@ -434,5 +455,102 @@ func TestMigration0007DownUp(t *testing.T) {
 	}
 	if n != 1 {
 		t.Fatalf("sections column missing after re-up")
+	}
+}
+
+// TestMigration0013ClearsMembersAndUnownedReports 0013 的破坏性语义:
+// 未上线阶段清空 members,但保留 reports/图像/OCR,只把 reports.member_id 置空。
+// 通过先降到 0012、按旧形状种一行成员与归属报告、再升到 0013 验证真实迁移路径。
+func TestMigration0013ClearsMembersAndUnownedReports(t *testing.T) {
+	dsn := os.Getenv("HDD_TEST_DSN")
+	if dsn == "" {
+		t.Skip("HDD_TEST_DSN not set: migration smoke runs against a disposable PG container")
+	}
+	ctx := context.Background()
+	db, err := sql.Open("pgx", dsn)
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	defer db.Close()
+	goose.SetBaseFS(migrationsFS)
+	if err := goose.SetDialect("postgres"); err != nil {
+		t.Fatalf("goose dialect: %v", err)
+	}
+	if err := goose.UpContext(ctx, db, migrationsDir); err != nil {
+		t.Fatalf("up to latest: %v", err)
+	}
+	if err := goose.DownToContext(ctx, db, migrationsDir, 12); err != nil {
+		t.Fatalf("down to 0012: %v", err)
+	}
+
+	const sha = "migration-0013-member-report"
+	if _, err := db.ExecContext(ctx, `INSERT INTO images (sha256, original_filename)
+		VALUES ($1, 'pre-launch.jpg')`, sha); err != nil {
+		t.Fatalf("seed image: %v", err)
+	}
+	var ocrID int64
+	if err := db.QueryRowContext(ctx, `INSERT INTO ocr_results (image_sha256, engine_output)
+		VALUES ($1, '{}') RETURNING id`, sha).Scan(&ocrID); err != nil {
+		t.Fatalf("seed ocr: %v", err)
+	}
+	var memberID int64
+	if err := db.QueryRowContext(ctx, `INSERT INTO members (name, is_child)
+		VALUES ('迁移前成员', true) RETURNING id`).Scan(&memberID); err != nil {
+		t.Fatalf("seed member: %v", err)
+	}
+	if _, err := db.ExecContext(ctx, `INSERT INTO reports
+		(image_sha256, ocr_result_id, report_type, report_date, status, member_id, panels)
+		VALUES ($1, $2, '血常规', '2026-10-01', 'success', $3, '{cbc}')`,
+		sha, ocrID, memberID); err != nil {
+		t.Fatalf("seed report: %v", err)
+	}
+
+	if err := goose.UpContext(ctx, db, migrationsDir); err != nil {
+		t.Fatalf("up to 0013: %v", err)
+	}
+
+	var members int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM members WHERE id = $1`, memberID).Scan(&members); err != nil {
+		t.Fatal(err)
+	}
+	if members != 0 {
+		t.Errorf("member rows = %d, want 0 (0013 clears members)", members)
+	}
+	var reportOwner sql.NullInt64
+	if err := db.QueryRowContext(ctx, `SELECT member_id FROM reports WHERE image_sha256 = $1`, sha).
+		Scan(&reportOwner); err != nil {
+		t.Fatalf("report row missing after 0013: %v", err)
+	}
+	if reportOwner.Valid {
+		t.Errorf("report member_id = %d, want NULL (ownership released)", reportOwner.Int64)
+	}
+	var images, ocrs int
+	if err := db.QueryRowContext(ctx, `SELECT
+		(SELECT COUNT(*) FROM images WHERE sha256 = $1),
+		(SELECT COUNT(*) FROM ocr_results WHERE image_sha256 = $1)`, sha).Scan(&images, &ocrs); err != nil {
+		t.Fatal(err)
+	}
+	if images != 1 || ocrs != 1 {
+		t.Errorf("image/ocr rows = %d/%d, want 1/1 (history retained)", images, ocrs)
+	}
+	var isChildCols, precisionCols int
+	if err := db.QueryRowContext(ctx, `SELECT
+		(SELECT COUNT(*) FROM information_schema.columns WHERE table_name='members' AND column_name='is_child'),
+		(SELECT COUNT(*) FROM information_schema.columns WHERE table_name='members' AND column_name='birth_date_precision')`).
+		Scan(&isChildCols, &precisionCols); err != nil {
+		t.Fatal(err)
+	}
+	if isChildCols != 0 || precisionCols != 0 {
+		t.Errorf("legacy is_child/precision columns = %d/%d, want 0/0", isChildCols, precisionCols)
+	}
+
+	for _, query := range []string{
+		`DELETE FROM reports WHERE image_sha256 = $1`,
+		`DELETE FROM ocr_results WHERE image_sha256 = $1`,
+		`DELETE FROM images WHERE sha256 = $1`,
+	} {
+		if _, err := db.ExecContext(ctx, query, sha); err != nil {
+			t.Fatalf("cleanup: %v", err)
+		}
 	}
 }

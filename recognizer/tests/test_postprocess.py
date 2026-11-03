@@ -906,6 +906,177 @@ def test_sections_status_ignores_report_date() -> None:
     assert section_of(r, "impression").text == "正常。"
 
 
+# ---------- 病历(llm-analysis 票 03:叙述型报告,标题词切段 + 整页兜底) ----------
+
+
+def test_clinical_note_prefers_record_date_and_stops_treatment_at_footer() -> None:
+    """记录日期优先于初诊时间；页脚 / 页码 / 记录日期 / 底部杂字不并入处理段落。"""
+    cells = [
+        {"x": 100, "y": -40, "text": "门诊病历"},
+        {"x": 100, "y": 0, "text": "初诊时间：2026-02-1309:42"},
+        {"x": 100, "y": 15, "text": "主诉：发现转氨酶升高1周"},
+        {"x": 100, "y": 30, "text": "现病史：平时食欲可，无恶心呕吐。"},
+        {"x": 100, "y": 45, "text": "诊断：肝功能不全"},
+        {"x": 100, "y": 60, "text": "处理：服药治疗不适随诊"},
+        {"x": 100, "y": 75, "text": "请妥善保管门诊病历，以便以后就诊使用。"},
+        {"x": 900, "y": 90, "text": "第1页"},
+        {"x": 1000, "y": 105, "text": "记录日期：2026-02-1409:42"},
+        {"x": 250, "y": 120, "text": "LUUCKY"},
+    ]
+    r = run_postprocess(mk_ocr(cells))
+    assert r.report_type == "clinical_note"
+    assert r.report_date == "2026-02-14"
+    assert section_of(r, "treatment").text == "服药治疗不适随诊"
+    joined = "\n".join(section.text for section in r.sections or [])
+    assert "请妥善保管" not in joined
+    assert "第1页" not in joined
+    assert "记录日期" not in joined
+    assert "LUUCKY" not in joined
+
+
+def test_clinical_note_falls_back_to_initial_visit_time() -> None:
+    """没有记录日期时使用初诊时间。"""
+    cells = [
+        {"x": 100, "y": -40, "text": "门诊病历"},
+        {"x": 100, "y": 0, "text": "初诊时间：2026-02-1309:42"},
+        {"x": 100, "y": 15, "text": "主诉：发热3天。"},
+    ]
+    r = run_postprocess(mk_ocr(cells))
+    assert r.report_type == "clinical_note"
+    assert r.report_date == "2026-02-13"
+
+
+def test_clinical_note_does_not_use_unrelated_date_line() -> None:
+    """病历没有日期标签时不抓出生日期等独立日期行。"""
+    cells = [
+        {"x": 100, "y": -40, "text": "门诊病历"},
+        {"x": 100, "y": 0, "text": "出生日期：1993-02-26"},
+        {"x": 100, "y": 15, "text": "主诉：发热3天。"},
+    ]
+    r = run_postprocess(mk_ocr(cells))
+    assert r.report_type == "clinical_note"
+    assert r.report_date is None
+
+
+def test_clinical_note_sections_split_by_title_words() -> None:
+    """病历按标题词切主诉 / 现病史 / 诊断 / 处理,原文与行号逐段留痕。"""
+    cells = [
+        {"x": 100, "y": -40, "text": "门诊病历"},
+        {"x": 100, "y": 0, "text": "主诉：发热3天。"},
+        {"x": 100, "y": 15, "text": "现病史：3天前出现发热，最高38.5℃。"},
+        {"x": 100, "y": 30, "text": "初步诊断：上呼吸道感染。"},
+        {"x": 100, "y": 45, "text": "处理：多饮水，对症退热。"},
+    ]
+    r = run_postprocess(mk_ocr(cells))
+    assert r.report_type == "clinical_note"
+    assert r.status == "success"
+    assert r.items == []
+    assert r.panels == ["clinical_note"]
+    assert section_of(r, "chief_complaint").text == "发热3天。"
+    assert section_of(r, "present_illness").text == "3天前出现发热，最高38.5℃。"
+    assert section_of(r, "diagnosis").text == "上呼吸道感染。"
+    assert section_of(r, "treatment").text == "多饮水，对症退热。"
+    assert section_of(r, "diagnosis").ocr_line_numbers == [3]
+
+
+def test_clinical_note_falls_back_to_single_note_section() -> None:
+    """切不出标题词时整页原文作为一个 note 段落,信息不丢。"""
+    cells = [
+        {"x": 100, "y": -40, "text": "门诊病历"},
+        {"x": 100, "y": 0, "text": "患儿今日复诊。"},
+        {"x": 100, "y": 15, "text": "一般情况可,继续观察。"},
+    ]
+    r = run_postprocess(mk_ocr(cells))
+    assert r.report_type == "clinical_note"
+    assert r.status == "success"
+    assert len(r.sections or []) == 1
+    note = section_of(r, "note")
+    assert note.text == "门诊病历\n患儿今日复诊。\n一般情况可,继续观察。"
+    assert note.ocr_line_numbers == [0, 1, 2]
+
+
+def test_clinical_note_empty_page_fails_like_existing_empty_reports() -> None:
+    """空病历走既有 failed 规则:无类别、无 items、无 sections。"""
+    r = run_postprocess(mk_ocr([]))
+    assert r.report_type == "unknown"
+    assert r.status == "failed"
+    assert r.items == []
+    assert r.sections is None
+
+
+def test_clinical_note_title_does_not_steal_lab_reports_with_medical_record_number() -> None:
+    """「病历号」不是病历标题:无指标项的检验单不能因此变成 successful note。"""
+    cells = [
+        {"x": 100, "y": -40, "text": "XX医院病历号：123456"},
+    ]
+    r = run_postprocess(mk_ocr(cells))
+    assert r.report_type == "unknown"
+    assert r.status == "failed"
+    assert r.sections is None
+
+
+def test_clinical_note_without_title_qualifies_by_two_section_anchors() -> None:
+    """裁剪 / 近拍丢失标题时,主诉 + 现病史 + 诊断等段落锚 ≥2 仍归档为病历。"""
+    cells = [
+        {"x": 100, "y": 0, "text": "主诉：发热3天。"},
+        {"x": 100, "y": 15, "text": "现病史：3天前出现发热。"},
+        {"x": 100, "y": 30, "text": "初步诊断：上呼吸道感染。"},
+    ]
+    r = run_postprocess(mk_ocr(cells))
+    assert r.report_type == "clinical_note"
+    assert r.status == "success"
+    assert section_of(r, "chief_complaint").text == "发热3天。"
+    assert section_of(r, "diagnosis").text == "上呼吸道感染。"
+
+
+def test_single_diagnosis_line_does_not_classify_as_clinical_note() -> None:
+    """检验单只有一条「诊断：」时不足以抢成病历(需 ≥2 个段落锚)。"""
+    cells = [
+        {"x": 100, "y": -40, "text": "检验报告单"},
+        {"x": 100, "y": 0, "text": "诊断：上呼吸道感染"},
+    ]
+    r = run_postprocess(mk_ocr(cells))
+    assert r.report_type == "unknown"
+    assert r.status == "failed"
+    assert r.sections is None
+
+
+def test_clinical_note_bare_title_is_recognized() -> None:
+    """标题只写「病历」也识别为病历,整页兜底为 note。"""
+    cells = [
+        {"x": 100, "y": -40, "text": "病历"},
+        {"x": 100, "y": 0, "text": "患儿今日复诊。"},
+    ]
+    r = run_postprocess(mk_ocr(cells))
+    assert r.report_type == "clinical_note"
+    assert r.status == "success"
+    assert section_of(r, "note").text == "病历\n患儿今日复诊。"
+
+
+def test_clinical_note_doctor_signature_is_not_a_section_anchor() -> None:
+    """「诊断医师」「处理医师」不是诊断 / 处理段落;切不出正文时整页兜底 note。"""
+    cells = [
+        {"x": 100, "y": -40, "text": "门诊病历"},
+        {"x": 100, "y": 0, "text": "诊断医师：张医生"},
+        {"x": 100, "y": 15, "text": "处理医师：李医生"},
+    ]
+    r = run_postprocess(mk_ocr(cells))
+    assert r.report_type == "clinical_note"
+    assert len(r.sections or []) == 1
+    assert section_of(r, "note").text == "门诊病历\n诊断医师：张医生\n处理医师：李医生"
+
+
+def test_clinical_note_title_does_not_steal_lab_reports_with_diagnosis_line() -> None:
+    """检验单里的「诊断：」行不能把报告抢成病历;标题与指标项仍按检验单分类。"""
+    cells = header_row() + row(30, "血红蛋白", "128", unit="g/L", ref="115-150") + [
+        {"x": 20, "y": 60, "text": "诊断：上呼吸道感染"},
+    ]
+    r = run_postprocess(mk_ocr(cells))
+    assert r.report_type == "临检"
+    assert len(r.items) == 1
+    assert r.sections is None
+
+
 # ---------- 单位规一化(印刷损耗形 → 词典注册的规范印形,单位表) ----------
 
 

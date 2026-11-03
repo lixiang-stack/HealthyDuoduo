@@ -15,9 +15,11 @@ import {
   type EditDraft,
 } from '../members/components';
 import { useCurrentMember } from '../members/CurrentMemberContext';
+import { memberProfileValid, type MemberSex } from '../members/profile';
 
-// 成员页(票 05):几十秒配好全家档案——建成员(显示名 + 是否孩子)、改名、改档;
-// 点选当前成员(经 CurrentMemberContext 供时间线过滤与上传归属默认消费,票 06+)。
+// 成员页(票 05 / llm-analysis 票 01):建成员(称呼 + 性别 + 出生日期)、改称呼、改资料;
+// 是否孩子由后端按生日计算。点选当前成员(经 CurrentMemberContext 供时间线过滤与上传归属默认消费,
+// 票 06+)。
 // 列表按创建序;删除成员会一并删除其全部报告(原图与 OCR 历史保留),不可恢复。
 
 type ScreenState =
@@ -38,7 +40,8 @@ export default function MembersScreen() {
   const { currentMemberId, selectMember, clearMember } = useCurrentMember();
   const [state, setState] = useState<ScreenState>({ status: 'loading' });
   const [name, setName] = useState('');
-  const [isChild, setIsChild] = useState(false);
+  const [sex, setSex] = useState<MemberSex>();
+  const [birthDate, setBirthDate] = useState('');
   const [editing, setEditing] = useState<EditDraft>();
   const [deleting, setDeleting] = useState<DeleteState>();
   const [busy, setBusy] = useState(false);
@@ -80,7 +83,7 @@ export default function MembersScreen() {
 
   const onCreate = useCallback(() => {
     const trimmed = name.trim();
-    if (!trimmed) {
+    if (!sex || !memberProfileValid(name, sex, birthDate)) {
       return;
     }
     void runAction(async () => {
@@ -89,19 +92,24 @@ export default function MembersScreen() {
         setState({ status: 'unconfigured' });
         return;
       }
-      await createMember(resolved.client, { name: trimmed, is_child: isChild });
+      await createMember(resolved.client, {
+        name: trimmed,
+        sex,
+        birth_date: birthDate,
+      });
       setName('');
-      setIsChild(false);
+      setSex(undefined);
+      setBirthDate('');
       await reload();
     });
-  }, [name, isChild, runAction, reload]);
+  }, [name, sex, birthDate, runAction, reload]);
 
   const onSaveEdit = useCallback(() => {
     if (!editing) {
       return;
     }
     const trimmed = editing.name.trim();
-    if (!trimmed) {
+    if (!memberProfileValid(editing.name, editing.sex, editing.birthDate)) {
       return;
     }
     void runAction(async () => {
@@ -112,7 +120,8 @@ export default function MembersScreen() {
       }
       await updateMember(resolved.client, editing.memberId, {
         name: trimmed,
-        is_child: editing.isChild,
+        sex: editing.sex,
+        birth_date: editing.birthDate,
       });
       setEditing(undefined);
       await reload();
@@ -208,7 +217,7 @@ export default function MembersScreen() {
       {state.status === 'ready' ? (
         <View style={styles.stack}>
           {members.length === 0 ? (
-            <Text style={sharedStyles.muted}>还没有家庭成员。先给家人建一个:填显示名,选择是否孩子。</Text>
+            <Text style={sharedStyles.muted}>还没有家庭成员。先给家人建一个:填称呼、性别与出生日期。</Text>
           ) : (
             members.map((m) => {
               if (deleting?.member.member_id === m.member_id) {
@@ -248,7 +257,12 @@ export default function MembersScreen() {
                   onEdit={() => {
                     deleteRequestId.current++;
                     setDeleting(undefined);
-                    setEditing({ memberId: m.member_id, name: m.name, isChild: m.is_child });
+                    setEditing({
+                      memberId: m.member_id,
+                      name: m.name,
+                      sex: m.sex,
+                      birthDate: m.birth_date,
+                    });
                   }}
                   onDelete={() => loadDeleteCount(m)}
                 />
@@ -258,10 +272,18 @@ export default function MembersScreen() {
           {actionError ? <Text style={styles.fail}>{actionError}</Text> : null}
           <MemberCreateForm
             name={name}
-            isChild={isChild}
+            sex={sex}
+            birthDate={birthDate}
             busy={busy}
             onNameChange={setName}
-            onIsChildChange={setIsChild}
+            onProfileChange={(patch) => {
+              if (patch.sex !== undefined) {
+                setSex(patch.sex);
+              }
+              if (patch.birthDate !== undefined) {
+                setBirthDate(patch.birthDate);
+              }
+            }}
             onSubmit={() => void onCreate()}
           />
         </View>

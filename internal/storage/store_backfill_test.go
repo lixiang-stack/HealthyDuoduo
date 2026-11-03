@@ -43,7 +43,7 @@ func TestBackfillStoreSmoke(t *testing.T) {
 	}
 
 	var memberID int64
-	if err := pool.QueryRow(ctx, `INSERT INTO members (name, is_child) VALUES ('回填测试成员', true) RETURNING id`).
+	if err := pool.QueryRow(ctx, `INSERT INTO members (name, sex, birth_date) VALUES ('回填测试成员', 'female', '2020-01-01') RETURNING id`).
 		Scan(&memberID); err != nil {
 		t.Fatalf("seed member: %v", err)
 	}

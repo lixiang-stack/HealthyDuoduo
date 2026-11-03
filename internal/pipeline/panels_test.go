@@ -15,7 +15,7 @@ func TestPanelOrderFixed(t *testing.T) {
 	want := []string{
 		"liver", "kidney", "lipid", "glucose", "uric_acid", "electrolyte",
 		"vitanemia", "thyroid", "sex_hormone", "infection", "autoimmune",
-		"coag", "cbc", "urinalysis", "imaging", "other",
+		"coag", "cbc", "urinalysis", "imaging", "clinical_note", "other",
 	}
 	if len(panelOrder) != len(want) {
 		t.Fatalf("panelOrder = %v, want %d codes", panelOrder, len(want))
@@ -100,6 +100,9 @@ func TestSortPanelSummaries(t *testing.T) {
 func TestPanelNarrative(t *testing.T) {
 	if !IsNarrativePanel("imaging") {
 		t.Error("imaging must be narrative")
+	}
+	if !IsNarrativePanel("clinical_note") {
+		t.Error("clinical_note must be narrative")
 	}
 	if IsNarrativePanel("liver") {
 		t.Error("liver is not narrative")

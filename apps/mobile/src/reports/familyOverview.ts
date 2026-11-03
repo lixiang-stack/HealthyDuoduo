@@ -2,6 +2,7 @@
 // 异常指标总数 + 项目数、最近报告偏高 / 偏低、报告总数。空白成员只给空文案。
 import type { PanelSummary, ReportSummary } from '../api/reports';
 
+import { reportTypeLabel } from './category';
 import { pendingSummary } from './overview';
 import { sortReports } from './order';
 import { abnormalPanelCount, totalAbnormalCount } from './panelOverview';
@@ -61,7 +62,7 @@ export function familyCardSummary(
       : `最近：${
           latestReport.panels.length > 0
             ? panelLabel(latestReport.panels[0])
-            : latestReport.report_type
+            : reportTypeLabel(latestReport.report_type)
         } · ${reportDateLabel(latestReport)}${relative ? ` · ${relative}` : ''}`;
 
   const pending = pendingSummary(reports);

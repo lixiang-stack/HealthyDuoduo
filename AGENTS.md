@@ -116,6 +116,7 @@
 
 - 修 bug 先写复现测试；改既有函数先读其单元测试；失败测试必须修好或说明，不跳过。
 - 关键逻辑必有单元测试；数据链路按 `docs/agents/e2e.md` 验证；App 屏幕逻辑用 `npm test` 的 RNTL 测试，合并 UI 改动前按 `apps/mobile/ANDROID.md` 做真机 smoke。
+- 改存储 / 迁移或新增服务端派生字段时，跑 `scripts/test-db.sh`；fake 必须镜像真实派生规则，详见 `docs/agents/testing.md`。
 - 测试数据尽量用真实 golden，不用凭空捏造的占位数据。
 
 ## 文档规则
@@ -135,6 +136,10 @@
 ### Triage labels
 
 五个状态角色沿用默认标签字符串（needs-triage / needs-info / ready-for-agent / ready-for-human / wontfix）。详见 `docs/agents/triage-labels.md`。
+
+### Contract changes
+
+改 schema、字段、枚举、panel 或叙述型报告前，先看 `docs/agents/contracts.md`：列出 Python / Go / App codegen / fixtures / E2E 的镜像点与收尾清单。
 
 ### Domain docs
 

@@ -3,7 +3,7 @@ import reportSchema from '../../../../schemas/report.schema.json';
 import { PANEL_LABELS, PANEL_ORDER, panelLabel } from './panels';
 
 describe('PANEL_ORDER', () => {
-  it('覆盖全部 16 个 code,顺序固定(spec §5.3)', () => {
+  it('覆盖全部 17 个 code,顺序固定(spec §5.3)', () => {
     expect(PANEL_ORDER).toEqual([
       'liver',
       'kidney',
@@ -20,6 +20,7 @@ describe('PANEL_ORDER', () => {
       'cbc',
       'urinalysis',
       'imaging',
+      'clinical_note',
       'other',
     ]);
     expect(Object.keys(PANEL_LABELS).sort()).toEqual([...PANEL_ORDER].sort());

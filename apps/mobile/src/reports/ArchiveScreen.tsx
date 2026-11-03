@@ -291,7 +291,7 @@ function PanelBrowser({ memberId, onShowTime }: { memberId: number; onShowTime: 
       ) : null}
       {state.panels.map((panel) => {
         const source = panelSourceLabel(panel.panel, panel.report_types);
-        const date = panelDateLabel(panel.latest_report_date, panel.narrative);
+        const date = panelDateLabel(panel.latest_report_date, panel.narrative, panel.panel);
         const meta = panel.narrative
           ? `${panel.report_count} 份 · 叙述型报告`
           : `${panel.report_count} 份 · ${panel.abnormal_count} 项异常 · ${panel.item_count} 项指标`;

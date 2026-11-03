@@ -9,6 +9,11 @@ export const SECTION_LABELS: Record<string, string> = {
   [EXAM_NAME_KIND]: '检查项目',
   findings: '检查所见',
   impression: '超声提示',
+  chief_complaint: '主诉',
+  present_illness: '现病史',
+  diagnosis: '诊断',
+  treatment: '处理',
+  note: '原文',
 };
 
 export type ReportSectionSlot = {

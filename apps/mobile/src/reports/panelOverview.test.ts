@@ -185,6 +185,16 @@ describe('reportPanelLabels', () => {
       reportPanelLabels(summary(['other'], { report_type: '其他专项', status: 'failed' })),
     ).toBe('其他专项');
     expect(reportPanelLabels(summary([], { report_type: '血常规' }))).toBe('血常规');
+    expect(
+      reportPanelLabels(
+        summary(['clinical_note'], { report_type: 'clinical_note' }),
+      ),
+    ).toBe('病历');
+    expect(
+      reportPanelLabels(
+        summary([], { report_type: 'clinical_note', status: 'failed' }),
+      ),
+    ).toBe('病历');
   });
 });
 
@@ -195,6 +205,9 @@ describe('reportTypeNote', () => {
     expect(reportTypeNote(summary(us01.panels, { report_type: '影像' }))).toBeUndefined();
     expect(reportTypeNote(summary(['other'], { status: 'failed' }))).toBeUndefined();
     expect(reportTypeNote(summary([], { report_type: '血常规' }))).toBeUndefined();
+    expect(
+      reportTypeNote(summary(['clinical_note'], { report_type: 'clinical_note' })),
+    ).toBeUndefined();
   });
 });
 

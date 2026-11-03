@@ -66,7 +66,9 @@ func getTrend(t *testing.T, srv *httptest.Server, memberID, name, unit string) (
 func newTrendMember(t *testing.T) (*fakeMemberStore, int64) {
 	t.Helper()
 	ms := &fakeMemberStore{}
-	member, err := ms.CreateMember(context.Background(), "小明", true)
+	member, err := ms.CreateMember(context.Background(), pipeline.MemberProfile{
+		Name: "小明", Sex: pipeline.SexMale, BirthDate: "2020-01-01",
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
