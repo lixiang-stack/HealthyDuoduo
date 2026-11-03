@@ -2,12 +2,9 @@ import { Link, router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import {
-  ANALYSIS_DEFAULT_WINDOW_MONTHS,
-  type AnalysisWindowMonths,
-} from '../../api/analyses';
 import type { PanelItem } from '../../api/reports';
 import { AnalysisConsentModal } from '../../analysis/ConsentModal';
+import { TimeRangeModal } from '../../analysis/TimeRangeModal';
 import { useStartAnalysis } from '../../analysis/useStartAnalysis';
 import { sharedStyles } from '../../components/styles';
 import { colors } from '../../components/theme';
@@ -48,10 +45,7 @@ export default function PanelDetailScreen() {
   const panel = parsePanelParam(params.panel);
   const { currentMemberId } = useCurrentMember();
   const { state, reload } = usePanelDetail(currentMemberId, panel);
-  const [windowMonths, setWindowMonths] = useState<AnalysisWindowMonths>(
-    ANALYSIS_DEFAULT_WINDOW_MONTHS,
-  );
-  const analysis = useStartAnalysis(currentMemberId, panel, windowMonths);
+  const analysis = useStartAnalysis(currentMemberId, panel);
   const [detailTrend, setDetailTrend] = useState<PanelTrend>();
   // 原图是独立路由;Modal 在跳转时隐藏但保持挂载,返回后原位恢复选中点。
   const [sheetHidden, setSheetHidden] = useState(false);
@@ -146,27 +140,6 @@ export default function PanelDetailScreen() {
                     {panelSourceLabel(detail.panel, detail.report_types)}
                   </Text>
                 ) : null}
-                <View style={styles.windowRow}>
-                  <Text style={styles.windowLabel}>时间范围</Text>
-                  {([6, 12, 24] as const).map((months) => {
-                    const active = months === windowMonths;
-                    return (
-                      <Pressable
-                        key={months}
-                        testID={`panel-window-${months}`}
-                        accessibilityRole="button"
-                        accessibilityLabel={`时间范围 ${months} 个月`}
-                        accessibilityState={{ selected: active }}
-                        onPress={() => setWindowMonths(months)}
-                        style={[styles.windowChip, active && styles.windowChipActive]}
-                      >
-                        <Text style={active ? styles.windowTextActive : styles.windowText}>
-                          {months} 个月
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
                 <Pressable
                   testID="panel-analyze"
                   accessibilityRole="button"
@@ -311,6 +284,13 @@ export default function PanelDetailScreen() {
           }}
         />
       ) : null}
+      <TimeRangeModal
+        key={analysis.rangeOpen ? 'range-open' : 'range-closed'}
+        visible={analysis.rangeOpen}
+        busy={analysis.starting}
+        onConfirm={(months) => void analysis.confirmRange(months)}
+        onCancel={analysis.cancelRange}
+      />
       <AnalysisConsentModal
         visible={analysis.pendingConsent}
         busy={analysis.starting}
@@ -521,18 +501,6 @@ const styles = StyleSheet.create({
   emptyChart: { fontSize: 12, color: colors.muted },
   meta: { fontSize: 12, color: colors.muted, lineHeight: 18 },
   detailLink: { alignSelf: 'flex-end', fontSize: 13, color: colors.accent },
-  windowRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  windowLabel: { fontSize: 13, color: colors.muted },
-  windowChip: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-  },
-  windowChipActive: { borderColor: colors.accent, backgroundColor: colors.accent },
-  windowText: { fontSize: 13, color: colors.text },
-  windowTextActive: { fontSize: 13, color: colors.onAccent },
   analyzeButton: {
     alignSelf: 'flex-start',
     paddingVertical: 10,

@@ -108,7 +108,7 @@ paths:
       description: |
         按测量日期降序(同日按记录 id 降序)返回该成员全部生长记录。
         BMI 由测量时点的身高体重实时计算,不缓存;weight_status 为超重 / 肥胖判定,
-        手输来源(manual)与百分位不可用时为 null。
+        百分位规则落地前为 null。
       parameters:
         - $ref: "#/components/parameters/MemberID"
       responses:
@@ -125,7 +125,7 @@ paths:
       summary: 新增生长记录
       description: |
         每次测量一行:measured_on 与 source 必填,height_cm / weight_kg 至少一项。
-        source=manual 时只输出 BMI 数值,不输出超重 / 肥胖判定。
+        来源只记录实测 / 体检单,用于区分测量值可信度。
       parameters:
         - $ref: "#/components/parameters/MemberID"
       requestBody:
@@ -552,15 +552,15 @@ components:
           description: 最近一次生长记录(按测量日期降序);没有记录为 null
     GrowthSource:
       type: string
-      enum: [measured, report, manual]
-      description: 生长记录来源:实测 / 体检单 / 手输。
+      enum: [measured, report]
+      description: 生长记录来源:实测 / 体检单。
     GrowthRecord:
       type: object
       additionalProperties: false
       required: [growth_id, member_id, measured_on, height_cm, weight_kg, source, bmi, weight_status]
       description: |
         一条生长记录。BMI 由测量时点的身高体重实时计算,不缓存;weight_status 为超重 / 肥胖判定,
-        source=manual 或年龄性别百分位不可用时为 null。
+        年龄性别百分位规则落地前为 null。
       properties:
         growth_id:
           type: integer
@@ -585,7 +585,7 @@ components:
           description: BMI = 体重(kg) / 身高(m)²,保留一位小数;身高体重缺一时为 null
         weight_status:
           type: [string, "null"]
-          description: 超重 / 肥胖判定;source=manual 或百分位不可用时为 null
+          description: 超重 / 肥胖判定;百分位规则落地前为 null
     GrowthRecordCreate:
       type: object
       additionalProperties: false

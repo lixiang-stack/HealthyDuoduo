@@ -6,7 +6,6 @@ import { parseBirthDate } from './profile';
 export const GROWTH_SOURCE_OPTIONS: readonly { value: GrowthSource; label: string }[] = [
   { value: 'measured', label: '实测' },
   { value: 'report', label: '体检单' },
-  { value: 'manual', label: '手输' },
 ];
 
 export function growthSourceLabel(source: GrowthSource): string {
@@ -94,7 +93,7 @@ export function todayISO(now = new Date()): string {
   return `${year}-${month}-${day}`;
 }
 
-/** 成员列表的一行摘要:有值才显示,手输来源不显示超重 / 肥胖判定。 */
+/** 成员列表的一行摘要:来源 + 有值的测量项 + BMI + 日期。 */
 export function growthSummary(record: GrowthRecord): string {
   const parts: string[] = [growthSourceLabel(record.source)];
   if (record.height_cm !== null) {

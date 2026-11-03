@@ -54,11 +54,11 @@ func TestGrowthStoreSmoke(t *testing.T) {
 		t.Fatalf("create newer: %v", err)
 	}
 	height = 119
-	manual, err := st.CreateGrowth(ctx, member.MemberID, pipeline.GrowthProfile{
-		MeasuredOn: "2026-10-01", HeightCm: &height, Source: pipeline.GrowthSourceManual,
+	heightOnly, err := st.CreateGrowth(ctx, member.MemberID, pipeline.GrowthProfile{
+		MeasuredOn: "2026-09-01", HeightCm: &height, Source: pipeline.GrowthSourceReport,
 	})
 	if err != nil {
-		t.Fatalf("create manual: %v", err)
+		t.Fatalf("create height-only: %v", err)
 	}
 
 	if older.BMI == nil || *older.BMI != 15.9 {
@@ -67,11 +67,14 @@ func TestGrowthStoreSmoke(t *testing.T) {
 	if newer.BMI == nil || *newer.BMI != 16 {
 		t.Errorf("newer BMI = %v, want 16", newer.BMI)
 	}
-	if manual.BMI != nil {
-		t.Errorf("height-only BMI = %v, want nil", *manual.BMI)
+	if heightOnly.BMI != nil {
+		t.Errorf("height-only BMI = %v, want nil", *heightOnly.BMI)
 	}
-	if manual.WeightStatus != nil {
-		t.Errorf("manual weight_status = %v, want nil", *manual.WeightStatus)
+	if heightOnly.WeightStatus != nil {
+		t.Errorf("height-only weight_status = %v, want nil", *heightOnly.WeightStatus)
+	}
+	if heightOnly.Source != pipeline.GrowthSourceReport {
+		t.Errorf("height-only source = %q, want report", heightOnly.Source)
 	}
 
 	records, err := st.ListGrowth(ctx, member.MemberID)
@@ -81,24 +84,23 @@ func TestGrowthStoreSmoke(t *testing.T) {
 	if len(records) != 3 {
 		t.Fatalf("records = %d, want 3", len(records))
 	}
-	// 同日按 id 降序:manual 后写入,排在同日 newer 之前。
-	if records[0].GrowthID != manual.GrowthID || records[1].GrowthID != newer.GrowthID ||
+	if records[0].GrowthID != newer.GrowthID || records[1].GrowthID != heightOnly.GrowthID ||
 		records[2].GrowthID != older.GrowthID {
-		t.Fatalf("list order = %v/%v/%v, want manual/newer/older",
+		t.Fatalf("list order = %v/%v/%v, want newer/height-only/older",
 			records[0].GrowthID, records[1].GrowthID, records[2].GrowthID)
 	}
 
-	// 成员列表 / 单成员视图带最近一次记录(同测量日期取 id 最大的 manual)。
+	// 成员列表 / 单成员视图带最近一次记录。
 	members, err := st.ListMembers(ctx)
 	if err != nil {
 		t.Fatalf("list members: %v", err)
 	}
 	if len(members) != 1 || members[0].LatestGrowth == nil ||
-		members[0].LatestGrowth.GrowthID != manual.GrowthID {
-		t.Fatalf("member latest growth = %+v, want growth %d", members[0].LatestGrowth, manual.GrowthID)
+		members[0].LatestGrowth.GrowthID != newer.GrowthID {
+		t.Fatalf("member latest growth = %+v, want growth %d", members[0].LatestGrowth, newer.GrowthID)
 	}
 	got, err := st.MemberByID(ctx, member.MemberID)
-	if err != nil || got == nil || got.LatestGrowth == nil || got.LatestGrowth.GrowthID != manual.GrowthID {
+	if err != nil || got == nil || got.LatestGrowth == nil || got.LatestGrowth.GrowthID != newer.GrowthID {
 		t.Fatalf("MemberByID latest growth = %+v, err = %v", got, err)
 	}
 

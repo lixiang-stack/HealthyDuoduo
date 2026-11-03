@@ -84,14 +84,14 @@ export interface paths {
          * 生长记录列表
          * @description 按测量日期降序(同日按记录 id 降序)返回该成员全部生长记录。
          *     BMI 由测量时点的身高体重实时计算,不缓存;weight_status 为超重 / 肥胖判定,
-         *     手输来源(manual)与百分位不可用时为 null。
+         *     百分位规则落地前为 null。
          */
         get: operations["listGrowth"];
         put?: never;
         /**
          * 新增生长记录
          * @description 每次测量一行:measured_on 与 source 必填,height_cm / weight_kg 至少一项。
-         *     source=manual 时只输出 BMI 数值,不输出超重 / 肥胖判定。
+         *     来源只记录实测 / 体检单,用于区分测量值可信度。
          */
         post: operations["createGrowth"];
         delete?: never;
@@ -366,13 +366,13 @@ export interface components {
             latest_growth: components["schemas"]["GrowthRecord"] | null;
         };
         /**
-         * @description 生长记录来源:实测 / 体检单 / 手输。
+         * @description 生长记录来源:实测 / 体检单。
          * @enum {string}
          */
-        GrowthSource: "measured" | "report" | "manual";
+        GrowthSource: "measured" | "report";
         /**
          * @description 一条生长记录。BMI 由测量时点的身高体重实时计算,不缓存;weight_status 为超重 / 肥胖判定,
-         *     source=manual 或年龄性别百分位不可用时为 null。
+         *     年龄性别百分位规则落地前为 null。
          */
         GrowthRecord: {
             /** Format: int64 */
@@ -388,7 +388,7 @@ export interface components {
             source: components["schemas"]["GrowthSource"];
             /** @description BMI = 体重(kg) / 身高(m)²,保留一位小数;身高体重缺一时为 null */
             bmi: number | null;
-            /** @description 超重 / 肥胖判定;source=manual 或百分位不可用时为 null */
+            /** @description 超重 / 肥胖判定;百分位规则落地前为 null */
             weight_status: string | null;
         };
         GrowthRecordCreate: {

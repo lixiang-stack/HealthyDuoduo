@@ -16,7 +16,7 @@
       "measured_on": "2026-06-01",
       "height_cm": 115,
       "weight_kg": null,
-      "source": "manual",
+      "source": "report",
       "bmi": null,
       "weight_status": null
     }

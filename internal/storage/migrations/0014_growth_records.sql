@@ -9,7 +9,7 @@ CREATE TABLE growth_records (
     measured_on DATE NOT NULL,
     height_cm   DOUBLE PRECISION CHECK (height_cm > 0),
     weight_kg   DOUBLE PRECISION CHECK (weight_kg > 0),
-    source      TEXT NOT NULL CHECK (source IN ('measured', 'report', 'manual')),
+    source      TEXT NOT NULL CHECK (source IN ('measured', 'report')),
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT growth_records_measurement_present CHECK (height_cm IS NOT NULL OR weight_kg IS NOT NULL)
 );

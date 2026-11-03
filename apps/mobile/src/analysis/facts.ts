@@ -72,7 +72,7 @@ export function exclusionItemsText(group: ExclusionGroup): string {
 
 export function windowText(facts: AnalysisFacts): string {
   const base = `${facts.window.from} 至 ${facts.window.to}`;
-  return facts.window.sparse ? `${base}（历史数据较少，已向前扩展）` : base;
+  return facts.window.sparse ? `${base}（部分指标历史数据较少）` : base;
 }
 
 export function scopeText(facts: AnalysisFacts): string {

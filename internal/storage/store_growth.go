@@ -63,7 +63,7 @@ func scanGrowth(row pgx.Row, record *pipeline.GrowthRecord) error {
 		return err
 	}
 	record.BMI = pipeline.BMI(record.HeightCm, record.WeightKg)
-	// 超重 / 肥胖判定依赖年龄性别百分位(后续工单);手输来源永不输出判定。
+	// 超重 / 肥胖判定依赖年龄性别百分位(后续工单);当前不输出判定。
 	record.WeightStatus = nil
 	return nil
 }

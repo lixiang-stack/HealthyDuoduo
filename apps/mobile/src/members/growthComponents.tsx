@@ -35,7 +35,7 @@ export function GrowthForm({
   };
   return (
     <View style={styles.cardForm}>
-      <Text style={styles.sectionTitle}>记录生长</Text>
+      <Text style={styles.sectionTitle}>记录身高体重</Text>
       <Text style={sharedStyles.label}>测量日期 *</Text>
       <TextInput
         testID="growth-measured-on"
@@ -112,7 +112,7 @@ export function GrowthForm({
           );
         })}
       </View>
-      <Text style={styles.hint}>手输来源只显示 BMI 数值，不做超重 / 肥胖判定。</Text>
+      <Text style={styles.hint}>来源只记录实测 / 体检单，用于区分测量值可信度。</Text>
       <View style={sharedStyles.horizontal}>
         <Pressable
           testID="growth-submit"

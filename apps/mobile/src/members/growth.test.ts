@@ -1,9 +1,20 @@
-import { growthCreateBody, growthFormErrors, growthSummary, todayISO, validMeasuredOn } from './growth';
+import {
+  GROWTH_SOURCE_OPTIONS,
+  growthCreateBody,
+  growthFormErrors,
+  growthSummary,
+  todayISO,
+  validMeasuredOn,
+} from './growth';
 import { makeGrowthRecord } from '../test/fixtures';
 
 const NOW = new Date(2026, 10, 3);
 
 describe('growth form rules', () => {
+  it('only offers measured and report sources', () => {
+    expect(GROWTH_SOURCE_OPTIONS.map((option) => option.value)).toEqual(['measured', 'report']);
+  });
+
   it('accepts a valid date and rejects invalid or future dates', () => {
     expect(validMeasuredOn('2026-10-01', NOW)).toBe(true);
     expect(validMeasuredOn('2026-02-30', NOW)).toBe(false);
@@ -45,8 +56,8 @@ describe('growth form rules', () => {
       '实测 · 身高 118.5 cm · 体重 22.4 kg · BMI 16.0 · 2026-10-01',
     );
     expect(
-      growthSummary(makeGrowthRecord({ height_cm: 119, weight_kg: null, bmi: null, source: 'manual' })),
-    ).toBe('手输 · 身高 119 cm · 2026-10-01');
+      growthSummary(makeGrowthRecord({ height_cm: 119, weight_kg: null, bmi: null, source: 'report' })),
+    ).toBe('体检单 · 身高 119 cm · 2026-10-01');
   });
 
   it('defaults the measurement date to today', () => {

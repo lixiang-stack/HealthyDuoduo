@@ -160,6 +160,21 @@ describe('MembersScreen', () => {
     });
   });
 
+  it('hides the add-member card while editing a member', async () => {
+    useApi({
+      GET: { '/members': () => ({ members: [makeMember({ member_id: 1, name: '小明' })] }) },
+    });
+
+    await renderScreen(<MembersScreen />);
+    expect(await screen.findByText('小明')).toBeTruthy();
+    expect(screen.getByTestId('members-create')).toBeTruthy();
+
+    fireEvent.press(screen.getByText('编辑'));
+    expect(await screen.findByTestId('member-edit-save-1')).toBeTruthy();
+
+    expect(screen.queryByTestId('members-create')).toBeNull();
+  });
+
   it('shows the generic irreversible confirmation when the member has no reports', async () => {
     useApi({
       GET: {
@@ -211,7 +226,7 @@ describe('MembersScreen', () => {
         measured_on: string;
         height_cm?: number;
         weight_kg?: number;
-        source: 'measured' | 'report' | 'manual';
+        source: 'measured' | 'report';
       };
       const bmi =
         body.height_cm && body.weight_kg

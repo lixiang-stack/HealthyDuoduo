@@ -1,11 +1,20 @@
-import { useFocusEffect } from 'expo-router';
-import { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { router, Stack, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  BackHandler,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 import { createMember, deleteMember, listMembers, updateMember, type Member } from '../api/members';
 import { createGrowth } from '../api/growth';
 import { listReports } from '../api/reports';
 import { resolveApiClient } from '../api/resolveClient';
+import { HeaderBackButton } from '../components/HeaderBackButton';
 import { sharedStyles } from '../components/styles';
 import { colors } from '../components/theme';
 import {
@@ -223,12 +232,52 @@ export default function MembersScreen() {
     setDeleting(undefined);
   }, []);
 
+  const transient = editing !== undefined || growthFor !== undefined || deleting !== undefined;
+
+  // 编辑 / 生长 / 删除确认是成员页内的临时态:顶部返回键先取消当前操作,
+  // 不直接退回家庭页;没有临时态时才离开成员页。
+  const handleBack = useCallback(() => {
+    if (editing !== undefined) {
+      setEditing(undefined);
+      return;
+    }
+    if (growthFor !== undefined) {
+      setGrowthFor(undefined);
+      setGrowthDraft(undefined);
+      return;
+    }
+    if (deleting !== undefined) {
+      onCancelDelete();
+      return;
+    }
+    router.back();
+  }, [editing, growthFor, deleting, onCancelDelete]);
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (!transient) {
+        return false;
+      }
+      handleBack();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [transient, handleBack]);
+
   const members = state.status === 'ready' ? state.members : [];
   // 读取报告数期间禁用其他成员操作,避免两个删除确认的异步结果互相覆盖。
   const actionsDisabled = busy || deleting?.loading === true;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <>
+      <Stack.Screen
+        options={{
+          headerLeft: transient
+            ? () => <HeaderBackButton onPress={handleBack} />
+            : undefined,
+        }}
+      />
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {state.status === 'loading' ? (
         <View style={sharedStyles.horizontal}>
           <ActivityIndicator />
@@ -320,25 +369,28 @@ export default function MembersScreen() {
             })
           )}
           {actionError ? <Text style={styles.fail}>{actionError}</Text> : null}
-          <MemberCreateForm
-            name={name}
-            sex={sex}
-            birthDate={birthDate}
-            busy={busy}
-            onNameChange={setName}
-            onProfileChange={(patch) => {
-              if (patch.sex !== undefined) {
-                setSex(patch.sex);
-              }
-              if (patch.birthDate !== undefined) {
-                setBirthDate(patch.birthDate);
-              }
-            }}
-            onSubmit={() => void onCreate()}
-          />
+          {!transient ? (
+            <MemberCreateForm
+              name={name}
+              sex={sex}
+              birthDate={birthDate}
+              busy={busy}
+              onNameChange={setName}
+              onProfileChange={(patch) => {
+                if (patch.sex !== undefined) {
+                  setSex(patch.sex);
+                }
+                if (patch.birthDate !== undefined) {
+                  setBirthDate(patch.birthDate);
+                }
+              }}
+              onSubmit={() => void onCreate()}
+            />
+          ) : null}
         </View>
       ) : null}
-    </ScrollView>
+      </ScrollView>
+    </>
   );
 }
 

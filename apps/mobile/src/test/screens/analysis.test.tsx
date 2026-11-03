@@ -35,6 +35,19 @@ function mockApi(routes: Parameters<typeof createFakeApiClient>[0]) {
   });
 }
 
+/** 分析入口现在先弹时间范围;默认 12 个月,可改 6 / 24。 */
+async function chooseRange(months: 6 | 12 | 24 = 12) {
+  expect(await screen.findByTestId('analysis-range')).toBeTruthy();
+  if (months !== 12) {
+    await act(async () => {
+      fireEvent.press(screen.getByTestId(`analysis-range-${months}`));
+    });
+  }
+  await act(async () => {
+    fireEvent.press(screen.getByTestId('analysis-range-confirm'));
+  });
+}
+
 beforeEach(async () => {
   jest.clearAllMocks();
   await AsyncStorage.clear();
@@ -180,6 +193,7 @@ describe('Panel analysis entry', () => {
     expect(await screen.findByTestId('panel-detail-heading')).toBeTruthy();
 
     fireEvent.press(screen.getByTestId('panel-analyze'));
+    await chooseRange(12);
     expect(await screen.findByTestId('analysis-consent')).toHaveTextContent(/分析会把本次涉及的检验数值/);
     expect(postHandler).not.toHaveBeenCalled();
 
@@ -211,6 +225,7 @@ describe('Panel analysis entry', () => {
     fireEvent.press(screen.getByTestId('panel-item-0'));
     expect(await screen.findByTestId('trend-analyze')).toBeTruthy();
     fireEvent.press(screen.getByTestId('trend-analyze'));
+    await chooseRange(12);
 
     await waitFor(() => expect(postHandler).toHaveBeenCalledTimes(1));
     expect(postHandler.mock.calls[0][0]).toMatchObject({
@@ -254,6 +269,7 @@ describe('Panel analysis entry', () => {
     expect(await screen.findByTestId('report-analyze-note')).toBeTruthy();
 
     fireEvent.press(screen.getByTestId('report-analyze-note'));
+    await chooseRange(12);
     await waitFor(() => expect(postHandler).toHaveBeenCalledTimes(1));
     expect(postHandler.mock.calls[0][0]).toMatchObject({
       body: {
@@ -274,10 +290,8 @@ describe('Panel analysis entry', () => {
     await renderScreen(<PanelDetailScreen />);
     expect(await screen.findByTestId('panel-detail-heading')).toBeTruthy();
 
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('panel-window-6'));
-    });
     fireEvent.press(screen.getByTestId('panel-item-analyze-0'));
+    await chooseRange(6);
     await waitFor(() => expect(postHandler).toHaveBeenCalledTimes(1));
     expect(screen.queryByTestId('analysis-consent')).toBeNull();
     expect(postHandler.mock.calls[0][0]).toMatchObject({

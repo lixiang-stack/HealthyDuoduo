@@ -99,23 +99,24 @@ func TestServeGrowthCreateAndList(t *testing.T) {
 		t.Fatalf("growth list = %+v", list.Records)
 	}
 
-	// 单填身高也合法;手输来源只给 BMI(缺体重时为 null),weight_status 永远 null。
+	// 单填身高也合法;缺体重时 BMI 为 null,weight_status 当前恒 null。
 	status, raw = doJSON(t, srv, http.MethodPost, path,
-		`{"measured_on":"2026-10-02","height_cm":119,"source":"manual"}`)
+		`{"measured_on":"2026-10-02","height_cm":119,"source":"report"}`)
 	if status != http.StatusCreated {
 		t.Fatalf("POST height-only status = %d, want 201; body=%s", status, raw)
 	}
-	var manual httpapi.GrowthRecord
-	if err := json.Unmarshal(raw, &manual); err != nil {
+	var heightOnly httpapi.GrowthRecord
+	if err := json.Unmarshal(raw, &heightOnly); err != nil {
 		t.Fatal(err)
 	}
-	if manual.WeightKg != nil || manual.BMI != nil || manual.WeightStatus != nil {
-		t.Fatalf("manual height-only = %+v, want nil weight/BMI/status", manual)
+	if heightOnly.WeightKg != nil || heightOnly.BMI != nil || heightOnly.WeightStatus != nil ||
+		heightOnly.Source != pipeline.GrowthSourceReport {
+		t.Fatalf("height-only = %+v, want nil weight/BMI/status + report source", heightOnly)
 	}
 
 	status, raw = doJSON(t, srv, http.MethodGet, path, "")
 	if status != http.StatusOK {
-		t.Fatalf("GET growth after manual status = %d; body=%s", status, raw)
+		t.Fatalf("GET growth after height-only status = %d; body=%s", status, raw)
 	}
 	if !strings.Contains(string(raw), `"records":[`) {
 		t.Errorf("growth list envelope = %s", raw)

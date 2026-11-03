@@ -2,8 +2,8 @@ import { Link, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { ANALYSIS_DEFAULT_WINDOW_MONTHS } from '../../api/analyses';
 import { AnalysisConsentModal } from '../../analysis/ConsentModal';
+import { TimeRangeModal } from '../../analysis/TimeRangeModal';
 import { useStartAnalysis } from '../../analysis/useStartAnalysis';
 import { sharedStyles } from '../../components/styles';
 import { colors } from '../../components/theme';
@@ -36,11 +36,7 @@ export default function ReportDetailScreen() {
   const [imageOverride, setImageOverride] = useState<boolean>();
 
   const report = state.status === 'ready' ? state.report : undefined;
-  const analysis = useStartAnalysis(
-    report?.member_id ?? currentMemberId,
-    CLINICAL_NOTE_PANEL,
-    ANALYSIS_DEFAULT_WINDOW_MONTHS,
-  );
+  const analysis = useStartAnalysis(report?.member_id ?? currentMemberId, CLINICAL_NOTE_PANEL);
   // 影像单与病历是叙述文档:主体为段落 + 原图,不呈现检验单式指标项与核对入口(票 03)。
   const narrative = report !== undefined && isNarrativeReport(report);
   const imageNoun = report !== undefined && isClinicalNoteReport(report) ? '病历原图' : '检查单原图';
@@ -196,6 +192,13 @@ export default function ReportDetailScreen() {
         </View>
       ) : null}
     </ScrollView>
+      <TimeRangeModal
+        key={analysis.rangeOpen ? 'range-open' : 'range-closed'}
+        visible={analysis.rangeOpen}
+        busy={analysis.starting}
+        onConfirm={(months) => void analysis.confirmRange(months)}
+        onCancel={analysis.cancelRange}
+      />
       <AnalysisConsentModal
         visible={analysis.pendingConsent}
         busy={analysis.starting}

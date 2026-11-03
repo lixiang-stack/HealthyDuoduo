@@ -2,9 +2,9 @@ import { Link, router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { ANALYSIS_DEFAULT_WINDOW_MONTHS } from '../api/analyses';
 import type { PanelItem, ReportSummary } from '../api/reports';
 import { AnalysisConsentModal } from '../analysis/ConsentModal';
+import { TimeRangeModal } from '../analysis/TimeRangeModal';
 import { useStartAnalysis } from '../analysis/useStartAnalysis';
 import { sharedStyles } from '../components/styles';
 import { colors } from '../components/theme';
@@ -120,7 +120,7 @@ function AbnormalPanels({ memberId, reports }: { memberId: number; reports: Repo
   const panels = state.status === 'ready' ? state.panels : undefined;
   const groupsState = useAbnormalPanelGroups(memberId, panels);
   const [detailTrend, setDetailTrend] = useState<SelectedTrend>();
-  const analysis = useStartAnalysis(memberId, detailTrend?.panel, ANALYSIS_DEFAULT_WINDOW_MONTHS);
+  const analysis = useStartAnalysis(memberId, detailTrend?.panel);
   // 原图是独立路由;Modal 在跳转时隐藏但保持挂载,返回后原位恢复选中点。
   const [sheetHidden, setSheetHidden] = useState(false);
   const [lastImageReportId, setLastImageReportId] = useState<string>();
@@ -236,6 +236,13 @@ function AbnormalPanels({ memberId, reports }: { memberId: number; reports: Repo
           }}
         />
       ) : null}
+      <TimeRangeModal
+        key={analysis.rangeOpen ? 'range-open' : 'range-closed'}
+        visible={analysis.rangeOpen}
+        busy={analysis.starting}
+        onConfirm={(months) => void analysis.confirmRange(months)}
+        onCancel={analysis.cancelRange}
+      />
       <AnalysisConsentModal
         visible={analysis.pendingConsent}
         busy={analysis.starting}

@@ -8,11 +8,11 @@ import (
 	"time"
 )
 
-// 生长记录来源枚举:实测 / 体检单 / 手输。手输数据不参与超重 / 肥胖判定。
+// 生长记录来源枚举:实测 / 体检单。来源用于区分测量值可信度;
+// 超重 / 肥胖判定所需的年龄性别百分位属后续工单。
 const (
 	GrowthSourceMeasured = "measured"
 	GrowthSourceReport   = "report"
-	GrowthSourceManual   = "manual"
 )
 
 // bmiDisplayScale BMI 展示保留一位小数(计算本身不落库)。
@@ -22,7 +22,7 @@ var (
 	// ErrGrowthMeasuredOnInvalid 测量日期不是合法的 YYYY-MM-DD,或晚于今天。
 	ErrGrowthMeasuredOnInvalid = errors.New("growth measured_on must be a valid date not in the future")
 	// ErrGrowthSourceInvalid 来源不在 measured/report/manual 内。
-	ErrGrowthSourceInvalid = errors.New("growth source must be one of measured, report, manual")
+	ErrGrowthSourceInvalid = errors.New("growth source must be one of measured, report")
 	// ErrGrowthMeasurementMissing 身高与体重至少填一项。
 	ErrGrowthMeasurementMissing = errors.New("growth requires at least one of height_cm or weight_kg")
 	// ErrGrowthMeasurementInvalid 身高或体重不是正数。
@@ -38,7 +38,7 @@ type GrowthProfile struct {
 }
 
 // GrowthRecord 生长记录业务视图;BMI 由测量时点的身高体重实时计算。
-// WeightStatus 预留给后续百分位规则:手输来源永远为 nil。
+// WeightStatus 预留给后续百分位规则;当前恒为 nil。
 type GrowthRecord struct {
 	GrowthID     int64
 	MemberID     int64
@@ -73,7 +73,7 @@ func ValidateGrowthProfile(p GrowthProfile, now time.Time) error {
 // ValidateGrowthSource 来源枚举规则(HTTP 边界与存储镜像共用)。
 func ValidateGrowthSource(source string) error {
 	switch source {
-	case GrowthSourceMeasured, GrowthSourceReport, GrowthSourceManual:
+	case GrowthSourceMeasured, GrowthSourceReport:
 		return nil
 	default:
 		return ErrGrowthSourceInvalid

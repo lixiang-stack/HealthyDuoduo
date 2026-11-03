@@ -1,27 +1,11 @@
-import { router, Stack } from 'expo-router';
+import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Platform, Pressable, StyleSheet, Text, type ColorValue } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+import { HeaderBackButton } from '../components/HeaderBackButton';
 import { ImageViewerProvider } from '../components/imageViewer/ImageViewerProvider';
-import { colors } from '../components/theme';
 import { CurrentMemberProvider } from '../members/CurrentMemberContext';
-
-// iOS 26 原生返回键在部分 Expo Go / react-native-screens 组合下会失去点击响应;
-// 用 JS 返回键替换,保留右滑返回手势。
-function HeaderBackButton({ tintColor }: { tintColor?: ColorValue }) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel="返回"
-      hitSlop={8}
-      onPress={() => router.back()}
-      style={styles.headerBack}
-    >
-      <Text style={[styles.headerBackText, { color: tintColor ?? colors.accent }]}>‹</Text>
-    </Pressable>
-  );
-}
 
 export default function RootLayout() {
   return (
@@ -59,12 +43,4 @@ export default function RootLayout() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  headerBack: {
-    width: 44,
-    height: 44,
-    marginLeft: -8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerBackText: { fontSize: 32, lineHeight: 34, marginTop: -2 },
 });

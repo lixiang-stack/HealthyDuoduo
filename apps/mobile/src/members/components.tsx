@@ -18,7 +18,7 @@ export type EditDraft = {
   birthDate: string;
 };
 
-// 成员行:点按设为当前成员,「生长」展开记录表单,「编辑」进入行内改名/改档,
+// 成员行:点按设为当前成员,「身高体重」展开记录表单,「编辑」进入行内改名/改档,
 // 「删除」进入确认面板;有生长记录时显示最近一次测量与日期。
 export function MemberRow({
   member,
@@ -58,7 +58,7 @@ export function MemberRow({
       </Pressable>
       <View style={styles.cardActions}>
         <Pressable testID={`member-growth-action-${member.member_id}`} onPress={onGrowth} disabled={disabled}>
-          <Text style={styles.cardAction}>生长</Text>
+          <Text style={styles.cardAction}>身高体重</Text>
         </Pressable>
         <Pressable onPress={onEdit} disabled={disabled}>
           <Text style={styles.cardAction}>编辑</Text>
