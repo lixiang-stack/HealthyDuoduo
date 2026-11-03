@@ -73,6 +73,7 @@ jobs:
           npm run codegen
           git diff --exit-code -- src/api/schema.d.ts
       - run: npm run typecheck
+      - run: npm run lint -- --max-warnings=0
       - run: npm test
 
   docs:

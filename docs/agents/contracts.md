@@ -38,9 +38,22 @@ This repo mirrors the same contract through several layers. Use this page as a n
 6. Run the relevant checks:
    - `go test ./... && go vet ./...`
    - `cd recognizer && uv run pytest && uv run ruff check .`
-   - `cd apps/mobile && npm run typecheck && npm test && npx expo lint`
+   - `cd apps/mobile && npm run typecheck && npm test && npm run lint -- --max-warnings=0`
    - storage/migration changes: `bash scripts/test-db.sh`
 7. Recognizer / panel / narrative changes: run the pipeline E2E path in `docs/agents/e2e.md`.
+
+## Adding an API endpoint / use case
+
+Use this as the implementation order; the table above says where each mirror lives.
+
+1. Add the path + request/response schemas to `schemas/openapi.yaml`.
+2. Mirror the shapes in `internal/httpapi` (`types.go` or a feature file). The handler decodes this mirror; do not define a second request-body struct in `cmd/hdd`.
+3. Put the business rules in the domain layer: `internal/pipeline` for orchestration / existing domains, `internal/analysis` for pure analysis rules.
+4. Add the storage port + adapter in `internal/storage`; add a migration when a new table/column is needed.
+5. Add the handler in `cmd/hdd/serve_<feature>.go` and register the route in `cmd/hdd/serve.go`.
+6. Add an HTTP fixture under `schemas/testdata/http/` and a reconcile case in `internal/httpapi/contract_test.go`.
+7. Add the App API wrapper under `apps/mobile/src/api/`, then the screen/component; cover the screen with RNTL. Use existing display helpers (`reportTypeLabel`, `flagLabel`, etc.) instead of raw wire enums.
+8. Run `npm run codegen`, `go test ./...`, `npm test`, `npm run lint -- --max-warnings=0`; for storage/migration changes run `bash scripts/test-db.sh`.
 
 ## Adding a narrative report type
 

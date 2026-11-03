@@ -20,7 +20,7 @@ This rule exists because fake-only tests have produced false-green results: HTTP
 bash scripts/test-db.sh
 ```
 
-The script starts a disposable PostgreSQL and creates a fresh database per `Test*` function. CI runs the same script in the `storage` job.
+The script starts a disposable PostgreSQL and creates a fresh database per `Test*` function. CI runs the same script in the `storage` job. `pre-push` runs `scripts/pre-push-storage.sh`, which invokes it only when the branch touches `internal/storage` or `internal/pipeline`.
 
 ## UI tests
 

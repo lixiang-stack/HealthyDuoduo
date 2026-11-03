@@ -5,13 +5,33 @@
 # then exposes them to a USB device via adb reverse. Uses a unique object-storage
 # bucket so the shared deploy data is never touched.
 #
-# Usage: bash scripts/android-acceptance.sh
+# Usage: bash scripts/android-acceptance.sh [--seed]
 # Stop with Ctrl+C; the trap removes services, reverse ports, DB, and bucket.
 #
 # Env overrides:
 #   HDD_PORT=18080 RECOGNIZER_PORT=18000 METRO_PORT=18081
 #   S3_ENDPOINT=http://127.0.0.1:8333 ADB=$HOME/Library/Android/sdk/platform-tools/adb
 set -euo pipefail
+
+seed=${SEED:-false}
+for arg in "$@"; do
+  case "$arg" in
+    --seed) seed=true ;;
+    -h|--help)
+      cat <<EOF
+Usage: bash scripts/android-acceptance.sh [--seed]
+
+  --seed   create a member, growth records, two liver reports, and a synthetic
+           clinical note in the disposable database (for analysis smoke tests)
+EOF
+      exit 0
+      ;;
+    *)
+      echo "android-acceptance: unknown argument $arg" >&2
+      exit 2
+      ;;
+  esac
+done
 
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$root"
@@ -130,6 +150,13 @@ if ! curl -fsS "http://127.0.0.1:$HDD_PORT/api/v1/health" >/dev/null 2>&1; then
   exit 1
 fi
 
+if [ "$seed" = true ]; then
+  echo "Seeding acceptance data..."
+  BASE_URL="http://127.0.0.1:$HDD_PORT/api/v1" \
+    PG_CONTAINER="$pg_container" DB_NAME="$db_name" \
+    bash scripts/seed-acceptance.sh
+fi
+
 echo "Starting Metro..."
 (
   cd apps/mobile
@@ -155,10 +182,16 @@ Isolated acceptance stack is ready.
 
   App Base URL:  http://127.0.0.1:$HDD_PORT/api/v1
   Metro:         http://127.0.0.1:$METRO_PORT
+  PG container:  $pg_container (db: $db_name)
+  Seed:          $seed
   Logs:          $logdir
 
 Open the App settings and set the Base URL above. This stack uses a disposable
 database and the bucket "$bucket"; the shared deploy data is untouched.
+
+If the app loses connection after Expo Go restarts, re-apply the USB forwards:
+  "$ADB" reverse "tcp:$HDD_PORT" "tcp:$HDD_PORT"
+  "$ADB" reverse "tcp:$METRO_PORT" "tcp:$METRO_PORT"
 
 Press Ctrl+C to stop and clean up. Afterward, restore the App Base URL you used
 before acceptance.
