@@ -41,6 +41,18 @@ const (
 	UnitStatusUnverified = "unverified"
 )
 
+// 分析物语义 key(识别端词典 analyte;框架层按此匹配,不再维护名称/别名表)。
+const (
+	AnalyteALT        = "alt"
+	AnalyteAST        = "ast"
+	AnalyteALP        = "alp"
+	AnalyteHemoglobin = "hemoglobin"
+	AnalyteMCV        = "mcv"
+	AnalyteMCH        = "mch"
+	AnalyteMCHC       = "mchc"
+	AnalyteRDWCV      = "rdw_cv"
+)
+
 // 叙述型报告类别:影像(超声)与病历(llm-analysis 票 03);主体是报告段落,零指标项。
 const (
 	ReportTypeImaging      = "影像"
@@ -111,6 +123,7 @@ type ReportItem struct {
 	// nil 时省略(旧 fixture / 未迁移报告逐字节兼容)。
 	Code          *string `json:"code,omitempty"`
 	Loinc         *string `json:"loinc,omitempty"`
+	Analyte       *string `json:"analyte,omitempty"`
 	UnitDisplay   *string `json:"unit_display,omitempty"`
 	UnitStatus    *string `json:"unit_status,omitempty"`
 	RawValue      *string `json:"raw_value,omitempty"`

@@ -6,6 +6,7 @@ export const QUOTA_EXHAUSTED_TEXT = '今日额度已用完，事实与判读仍�
 export const QUOTA_EXHAUSTED_HISTORY_TEXT = '本次分析生成时额度已用完，事实与判读仍可用。';
 export const EXPLANATION_UNAVAILABLE_TEXT = '本次解释暂不可用，事实与判读仍可用。';
 export const QUOTA_UNAVAILABLE_TEXT = '额度状态暂不可用，事实与判读仍可用。';
+export const NO_ENTRIES_GUIDANCE_TEXT = '本次没有可引用的解读条目，可以带着上面的数值问医生。';
 
 export function hasFrameworkLabels(framework: AnalysisFramework | undefined): framework is AnalysisFramework {
   return Boolean(framework && framework.labels.length > 0);
@@ -15,7 +16,7 @@ export function frameworkSourceText(label: AnalysisFrameworkLabel): string {
   return label.sources.map((source) => source.standard).join(' / ');
 }
 
-/** 解释层不可用提示:配额用尽优先;无条目时不显示空状态(留给条目工单的固定引导)。 */
+/** 解释层不可用提示:配额用尽优先;无条目时给固定引导,不显示空状态。 */
 export function explanationUnavailableText(
   reason: string | undefined,
   available: boolean,
@@ -33,6 +34,8 @@ export function explanationUnavailableText(
       return EXPLANATION_UNAVAILABLE_TEXT;
     case 'quota_unavailable':
       return QUOTA_UNAVAILABLE_TEXT;
+    case 'no_entries':
+      return NO_ENTRIES_GUIDANCE_TEXT;
     default:
       break;
   }

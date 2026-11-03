@@ -119,6 +119,7 @@ func BuildSnapshot(req Request, facts Facts) Snapshot {
 		WindowFrom:      facts.Window.From,
 		WindowTo:        facts.Window.To,
 		RuleVersion:     RuleVersion,
+		PromptVersion:   explanationPromptVersion,
 		Points:          []SnapshotPoint{},
 		Notes:           []SnapshotNote{},
 	}
@@ -448,6 +449,7 @@ func evidencePoint(point InputPoint) EvidencePoint {
 		ReportDate:  nonEmptyPtr(point.ReportDate),
 		ReportType:  point.ReportType,
 		TrendKey:    contract.TrendKey(point.Code, point.Loinc, point.Name),
+		Analyte:     point.Analyte,
 		Name:        point.Name,
 		Unit:        nonEmptyPtr(point.Unit),
 		UnitDisplay: nonEmptyPtr(point.UnitDisplay),

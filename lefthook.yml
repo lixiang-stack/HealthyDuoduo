@@ -19,6 +19,11 @@ pre-commit:
     go-test:
       glob: "**/*.go"
       run: go test ./...
+    framework-data-sync:
+      glob: "{internal/analysis/**/*.go,internal/analysis/data/*.csv}"
+      run: |
+        go generate ./internal/analysis
+        git diff --exit-code -- internal/analysis/who_bmi_data.go internal/analysis/framework_reference.go
     ruff:
       glob: "recognizer/**/*.py"
       run: cd recognizer && uv run ruff check .

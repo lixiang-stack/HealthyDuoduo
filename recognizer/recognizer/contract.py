@@ -212,6 +212,7 @@ _OPTIONAL_NULL_FIELDS = (
     "flag_reason",
     "code",
     "loinc",
+    "analyte",
     "unit_display",
     "unit_status",
     "raw_value",
@@ -243,6 +244,9 @@ class ReportItem(BaseModel):
     # 缺失时序列化省略(旧 golden / 旧报告逐字节兼容)。
     code: str | None = Field(None, description="WS/T 886 标准码;未迁移/无标准码为 null")
     loinc: str | None = Field(None, description="LOINC 码;无 exact 码为 null")
+    analyte: str | None = Field(
+        None, description="分析物语义 key(如 alt/hemoglobin);框架层按此匹配,未映射为 null"
+    )
     unit_display: str | None = Field(
         None, description="人类可读展示单位(UI 优先);缺失时回退 unit"
     )

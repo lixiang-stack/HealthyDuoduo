@@ -120,7 +120,7 @@ func (e *Explainer) Explain(ctx context.Context, analysisID int64, req Request, 
 	}
 
 	var lastReason string
-	for attempt := 0; attempt < 2; attempt++ {
+	for attempt := 0; attempt < llmMaxAttempts; attempt++ {
 		response, err := e.Client.Complete(ctx, LLMRequest{
 			System:    explanationSystemPrompt,
 			User:      string(user),
@@ -165,9 +165,12 @@ func (e *Explainer) record(ctx context.Context, analysisID int64, kind, detail s
 	_ = e.Events.RecordAnalysisEvent(ctx, analysisID, kind, detail)
 }
 
-const explanationSystemPrompt = `你是医学检验结果的排版助手。只输出 JSON：{"sections":[{"entry_id":"...","evidence_ids":["e1"],"bridge_text":"..."}]}。
-bridge_text 只能连接给定条目与证据，不得加入新事实，不得写诊断、治疗建议、药物或剂量。
-bridge_text 中的数字必须来自 evidence_ids 指向的证据；不得使用「可能」「提示」「考虑」「建议」「应该」。`
+const (
+	llmMaxAttempts     = 2
+	maxBridgeTextRunes = 200
+)
+
+var bannedInferenceWords = []string{"可能", "提示", "考虑", "建议", "应该"}
 
 type llmOutput struct {
 	Sections []llmSection `json:"sections"`
@@ -210,11 +213,11 @@ func validateExplanation(content string, entries []KnowledgeEntry, mapping Evide
 
 func validateSection(section llmSection, entryByID map[string]KnowledgeEntry, mapping EvidenceMapping) (ExplanationSection, bool) {
 	entry, ok := entryByID[section.EntryID]
-	if !ok {
+	if !ok || entry.Review.Decision != ReviewDecisionAccepted {
 		return ExplanationSection{}, false
 	}
 	bridgeText := strings.TrimSpace(section.BridgeText)
-	if bridgeText == "" || utf8.RuneCountInString(bridgeText) > 200 {
+	if bridgeText == "" || utf8.RuneCountInString(bridgeText) > maxBridgeTextRunes {
 		return ExplanationSection{}, false
 	}
 	if containsBannedInference(bridgeText) {
@@ -256,7 +259,7 @@ func stripCodeFence(content string) string {
 }
 
 func containsBannedInference(text string) bool {
-	for _, word := range []string{"可能", "提示", "考虑", "建议", "应该"} {
+	for _, word := range bannedInferenceWords {
 		if strings.Contains(text, word) {
 			return true
 		}
@@ -298,9 +301,13 @@ func ExplanationSources(explanation *Explanation) []Source {
 	if explanation == nil {
 		return nil
 	}
-	groups := make([][]Source, 0, len(explanation.Sections))
-	for _, section := range explanation.Sections {
-		groups = append(groups, section.Sources)
+	return mergeSourcesFrom(explanation.Sections, func(section ExplanationSection) []Source { return section.Sources })
+}
+
+func mergeSourcesFrom[T any](items []T, sources func(T) []Source) []Source {
+	groups := make([][]Source, 0, len(items))
+	for _, item := range items {
+		groups = append(groups, sources(item))
 	}
 	return MergeSources(groups...)
 }

@@ -24,6 +24,7 @@ This repo mirrors the same contract through several layers. Use this page as a n
 ### Cross-cutting mirrors
 
 - Panel code / order: `schemas/report.schema.json` `$defs.panel` → `recognizer/recognizer/contract.py` → `internal/pipeline/panels.go` → `apps/mobile/src/reports/panels.ts`.
+- Report item analyte: `recognizer/recognizer/{chemistry,cbc}_dict.yaml` `analyte` → `schemas/report.schema.json` `reportItem.analyte` → `recognizer/recognizer/contract.py` / `internal/contract` / `internal/httpapi.ReportItem` → `report_items.analyte` → `internal/analysis` framework matching. 加指标时必须同时给词典项写 `analyte`，否则框架层不会按该指标出标签。
 - Narrative report kinds: `recognizer/recognizer/postprocess.py` (`NARRATIVE_BODY_SECTION_KINDS`) → `internal/pipeline/reports.go` (`hasReportBody`) → `recognizer/tools/e2e.py` (`verify_narrative_reports`) → App `sections.ts` / `status.ts`.
 - Report summary/detail projection: `internal/httpapi/types.go` ↔ `schemas/openapi.yaml` ↔ App `api/reports.ts`.
 - Analysis facts: `internal/analysis` (`Facts` / `Snapshot` JSON tags) ↔ `schemas/openapi.yaml` `AnalysisFacts` / `AnalysisSnapshot` ↔ App `api/analyses.ts`; facts window / gating changes must keep the snapshot rule version in sync.

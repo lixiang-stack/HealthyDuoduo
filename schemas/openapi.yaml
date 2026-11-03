@@ -903,6 +903,9 @@ components:
         loinc:
           type: [string, "null"]
           description: "LOINC 码;无 exact 码为 null"
+        analyte:
+          type: [string, "null"]
+          description: "分析物语义 key(如 alt/hemoglobin);框架层按此匹配,未映射为 null"
         unit_display:
           type: [string, "null"]
           description: "人类可读展示单位(UI 优先);缺失时回退 unit"
@@ -1566,6 +1569,14 @@ components:
         window_from: { type: string, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
         window_to: { type: string, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
         rule_version: { type: string, minLength: 1 }
+        prompt_version:
+          type: string
+          minLength: 1
+          description: 解释层 prompt 版本;旧快照可缺省。
+        entry_versions:
+          type: object
+          additionalProperties: { type: string }
+          description: 命中的知识条目 id → version;旧快照/无条目时可缺省。
         data_version:
           type: string
           minLength: 1

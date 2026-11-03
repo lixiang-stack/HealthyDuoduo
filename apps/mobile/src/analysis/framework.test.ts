@@ -1,6 +1,7 @@
 import { makeAnalysisFramework } from '../test/fixtures';
 import {
   EXPLANATION_UNAVAILABLE_TEXT,
+  NO_ENTRIES_GUIDANCE_TEXT,
   QUOTA_EXHAUSTED_HISTORY_TEXT,
   QUOTA_UNAVAILABLE_TEXT,
   QUOTA_EXHAUSTED_TEXT,
@@ -26,7 +27,7 @@ describe('analysis framework display helpers', () => {
     expect(explanationUnavailableText('quota_exhausted', true)).toBe(QUOTA_EXHAUSTED_HISTORY_TEXT);
     expect(explanationUnavailableText('llm_timeout', true)).toBe(EXPLANATION_UNAVAILABLE_TEXT);
     expect(explanationUnavailableText('llm_timeout', false)).toBe(EXPLANATION_UNAVAILABLE_TEXT);
-    expect(explanationUnavailableText('no_entries', true)).toBeUndefined();
+    expect(explanationUnavailableText('no_entries', true)).toBe(NO_ENTRIES_GUIDANCE_TEXT);
     expect(explanationUnavailableText('quota_unavailable', true)).toBe(QUOTA_UNAVAILABLE_TEXT);
   });
 });

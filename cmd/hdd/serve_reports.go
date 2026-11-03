@@ -485,6 +485,7 @@ func toAPIItem(it pipeline.ReportItemRow, ocr *contract.OCRResult) httpapi.Repor
 		Method:        it.Method,
 		Code:          it.Code,
 		Loinc:         it.Loinc,
+		Analyte:       it.Analyte,
 		UnitDisplay:   it.UnitDisplay,
 		UnitStatus:    it.UnitStatus,
 		RawValue:      it.RawValue,

@@ -33,7 +33,7 @@ func (s *Store) Close() { s.pool.Close() }
 
 // reportItemStandardColumnsSQL 标准层列(票 01);三处读取与插入共用同一顺序,
 // 与 reportItemStandardDest 的扫描顺序一致。
-const reportItemStandardColumnsSQL = `code, loinc, unit_display, unit_status,
+const reportItemStandardColumnsSQL = `code, loinc, analyte, unit_display, unit_status,
 	   raw_value, raw_unit, raw_ref_range, ref_kind, result_kind, result_basis`
 
 // 语义化 SQL 常量;占位仅传参,未拼接任何用户值(无注入面)。
@@ -203,6 +203,7 @@ const (
 		   flag_reason = $7,
 		   unit_display = CASE WHEN $8 THEN NULL ELSE unit_display END,
 		   unit_status = CASE WHEN $8 THEN NULL ELSE unit_status END,
+		   analyte = CASE WHEN name <> $2 THEN NULL ELSE analyte END,
 		   review_status = 'corrected' WHERE id = $1`
 
 	// 修正对 append-only(ADR-0005;before→after 四项纸面事实全集 + 原始行文 + OCR 行号)。
@@ -251,7 +252,7 @@ const (
 	sqlItemInsert = `INSERT INTO report_items
 		 (report_sha256, name, panel, value, unit, ref_range, method, flag, flag_reason, low_confidence, raw_text, ocr_line_numbers,
 		  ` + reportItemStandardColumnsSQL + `)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)`
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)`
 
 	// 成员(迁移 0004;0013 起显示名 + 性别 + 出生日期):
 	// 列表按 id 升序 = 创建序返回;删除时先删该成员报告再删成员(单事务;原图与 OCR 历史保留)。
@@ -426,7 +427,7 @@ func (s *Store) ItemsByImage(ctx context.Context, reportSha string) ([]contract.
 // reportItemStandardDest 标准层列扫描目标(顺序与 reportItemStandardColumnsSQL 一致)。
 func reportItemStandardDest(it *contract.ReportItem) []any {
 	return []any{
-		&it.Code, &it.Loinc, &it.UnitDisplay, &it.UnitStatus,
+		&it.Code, &it.Loinc, &it.Analyte, &it.UnitDisplay, &it.UnitStatus,
 		&it.RawValue, &it.RawUnit, &it.RawRefRange, &it.RefKind,
 		&it.ResultKind, &it.ResultBasis,
 	}
@@ -852,7 +853,7 @@ func (s *Store) WriteReport(ctx context.Context, reportSha string, ocrID int64, 
 		if _, err := tx.Exec(ctx, sqlItemInsert, append([]any{
 			reportSha, it.Name, panel, it.Value, it.Unit, it.RefRange, it.Method, it.Flag, it.FlagReason,
 			it.LowConfidence, it.RawText, it.OCRLineNumbers,
-		}, it.Code, it.Loinc, it.UnitDisplay, it.UnitStatus, it.RawValue, it.RawUnit,
+		}, it.Code, it.Loinc, it.Analyte, it.UnitDisplay, it.UnitStatus, it.RawValue, it.RawUnit,
 			it.RawRefRange, it.RefKind, it.ResultKind, it.ResultBasis)...); err != nil {
 			return fmt.Errorf("write report item %q: %w", it.Name, err)
 		}

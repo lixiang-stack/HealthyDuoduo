@@ -79,7 +79,7 @@ func TestReportStoreSmoke(t *testing.T) {
 	// 0012 标准层字段:回填一行,校验读回链路。未核验单位按 spec §3.2 置 unit=NULL,
 	// 原文单位保留;单核细胞比率为 local 项(无 WS/T 码,LOINC 5905-5)。
 	if _, err := pool.Exec(ctx, `UPDATE report_items SET
-		unit=NULL, loinc='5905-5', unit_display='%', unit_status='unverified',
+		unit=NULL, loinc='5905-5', analyte='mcv', unit_display='%', unit_status='unverified',
 		raw_value='10.8', raw_unit='%', raw_ref_range='3-10',
 		ref_kind='numeric', result_kind='quantitative'
 		WHERE report_sha256='rep-a' AND name='单核细胞比率'`); err != nil {
@@ -197,6 +197,7 @@ func TestReportStoreSmoke(t *testing.T) {
 	// 标准层字段(0012)读回:有值行完整,未回填行 nil(不报错)。
 	first := items[0]
 	if first.Code != nil || first.Loinc == nil || *first.Loinc != "5905-5" ||
+		first.Analyte == nil || *first.Analyte != "mcv" ||
 		first.Unit != nil || first.UnitDisplay == nil || *first.UnitDisplay != "%" ||
 		first.UnitStatus == nil || *first.UnitStatus != "unverified" ||
 		first.RawValue == nil || *first.RawValue != "10.8" || first.RawUnit == nil || *first.RawUnit != "%" ||

@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"healthyduoduo/internal/analysis"
+	"healthyduoduo/internal/contract"
 	"healthyduoduo/internal/httpapi"
 	"healthyduoduo/internal/pipeline"
 )
@@ -157,7 +158,8 @@ func analysisPoint(itemID int64, reportID, date, value, flag string) analysis.In
 	return analysis.InputPoint{
 		MemberID: 1, ReportID: reportID, ReportDate: date, ReportType: "生化",
 		ReportStatus: "success", Panel: "liver", ItemID: itemID,
-		Name: "丙氨酸转氨酶测定", Code: "1500104A", Unit: "U/L", UnitDisplay: "U/L",
+		Name: "丙氨酸转氨酶测定", Code: "1500104A", Analyte: contract.AnalyteALT,
+		Unit: "U/L", UnitDisplay: "U/L",
 		UnitStatus: "verified", Value: value, RefRange: "7-40", Flag: flag,
 		ReviewStatus: "unreviewed",
 	}
@@ -461,11 +463,24 @@ func TestServeAnalysisQuotaReadFailureStillReturnsFacts(t *testing.T) {
 }
 
 func TestServeAnalysisTrustGateEvent(t *testing.T) {
-	store := &fakeAnalysisStore{}
-	srv, ms := newAnalysisTestServer(t, store)
+	empty := &fakeAnalysisStore{}
+	srv, ms := newAnalysisTestServer(t, empty)
 	memberID := createAnalysisMember(t, ms)
 	body := `{"member_id":` + strconv.FormatInt(memberID, 10) + `,"panel":"liver","entry":"panel"}`
+	if status, raw := doJSON(t, srv, http.MethodPost, "/api/v1/analyses", body); status != http.StatusCreated {
+		t.Fatalf("empty status = %d, want 201; body=%s", status, raw)
+	}
+	if len(empty.events) != 0 {
+		t.Fatalf("empty member events = %v, want none", empty.events)
+	}
 
+	sha := strings.Repeat("a", 64)
+	low := analysisPoint(1, sha, "2026-10-01", "83.5", "high")
+	low.LowConfidence = true
+	store := &fakeAnalysisStore{points: []analysis.InputPoint{low}}
+	srv, ms = newAnalysisTestServer(t, store)
+	memberID = createAnalysisMember(t, ms)
+	body = `{"member_id":` + strconv.FormatInt(memberID, 10) + `,"panel":"liver","entry":"panel"}`
 	status, raw := doJSON(t, srv, http.MethodPost, "/api/v1/analyses", body)
 	if status != http.StatusCreated {
 		t.Fatalf("status = %d, want 201; body=%s", status, raw)

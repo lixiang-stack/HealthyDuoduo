@@ -24,7 +24,7 @@ const sqlIndicatorPanel = `SELECT i.panel
 const sqlAnalysisPoints = `SELECT r.member_id, r.image_sha256,
 	   COALESCE(to_char(r.report_date, 'YYYY-MM-DD'), ''), r.report_type, r.status,
 	   i.panel, i.id, i.name,
-	   COALESCE(i.code, ''), COALESCE(i.loinc, ''),
+	   COALESCE(i.code, ''), COALESCE(i.loinc, ''), COALESCE(i.analyte, ''),
 	   COALESCE(i.unit, ''), COALESCE(i.unit_display, ''), COALESCE(i.unit_status, ''),
 	   COALESCE(i.value, ''), COALESCE(i.ref_range, ''), i.flag, i.low_confidence, i.review_status
 	   FROM report_items i JOIN reports r ON r.image_sha256 = i.report_sha256
@@ -98,6 +98,7 @@ const sqlAnalysisDataVersion = `SELECT md5(
 	       FROM reports r WHERE r.member_id = $1
 	   ), '') || '|' || COALESCE((
 	       SELECT string_agg(i.id::text || ':' || i.review_status || ':' || i.flag || ':'
+	              || COALESCE(i.name, '') || ':' || COALESCE(i.analyte, '') || ':'
 	              || COALESCE(i.value, '') || ':' || COALESCE(i.unit, '') || ':'
 	              || COALESCE(i.ref_range, '') || ':' || COALESCE(i.unit_status, ''),
 	              ',' ORDER BY i.id)
@@ -144,7 +145,7 @@ func (s *Store) AnalysisPoints(ctx context.Context, memberID int64, panel string
 		var point analysis.InputPoint
 		if err := rows.Scan(&point.MemberID, &point.ReportID, &point.ReportDate,
 			&point.ReportType, &point.ReportStatus, &point.Panel, &point.ItemID, &point.Name,
-			&point.Code, &point.Loinc, &point.Unit, &point.UnitDisplay, &point.UnitStatus,
+			&point.Code, &point.Loinc, &point.Analyte, &point.Unit, &point.UnitDisplay, &point.UnitStatus,
 			&point.Value, &point.RefRange, &point.Flag, &point.LowConfidence,
 			&point.ReviewStatus); err != nil {
 			return nil, err

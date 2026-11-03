@@ -8,6 +8,10 @@ import (
 	"time"
 )
 
+func acceptedEntry(id string) KnowledgeEntry {
+	return KnowledgeEntry{ID: id, Review: KnowledgeReview{Decision: ReviewDecisionAccepted}}
+}
+
 type fakeLLM struct {
 	responses []LLMResponse
 	errs      []error
@@ -96,6 +100,7 @@ func TestExplainSuccessMapsEphemeralEvidenceIDs(t *testing.T) {
 	client := &fakeLLM{responses: []LLMResponse{{Content: validExplanationJSON}}}
 	explainer, quota, events := explanationTestExplainer(client, fakeMatcher{entries: []KnowledgeEntry{{
 		ID: "liver-hepatocellular-mild", Explanation: "条目原文",
+		Review: KnowledgeReview{Decision: ReviewDecisionAccepted},
 	}}})
 	explanation, reason := explainer.Explain(context.Background(), 7, testRequest(EntryPanel, "liver", 12), explanationTestFacts())
 	if reason != "" || explanation == nil || len(explanation.Sections) != 1 {
@@ -119,7 +124,7 @@ func TestExplainRetriesOnceThenSucceeds(t *testing.T) {
 		errs:      []error{ErrLLMTimeout, nil},
 		responses: []LLMResponse{{}, {Content: validExplanationJSON}},
 	}
-	explainer, quota, events := explanationTestExplainer(client, fakeMatcher{entries: []KnowledgeEntry{{ID: "liver-hepatocellular-mild"}}})
+	explainer, quota, events := explanationTestExplainer(client, fakeMatcher{entries: []KnowledgeEntry{acceptedEntry("liver-hepatocellular-mild")}})
 	explanation, reason := explainer.Explain(context.Background(), 7, testRequest(EntryPanel, "liver", 12), explanationTestFacts())
 	if reason != "" || explanation == nil {
 		t.Fatalf("explanation = %+v, reason = %q", explanation, reason)
@@ -131,7 +136,7 @@ func TestExplainRetriesOnceThenSucceeds(t *testing.T) {
 
 func TestExplainTimeoutAfterRetry(t *testing.T) {
 	client := &fakeLLM{errs: []error{ErrLLMTimeout, ErrLLMTimeout}}
-	explainer, quota, events := explanationTestExplainer(client, fakeMatcher{entries: []KnowledgeEntry{{ID: "liver-hepatocellular-mild"}}})
+	explainer, quota, events := explanationTestExplainer(client, fakeMatcher{entries: []KnowledgeEntry{acceptedEntry("liver-hepatocellular-mild")}})
 	explanation, reason := explainer.Explain(context.Background(), 7, testRequest(EntryPanel, "liver", 12), explanationTestFacts())
 	if explanation != nil || reason != ExplanationReasonTimeout {
 		t.Fatalf("explanation = %+v, reason = %q", explanation, reason)
@@ -143,7 +148,7 @@ func TestExplainTimeoutAfterRetry(t *testing.T) {
 
 func TestExplainInvalidJSONAfterRetry(t *testing.T) {
 	client := &fakeLLM{responses: []LLMResponse{{Content: "not json"}, {Content: "still not json"}}}
-	explainer, _, events := explanationTestExplainer(client, fakeMatcher{entries: []KnowledgeEntry{{ID: "liver-hepatocellular-mild"}}})
+	explainer, _, events := explanationTestExplainer(client, fakeMatcher{entries: []KnowledgeEntry{acceptedEntry("liver-hepatocellular-mild")}})
 	explanation, reason := explainer.Explain(context.Background(), 7, testRequest(EntryPanel, "liver", 12), explanationTestFacts())
 	if explanation != nil || reason != ExplanationReasonInvalidJSON {
 		t.Fatalf("explanation = %+v, reason = %q", explanation, reason)
@@ -155,7 +160,7 @@ func TestExplainInvalidJSONAfterRetry(t *testing.T) {
 
 func TestExplainQuotaExhausted(t *testing.T) {
 	client := &fakeLLM{responses: []LLMResponse{{Content: validExplanationJSON}}}
-	explainer, quota, events := explanationTestExplainer(client, fakeMatcher{entries: []KnowledgeEntry{{ID: "liver-hepatocellular-mild"}}})
+	explainer, quota, events := explanationTestExplainer(client, fakeMatcher{entries: []KnowledgeEntry{acceptedEntry("liver-hepatocellular-mild")}})
 	quota.used = 20
 	explanation, reason := explainer.Explain(context.Background(), 7, testRequest(EntryPanel, "liver", 12), explanationTestFacts())
 	if explanation != nil || reason != ExplanationReasonQuotaExhausted {
@@ -177,7 +182,7 @@ func TestExplainBridgeTextRejected(t *testing.T) {
 	for _, content := range cases {
 		t.Run(content[:20], func(t *testing.T) {
 			client := &fakeLLM{responses: []LLMResponse{{Content: content}, {Content: content}}}
-			explainer, _, events := explanationTestExplainer(client, fakeMatcher{entries: []KnowledgeEntry{{ID: "liver-hepatocellular-mild"}}})
+			explainer, _, events := explanationTestExplainer(client, fakeMatcher{entries: []KnowledgeEntry{acceptedEntry("liver-hepatocellular-mild")}})
 			explanation, reason := explainer.Explain(context.Background(), 7, testRequest(EntryPanel, "liver", 12), explanationTestFacts())
 			if explanation != nil || reason != ExplanationReasonBridgeRejected {
 				t.Fatalf("explanation = %+v, reason = %q", explanation, reason)
@@ -208,10 +213,41 @@ func TestExplainNoEntriesDoesNotCallLLM(t *testing.T) {
 
 func TestExplainStripsCodeFence(t *testing.T) {
 	client := &fakeLLM{responses: []LLMResponse{{Content: "```json\n" + validExplanationJSON + "\n```"}}}
-	explainer, _, _ := explanationTestExplainer(client, fakeMatcher{entries: []KnowledgeEntry{{ID: "liver-hepatocellular-mild"}}})
+	explainer, _, _ := explanationTestExplainer(client, fakeMatcher{entries: []KnowledgeEntry{acceptedEntry("liver-hepatocellular-mild")}})
 	explanation, reason := explainer.Explain(context.Background(), 7, testRequest(EntryPanel, "liver", 12), explanationTestFacts())
 	if reason != "" || explanation == nil {
 		t.Fatalf("explanation = %+v, reason = %q", explanation, reason)
+	}
+}
+
+func TestValidateSectionRejectsUnreviewedEntry(t *testing.T) {
+	section := llmSection{EntryID: "x", EvidenceIDs: []string{"e1"}, BridgeText: "本次结果已整理。"}
+	mapping := EvidenceMapping{"e1": {EvidenceID: "ev-1"}}
+	if _, ok := validateSection(section, map[string]KnowledgeEntry{"x": {ID: "x"}}, mapping); ok {
+		t.Fatal("unreviewed entry must be rejected")
+	}
+	accepted := KnowledgeEntry{ID: "x", Review: KnowledgeReview{Decision: ReviewDecisionAccepted}}
+	if _, ok := validateSection(section, map[string]KnowledgeEntry{"x": accepted}, mapping); !ok {
+		t.Fatal("accepted entry should pass")
+	}
+}
+
+func TestExplanationPromptEmbeddedAndVersioned(t *testing.T) {
+	if strings.TrimSpace(explanationSystemPrompt) == "" {
+		t.Fatal("embedded explanation prompt is empty")
+	}
+	for _, want := range []string{`"sections"`, `"evidence_ids"`, `"bridge_text"`} {
+		if !strings.Contains(explanationSystemPrompt, want) {
+			t.Fatalf("prompt missing %s", want)
+		}
+	}
+	for _, word := range bannedInferenceWords {
+		if !strings.Contains(explanationSystemPrompt, word) {
+			t.Fatalf("prompt missing banned word %q; keep prompt and validator in sync", word)
+		}
+	}
+	if explanationPromptVersion == "" {
+		t.Fatal("explanationPromptVersion is empty")
 	}
 }
 
@@ -222,7 +258,8 @@ func TestExplainKeepsValidSectionsWhenOneIsRejected(t *testing.T) {
 	]}`
 	client := &fakeLLM{responses: []LLMResponse{{Content: content}}}
 	explainer, _, events := explanationTestExplainer(client, fakeMatcher{entries: []KnowledgeEntry{{
-		ID: "liver-hepatocellular-mild",
+		ID:     "liver-hepatocellular-mild",
+		Review: KnowledgeReview{Decision: ReviewDecisionAccepted},
 	}}})
 	explanation, reason := explainer.Explain(context.Background(), 7, testRequest(EntryPanel, "liver", 12), explanationTestFacts())
 	if reason != "" || explanation == nil || len(explanation.Sections) != 1 {

@@ -292,7 +292,7 @@ export function makeAnalysisResult(overrides: Partial<AnalysisResult> = {}): Ana
       window_months: 12,
       window_from: '2025-11-03',
       window_to: '2026-11-03',
-      rule_version: 'llm-analysis-v2',
+      rule_version: 'llm-analysis-v3',
       data_version: 'v1',
       points: [
         {

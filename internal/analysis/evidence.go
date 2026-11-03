@@ -128,7 +128,7 @@ func BuildEvidencePack(req Request, facts Facts, entries []KnowledgeEntry) (Evid
 	for _, entry := range entries {
 		pack.Entries = append(pack.Entries, EvidencePackEntry{
 			EntryID: entry.ID,
-			Text:    entryText(entry),
+			Text:    entry.Text(),
 			Sources: entry.Sources,
 		})
 	}
@@ -149,7 +149,7 @@ func excludedReasons(excluded []Exclusion) []string {
 	return out
 }
 
-func entryText(entry KnowledgeEntry) string {
+func (entry KnowledgeEntry) Text() string {
 	parts := []string{}
 	if text := strings.TrimSpace(entry.Explanation); text != "" {
 		parts = append(parts, text)
@@ -225,7 +225,7 @@ func EstimateTokens(text string) int {
 }
 
 func ageBand(birthDate, onDate string) string {
-	months, ok := ageMonthsBetween(birthDate, onDate)
+	months, ok := monthsBetween(birthDate, onDate)
 	if !ok {
 		return ""
 	}
@@ -237,7 +237,7 @@ func relativeTime(reportDate string, now time.Time) string {
 	if strings.TrimSpace(reportDate) == "" {
 		return ""
 	}
-	months, ok := ageMonthsBetween(reportDate, dayString(now))
+	months, ok := monthsBetween(reportDate, dayString(now))
 	if !ok {
 		return ""
 	}

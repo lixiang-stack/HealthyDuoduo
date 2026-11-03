@@ -19,7 +19,7 @@ const (
 )
 
 // RuleVersion 事实层 + 框架层规则版本,随快照永久记录。
-const RuleVersion = "llm-analysis-v2"
+const RuleVersion = "llm-analysis-v3"
 
 // 默认 / 稀疏扩展参数(spec §4.9)。
 const (
@@ -82,6 +82,7 @@ type InputPoint struct {
 	Name          string
 	Code          string
 	Loinc         string
+	Analyte       string
 	Unit          string
 	UnitDisplay   string
 	UnitStatus    string // verified | unverified | 空串(NULL)
@@ -167,6 +168,7 @@ type EvidencePoint struct {
 	ReportDate  *string `json:"report_date"`
 	ReportType  string  `json:"report_type"`
 	TrendKey    string  `json:"trend_key"`
+	Analyte     string  `json:"-"`
 	Name        string  `json:"name"`
 	Unit        *string `json:"unit"`
 	UnitDisplay *string `json:"unit_display"`
@@ -227,9 +229,21 @@ type FrameworkLabel struct {
 	Sources     []Source `json:"sources"`
 }
 
+// 知识条目审核决策(spec §4.6);只有 accepted 条目可被模型引用。
+const ReviewDecisionAccepted = "accepted"
+
+// KnowledgeReview 条目审核记录;单人审核,只记 decision / reviewed_at / note。
+type KnowledgeReview struct {
+	Decision   string
+	ReviewedAt string
+	Note       string
+}
+
 // KnowledgeEntry 已匹配的知识条目;医学原文由服务端从条目拼接,模型只写 bridge_text。
 type KnowledgeEntry struct {
 	ID              string
+	Version         string
+	Review          KnowledgeReview
 	Explanation     string
 	CheckDirections []string
 	GeneralAdvice   []string
@@ -256,20 +270,22 @@ type ExplanationSection struct {
 // Snapshot 永久保留的分析快照:成员、Panel、窗口、有效点集合、病历引用与规则版本。
 // 成员性别 / 生日用于解释框架层输入,旧快照缺字段时省略。
 type Snapshot struct {
-	MemberID        int64           `json:"member_id"`
-	MemberName      string          `json:"member_name"`
-	MemberSex       string          `json:"member_sex,omitempty"`
-	MemberBirthDate string          `json:"member_birth_date,omitempty"`
-	Panel           string          `json:"panel"`
-	Entry           string          `json:"entry"`
-	IndicatorName   *string         `json:"indicator_name"`
-	WindowMonths    int             `json:"window_months"`
-	WindowFrom      string          `json:"window_from"`
-	WindowTo        string          `json:"window_to"`
-	RuleVersion     string          `json:"rule_version"`
-	DataVersion     string          `json:"data_version"`
-	Points          []SnapshotPoint `json:"points"`
-	Notes           []SnapshotNote  `json:"notes"`
+	MemberID        int64             `json:"member_id"`
+	MemberName      string            `json:"member_name"`
+	MemberSex       string            `json:"member_sex,omitempty"`
+	MemberBirthDate string            `json:"member_birth_date,omitempty"`
+	Panel           string            `json:"panel"`
+	Entry           string            `json:"entry"`
+	IndicatorName   *string           `json:"indicator_name"`
+	WindowMonths    int               `json:"window_months"`
+	WindowFrom      string            `json:"window_from"`
+	WindowTo        string            `json:"window_to"`
+	RuleVersion     string            `json:"rule_version"`
+	PromptVersion   string            `json:"prompt_version,omitempty"` // 解释层 prompt 版本;随快照记录
+	EntryVersions   map[string]string `json:"entry_versions,omitempty"` // 条目 id → version;08 接条目后写入
+	DataVersion     string            `json:"data_version"`
+	Points          []SnapshotPoint   `json:"points"`
+	Notes           []SnapshotNote    `json:"notes"`
 }
 
 // SnapshotPoint 快照中的有效点。

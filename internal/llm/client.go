@@ -26,6 +26,8 @@ type Config struct {
 	MaxOutputTokens int
 }
 
+const maxErrorBodyBytes = 512
+
 // Client OpenAI 兼容客户端。
 type Client struct {
 	baseURL         string
@@ -112,7 +114,7 @@ func (c *Client) Complete(ctx context.Context, req analysis.LLMRequest) (analysi
 	}
 	defer response.Body.Close()
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		body, _ := io.ReadAll(io.LimitReader(response.Body, 512))
+		body, _ := io.ReadAll(io.LimitReader(response.Body, maxErrorBodyBytes))
 		return analysis.LLMResponse{}, fmt.Errorf("llm http %d: %s", response.StatusCode, strings.TrimSpace(string(body)))
 	}
 	var decoded chatResponse

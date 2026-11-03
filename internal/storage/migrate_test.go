@@ -31,13 +31,13 @@ func TestMigrationSmokeM0Contract(t *testing.T) {
 		t.Fatalf("migrate: %v", err)
 	}
 
-	// goose 已升到 0016 且幂等(Open 内重复 Migrate 不报错)。
+	// goose 已升到 0017 且幂等(Open 内重复 Migrate 不报错)。
 	var latest int
 	if err := pool.QueryRow(ctx, `SELECT max(version_id) FROM goose_db_version`).Scan(&latest); err != nil {
 		t.Fatalf("read goose version: %v", err)
 	}
-	if latest != 16 {
-		t.Fatalf("goose version = %d, want 16", latest)
+	if latest != 17 {
+		t.Fatalf("goose version = %d, want 17", latest)
 	}
 
 	// reports.sections(0007,ADR-0008):可选报告段落 JSONB,可空(存量/非叙述型 NULL)。
@@ -82,7 +82,7 @@ func TestMigrationSmokeM0Contract(t *testing.T) {
 	// 0012:标准层字段全部可空 text(旧行 NULL,读取不报错;本期只做透传)。
 	t.Run("report item standard fields columns", func(t *testing.T) {
 		for _, column := range []string{
-			"code", "loinc", "unit_display", "unit_status", "raw_value", "raw_unit",
+			"code", "loinc", "analyte", "unit_display", "unit_status", "raw_value", "raw_unit",
 			"raw_ref_range", "ref_kind", "result_kind", "result_basis",
 		} {
 			var dataType, nullable string
@@ -583,6 +583,74 @@ func TestMigration0011LegacyDefaults(t *testing.T) {
 	}
 	if panel != "other" {
 		t.Fatalf("legacy report_items.panel = %q, want other", panel)
+	}
+}
+
+// TestMigration0017BackfillsAnalyte 0017 回填:旧行按 code / loinc 映射到 analyte,
+// 未知指标保持 NULL;新报告由识别端写入,不依赖迁移。
+func TestMigration0017BackfillsAnalyte(t *testing.T) {
+	dsn := os.Getenv("HDD_TEST_DSN")
+	if dsn == "" {
+		t.Skip("HDD_TEST_DSN not set: migration smoke runs against a disposable PG container")
+	}
+	ctx := context.Background()
+	db, err := sql.Open("pgx", dsn)
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	defer db.Close()
+	goose.SetBaseFS(migrationsFS)
+	if err := goose.SetDialect("postgres"); err != nil {
+		t.Fatalf("goose dialect: %v", err)
+	}
+	if err := goose.UpContext(ctx, db, migrationsDir); err != nil {
+		t.Fatalf("up to latest: %v", err)
+	}
+	if err := goose.DownToContext(ctx, db, migrationsDir, 16); err != nil {
+		t.Fatalf("down to 0016: %v", err)
+	}
+	defer func() {
+		if _, err := db.ExecContext(context.Background(), `
+			DELETE FROM reports WHERE image_sha256 = 'img-pre-0017';
+			DELETE FROM ocr_results WHERE image_sha256 = 'img-pre-0017';
+			DELETE FROM images WHERE sha256 = 'img-pre-0017';`); err != nil {
+			t.Logf("cleanup seeded rows: %v", err)
+		}
+	}()
+	if _, err := db.ExecContext(ctx, `
+		INSERT INTO images (sha256, original_filename) VALUES ('img-pre-0017', 'old.jpg');
+		INSERT INTO ocr_results (image_sha256, engine_output) VALUES ('img-pre-0017', '{}');
+		INSERT INTO reports (image_sha256, ocr_result_id, report_type, status)
+		VALUES ('img-pre-0017', (SELECT id FROM ocr_results WHERE image_sha256='img-pre-0017'),
+		        '生化', 'success');
+		INSERT INTO report_items (report_sha256, name, code, loinc, flag, raw_text, low_confidence) VALUES
+			('img-pre-0017', 'ALT', '1500104A', NULL, 'normal', 'ALT', false),
+			('img-pre-0017', 'RDW-CV', NULL, '788-0', 'normal', 'RDW-CV', false),
+			('img-pre-0017', 'Other', '9999999', NULL, 'normal', 'Other', false);`); err != nil {
+		t.Fatalf("seed pre-0017 rows: %v", err)
+	}
+	if err := goose.UpContext(ctx, db, migrationsDir); err != nil {
+		t.Fatalf("up 0017: %v", err)
+	}
+	rows, err := db.QueryContext(ctx, `SELECT name, COALESCE(analyte, '')
+		FROM report_items WHERE report_sha256='img-pre-0017' ORDER BY name`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	got := map[string]string{}
+	for rows.Next() {
+		var name, analyte string
+		if err := rows.Scan(&name, &analyte); err != nil {
+			t.Fatal(err)
+		}
+		got[name] = analyte
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	if got["ALT"] != "alt" || got["RDW-CV"] != "rdw_cv" || got["Other"] != "" {
+		t.Fatalf("backfilled analytes = %+v, want ALT=alt, RDW-CV=rdw_cv, Other empty", got)
 	}
 }
 

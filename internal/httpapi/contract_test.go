@@ -175,7 +175,7 @@ func TestOpenAPIMirrorsRecognitionItem(t *testing.T) {
 
 	shared := []string{
 		"name", "value", "unit", "ref_range", "method", "flag", "low_confidence", "raw_text",
-		"code", "loinc", "unit_display", "unit_status", "raw_value", "raw_unit",
+		"code", "loinc", "analyte", "unit_display", "unit_status", "raw_value", "raw_unit",
 		"raw_ref_range", "ref_kind", "result_kind", "result_basis",
 	}
 	for _, field := range shared {

@@ -579,6 +579,8 @@ export interface components {
             code?: string | null;
             /** @description LOINC 码;无 exact 码为 null */
             loinc?: string | null;
+            /** @description 分析物语义 key(如 alt/hemoglobin);框架层按此匹配,未映射为 null */
+            analyte?: string | null;
             /** @description 人类可读展示单位(UI 优先);缺失时回退 unit */
             unit_display?: string | null;
             /**
@@ -980,6 +982,12 @@ export interface components {
             window_from: string;
             window_to: string;
             rule_version: string;
+            /** @description 解释层 prompt 版本;旧快照可缺省。 */
+            prompt_version?: string;
+            /** @description 命中的知识条目 id → version;旧快照/无条目时可缺省。 */
+            entry_versions?: {
+                [key: string]: string;
+            };
             /** @description 生成快照时的成员数据指纹;当前数据不同即 stale=true。 */
             data_version: string;
             points: components["schemas"]["AnalysisSnapshotPoint"][];

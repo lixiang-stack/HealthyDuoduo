@@ -10,6 +10,17 @@ import (
 	"healthyduoduo/internal/pipeline"
 )
 
+var testAnalyteByName = map[string]string{
+	"丙氨酸氨基转移酶测定":    contract.AnalyteALT,
+	"天门冬氨酸氨基转移酶测定":  contract.AnalyteAST,
+	"碱性磷酸酶测定":       contract.AnalyteALP,
+	"血红蛋白测定":        contract.AnalyteHemoglobin,
+	"平均红细胞体积测定":     contract.AnalyteMCV,
+	"平均红细胞血红蛋白含量测定": contract.AnalyteMCH,
+	"平均红细胞血红蛋白浓度测定": contract.AnalyteMCHC,
+	"红细胞分布宽度-CV":    contract.AnalyteRDWCV,
+}
+
 func frameworkPoint(itemID int64, name, value, unit, refRange, flag string) EvidencePoint {
 	return EvidencePoint{
 		EvidenceID:  "ev-r1-" + strconv.FormatInt(itemID, 10),
@@ -17,6 +28,7 @@ func frameworkPoint(itemID int64, name, value, unit, refRange, flag string) Evid
 		ReportDate:  strPtr("2026-10-01"),
 		ReportType:  "生化",
 		TrendKey:    name,
+		Analyte:     testAnalyteByName[name],
 		Name:        name,
 		Unit:        strPtr(unit),
 		UnitDisplay: strPtr(unit),
@@ -24,6 +36,14 @@ func frameworkPoint(itemID int64, name, value, unit, refRange, flag string) Evid
 		RefRange:    strPtr(refRange),
 		Flag:        flag,
 	}
+}
+
+func frameworkPointFor(reportID, date string, itemID int64, name, value, unit, refRange, flag string) EvidencePoint {
+	point := frameworkPoint(itemID, name, value, unit, refRange, flag)
+	point.ReportID = reportID
+	point.ReportDate = strPtr(date)
+	point.EvidenceID = "ev-" + reportID + "-" + strconv.FormatInt(itemID, 10)
+	return point
 }
 
 func frameworkFacts(points ...EvidencePoint) Facts {
@@ -78,6 +98,71 @@ func TestLiverRValueBoundaries(t *testing.T) {
 				t.Fatalf("R label missing source/value: %+v", label)
 			}
 		})
+	}
+}
+
+func TestLiverRValueClassifiesRawRatio(t *testing.T) {
+	// 原始 R = (200.1/40)/(100.1/100) = 4.9975;四舍五入后显示 5.00,但分类必须按原始值判混合型。
+	points := []EvidencePoint{
+		frameworkPoint(1, "丙氨酸氨基转移酶测定", "200.1", "U/L", "7-40", contract.FlagHigh),
+		frameworkPoint(2, "碱性磷酸酶测定", "100.1", "U/L", "40-100", contract.FlagHigh),
+	}
+	labels := frameworkLabels(t, testRequest(EntryPanel, pipeline.PanelLiver, 12), frameworkFacts(points...), nil)
+	label, ok := labelByCode(labels, LabelLiverRValue)
+	if !ok || label.Label != "混合型" {
+		t.Fatalf("R label = %+v, want 混合型 (raw R=4.9975)", label)
+	}
+	if label.Value == nil || !strings.Contains(*label.Value, "R = 5.00") {
+		t.Fatalf("R value = %v, want rounded display 5.00", label.Value)
+	}
+}
+
+func TestTransaminaseGradeClassifiesRawRatio(t *testing.T) {
+	cases := []struct{ name, value, want string }{
+		{"1.999", "79.96", "临界"},
+		{"1.001", "40.04", "临界"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			points := []EvidencePoint{
+				frameworkPoint(1, "丙氨酸氨基转移酶测定", c.value, "U/L", "7-40", contract.FlagHigh),
+			}
+			labels := frameworkLabels(t, testRequest(EntryPanel, pipeline.PanelLiver, 12), frameworkFacts(points...), nil)
+			label, ok := labelByCode(labels, LabelLiverTransaminaseGrade)
+			if !ok || label.Label != "转氨酶升高："+c.want {
+				t.Fatalf("grade = %+v, want %s", label, c.want)
+			}
+		})
+	}
+}
+
+func TestFrameworkFallsBackToOlderReportWithRequiredIndicators(t *testing.T) {
+	older := []EvidencePoint{
+		frameworkPointFor("r1", "2026-09-01", 1, "丙氨酸氨基转移酶测定", "200.1", "U/L", "7-40", contract.FlagHigh),
+		frameworkPointFor("r1", "2026-09-01", 2, "碱性磷酸酶测定", "100.1", "U/L", "40-100", contract.FlagHigh),
+		frameworkPointFor("r1", "2026-09-01", 3, "天门冬氨酸氨基转移酶测定", "80", "U/L", "13-35", contract.FlagHigh),
+	}
+	latest := []EvidencePoint{
+		frameworkPointFor("r2", "2026-10-01", 4, "血红蛋白测定", "120", "g/L", "115-150", contract.FlagNormal),
+	}
+	facts := Facts{
+		Panel: pipeline.PanelLiver,
+		Entry: EntryPanel,
+		Reports: []ReportRef{
+			{ReportID: "r2", ReportDate: strPtr("2026-10-01"), ReportType: "生化"},
+			{ReportID: "r1", ReportDate: strPtr("2026-09-01"), ReportType: "生化"},
+		},
+		History: []History{
+			{Points: latest, Latest: latest[0]},
+			{Points: older, Latest: older[len(older)-1]},
+		},
+	}
+	labels := frameworkLabels(t, testRequest(EntryPanel, pipeline.PanelLiver, 12), facts, nil)
+	for _, code := range []string{LabelLiverRValue, LabelLiverTransaminaseGrade, LabelLiverASTALTRatio} {
+		label, ok := labelByCode(labels, code)
+		if !ok || label.Value == nil || !strings.Contains(*label.Value, "2026-09-01") {
+			t.Fatalf("%s = %+v, want fallback to 2026-09-01", code, label)
+		}
 	}
 }
 
@@ -174,8 +259,8 @@ func TestASTALTRatio(t *testing.T) {
 	}
 	labels := frameworkLabels(t, testRequest(EntryPanel, pipeline.PanelLiver, 12), frameworkFacts(points...), nil)
 	label, ok := labelByCode(labels, LabelLiverASTALTRatio)
-	if !ok || label.Value == nil || *label.Value != "0.50" {
-		t.Fatalf("AST/ALT label = %+v, want 0.50", label)
+	if !ok || label.Value == nil || *label.Value != "0.50（报告日期 2026-10-01）" {
+		t.Fatalf("AST/ALT label = %+v, want 0.50 with report date", label)
 	}
 }
 
@@ -326,6 +411,40 @@ func TestBMIWSTBoundaries(t *testing.T) {
 	}
 }
 
+func TestWSTBMIStatusStopsAt18(t *testing.T) {
+	if _, ok := wstBMIStatus(pipeline.SexMale, 215, 24); !ok {
+		t.Fatal("17y11m should use WS/T")
+	}
+	if _, ok := wstBMIStatus(pipeline.SexMale, 216, 24); ok {
+		t.Fatal("18y0m should not use WS/T")
+	}
+	if _, ok := whoBMIZ(pipeline.SexMale, 216, 24); !ok {
+		t.Fatal("18y0m should use WHO z")
+	}
+	if _, ok := whoBMIZ(pipeline.SexMale, 228, 24); !ok {
+		t.Fatal("19y0m should use WHO z")
+	}
+	if _, ok := whoBMIZ(pipeline.SexMale, 229, 24); ok {
+		t.Fatal("19y1m should be outside WHO table")
+	}
+}
+
+func TestBMILabelsUsesWHOAfter18(t *testing.T) {
+	height, weight := 170.0, 70.0 // BMI 24.22
+	growth := InputGrowth{MeasuredOn: "2026-07-01", HeightCm: &height, WeightKg: &weight, Source: pipeline.GrowthSourceMeasured}
+	req := testRequest(EntryPanel, pipeline.PanelCBC, 12)
+	req.MemberBirthDate = "2008-01-01" // 18y6m
+	req.MemberSex = pipeline.SexMale
+	labels := frameworkLabels(t, req, frameworkFacts(), &growth)
+	status, ok := labelByCode(labels, LabelBMIStatus)
+	if !ok || len(status.Sources) == 0 || status.Sources[0].Standard != "WHO 2007" {
+		t.Fatalf("BMI status = %+v, want WHO 2007 source after 18", status)
+	}
+	if _, ok := labelByCode(labels, LabelBMIZScore); !ok {
+		t.Fatal("BMI z missing after 18")
+	}
+}
+
 func TestBMIWithoutDemographicsHasValueOnly(t *testing.T) {
 	height, weight := 140.0, 50.0
 	growth := InputGrowth{MeasuredOn: "2026-10-01", HeightCm: &height, WeightKg: &weight, Source: pipeline.GrowthSourceMeasured}
@@ -419,8 +538,8 @@ func TestLiverRValueAndGradeDisplayUnroundedValue(t *testing.T) {
 	}
 	rLabels := frameworkLabels(t, testRequest(EntryPanel, pipeline.PanelLiver, 12), frameworkFacts(rPoints...), nil)
 	rLabel, ok := labelByCode(rLabels, LabelLiverRValue)
-	if !ok || rLabel.Label != "混合型" || rLabel.Value == nil || *rLabel.Value != "R = 4.95" {
-		t.Fatalf("R label = %+v, want 混合型 / R = 4.95", rLabel)
+	if !ok || rLabel.Label != "混合型" || rLabel.Value == nil || *rLabel.Value != "R = 4.95（报告日期 2026-10-01）" {
+		t.Fatalf("R label = %+v, want 混合型 / R = 4.95 with report date", rLabel)
 	}
 
 	gradePoints := []EvidencePoint{
@@ -428,8 +547,8 @@ func TestLiverRValueAndGradeDisplayUnroundedValue(t *testing.T) {
 	}
 	gradeLabels := frameworkLabels(t, testRequest(EntryPanel, pipeline.PanelLiver, 12), frameworkFacts(gradePoints...), nil)
 	grade, ok := labelByCode(gradeLabels, LabelLiverTransaminaseGrade)
-	if !ok || grade.Label != "转氨酶升高：临界" || grade.Value == nil || *grade.Value != "ALT 1.98×ULN" {
-		t.Fatalf("grade label = %+v, want 临界 / ALT 1.98×ULN", grade)
+	if !ok || grade.Label != "转氨酶升高：临界" || grade.Value == nil || *grade.Value != "ALT 1.98×ULN（报告日期 2026-10-01）" {
+		t.Fatalf("grade label = %+v, want 临界 / ALT 1.98×ULN with report date", grade)
 	}
 }
 

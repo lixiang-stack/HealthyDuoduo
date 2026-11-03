@@ -174,7 +174,7 @@ func handleCreateAnalysis(d *deps) http.HandlerFunc {
 			writeErrorJSON(w, http.StatusInternalServerError, "save analysis failed")
 			return
 		}
-		if facts.InsufficientEvidence && d.observability != nil {
+		if facts.InsufficientEvidence && hasTrustGateFailure(facts) && d.observability != nil {
 			_ = d.observability.RecordAnalysisEvent(r.Context(), saved.AnalysisID, analysis.EventTrustGateFailed, "")
 		}
 		if d.explainer != nil && !facts.InsufficientEvidence {
@@ -283,6 +283,17 @@ func toAPIAnalysisResult(record analysis.Record, quota httpapi.AnalysisQuota) ht
 		Quota:      quota,
 		Stale:      record.Stale,
 	}
+}
+
+// hasTrustGateFailure 只有「有候选点但全部被信任门控排除」才算降级;
+// 空成员/无数据不是 trust_gate_failed,避免周检降级率被空档案抬高。
+func hasTrustGateFailure(facts analysis.Facts) bool {
+	for _, exclusion := range facts.Excluded {
+		if exclusion.Reason == analysis.ReasonLowConfidence {
+			return true
+		}
+	}
+	return false
 }
 
 func containsNote(notes []analysis.InputNote, reportID string) bool {

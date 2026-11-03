@@ -110,6 +110,10 @@
           "type": ["string", "null"],
           "description": "LOINC 码;无 exact 码为 null"
         },
+        "analyte": {
+          "type": ["string", "null"],
+          "description": "分析物语义 key(如 alt/hemoglobin);框架层按此匹配,未映射为 null"
+        },
         "unit_display": {
           "type": ["string", "null"],
           "description": "人类可读展示单位(UI 优先);缺失时回退 unit"

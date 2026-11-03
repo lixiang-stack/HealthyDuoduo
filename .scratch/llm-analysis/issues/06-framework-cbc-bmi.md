@@ -25,3 +25,9 @@
 - BMI：`pipeline.BMI` 用测量时点值；6–18 岁按 WS/T 586—2018 半岁年龄别界值；5–19 岁输出 WHO 2007 z 值与百分位（LMS 表由 WHO 2007 扩展表生成）。缺 `birth_date` / `sex` 时不输出百分位；`source = manual` 只输出 BMI 数值（该来源已在票 02 体验修订中移除，领域层保留守卫）。
 - App `FrameworkCard` 通用渲染框架层标签；RNTL 覆盖形态学、Hb 切点与 BMI 百分位文案。
 - 单测覆盖 WS/T 界值上下（19.1 / 19.2 / 21.9）、缺生日/性别、manual 来源、WHO 5.5 岁 z 值、形态学缺 Hb/MCV。
+
+**复核修订（2026-11-03）**
+
+- 血常规与 BMI 规则拆到 `internal/analysis/framework_cbc.go` / `framework_bmi.go`。
+- BMI 在 18 岁生日前用 WS/T 586，18–19 岁用 WHO 2007 z；WS/T 的 18.0 行不再用于 18 岁生日后的判定。
+- 血常规与 BMI 也按识别端 `analyte` key 匹配；参考表 CSV 为唯一源，`go generate ./internal/analysis` 生成 Go 数据。
