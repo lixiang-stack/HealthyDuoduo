@@ -564,8 +564,8 @@ id: liver-hepatocellular-mild
 priority: 10
 trigger:
   panel: liver
-  any_flag_high: [ALT, AST]
-  all_normal: [ALP, 总胆红素]
+  any_flag_high: [alanine_aminotransferase, aspartate_aminotransferase]
+  all_normal: [alkaline_phosphatase, bilirubin_total]
 explanation: >
   转氨酶升高而碱性磷酸酶和胆红素正常，通常提示肝细胞受累，
   而不是胆道淤积。
@@ -584,3 +584,7 @@ version: 1
 ```
 
 `explanation` 中的「通常提示」经确认不算越界；`check_directions` 中的「复查」经确认不算被禁的复查提醒。
+
+### 7.7 结果页 UX v2
+
+分析结果页的信息架构、文案、来源/报告链接、状态与操作由 `.scratch/analysis-result-ux/spec.md` 定义，实现工单见 `.scratch/analysis-result-ux/issues/`。本 spec 继续约束分析引擎、事实层筛选、框架层规则与解释层契约；结果页改版不得改变这里的窗口、信任门控或 LLM 边界。
