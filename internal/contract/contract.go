@@ -41,7 +41,9 @@ const (
 	UnitStatusUnverified = "unverified"
 )
 
-// 分析物语义 key(识别端词典 analyte;框架层按此匹配,不再维护名称/别名表)。
+// 分析物语义 key:产品内部词汇,不是 LOINC / WS/T 886 码。
+// 每个 key 必须对应识别端词典中唯一一个规范指标(以 code / LOINC 锚定),
+// 且只给框架层当前消费的分析物加 key;名称、别名、单位、方法差异留在识别端词典。
 const (
 	AnalyteALT        = "alt"
 	AnalyteAST        = "ast"
