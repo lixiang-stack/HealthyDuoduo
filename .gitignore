@@ -3,6 +3,9 @@
 
 # 未脱敏真实数据(NF-01):仅本机迭代用,永不提交入库
 /data/
+
+# 本机密钥:文件型 secret 与 .env 一律不入库
+deploy/.env*
 __pycache__/
 *.py[cod]
 dist/

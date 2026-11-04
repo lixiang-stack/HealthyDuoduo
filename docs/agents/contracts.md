@@ -18,13 +18,13 @@ This repo mirrors the same contract through several layers. Use this page as a n
 | HTTP fixtures | `schemas/testdata/http/*.json` | round-trip against Go mirrors and OpenAPI schemas |
 | Growth record | `schemas/openapi.yaml` `GrowthRecord` | `internal/httpapi/types.go`; App `src/api/growth.ts`; storage `growth_records` |
 | Analysis facts / snapshot | `schemas/openapi.yaml` `Analysis*` | `internal/httpapi/analysis.go` → `internal/analysis` types; App `src/api/analyses.ts`; storage `analyses.layers/snapshot` |
-| Analysis framework / explanation / quota | `schemas/openapi.yaml` `AnalysisFramework`, `AnalysisExplanation`, `AnalysisQuota` | `internal/analysis/framework.go`, `explain.go`; App `src/analysis/components.tsx`, `framework.ts` |
+| Analysis framework / explanation / quota | `schemas/openapi.yaml` `AnalysisFramework`, `AnalysisExplanation`, `AnalysisQuota` | `internal/analysis/framework*.go`, `knowledge/`, `explain.go`; App `src/analysis/components.tsx`, `framework.ts` |
 | Analysis feedback / metrics | `schemas/openapi.yaml` `AnalysisFeedback*`, `AnalysisMetrics` | `cmd/hdd/serve_analysis_feedback.go`; `internal/analysis/store.go`; storage `analysis_feedback`, `analysis_events`, `analysis_llm_calls`; App `src/analysis/FeedbackModal.tsx` |
 
 ### Cross-cutting mirrors
 
 - Panel code / order: `schemas/report.schema.json` `$defs.panel` → `recognizer/recognizer/contract.py` → `internal/pipeline/panels.go` → `apps/mobile/src/reports/panels.ts`.
-- Report item analyte: `recognizer/recognizer/{chemistry,cbc}_dict.yaml` `analyte` → `schemas/report.schema.json` `reportItem.analyte` → `recognizer/recognizer/contract.py` / `internal/contract` / `internal/httpapi.ReportItem` → `report_items.analyte` → `internal/analysis` framework matching. 加指标时必须同时给词典项写 `analyte`，否则框架层不会按该指标出标签。
+- Report item analyte: `recognizer/recognizer/{chemistry,cbc}_dict.yaml` `analyte` → `schemas/report.schema.json` `reportItem.analyte` → `recognizer/recognizer/contract.py` / `internal/contract` / `internal/httpapi.ReportItem` → `report_items.analyte` → `internal/analysis` framework / knowledge matching. key 取 LOINC component 风格的全称小写 snake_case（如 `alanine_aminotransferase`、`bilirubin_total`），缩写只用于 UI / 框架文案；加指标时必须同时给词典项写 `analyte`，否则框架层与条目触发不会按该指标匹配。
 - Narrative report kinds: `recognizer/recognizer/postprocess.py` (`NARRATIVE_BODY_SECTION_KINDS`) → `internal/pipeline/reports.go` (`hasReportBody`) → `recognizer/tools/e2e.py` (`verify_narrative_reports`) → App `sections.ts` / `status.ts`.
 - Report summary/detail projection: `internal/httpapi/types.go` ↔ `schemas/openapi.yaml` ↔ App `api/reports.ts`.
 - Analysis facts: `internal/analysis` (`Facts` / `Snapshot` JSON tags) ↔ `schemas/openapi.yaml` `AnalysisFacts` / `AnalysisSnapshot` ↔ App `api/analyses.ts`; facts window / gating changes must keep the snapshot rule version in sync.

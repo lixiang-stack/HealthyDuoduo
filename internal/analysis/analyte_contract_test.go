@@ -28,14 +28,15 @@ func TestAnalyteCatalogMatchesRecognizerDictionaries(t *testing.T) {
 		code  string
 		loinc string
 	}{
-		contract.AnalyteALT:        {code: "1500104A", loinc: "1742-6"},
-		contract.AnalyteAST:        {code: "1500204A", loinc: "1920-8"},
-		contract.AnalyteALP:        {code: "1500404A", loinc: "6768-6"},
-		contract.AnalyteHemoglobin: {code: "0100401A", loinc: "718-7"},
-		contract.AnalyteMCV:        {code: "0100601A", loinc: "787-2"},
-		contract.AnalyteMCH:        {code: "0100701A", loinc: "785-6"},
-		contract.AnalyteMCHC:       {code: "0100801A", loinc: "786-4"},
-		contract.AnalyteRDWCV:      {loinc: "788-0"},
+		contract.AnalyteALT:            {code: "1500104A", loinc: "1742-6"},
+		contract.AnalyteAST:            {code: "1500204A", loinc: "1920-8"},
+		contract.AnalyteALP:            {code: "1500404A", loinc: "6768-6"},
+		contract.AnalyteBilirubinTotal: {code: "1700504A", loinc: "1975-2"},
+		contract.AnalyteHemoglobin:     {code: "0100401A", loinc: "718-7"},
+		contract.AnalyteMCV:            {code: "0100601A", loinc: "787-2"},
+		contract.AnalyteMCH:            {code: "0100701A", loinc: "785-6"},
+		contract.AnalyteMCHC:           {code: "0100801A", loinc: "786-4"},
+		contract.AnalyteRDWCV:          {loinc: "788-0"},
 	}
 	keyPattern := regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 	seen := make(map[string]string)

@@ -128,10 +128,23 @@ func (f *fakeAnalysisStore) AnalysisMetrics(ctx context.Context, from, to time.T
 	return f.metrics, nil
 }
 
+type fakeAnalysisLLM struct {
+	response string
+}
+
+func (f fakeAnalysisLLM) Complete(ctx context.Context, req analysis.LLMRequest) (analysis.LLMResponse, error) {
+	return analysis.LLMResponse{Content: f.response}, nil
+}
+
 func newAnalysisTestServer(t *testing.T, store analysis.Store) (*httptest.Server, *fakeMemberStore) {
 	t.Helper()
+	return newAnalysisTestServerWithExplainer(t, store, nil)
+}
+
+func newAnalysisTestServerWithExplainer(t *testing.T, store analysis.Store, explainer *analysis.Explainer) (*httptest.Server, *fakeMemberStore) {
+	t.Helper()
 	ms := &fakeMemberStore{}
-	d := &deps{members: ms, analyses: store}
+	d := &deps{members: ms, analyses: store, explainer: explainer}
 	if quota, ok := store.(analysis.QuotaStore); ok {
 		d.quota = quota
 	}
@@ -251,6 +264,50 @@ func TestServeAnalysisPanelFacts(t *testing.T) {
 	}
 	if !stale.Stale {
 		t.Fatal("analysis not marked stale after data version change")
+	}
+}
+
+func TestServeAnalysisUsesKnowledgeEntryAndFreezesVersion(t *testing.T) {
+	reportID := strings.Repeat("a", 64)
+	alt := analysisPoint(1, reportID, "2026-10-01", "83.5", "high")
+	alp := analysisPoint(2, reportID, "2026-10-01", "80", "normal")
+	alp.Name, alp.Code, alp.Analyte = "碱性磷酸酶测定", "1500404A", contract.AnalyteALP
+	alp.RefRange = "40-100"
+	bilirubin := analysisPoint(3, reportID, "2026-10-01", "15", "normal")
+	bilirubin.Name, bilirubin.Code, bilirubin.Analyte = "总胆红素测定", "1700504A", contract.AnalyteBilirubinTotal
+	bilirubin.RefRange, bilirubin.Unit, bilirubin.UnitDisplay = "0-26", "umol/L", "μmol/L"
+	store := &fakeAnalysisStore{points: []analysis.InputPoint{alt, alp, bilirubin}}
+	matcher, err := analysis.NewKnowledgeMatcher()
+	if err != nil {
+		t.Fatal(err)
+	}
+	explainer := &analysis.Explainer{
+		Client:  fakeAnalysisLLM{response: `{"sections":[{"entry_id":"liver-hepatocellular-mild","evidence_ids":["e1"],"bridge_text":"先看本次转氨酶与碱性磷酸酶的关系。"}]}`},
+		Matcher: matcher, Quota: store, Events: store,
+		DailyLimit: 20, InputTokenLimit: 8000, OutputTokenLimit: 1500, RecordEntryMiss: true,
+	}
+	srv, ms := newAnalysisTestServerWithExplainer(t, store, explainer)
+	memberID := createAnalysisMember(t, ms)
+	body := `{"member_id":` + strconv.FormatInt(memberID, 10) + `,"panel":"liver","entry":"panel"}`
+
+	status, raw := doJSON(t, srv, http.MethodPost, "/api/v1/analyses", body)
+	if status != http.StatusCreated {
+		t.Fatalf("POST analyses status = %d, want 201; body=%s", status, raw)
+	}
+	var result httpapi.AnalysisResult
+	if err := json.Unmarshal(raw, &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.Layers.Explanation == nil || len(result.Layers.Explanation.Sections) != 1 {
+		t.Fatalf("explanation = %+v", result.Layers.Explanation)
+	}
+	section := result.Layers.Explanation.Sections[0]
+	if section.EntryID != "liver-hepatocellular-mild" || section.Explanation == "" ||
+		len(section.CheckDirections) != 1 || section.TrackItems[0] != "ALT" {
+		t.Fatalf("section = %+v", section)
+	}
+	if result.Snapshot.EntryVersions["liver-hepatocellular-mild"] != "1" {
+		t.Fatalf("entry versions = %v, want frozen entry version", result.Snapshot.EntryVersions)
 	}
 }
 

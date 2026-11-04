@@ -100,7 +100,9 @@ func TestExplainSuccessMapsEphemeralEvidenceIDs(t *testing.T) {
 	client := &fakeLLM{responses: []LLMResponse{{Content: validExplanationJSON}}}
 	explainer, quota, events := explanationTestExplainer(client, fakeMatcher{entries: []KnowledgeEntry{{
 		ID: "liver-hepatocellular-mild", Explanation: "条目原文",
-		Review: KnowledgeReview{Decision: ReviewDecisionAccepted},
+		CheckDirections: []string{"复查肝功能"}, GeneralAdvice: []string{"规律作息"},
+		TrackItems: []string{"ALT", "AST"},
+		Review:     KnowledgeReview{Decision: ReviewDecisionAccepted},
 	}}})
 	explanation, reason := explainer.Explain(context.Background(), 7, testRequest(EntryPanel, "liver", 12), explanationTestFacts())
 	if reason != "" || explanation == nil || len(explanation.Sections) != 1 {
@@ -110,6 +112,10 @@ func TestExplainSuccessMapsEphemeralEvidenceIDs(t *testing.T) {
 	if section.EntryID != "liver-hepatocellular-mild" || len(section.EvidenceIDs) != 1 ||
 		section.EvidenceIDs[0] != "ev-r1-1" || section.BridgeText == "" {
 		t.Fatalf("section = %+v", section)
+	}
+	if section.Explanation != "条目原文" || len(section.CheckDirections) != 1 ||
+		len(section.GeneralAdvice) != 1 || len(section.TrackItems) != 2 {
+		t.Fatalf("server-assembled entry text = %+v", section)
 	}
 	if quota.calls != 1 || len(events.kinds) != 0 {
 		t.Fatalf("quota/events = %+v / %v", quota, events.kinds)

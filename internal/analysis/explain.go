@@ -1,6 +1,6 @@
-// 解释层编排(llm-analysis 票 07):条目匹配 → 脱敏证据包 → 每日配额 → LLM 调用
-// (失败重试 1 次) → bridge_text 结构校验。前两层不受任何失败影响。
-// 条目 YAML 加载与四段式医学原文拼接属工单 08;本文件只依赖已匹配的条目。
+// 解释层编排(llm-analysis 票 07/08):条目匹配 → 脱敏证据包 → 每日配额 → LLM 调用
+// (失败重试 1 次) → bridge_text 结构校验 → 服务端拼接条目四段式原文。
+// 前两层不受任何失败影响。
 package analysis
 
 import (
@@ -59,12 +59,12 @@ type LLMClient interface {
 	Complete(ctx context.Context, req LLMRequest) (LLMResponse, error)
 }
 
-// EntryMatcher 知识条目匹配端口;07 生产侧无条目(NoEntries),08 接入 YAML 条目。
+// EntryMatcher 知识条目匹配端口;生产实现为 KnowledgeMatcher,测试可注入 fake / NoEntries。
 type EntryMatcher interface {
 	Match(req Request, facts Facts) []KnowledgeEntry
 }
 
-// NoEntries 工单 08 之前的空匹配器:不调用云端、不消耗配额。
+// NoEntries 空匹配器:不调用云端、不消耗配额。
 type NoEntries struct{}
 
 // Match 永远返回空;解释层省略,前两层照常输出。
@@ -83,12 +83,20 @@ type Explainer struct {
 	RecordEntryMiss bool
 }
 
+// Match 暴露命中条目的只读查询,供保存快照前记录 entry_versions;匹配是纯函数。
+func (e *Explainer) Match(req Request, facts Facts) []KnowledgeEntry {
+	if e == nil || e.Matcher == nil {
+		return nil
+	}
+	return e.Matcher.Match(req, facts)
+}
+
 // Explain 尝试生成解释层;返回 nil + 原因表示省略解释层。
 func (e *Explainer) Explain(ctx context.Context, analysisID int64, req Request, facts Facts) (*Explanation, string) {
 	if e == nil || e.Client == nil || e.Matcher == nil {
 		return nil, ExplanationReasonNotConfigured
 	}
-	entries := e.Matcher.Match(req, facts)
+	entries := e.Match(req, facts)
 	if len(entries) == 0 {
 		if e.RecordEntryMiss {
 			e.record(ctx, analysisID, EventEntryMiss, "no knowledge entry matched")
@@ -239,10 +247,14 @@ func validateSection(section llmSection, entryByID map[string]KnowledgeEntry, ma
 		return ExplanationSection{}, false
 	}
 	return ExplanationSection{
-		EntryID:     section.EntryID,
-		EvidenceIDs: realIDs,
-		BridgeText:  bridgeText,
-		Sources:     entry.Sources,
+		EntryID:         section.EntryID,
+		EvidenceIDs:     realIDs,
+		BridgeText:      bridgeText,
+		Explanation:     entry.Explanation,
+		CheckDirections: nonEmptyStrings(entry.CheckDirections),
+		GeneralAdvice:   nonEmptyStrings(entry.GeneralAdvice),
+		TrackItems:      nonEmptyStrings(entry.TrackItems),
+		Sources:         entry.Sources,
 	}, true
 }
 

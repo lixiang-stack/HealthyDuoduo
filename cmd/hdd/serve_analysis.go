@@ -157,6 +157,9 @@ func handleCreateAnalysis(d *deps) http.HandlerFunc {
 		}
 		snapshot := analysis.BuildSnapshot(req, facts)
 		snapshot.DataVersion = dataVersion
+		if d.explainer != nil && !facts.InsufficientEvidence {
+			snapshot.EntryVersions = analysis.EntryVersions(d.explainer.Match(req, facts))
+		}
 		record := analysis.Record{
 			MemberID:      member.MemberID,
 			Panel:         panel,

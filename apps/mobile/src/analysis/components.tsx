@@ -1,6 +1,7 @@
-// 分析结果页的非路由展示组件(llm-analysis 票 04):本次范围卡与通用分组。
-import type { ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+// 分析结果页的非路由展示组件(llm-analysis 票 04/08):本次范围卡、通用分组、
+// 框架层标签与四段式解释;解释原文由服务端从条目拼接,App 只做排版。
+import { useState, type ReactNode } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { AnalysisExplanation, AnalysisFramework, AnalysisResult } from '../api/analyses';
 import { colors } from '../components/theme';
@@ -75,19 +76,82 @@ export function ExplanationCard({ explanation }: { explanation: AnalysisExplanat
   return (
     <Section title="解读" testID="analysis-explanation">
       {explanation.sections.map((section) => (
-        <View key={section.entry_id} style={styles.labelRow}>
-          <Text style={styles.labelTitle}>{section.bridge_text}</Text>
-          {section.source_ids?.length ? (
-            <Text style={styles.sourceText}>
-              依据 {section.source_ids.map((source) => source.standard).join(' / ')}
-            </Text>
-          ) : null}
-        </View>
+        <ExplanationSectionCard key={section.entry_id} section={section} />
       ))}
       {explanation.truncated ? (
         <Text style={styles.mutedSmall}>解释内容达到长度上限，已截断。</Text>
       ) : null}
     </Section>
+  );
+}
+
+function ExplanationSectionCard({
+  section,
+}: {
+  section: AnalysisExplanation['sections'][number];
+}) {
+  const [showSources, setShowSources] = useState(false);
+  const sources = section.source_ids ?? [];
+  // 旧分析快照可能没有四段式字段;缺字段时只显示 bridge_text,不让结果页崩溃。
+  const explanation = section.explanation ?? '';
+  const checkDirections = section.check_directions ?? [];
+  const generalAdvice = section.general_advice ?? [];
+  const trackItems = section.track_items ?? [];
+  return (
+    <View testID={`analysis-explanation-section-${section.entry_id}`} style={styles.labelRow}>
+      <Text style={styles.labelTitle}>{section.bridge_text}</Text>
+      {explanation ? (
+        <>
+          <Text style={styles.partTitle}>可能原因</Text>
+          <Text style={styles.bodyText}>{explanation}</Text>
+        </>
+      ) : null}
+      <ExplanationLines title="进一步检查" lines={checkDirections} />
+      <ExplanationLines title="生活建议" lines={generalAdvice} />
+      {trackItems.length > 0 ? (
+        <>
+          <Text style={styles.partTitle}>长期跟踪</Text>
+          <Text style={styles.bodyText}>建议持续记录：{trackItems.join('、')}</Text>
+        </>
+      ) : null}
+      {sources.length > 0 ? (
+        <Pressable
+          testID={`analysis-explanation-sources-${section.entry_id}`}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: showSources }}
+          onPress={() => setShowSources((open) => !open)}
+        >
+          <Text style={styles.sourceToggle}>{showSources ? '收起依据' : '查看依据'}</Text>
+        </Pressable>
+      ) : null}
+      {showSources ? (
+        <View testID={`analysis-explanation-sources-detail-${section.entry_id}`}>
+          {sources.map((source, index) => (
+            <Text key={`${source.standard}-${index}`} style={styles.sourceText}>
+              {source.standard}
+              {source.note ? ` · ${source.note}` : ''}
+              {source.url ? ` · ${source.url}` : ''}
+            </Text>
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function ExplanationLines({ title, lines }: { title: string; lines: string[] }) {
+  if (lines.length === 0) {
+    return null;
+  }
+  return (
+    <>
+      <Text style={styles.partTitle}>{title}</Text>
+      {lines.map((line) => (
+        <Text key={line} style={styles.bodyText}>
+          · {line}
+        </Text>
+      ))}
+    </>
   );
 }
 
@@ -112,5 +176,8 @@ const styles = StyleSheet.create({
   labelHeader: { gap: 2 },
   labelTitle: { fontSize: 15, color: colors.text, fontWeight: '600' },
   labelValue: { fontSize: 13, color: colors.text, fontVariant: ['tabular-nums'] },
+  partTitle: { fontSize: 13, color: colors.text, fontWeight: '600', marginTop: 4 },
+  bodyText: { fontSize: 13, color: colors.text, lineHeight: 19 },
+  sourceToggle: { fontSize: 12, color: colors.accent, marginTop: 4 },
   sourceText: { fontSize: 11, color: colors.muted, lineHeight: 16 },
 });

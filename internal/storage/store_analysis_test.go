@@ -83,7 +83,7 @@ func TestAnalysisStoreSmoke(t *testing.T) {
 	}
 	if _, err := pool.Exec(ctx, `INSERT INTO report_items
 		(report_sha256, name, panel, analyte, value, unit, unit_status, ref_range, flag, low_confidence, raw_text)
-		VALUES ($1, '丙氨酸转氨酶测定', 'liver', 'alt', '83.5', 'U/L', 'verified', '7-40', 'high', false, 'ALT 83.5')`,
+		VALUES ($1, '丙氨酸转氨酶测定', 'liver', 'alanine_aminotransferase', '83.5', 'U/L', 'verified', '7-40', 'high', false, 'ALT 83.5')`,
 		reportID); err != nil {
 		t.Fatalf("seed item: %v", err)
 	}
@@ -118,7 +118,7 @@ func TestAnalysisStoreSmoke(t *testing.T) {
 	}
 	if len(points) != 1 || points[0].ReportID != reportID || points[0].Flag != "high" ||
 		points[0].UnitStatus != "verified" || points[0].MemberID != member.MemberID ||
-		points[0].Analyte != "alt" {
+		points[0].Analyte != "alanine_aminotransferase" {
 		t.Fatalf("analysis points = %+v", points)
 	}
 
