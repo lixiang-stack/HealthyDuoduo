@@ -30,7 +30,7 @@ items:
         source: legacy printed name (pre-standardization dictionary)
     code: 1500104A
     loinc: 1742-6
-    analyte: alt
+    analyte: alanine_aminotransferase
     local_code:
     source_status: primary
     review_status: approved
@@ -50,7 +50,7 @@ items:
         source: legacy printed name (pre-standardization dictionary)
     code: 1500204A
     loinc: 1920-8
-    analyte: ast
+    analyte: aspartate_aminotransferase
     local_code:
     source_status: primary
     review_status: approved
@@ -102,7 +102,7 @@ items:
         source: legacy printed name (pre-standardization dictionary)
     code: 1500404A
     loinc: 6768-6
-    analyte: alp
+    analyte: alkaline_phosphatase
     local_code:
     source_status: primary
     review_status: approved
@@ -213,6 +213,7 @@ items:
         source: legacy printed name (pre-standardization dictionary)
     code: 1700504A
     loinc: 1975-2
+    analyte: bilirubin_total
     local_code:
     source_status: primary
     review_status: approved

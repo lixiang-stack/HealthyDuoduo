@@ -230,7 +230,10 @@ type FrameworkLabel struct {
 }
 
 // 知识条目审核决策(spec §4.6);只有 accepted 条目可被模型引用。
-const ReviewDecisionAccepted = "accepted"
+const (
+	ReviewDecisionAccepted = "accepted"
+	ReviewDecisionRejected = "rejected"
+)
 
 // KnowledgeReview 条目审核记录;单人审核,只记 decision / reviewed_at / note。
 type KnowledgeReview struct {
@@ -239,9 +242,19 @@ type KnowledgeReview struct {
 	Note       string
 }
 
+// KnowledgeTrigger 条目触发条件:Panel + 分析物 flag 组合。
+// 所有列出条件必须同时满足才算命中;部分满足一律不输出。
+type KnowledgeTrigger struct {
+	Panel       string
+	AnyFlagHigh []string
+	AllNormal   []string
+}
+
 // KnowledgeEntry 已匹配的知识条目;医学原文由服务端从条目拼接,模型只写 bridge_text。
 type KnowledgeEntry struct {
 	ID              string
+	Priority        int
+	Trigger         KnowledgeTrigger
 	Version         string
 	Review          KnowledgeReview
 	Explanation     string
@@ -258,13 +271,17 @@ type Explanation struct {
 	Truncated bool                 `json:"truncated"`
 }
 
-// ExplanationSection 一条解释;EntryID / EvidenceIDs / BridgeText 来自模型并经服务端校验。
-// 四段式医学原文与「查看依据」由工单 08 追加;本工单只锁定引用与来源。
+// ExplanationSection 一条解释;EntryID / EvidenceIDs / BridgeText 来自模型并经服务端校验,
+// 四段式医学原文直接取自条目,模型无法修改。
 type ExplanationSection struct {
-	EntryID     string   `json:"entry_id"`
-	EvidenceIDs []string `json:"evidence_ids"`
-	BridgeText  string   `json:"bridge_text"`
-	Sources     []Source `json:"source_ids,omitempty"`
+	EntryID         string   `json:"entry_id"`
+	EvidenceIDs     []string `json:"evidence_ids"`
+	BridgeText      string   `json:"bridge_text"`
+	Explanation     string   `json:"explanation"`
+	CheckDirections []string `json:"check_directions"`
+	GeneralAdvice   []string `json:"general_advice"`
+	TrackItems      []string `json:"track_items"`
+	Sources         []Source `json:"source_ids,omitempty"`
 }
 
 // Snapshot 永久保留的分析快照:成员、Panel、窗口、有效点集合、病历引用与规则版本。

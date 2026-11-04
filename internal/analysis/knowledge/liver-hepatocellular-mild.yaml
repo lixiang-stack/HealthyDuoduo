@@ -1,0 +1,20 @@
+id: liver-hepatocellular-mild
+priority: 10
+trigger:
+  panel: liver
+  any_flag_high: [alanine_aminotransferase, aspartate_aminotransferase]
+  all_normal: [alkaline_phosphatase, bilirubin_total]
+explanation: 转氨酶升高而碱性磷酸酶和胆红素正常，通常提示肝细胞受累，而不是胆道淤积。
+check_directions:
+  - 复查肝功能，观察是否持续升高
+general_advice: []
+track_items: [ALT, AST]
+source_ids:
+  - standard: AASLD
+    note: R 值分型与肝细胞型定义
+    url: https://www.aasld.org/liver-fellow-network/core-series/back-basics/how-approach-elevated-liver-enzymes
+review:
+  decision: accepted
+  reviewed_at: 2026-11-02
+  note: 单人审核
+version: 1

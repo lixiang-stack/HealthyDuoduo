@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 
+import type { AnalysisExplanation } from '../../api/analyses';
 import { resolveApiClient } from '../../api/resolveClient';
 import AnalysisScreen from '../../app/analysis/[analysis_id]';
 import ReportDetailScreen from '../../app/report/[report_id]';
@@ -214,6 +215,10 @@ describe('AnalysisScreen', () => {
               entry_id: 'liver-hepatocellular-mild',
               evidence_ids: ['ev-aaaaaaaaaaaa-1'],
               bridge_text: '先看本次转氨酶与碱性磷酸酶的关系。',
+              explanation: '转氨酶升高而碱性磷酸酶和胆红素正常，通常提示肝细胞受累，而不是胆道淤积。',
+              check_directions: ['复查肝功能，观察是否持续升高'],
+              general_advice: ['规律作息'],
+              track_items: ['ALT', 'AST'],
               source_ids: [{ standard: 'AASLD', note: 'R 值分型', url: null }],
             },
           ],
@@ -227,8 +232,44 @@ describe('AnalysisScreen', () => {
     await renderScreen(<AnalysisScreen />);
 
     expect(await screen.findByTestId('analysis-explanation')).toHaveTextContent(/先看本次转氨酶/);
+    const section = screen.getByTestId('analysis-explanation-section-liver-hepatocellular-mild');
+    expect(section).toHaveTextContent(/可能原因/);
+    expect(section).toHaveTextContent(/通常提示肝细胞受累/);
+    expect(section).toHaveTextContent(/进一步检查/);
+    expect(section).toHaveTextContent(/复查肝功能/);
+    expect(section).toHaveTextContent(/生活建议/);
+    expect(section).toHaveTextContent(/规律作息/);
+    expect(section).toHaveTextContent(/长期跟踪/);
+    expect(section).toHaveTextContent(/建议持续记录：ALT、AST/);
     expect(screen.getByTestId('analysis-explanation')).toHaveTextContent(/已截断/);
-    expect(screen.getByTestId('analysis-explanation')).toHaveTextContent(/依据 AASLD/);
+    expect(screen.queryByTestId('analysis-explanation-sources-detail-liver-hepatocellular-mild')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('analysis-explanation-sources-liver-hepatocellular-mild'));
+    expect(
+      await screen.findByTestId('analysis-explanation-sources-detail-liver-hepatocellular-mild'),
+    ).toHaveTextContent(/AASLD · R 值分型/);
+  });
+
+  it('renders legacy explanation sections that predate the four-part fields', async () => {
+    const legacy = {
+      entry_id: 'liver-hepatocellular-mild',
+      evidence_ids: [],
+      bridge_text: '旧分析只有连接语。',
+      source_ids: [],
+    } as unknown as AnalysisExplanation['sections'][number];
+    const result = makeAnalysisResult({
+      layers: {
+        facts: makeAnalysisFacts(),
+        explanation: { sections: [legacy], truncated: false },
+      },
+    });
+    mockUseLocalSearchParams.mockReturnValue({ analysis_id: '12' });
+    mockApi({ GET: { '/analyses/{analysis_id}': () => result } });
+
+    await renderScreen(<AnalysisScreen />);
+
+    expect(await screen.findByTestId('analysis-explanation')).toHaveTextContent(/旧分析只有连接语/);
+    expect(screen.queryByText('可能原因')).toBeNull();
   });
 
   it('shows the quota message in the explanation position without disabling the result', async () => {

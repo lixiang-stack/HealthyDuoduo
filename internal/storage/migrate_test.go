@@ -31,13 +31,13 @@ func TestMigrationSmokeM0Contract(t *testing.T) {
 		t.Fatalf("migrate: %v", err)
 	}
 
-	// goose 已升到 0017 且幂等(Open 内重复 Migrate 不报错)。
+	// goose 已升到 0018 且幂等(Open 内重复 Migrate 不报错)。
 	var latest int
 	if err := pool.QueryRow(ctx, `SELECT max(version_id) FROM goose_db_version`).Scan(&latest); err != nil {
 		t.Fatalf("read goose version: %v", err)
 	}
-	if latest != 17 {
-		t.Fatalf("goose version = %d, want 17", latest)
+	if latest != 18 {
+		t.Fatalf("goose version = %d, want 18", latest)
 	}
 
 	// reports.sections(0007,ADR-0008):可选报告段落 JSONB,可空(存量/非叙述型 NULL)。
@@ -586,9 +586,9 @@ func TestMigration0011LegacyDefaults(t *testing.T) {
 	}
 }
 
-// TestMigration0017BackfillsAnalyte 0017 回填:旧行按 code / loinc 映射到 analyte,
-// 未知指标保持 NULL;新报告由识别端写入,不依赖迁移。
-func TestMigration0017BackfillsAnalyte(t *testing.T) {
+// TestMigrationAnalyteBackfillAndRename 0017 回填 analyte,0018 统一为全称 key;
+// 未知指标保持 NULL。新报告由识别端直接写入新 key。
+func TestMigrationAnalyteBackfillAndRename(t *testing.T) {
 	dsn := os.Getenv("HDD_TEST_DSN")
 	if dsn == "" {
 		t.Skip("HDD_TEST_DSN not set: migration smoke runs against a disposable PG container")
@@ -626,13 +626,32 @@ func TestMigration0017BackfillsAnalyte(t *testing.T) {
 		INSERT INTO report_items (report_sha256, name, code, loinc, flag, raw_text, low_confidence) VALUES
 			('img-pre-0017', 'ALT', '1500104A', NULL, 'normal', 'ALT', false),
 			('img-pre-0017', 'RDW-CV', NULL, '788-0', 'normal', 'RDW-CV', false),
+			('img-pre-0017', 'TBIL', '1700504A', '1975-2', 'normal', 'TBIL', false),
 			('img-pre-0017', 'Other', '9999999', NULL, 'normal', 'Other', false);`); err != nil {
 		t.Fatalf("seed pre-0017 rows: %v", err)
 	}
-	if err := goose.UpContext(ctx, db, migrationsDir); err != nil {
+	if err := goose.UpToContext(ctx, db, migrationsDir, 17); err != nil {
 		t.Fatalf("up 0017: %v", err)
 	}
-	rows, err := db.QueryContext(ctx, `SELECT name, COALESCE(analyte, '')
+	got := analyteKeys(t, db)
+	if got["ALT"] != "alt" || got["RDW-CV"] != "rdw_cv" ||
+		got["TBIL"] != "" || got["Other"] != "" {
+		t.Fatalf("0017 analytes = %+v, want ALT=alt, RDW-CV=rdw_cv, TBIL/Other empty", got)
+	}
+	if err := goose.UpContext(ctx, db, migrationsDir); err != nil {
+		t.Fatalf("up 0018: %v", err)
+	}
+	got = analyteKeys(t, db)
+	if got["ALT"] != "alanine_aminotransferase" ||
+		got["RDW-CV"] != "erythrocyte_distribution_width_cv" ||
+		got["TBIL"] != "bilirubin_total" || got["Other"] != "" {
+		t.Fatalf("0018 analytes = %+v, want full keys and Other empty", got)
+	}
+}
+
+func analyteKeys(t *testing.T, db *sql.DB) map[string]string {
+	t.Helper()
+	rows, err := db.Query(`SELECT name, COALESCE(analyte, '')
 		FROM report_items WHERE report_sha256='img-pre-0017' ORDER BY name`)
 	if err != nil {
 		t.Fatal(err)
@@ -649,9 +668,7 @@ func TestMigration0017BackfillsAnalyte(t *testing.T) {
 	if err := rows.Err(); err != nil {
 		t.Fatal(err)
 	}
-	if got["ALT"] != "alt" || got["RDW-CV"] != "rdw_cv" || got["Other"] != "" {
-		t.Fatalf("backfilled analytes = %+v, want ALT=alt, RDW-CV=rdw_cv, Other empty", got)
-	}
+	return got
 }
 
 // TestMigration0007DownUp 0007 升降版:down 删除 sections 列,up 重新加回(0006 为空占位)。

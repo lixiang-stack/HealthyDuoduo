@@ -579,7 +579,7 @@ export interface components {
             code?: string | null;
             /** @description LOINC 码;无 exact 码为 null */
             loinc?: string | null;
-            /** @description 分析物语义 key(如 alt/hemoglobin);框架层按此匹配,未映射为 null */
+            /** @description 分析物语义 key,取 LOINC component 风格的全称小写 snake_case(如 alanine_aminotransferase/hemoglobin);框架层按此匹配,未映射为 null */
             analyte?: string | null;
             /** @description 人类可读展示单位(UI 优先);缺失时回退 unit */
             unit_display?: string | null;
@@ -864,10 +864,23 @@ export interface components {
             /** @description 模型输出达到单次 output 上限被截断。 */
             truncated: boolean;
         };
+        /**
+         * @description 一条解释。bridge_text / evidence_ids 由模型输出并经服务端校验；
+         *     四段式医学原文由服务端从 accepted 条目逐字拼接，模型无法修改。
+         */
         AnalysisExplanationSection: {
             entry_id: string;
             evidence_ids: string[];
             bridge_text: string;
+            /** @description 可能原因（条目原文）。 */
+            explanation: string;
+            /** @description 进一步检查（条目原文，可为空）。 */
+            check_directions: string[];
+            /** @description 生活建议（条目原文，可为空）。 */
+            general_advice: string[];
+            /** @description 长期跟踪的趋势键（条目原文）。 */
+            track_items: string[];
+            /** @description 「查看依据」由代码从条目 source_ids 渲染，模型不得自行书写。 */
             source_ids?: components["schemas"]["AnalysisSource"][];
         };
         /**

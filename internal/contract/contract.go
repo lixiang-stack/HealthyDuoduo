@@ -42,17 +42,21 @@ const (
 )
 
 // 分析物语义 key:产品内部词汇,不是 LOINC / WS/T 886 码。
+// key 取 LOINC component 风格的全称小写 snake_case(如 alanine_aminotransferase、
+// bilirubin_total,必要时带 _cv 等限定);缩写只用于 UI 与框架层文案,不进入 key。
 // 每个 key 必须对应识别端词典中唯一一个规范指标(以 code / LOINC 锚定),
-// 且只给框架层当前消费的分析物加 key;名称、别名、单位、方法差异留在识别端词典。
+// 且只给框架层或知识条目触发条件当前消费的分析物加 key;
+// 名称、别名、单位、方法差异留在识别端词典。
 const (
-	AnalyteALT        = "alt"
-	AnalyteAST        = "ast"
-	AnalyteALP        = "alp"
-	AnalyteHemoglobin = "hemoglobin"
-	AnalyteMCV        = "mcv"
-	AnalyteMCH        = "mch"
-	AnalyteMCHC       = "mchc"
-	AnalyteRDWCV      = "rdw_cv"
+	AnalyteALT            = "alanine_aminotransferase"
+	AnalyteAST            = "aspartate_aminotransferase"
+	AnalyteALP            = "alkaline_phosphatase"
+	AnalyteBilirubinTotal = "bilirubin_total"
+	AnalyteHemoglobin     = "hemoglobin"
+	AnalyteMCV            = "mean_corpuscular_volume"
+	AnalyteMCH            = "mean_corpuscular_hemoglobin"
+	AnalyteMCHC           = "mean_corpuscular_hemoglobin_concentration"
+	AnalyteRDWCV          = "erythrocyte_distribution_width_cv"
 )
 
 // 叙述型报告类别:影像(超声)与病历(llm-analysis 票 03);主体是报告段落,零指标项。

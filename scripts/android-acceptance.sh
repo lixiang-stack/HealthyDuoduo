@@ -11,6 +11,7 @@
 # Env overrides:
 #   HDD_PORT=18080 RECOGNIZER_PORT=18000 METRO_PORT=18081
 #   S3_ENDPOINT=http://127.0.0.1:8333 ADB=$HOME/Library/Android/sdk/platform-tools/adb
+#   HDD_LLM_API_KEY_FILE=$HOME/.config/healthyduoduo/llm_api_key
 set -euo pipefail
 
 seed=${SEED:-false}
@@ -41,6 +42,8 @@ RECOGNIZER_PORT=${RECOGNIZER_PORT:-18000}
 METRO_PORT=${METRO_PORT:-18081}
 S3_ENDPOINT=${S3_ENDPOINT:-http://127.0.0.1:8333}
 ADB=${ADB:-$HOME/Library/Android/sdk/platform-tools/adb}
+HDD_LLM_API_KEY_FILE=${HDD_LLM_API_KEY_FILE:-$HOME/.config/healthyduoduo/llm_api_key}
+export HDD_LLM_API_KEY_FILE
 PG_IMAGE=${PG_IMAGE:-postgres:17-alpine}
 logdir="${TMPDIR:-/tmp}"; logdir="${logdir%/}/hdd-acceptance-$$"
 

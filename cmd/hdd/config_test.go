@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -10,6 +12,7 @@ import (
 
 var llmEnvKeys = []string{
 	"HDD_LLM_API_KEY",
+	"HDD_LLM_API_KEY_FILE",
 	"HDD_LLM_BASE_URL",
 	"HDD_LLM_MODEL",
 	"HDD_LLM_TIMEOUT_SECONDS",
@@ -28,8 +31,8 @@ func clearLLMEnv(t *testing.T) {
 func TestEnvConfigLLMDefaults(t *testing.T) {
 	clearLLMEnv(t)
 	c := envConfig()
-	if c.llmAPIKey != "" {
-		t.Errorf("llmAPIKey = %q, want empty", c.llmAPIKey)
+	if c.llmAPIKey != "" || c.llmAPIKeyFile != "" {
+		t.Errorf("llmAPIKey/file = %q/%q, want empty", c.llmAPIKey, c.llmAPIKeyFile)
 	}
 	if c.llmBaseURL != "https://api.deepseek.com" {
 		t.Errorf("llmBaseURL = %q", c.llmBaseURL)
@@ -46,8 +49,8 @@ func TestEnvConfigLLMDefaults(t *testing.T) {
 	if c.analysisLimit != analysisDailyLimitDefault {
 		t.Errorf("analysisLimit = %d, want %d", c.analysisLimit, analysisDailyLimitDefault)
 	}
-	if explainer := newExplainer(c, nil, nil); explainer != nil {
-		t.Fatal("explainer created without API key")
+	if explainer, err := newExplainer(c, nil, nil); err != nil || explainer != nil {
+		t.Fatalf("explainer = %+v, err = %v; want nil, nil without API key", explainer, err)
 	}
 }
 
@@ -69,8 +72,73 @@ func TestEnvConfigLLMOverrides(t *testing.T) {
 		c.llmOutputTokens != 2000 || c.analysisLimit != 7 {
 		t.Fatalf("llm limits = %+v", c)
 	}
-	if explainer := newExplainer(c, nil, nil); explainer == nil {
-		t.Fatal("explainer not created with API key")
+	if explainer, err := newExplainer(c, nil, nil); err != nil || explainer == nil {
+		t.Fatalf("explainer = %+v, err = %v; want explainer with API key", explainer, err)
+	}
+}
+
+func TestEnvConfigReadsLLMAPIKeyFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "llm_api_key")
+	t.Setenv("HDD_LLM_API_KEY_FILE", path)
+	c := envConfig()
+	if c.llmAPIKeyFile != path {
+		t.Fatalf("llmAPIKeyFile = %q, want %q", c.llmAPIKeyFile, path)
+	}
+}
+
+func TestResolveLLMAPIKeyPrefersFileOverEnv(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "llm_api_key")
+	if err := os.WriteFile(path, []byte("  sk-file\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got, err := resolveLLMAPIKey(config{llmAPIKey: "sk-env", llmAPIKeyFile: path})
+	if err != nil || got != "sk-file" {
+		t.Fatalf("resolve = %q, %v; want trimmed file key", got, err)
+	}
+}
+
+func TestResolveLLMAPIKeyFallsBackToEnv(t *testing.T) {
+	got, err := resolveLLMAPIKey(config{llmAPIKey: "  sk-env \n"})
+	if err != nil || got != "sk-env" {
+		t.Fatalf("resolve = %q, %v; want trimmed env key", got, err)
+	}
+}
+
+func TestResolveLLMAPIKeyMissingOrEmptyDisables(t *testing.T) {
+	dir := t.TempDir()
+	if got, err := resolveLLMAPIKey(config{llmAPIKeyFile: filepath.Join(dir, "missing")}); err != nil || got != "" {
+		t.Fatalf("missing file = %q, %v; want empty, nil", got, err)
+	}
+	empty := filepath.Join(dir, "empty")
+	if err := os.WriteFile(empty, []byte(" \n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := resolveLLMAPIKey(config{llmAPIKeyFile: empty}); err != nil || got != "" {
+		t.Fatalf("empty file = %q, %v; want empty, nil", got, err)
+	}
+}
+
+func TestResolveLLMAPIKeyFileReadErrorFails(t *testing.T) {
+	if _, err := resolveLLMAPIKey(config{llmAPIKeyFile: t.TempDir()}); err == nil {
+		t.Fatal("unreadable key path should fail")
+	}
+}
+
+func TestNewExplainerReadsKeyFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "llm_api_key")
+	if err := os.WriteFile(path, []byte("sk-file\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	explainer, err := newExplainer(config{llmAPIKeyFile: path}, nil, nil)
+	if err != nil || explainer == nil {
+		t.Fatalf("explainer = %+v, err = %v; want explainer from key file", explainer, err)
+	}
+}
+
+func TestNewExplainerMissingKeyFileDisables(t *testing.T) {
+	explainer, err := newExplainer(config{llmAPIKeyFile: filepath.Join(t.TempDir(), "missing")}, nil, nil)
+	if err != nil || explainer != nil {
+		t.Fatalf("explainer = %+v, err = %v; want disabled without key file", explainer, err)
 	}
 }
 
@@ -123,15 +191,15 @@ func TestNewExplainerWiresConfigAndStores(t *testing.T) {
 		llmOutputTokens: 2000,
 		analysisLimit:   7,
 	}
-	explainer := newExplainer(c, store, store)
-	if explainer == nil {
-		t.Fatal("explainer not created with API key")
+	explainer, err := newExplainer(c, store, store)
+	if err != nil || explainer == nil {
+		t.Fatalf("explainer = %+v, err = %v", explainer, err)
 	}
 	if _, ok := explainer.Client.(*llm.Client); !ok {
 		t.Fatalf("client type = %T, want *llm.Client", explainer.Client)
 	}
-	if _, ok := explainer.Matcher.(analysis.NoEntries); !ok {
-		t.Fatalf("matcher type = %T, want analysis.NoEntries", explainer.Matcher)
+	if _, ok := explainer.Matcher.(*analysis.KnowledgeMatcher); !ok {
+		t.Fatalf("matcher type = %T, want *analysis.KnowledgeMatcher", explainer.Matcher)
 	}
 	if explainer.Quota != store || explainer.Events != store {
 		t.Fatal("quota/events store not wired")
@@ -139,5 +207,8 @@ func TestNewExplainerWiresConfigAndStores(t *testing.T) {
 	if explainer.DailyLimit != 7 || explainer.InputTokenLimit != 9000 ||
 		explainer.OutputTokenLimit != 2000 {
 		t.Fatalf("explainer limits = %+v", explainer)
+	}
+	if !explainer.RecordEntryMiss {
+		t.Fatal("entry miss events not enabled with real matcher")
 	}
 }
