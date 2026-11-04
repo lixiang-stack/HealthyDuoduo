@@ -13,6 +13,7 @@ import { CURRENT_MEMBER_STORAGE_KEY } from '../../members/currentMemberStore';
 import { createFakeApiClient, TEST_BASE_URL, type FakeApiOptions } from '../fakeApi';
 import {
   makeAnalysisFacts,
+  makeAnalysisFramework,
   makeAnalysisHistory,
   makeAnalysisResult,
   makeMember,
@@ -143,6 +144,141 @@ describe('AnalysisScreen', () => {
       '证据不足，请先核对',
     );
     expect(screen.queryByTestId('analysis-deviations')).toBeNull();
+  });
+
+  it('renders framework labels with fixed explanations and sources', async () => {
+    const result = makeAnalysisResult();
+    mockUseLocalSearchParams.mockReturnValue({ analysis_id: '12' });
+    mockApi({ GET: { '/analyses/{analysis_id}': () => result } });
+
+    await renderScreen(<AnalysisScreen />);
+
+    expect(await screen.findByTestId('analysis-framework')).toHaveTextContent(/转氨酶升高：轻度/);
+    expect(screen.getByTestId('analysis-framework')).toHaveTextContent(/转氨酶升高 2–5×ULN/);
+    expect(screen.getByTestId('analysis-framework')).toHaveTextContent(/依据 ACG 2016/);
+  });
+
+  it('renders CBC morphology, Hb cutoff and BMI percentile labels', async () => {
+    const framework = makeAnalysisFramework({
+      labels: [
+        {
+          code: 'cbc_hemoglobin_cutoff',
+          label: '血红蛋白低于该年龄段切点',
+          explanation: '按 WHO 2024 年龄与性别血红蛋白切点；单据参考范围 115-150。切点标签不是诊断。',
+          value: '108 g/L（WHO 切点 115 g/L）',
+          evidence_ids: ['ev-a-1'],
+          sources: [{ standard: 'WHO 2024', note: '血红蛋白贫血切点', url: null }],
+        },
+        {
+          code: 'cbc_anemia_morphology',
+          label: '小细胞低色素性形态，RDW 升高',
+          explanation: 'MCV 偏低；MCH / MCHC 偏低。这是形态学描述，不是诊断。',
+          value: 'MCV 72 fL · MCH 24 pg',
+          evidence_ids: ['ev-a-2'],
+          sources: [{ standard: 'WS/T 405 / WS/T 779', note: '血细胞分析参考区间', url: null }],
+        },
+        {
+          code: 'bmi_z_score',
+          label: 'BMI 年龄别 z 值与百分位',
+          explanation: '按 WHO 2007 5–19 岁 BMI 年龄别参考计算。',
+          value: 'z = +1.30（第 90 百分位）',
+          evidence_ids: [],
+          sources: [{ standard: 'WHO 2007', note: 'BMI-for-age', url: null }],
+        },
+      ],
+    });
+    mockUseLocalSearchParams.mockReturnValue({ analysis_id: '12' });
+    mockApi({
+      GET: {
+        '/analyses/{analysis_id}': () =>
+          makeAnalysisResult({
+            layers: { facts: makeAnalysisFacts({ panel: 'cbc' }), framework },
+          }),
+      },
+    });
+
+    await renderScreen(<AnalysisScreen />);
+
+    expect(await screen.findByTestId('analysis-framework')).toHaveTextContent(/小细胞低色素性形态/);
+    expect(screen.getByTestId('analysis-framework')).toHaveTextContent(/WHO 切点 115 g\/L/);
+    expect(screen.getByTestId('analysis-framework')).toHaveTextContent(/第 90 百分位/);
+  });
+
+  it('renders the explanation bridge text and marks truncation', async () => {
+    const result = makeAnalysisResult({
+      layers: {
+        facts: makeAnalysisFacts(),
+        explanation: {
+          sections: [
+            {
+              entry_id: 'liver-hepatocellular-mild',
+              evidence_ids: ['ev-aaaaaaaaaaaa-1'],
+              bridge_text: '先看本次转氨酶与碱性磷酸酶的关系。',
+              source_ids: [{ standard: 'AASLD', note: 'R 值分型', url: null }],
+            },
+          ],
+          truncated: true,
+        },
+      },
+    });
+    mockUseLocalSearchParams.mockReturnValue({ analysis_id: '12' });
+    mockApi({ GET: { '/analyses/{analysis_id}': () => result } });
+
+    await renderScreen(<AnalysisScreen />);
+
+    expect(await screen.findByTestId('analysis-explanation')).toHaveTextContent(/先看本次转氨酶/);
+    expect(screen.getByTestId('analysis-explanation')).toHaveTextContent(/已截断/);
+    expect(screen.getByTestId('analysis-explanation')).toHaveTextContent(/依据 AASLD/);
+  });
+
+  it('shows the quota message in the explanation position without disabling the result', async () => {
+    const result = makeAnalysisResult({
+      layers: { facts: makeAnalysisFacts() },
+      quota: {
+        used_today: 20,
+        limit_today: 20,
+        explanation_available: false,
+        explanation_reason: 'quota_exhausted',
+      },
+    });
+    mockUseLocalSearchParams.mockReturnValue({ analysis_id: '12' });
+    mockApi({ GET: { '/analyses/{analysis_id}': () => result } });
+
+    await renderScreen(<AnalysisScreen />);
+
+    expect(await screen.findByTestId('analysis-explanation-unavailable')).toHaveTextContent(
+      /今日额度已用完，事实与判读仍可用/,
+    );
+    expect(screen.getByTestId('analysis-quota-remaining')).toHaveTextContent(/今日剩余解读次数 0 次/);
+    expect(screen.getByTestId('analysis-feedback-open')).toBeTruthy();
+  });
+
+  it('records a "this is wrong" feedback with the optional reason', async () => {
+    const postHandler = jest.fn((_options?: FakeApiOptions) => ({
+      feedback_id: 7,
+      created_at: '2026-11-03T12:00:00Z',
+    }));
+    mockUseLocalSearchParams.mockReturnValue({ analysis_id: '12' });
+    mockApi({
+      GET: { '/analyses/{analysis_id}': () => makeAnalysisResult() },
+      POST: { '/analyses/{analysis_id}/feedback': postHandler },
+    });
+
+    await renderScreen(<AnalysisScreen />);
+    fireEvent.press(await screen.findByTestId('analysis-feedback-open'));
+    const reasonInput = await screen.findByTestId('analysis-feedback-reason');
+    fireEvent.changeText(reasonInput, '解释和数值对不上');
+    await waitFor(() =>
+      expect(screen.getByTestId('analysis-feedback-reason').props.value).toBe('解释和数值对不上'),
+    );
+    fireEvent.press(screen.getByTestId('analysis-feedback-submit'));
+
+    await waitFor(() => expect(postHandler).toHaveBeenCalledTimes(1));
+    expect(postHandler.mock.calls[0][0]).toMatchObject({
+      params: { path: { analysis_id: 12 } },
+      body: { reason: '解释和数值对不上' },
+    });
+    expect(await screen.findByTestId('analysis-feedback-done')).toHaveTextContent(/已记录/);
   });
 
   it('shows the indicator-to-panel expansion notice and stale marker', async () => {

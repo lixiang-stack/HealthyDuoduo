@@ -1,0 +1,13 @@
+{
+  "from": "2026-10-28",
+  "to": "2026-11-03",
+  "analyses": 10,
+  "feedback": 2,
+  "feedback_rate": 0.2,
+  "degradations": 3,
+  "degradation_rate": 0.3,
+  "degradation_kinds": {
+    "llm_timeout": 2,
+    "quota_exhausted": 1
+  }
+}

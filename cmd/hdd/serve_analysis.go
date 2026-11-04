@@ -4,6 +4,7 @@
 package main
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -15,6 +16,14 @@ import (
 
 // 分析配额默认值:配额只锁解释层,事实层与框架层不消耗配额(票 07 接配置)。
 const analysisDailyLimitDefault = 20
+
+// analysisDailyLimit 配置覆盖默认值;0 表示未配置。
+func (d *deps) analysisDailyLimit() int {
+	if d.analysisLimit > 0 {
+		return d.analysisLimit
+	}
+	return analysisDailyLimitDefault
+}
 
 const (
 	analysisNotFoundMessage    = "analysis not found"
@@ -114,20 +123,32 @@ func handleCreateAnalysis(d *deps) http.HandlerFunc {
 			return
 		}
 
+		growth, err := d.analyses.LatestGrowth(r.Context(), member.MemberID)
+		if err != nil {
+			writeErrorJSON(w, http.StatusInternalServerError, "read latest growth failed")
+			return
+		}
 		req := analysis.Request{
-			MemberID:      member.MemberID,
-			MemberName:    member.Name,
-			Panel:         panel,
-			Entry:         body.Entry,
-			IndicatorName: pointerText(body.IndicatorName),
-			ReportSHA:     pointerText(body.ReportSHA),
-			WindowMonths:  months,
-			Now:           time.Now(),
+			MemberID:        member.MemberID,
+			MemberName:      member.Name,
+			MemberSex:       member.Sex,
+			MemberBirthDate: member.BirthDate,
+			Panel:           panel,
+			Entry:           body.Entry,
+			IndicatorName:   pointerText(body.IndicatorName),
+			ReportSHA:       pointerText(body.ReportSHA),
+			WindowMonths:    months,
+			Now:             time.Now(),
 		}
 		facts := analysis.BuildFacts(req, points, notes)
 		status := analysis.StatusSuccess
 		if facts.InsufficientEvidence {
 			status = analysis.StatusInsufficientEvidence
+		}
+		// 信任门控全未通过时框架层与解释层不输出(spec §4.15 规则 3)。
+		framework := analysis.Framework{Labels: []analysis.FrameworkLabel{}}
+		if !facts.InsufficientEvidence {
+			framework = analysis.BuildFramework(req, facts, growth)
 		}
 		dataVersion, err := d.analyses.DataVersion(r.Context(), member.MemberID)
 		if err != nil {
@@ -144,15 +165,41 @@ func handleCreateAnalysis(d *deps) http.HandlerFunc {
 			WindowMonths:  months,
 			Status:        status,
 			Facts:         facts,
+			Framework:     framework,
 			Snapshot:      snapshot,
-			Sources:       []analysis.Source{},
+			Sources:       analysis.FrameworkSources(framework),
 		}
 		saved, err := d.analyses.SaveAnalysis(r.Context(), record)
 		if err != nil {
 			writeErrorJSON(w, http.StatusInternalServerError, "save analysis failed")
 			return
 		}
-		writeJSON(w, http.StatusCreated, toAPIAnalysisResult(*saved))
+		if facts.InsufficientEvidence && hasTrustGateFailure(facts) && d.observability != nil {
+			_ = d.observability.RecordAnalysisEvent(r.Context(), saved.AnalysisID, analysis.EventTrustGateFailed, "")
+		}
+		if d.explainer != nil && !facts.InsufficientEvidence {
+			explanation, reason := d.explainer.Explain(r.Context(), saved.AnalysisID, req, facts)
+			sources := analysis.MergeSources(analysis.FrameworkSources(framework), analysis.ExplanationSources(explanation))
+			if err := d.analyses.UpdateAnalysisExplanation(r.Context(), saved.AnalysisID, explanation, reason, sources); err != nil {
+				writeErrorJSON(w, http.StatusInternalServerError, "save analysis explanation failed")
+				return
+			}
+			saved.Explanation = explanation
+			saved.ExplanationReason = reason
+			saved.Sources = sources
+		}
+		quota, quotaErr := d.analysisQuota(r, saved)
+		if quotaErr != nil {
+			log.Printf("analysis quota read failed: %v", quotaErr)
+			reason := "quota_unavailable"
+			quota = httpapi.AnalysisQuota{
+				UsedToday:            0,
+				LimitToday:           d.analysisDailyLimit(),
+				ExplanationAvailable: true,
+				ExplanationReason:    &reason,
+			}
+		}
+		writeJSON(w, http.StatusCreated, toAPIAnalysisResult(*saved, quota))
 	}
 }
 
@@ -179,29 +226,74 @@ func handleGetAnalysis(d *deps) http.HandlerFunc {
 			return
 		}
 		record.Stale = record.Snapshot.DataVersion != current
-		writeJSON(w, http.StatusOK, toAPIAnalysisResult(*record))
+		quota, err := d.analysisQuota(r, record)
+		if err != nil {
+			log.Printf("analysis quota read failed: %v", err)
+			writeErrorJSON(w, http.StatusInternalServerError, "read analysis quota failed")
+			return
+		}
+		writeJSON(w, http.StatusOK, toAPIAnalysisResult(*record, quota))
 	}
 }
 
+// analysisQuota 当前配额快照;已保存解释层仍可查看,不因当日额度用完而隐藏。
+func (d *deps) analysisQuota(r *http.Request, record *analysis.Record) (httpapi.AnalysisQuota, error) {
+	limit := d.analysisDailyLimit()
+	used := 0
+	if d.quota != nil {
+		value, err := d.quota.LLMUsedToday(r.Context())
+		if err != nil {
+			return httpapi.AnalysisQuota{}, err
+		}
+		used = value
+	}
+	available := used < limit || record.Explanation != nil
+	quota := httpapi.AnalysisQuota{
+		UsedToday:            used,
+		LimitToday:           limit,
+		ExplanationAvailable: available,
+	}
+	if record.Explanation == nil && record.ExplanationReason != "" {
+		reason := record.ExplanationReason
+		quota.ExplanationReason = &reason
+	}
+	return quota, nil
+}
+
 // toAPIAnalysisResult 已保存分析 → 契约信封;事实层数组保证非 null。
-func toAPIAnalysisResult(record analysis.Record) httpapi.AnalysisResult {
+func toAPIAnalysisResult(record analysis.Record, quota httpapi.AnalysisQuota) httpapi.AnalysisResult {
 	sources := record.Sources
 	if sources == nil {
 		sources = []analysis.Source{}
 	}
+	layers := httpapi.AnalysisLayers{Facts: record.Facts}
+	if record.Framework.Labels != nil {
+		framework := record.Framework
+		layers.Framework = &framework
+	}
+	if record.Explanation != nil {
+		layers.Explanation = record.Explanation
+	}
 	return httpapi.AnalysisResult{
 		AnalysisID: record.AnalysisID,
 		Status:     record.Status,
-		Layers:     httpapi.AnalysisLayers{Facts: record.Facts},
+		Layers:     layers,
 		Snapshot:   record.Snapshot,
 		Sources:    sources,
-		Quota: httpapi.AnalysisQuota{
-			UsedToday:            0,
-			LimitToday:           analysisDailyLimitDefault,
-			ExplanationAvailable: false,
-		},
-		Stale: record.Stale,
+		Quota:      quota,
+		Stale:      record.Stale,
 	}
+}
+
+// hasTrustGateFailure 只有「有候选点但全部被信任门控排除」才算降级;
+// 空成员/无数据不是 trust_gate_failed,避免周检降级率被空档案抬高。
+func hasTrustGateFailure(facts analysis.Facts) bool {
+	for _, exclusion := range facts.Excluded {
+		if exclusion.Reason == analysis.ReasonLowConfidence {
+			return true
+		}
+	}
+	return false
 }
 
 func containsNote(notes []analysis.InputNote, reportID string) bool {

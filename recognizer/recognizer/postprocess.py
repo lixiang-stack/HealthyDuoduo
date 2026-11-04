@@ -241,6 +241,7 @@ class DictItem:
     # 标准层:名称/代码/单位/结果类型/来源;缺省时保持旧词典行为。
     code: str | None = None
     loinc: str | None = None
+    analyte: str | None = None
     local_code: str | None = None
     source_status: str = "pending"
     review_status: str = "pending"
@@ -382,6 +383,7 @@ def _build_dict(path: Path) -> LabDict:
             panel=Panel(it.get("panel", default_panel)),
             code=it.get("code"),
             loinc=it.get("loinc"),
+            analyte=it.get("analyte"),
             local_code=it.get("local_code"),
             source_status=str(it.get("source_status", "pending")),
             review_status=str(it.get("review_status", "pending")),
@@ -2033,6 +2035,7 @@ def run_postprocess(
             standard = {
                 "code": it.code or it.local_code,
                 "loinc": it.loinc,
+                "analyte": it.analyte,
                 "unit_display": out.unit_display,
                 "unit_status": out.unit_status,
                 "raw_value": out.raw_value,

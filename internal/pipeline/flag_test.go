@@ -52,6 +52,33 @@ func TestCompare(t *testing.T) {
 	}
 }
 
+func TestRefRangeUpperBound(t *testing.T) {
+	cases := []struct {
+		ref  string
+		want float64
+		ok   bool
+	}{
+		{"7-40", 40, true},
+		{"130--175", 175, true},
+		{"110.0~160.0", 160, true},
+		{"男:3-10", 10, true},
+		{"<40", 40, true},
+		{"≤40", 40, true},
+		{">5", 0, false},
+		{"0", 0, false},
+		{"-", 0, false},
+	}
+	for _, c := range cases {
+		got, ok := RefRangeUpperBound(&c.ref)
+		if got != c.want || ok != c.ok {
+			t.Errorf("RefRangeUpperBound(%q) = %v,%v want %v,%v", c.ref, got, ok, c.want, c.ok)
+		}
+	}
+	if _, ok := RefRangeUpperBound(nil); ok {
+		t.Error("nil ref range returned an upper bound")
+	}
+}
+
 func str(s string) *string { return &s }
 
 func deref(s *string) string {

@@ -124,7 +124,7 @@ type PrevValue struct {
 
 // ReportItem GET /reports/{report_id} 详情中的单个指标项。
 // name/value/unit/ref_range/method/flag/low_confidence/raw_text 及标准层字段
-// (code/loinc/unit_display/unit_status/raw_*/ref_kind/result_kind/result_basis)
+// (code/loinc/analyte/unit_display/unit_status/raw_*/ref_kind/result_kind/result_basis)
 // 与识别端 report.schema.json 的 reportItem 同源(互证测试锁死逐字段子树相等);
 // 后四项为 HTTP 侧扩展。
 type ReportItem struct {
@@ -137,6 +137,7 @@ type ReportItem struct {
 	Method        *string       `json:"method"`
 	Code          *string       `json:"code,omitempty"`
 	Loinc         *string       `json:"loinc,omitempty"`
+	Analyte       *string       `json:"analyte,omitempty"`
 	UnitDisplay   *string       `json:"unit_display,omitempty"`
 	UnitStatus    *string       `json:"unit_status,omitempty"`
 	RawValue      *string       `json:"raw_value,omitempty"`

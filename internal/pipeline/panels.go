@@ -15,8 +15,11 @@ import (
 
 // 项目组 code(与识别端 / OpenAPI PanelCode 枚举同源;other 为唯一跨类别兜底)。
 const (
+	PanelLiver        = "liver"
+	PanelCBC          = "cbc"
 	PanelImaging      = "imaging"
 	PanelClinicalNote = "clinical_note"
+	PanelOther        = "other"
 )
 
 // panelOrder spec §5.3 的固定优先级:命中项数降序后,同数按此顺序(数值小优先);

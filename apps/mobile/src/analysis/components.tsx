@@ -2,10 +2,11 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import type { AnalysisResult } from '../api/analyses';
+import type { AnalysisExplanation, AnalysisFramework, AnalysisResult } from '../api/analyses';
 import { colors } from '../components/theme';
 import { reportTypeLabel } from '../reports/category';
 import { noteDate, scopeText } from './facts';
+import { frameworkSourceText } from './framework';
 
 export function ScopeCard({ result }: { result: AnalysisResult }) {
   const facts = result.layers.facts;
@@ -45,6 +46,51 @@ export function Section({
   );
 }
 
+export function FrameworkCard({ framework }: { framework: AnalysisFramework }) {
+  if (framework.labels.length === 0) {
+    return null;
+  }
+  return (
+    <Section title="判读标签" testID="analysis-framework">
+      {framework.labels.map((label) => (
+        <View key={label.code} style={styles.labelRow}>
+          <View style={styles.labelHeader}>
+            <Text style={styles.labelTitle}>{label.label}</Text>
+            {label.value ? <Text style={styles.labelValue}>{label.value}</Text> : null}
+          </View>
+          <Text style={styles.mutedSmall}>{label.explanation}</Text>
+          {frameworkSourceText(label) ? (
+            <Text style={styles.sourceText}>依据 {frameworkSourceText(label)}</Text>
+          ) : null}
+        </View>
+      ))}
+    </Section>
+  );
+}
+
+export function ExplanationCard({ explanation }: { explanation: AnalysisExplanation }) {
+  if (explanation.sections.length === 0) {
+    return null;
+  }
+  return (
+    <Section title="解读" testID="analysis-explanation">
+      {explanation.sections.map((section) => (
+        <View key={section.entry_id} style={styles.labelRow}>
+          <Text style={styles.labelTitle}>{section.bridge_text}</Text>
+          {section.source_ids?.length ? (
+            <Text style={styles.sourceText}>
+              依据 {section.source_ids.map((source) => source.standard).join(' / ')}
+            </Text>
+          ) : null}
+        </View>
+      ))}
+      {explanation.truncated ? (
+        <Text style={styles.mutedSmall}>解释内容达到长度上限，已截断。</Text>
+      ) : null}
+    </Section>
+  );
+}
+
 const styles = StyleSheet.create({
   card: {
     borderWidth: 1,
@@ -56,4 +102,15 @@ const styles = StyleSheet.create({
   section: { gap: 8 },
   sectionTitle: { fontSize: 15, color: colors.text, fontWeight: '600', marginTop: 4 },
   mutedSmall: { fontSize: 12, color: colors.muted, lineHeight: 18 },
+  labelRow: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    padding: 12,
+    gap: 4,
+  },
+  labelHeader: { gap: 2 },
+  labelTitle: { fontSize: 15, color: colors.text, fontWeight: '600' },
+  labelValue: { fontSize: 13, color: colors.text, fontVariant: ['tabular-nums'] },
+  sourceText: { fontSize: 11, color: colors.muted, lineHeight: 16 },
 });

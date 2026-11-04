@@ -103,7 +103,7 @@ def _item(name: str = "血红蛋白", panel: str = "cbc") -> dict:
 
 
 _STANDARD_FIELDS = (
-    "code", "loinc", "unit_display", "unit_status", "raw_value", "raw_unit",
+    "code", "loinc", "analyte", "unit_display", "unit_status", "raw_value", "raw_unit",
     "raw_ref_range", "ref_kind", "result_kind", "result_basis",
 )
 
@@ -122,6 +122,7 @@ def test_report_item_standard_fields_match_schema_and_omit_nulls() -> None:
         **_item(),
         "code": "0100401A",
         "loinc": "718-7",
+        "analyte": "hemoglobin",
         "unit_display": "g/L",
         "unit_status": "verified",
         "raw_value": "128",
@@ -134,6 +135,7 @@ def test_report_item_standard_fields_match_schema_and_omit_nulls() -> None:
     assert {field: populated[field] for field in _STANDARD_FIELDS} == {
         "code": "0100401A",
         "loinc": "718-7",
+        "analyte": "hemoglobin",
         "unit_display": "g/L",
         "unit_status": "verified",
         "raw_value": "128",

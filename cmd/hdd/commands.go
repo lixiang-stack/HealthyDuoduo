@@ -27,17 +27,21 @@ import (
 // 成员域、serve 报告域、serve 趋势域、存量回填各持所需方法,既有 fake 零膨胀);
 // classifier/rec 为同一识别服务客户端的两个消费面。
 type deps struct {
-	store      pipeline.Store
-	members    pipeline.MemberStore
-	reports    pipeline.ReportStore
-	trends     pipeline.TrendStore
-	panels     pipeline.PanelStore
-	growth     pipeline.GrowthStore
-	analyses   analysis.Store
-	backfill   pipeline.BackfillStore
-	classifier pipeline.PanelClassifier
-	rec        pipeline.Recognizer
-	obj        pipeline.ObjectStore
+	store         pipeline.Store
+	members       pipeline.MemberStore
+	reports       pipeline.ReportStore
+	trends        pipeline.TrendStore
+	panels        pipeline.PanelStore
+	growth        pipeline.GrowthStore
+	analyses      analysis.Store
+	quota         analysis.QuotaStore
+	observability analysis.ObservabilityStore
+	explainer     *analysis.Explainer
+	analysisLimit int
+	backfill      pipeline.BackfillStore
+	classifier    pipeline.PanelClassifier
+	rec           pipeline.Recognizer
+	obj           pipeline.ObjectStore
 }
 
 // typeDisplay 已知报告类别 → CLI 显示缩写(域数据 storage 中原样保留)。

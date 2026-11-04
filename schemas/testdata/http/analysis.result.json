@@ -26,8 +26,14 @@
           "report_date": "2026-09-20",
           "outside_window": false,
           "sections": [
-            { "kind": "diagnosis", "text": "缺铁性贫血" },
-            { "kind": "treatment", "text": "补铁治疗，一个月后复查。" }
+            {
+              "kind": "diagnosis",
+              "text": "缺铁性贫血"
+            },
+            {
+              "kind": "treatment",
+              "text": "补铁治疗，一个月后复查。"
+            }
           ]
         }
       ],
@@ -100,6 +106,45 @@
         }
       ],
       "insufficient_evidence": false
+    },
+    "framework": {
+      "labels": [
+        {
+          "code": "liver_transaminase_grade",
+          "label": "转氨酶升高：轻度",
+          "explanation": "转氨酶升高 2–5×ULN，按 ACG 2016 为轻度；本次 ALT 2.1×ULN。",
+          "value": "ALT 2.1×ULN",
+          "evidence_ids": [
+            "ev-aaaaaaaaaaaa-1"
+          ],
+          "sources": [
+            {
+              "standard": "ACG 2016",
+              "note": "转氨酶升高分级：< 2×ULN 临界、2–5× 轻度、5–15× 中度、> 15× 重度",
+              "url": "https://doi.org/10.1038/ajg.2016.517"
+            }
+          ]
+        }
+      ]
+    },
+    "explanation": {
+      "sections": [
+        {
+          "entry_id": "liver-hepatocellular-mild",
+          "evidence_ids": [
+            "ev-aaaaaaaaaaaa-1"
+          ],
+          "bridge_text": "先看本次转氨酶与碱性磷酸酶的关系。",
+          "source_ids": [
+            {
+              "standard": "AASLD",
+              "note": "R 值分型与肝细胞型定义",
+              "url": "https://www.aasld.org/liver-fellow-network/core-series/back-basics/how-approach-elevated-liver-enzymes"
+            }
+          ]
+        }
+      ],
+      "truncated": false
     }
   },
   "snapshot": {
@@ -111,7 +156,7 @@
     "window_months": 12,
     "window_from": "2025-11-03",
     "window_to": "2026-11-03",
-    "rule_version": "llm-analysis-facts-v1",
+    "rule_version": "llm-analysis-v3",
     "data_version": "v1",
     "points": [
       {
@@ -129,15 +174,31 @@
         "report_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "report_date": "2026-09-20",
         "outside_window": false,
-        "section_kinds": ["diagnosis", "treatment"]
+        "section_kinds": [
+          "diagnosis",
+          "treatment"
+        ]
       }
-    ]
+    ],
+    "member_sex": "male",
+    "member_birth_date": "2016-05-20"
   },
-  "sources": [],
+  "sources": [
+    {
+      "standard": "ACG 2016",
+      "note": "转氨酶升高分级：< 2×ULN 临界、2–5× 轻度、5–15× 中度、> 15× 重度",
+      "url": "https://doi.org/10.1038/ajg.2016.517"
+    },
+    {
+      "standard": "AASLD",
+      "note": "R 值分型与肝细胞型定义",
+      "url": "https://www.aasld.org/liver-fellow-network/core-series/back-basics/how-approach-elevated-liver-enzymes"
+    }
+  ],
   "quota": {
-    "used_today": 0,
+    "used_today": 1,
     "limit_today": 20,
-    "explanation_available": false
+    "explanation_available": true
   },
   "stale": false
 }

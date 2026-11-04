@@ -108,17 +108,20 @@ func BuildFacts(req Request, points []InputPoint, notes []InputNote) Facts {
 func BuildSnapshot(req Request, facts Facts) Snapshot {
 	name := facts.IndicatorName
 	snapshot := Snapshot{
-		MemberID:      req.MemberID,
-		MemberName:    req.MemberName,
-		Panel:         facts.Panel,
-		Entry:         facts.Entry,
-		IndicatorName: name,
-		WindowMonths:  facts.Window.Months,
-		WindowFrom:    facts.Window.From,
-		WindowTo:      facts.Window.To,
-		RuleVersion:   RuleVersion,
-		Points:        []SnapshotPoint{},
-		Notes:         []SnapshotNote{},
+		MemberID:        req.MemberID,
+		MemberName:      req.MemberName,
+		MemberSex:       req.MemberSex,
+		MemberBirthDate: req.MemberBirthDate,
+		Panel:           facts.Panel,
+		Entry:           facts.Entry,
+		IndicatorName:   name,
+		WindowMonths:    facts.Window.Months,
+		WindowFrom:      facts.Window.From,
+		WindowTo:        facts.Window.To,
+		RuleVersion:     RuleVersion,
+		PromptVersion:   explanationPromptVersion,
+		Points:          []SnapshotPoint{},
+		Notes:           []SnapshotNote{},
 	}
 	for _, history := range facts.History {
 		for _, point := range history.Points {
@@ -446,6 +449,7 @@ func evidencePoint(point InputPoint) EvidencePoint {
 		ReportDate:  nonEmptyPtr(point.ReportDate),
 		ReportType:  point.ReportType,
 		TrendKey:    contract.TrendKey(point.Code, point.Loinc, point.Name),
+		Analyte:     point.Analyte,
 		Name:        point.Name,
 		Unit:        nonEmptyPtr(point.Unit),
 		UnitDisplay: nonEmptyPtr(point.UnitDisplay),

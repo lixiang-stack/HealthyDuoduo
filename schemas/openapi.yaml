@@ -428,6 +428,56 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "404":
           $ref: "#/components/responses/NotFound"
+  /analyses/metrics:
+    get:
+      operationId: getAnalysisMetrics
+      summary: 周检指标
+      description: |
+        返回指定日期区间的分析数、反馈数与降级事件数,用于每周计算反馈率与降级率。
+        from / to 缺省为最近 7 天(含当天);日期格式 YYYY-MM-DD。
+      parameters:
+        - name: from
+          in: query
+          required: false
+          schema: { type: string, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
+        - name: to
+          in: query
+          required: false
+          schema: { type: string, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
+      responses:
+        "200":
+          description: 区间指标
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisMetrics"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /analyses/{analysis_id}/feedback:
+    post:
+      operationId: createAnalysisFeedback
+      summary: 记录「这不对」反馈
+      description: |
+        只记录 analysis_id、可选 entry_id、理由与时间;不自动降级条目。
+      parameters:
+        - $ref: "#/components/parameters/AnalysisID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnalysisFeedbackRequest"
+      responses:
+        "201":
+          description: 已记录
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisFeedbackResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /analyses/{analysis_id}:
     get:
       operationId: getAnalysis
@@ -853,6 +903,9 @@ components:
         loinc:
           type: [string, "null"]
           description: "LOINC 码;无 exact 码为 null"
+        analyte:
+          type: [string, "null"]
+          description: "分析物语义 key(如 alt/hemoglobin);框架层按此匹配,未映射为 null"
         unit_display:
           type: [string, "null"]
           description: "人类可读展示单位(UI 优先);缺失时回退 unit"
@@ -1250,6 +1303,10 @@ components:
       properties:
         facts:
           $ref: "#/components/schemas/AnalysisFacts"
+        framework:
+          $ref: "#/components/schemas/AnalysisFramework"
+        explanation:
+          $ref: "#/components/schemas/AnalysisExplanation"
     AnalysisQuota:
       type: object
       additionalProperties: false
@@ -1257,7 +1314,64 @@ components:
       properties:
         used_today: { type: integer, minimum: 0 }
         limit_today: { type: integer, minimum: 0 }
-        explanation_available: { type: boolean }
+        explanation_available:
+          type: boolean
+          description: 今日解释层额度仍可用,或本次分析已保存了解释层。
+        explanation_reason:
+          type: string
+          description: 省略解释层的原因(quota_exhausted / llm_timeout / llm_invalid_json / no_entries 等)。
+    AnalysisFramework:
+      type: object
+      additionalProperties: false
+      required: [labels]
+      description: 框架层:代码算得出的判读标签与固定解释文案;无规则时 labels 为空数组。
+      properties:
+        labels:
+          type: array
+          items: { $ref: "#/components/schemas/AnalysisFrameworkLabel" }
+    AnalysisFrameworkLabel:
+      type: object
+      additionalProperties: false
+      required: [code, label, explanation, value, evidence_ids, sources]
+      properties:
+        code: { type: string, minLength: 1 }
+        label: { type: string, minLength: 1 }
+        explanation: { type: string, minLength: 1 }
+        value: { type: [string, "null"] }
+        evidence_ids:
+          type: array
+          items: { type: string, minLength: 1 }
+        sources:
+          type: array
+          items: { $ref: "#/components/schemas/AnalysisSource" }
+    AnalysisExplanation:
+      type: object
+      additionalProperties: false
+      required: [sections, truncated]
+      description: 解释层;无条目 / 失败时整层省略,不显示空状态。
+      properties:
+        sections:
+          type: array
+          items: { $ref: "#/components/schemas/AnalysisExplanationSection" }
+        truncated:
+          type: boolean
+          description: 模型输出达到单次 output 上限被截断。
+    AnalysisExplanationSection:
+      type: object
+      additionalProperties: false
+      required: [entry_id, evidence_ids, bridge_text]
+      properties:
+        entry_id: { type: string, minLength: 1 }
+        evidence_ids:
+          type: array
+          items: { type: string, minLength: 1 }
+        bridge_text:
+          type: string
+          minLength: 1
+          maxLength: 200
+        source_ids:
+          type: array
+          items: { $ref: "#/components/schemas/AnalysisSource" }
     AnalysisFacts:
       type: object
       additionalProperties: false
@@ -1438,6 +1552,14 @@ components:
       properties:
         member_id: { type: integer, format: int64 }
         member_name: { type: string, minLength: 1 }
+        member_sex:
+          type: string
+          enum: [male, female]
+          description: 框架层年龄性别规则输入;旧快照可缺省。
+        member_birth_date:
+          type: string
+          pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+          description: 框架层年龄规则输入;旧快照可缺省。
         panel:
           $ref: "#/components/schemas/PanelCode"
         entry:
@@ -1447,6 +1569,14 @@ components:
         window_from: { type: string, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
         window_to: { type: string, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
         rule_version: { type: string, minLength: 1 }
+        prompt_version:
+          type: string
+          minLength: 1
+          description: 解释层 prompt 版本;旧快照可缺省。
+        entry_versions:
+          type: object
+          additionalProperties: { type: string }
+          description: 命中的知识条目 id → version;旧快照/无条目时可缺省。
         data_version:
           type: string
           minLength: 1
@@ -1486,11 +1616,47 @@ components:
       type: object
       additionalProperties: false
       required: [standard, note, url]
-      description: 解释层引用的标准 / 指南;事实层当前为空数组。
+      description: 框架层 / 解释层引用的标准或指南;由代码渲染,模型不得自行书写。
       properties:
         standard: { type: string, minLength: 1 }
         note: { type: string, minLength: 1 }
         url: { type: [string, "null"] }
+    AnalysisFeedbackRequest:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        entry_id:
+          type: string
+          maxLength: 200
+          description: 可选;当前结果级按钮不传。
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+    AnalysisFeedbackResult:
+      type: object
+      additionalProperties: false
+      required: [feedback_id, created_at]
+      properties:
+        feedback_id: { type: integer, format: int64 }
+        created_at: { type: string, format: date-time }
+    AnalysisMetrics:
+      type: object
+      additionalProperties: false
+      required: [from, to, analyses, feedback, feedback_rate, degradations,
+                 degradation_rate, degradation_kinds]
+      properties:
+        from: { type: string, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
+        to: { type: string, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
+        analyses: { type: integer, minimum: 0 }
+        feedback: { type: integer, minimum: 0 }
+        feedback_rate: { type: number, minimum: 0 }
+        degradations: { type: integer, minimum: 0 }
+        degradation_rate: { type: number, minimum: 0 }
+        degradation_kinds:
+          type: object
+          additionalProperties: { type: integer, minimum: 0 }
     Error:
       type: object
       additionalProperties: false

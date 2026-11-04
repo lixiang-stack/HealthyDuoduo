@@ -28,6 +28,10 @@ jobs:
           if [ -n "$unformatted" ]; then echo "$unformatted"; exit 1; fi
       - run: go vet ./...
       - run: go test ./...
+      - name: framework data generated in sync
+        run: |
+          go generate ./internal/analysis
+          git diff --exit-code -- internal/analysis/who_bmi_data.go internal/analysis/framework_reference.go
 
   storage:
     runs-on: ubuntu-latest

@@ -83,6 +83,7 @@ items:
         source: legacy printed name (pre-standardization dictionary)
     code: 0100401A
     loinc: 718-7
+    analyte: hemoglobin
     local_code:
     source_status: primary
     review_status: approved
@@ -135,6 +136,7 @@ items:
         source: legacy printed name (pre-standardization dictionary)
     code: 0100601A
     loinc: 787-2
+    analyte: mcv
     local_code:
     source_status: primary
     review_status: approved
@@ -153,6 +155,7 @@ items:
         source: legacy printed name (pre-standardization dictionary)
     code: 0100701A
     loinc: 785-6
+    analyte: mch
     local_code:
     source_status: primary
     review_status: approved
@@ -171,6 +174,7 @@ items:
         source: legacy printed name (pre-standardization dictionary)
     code: 0100801A
     loinc: 786-4
+    analyte: mchc
     local_code:
     source_status: primary
     review_status: approved
@@ -194,6 +198,7 @@ items:
     aliases: ["红细胞分布宽度-CV", "红细胞分布宽度(CV)", "RDW-CV", 红细胞分布宽度变异系数, 红细胞分布宽度CV]
     code:
     loinc: 788-0
+    analyte: rdw_cv
     local_code:
     source_status: local
     review_status: approved

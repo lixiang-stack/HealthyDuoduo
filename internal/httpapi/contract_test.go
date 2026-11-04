@@ -61,7 +61,9 @@ func TestOpenAPIFrozenPathSet(t *testing.T) {
 		"GET /members/{member_id}/panels":            true,
 		"GET /members/{member_id}/panels/{panel}":    true,
 		"POST /analyses":                             true,
+		"GET /analyses/metrics":                      true,
 		"GET /analyses/{analysis_id}":                true,
+		"POST /analyses/{analysis_id}/feedback":      true,
 	}
 	got := map[string]bool{}
 	for path, item := range doc["paths"].(map[string]any) {
@@ -173,7 +175,7 @@ func TestOpenAPIMirrorsRecognitionItem(t *testing.T) {
 
 	shared := []string{
 		"name", "value", "unit", "ref_range", "method", "flag", "low_confidence", "raw_text",
-		"code", "loinc", "unit_display", "unit_status", "raw_value", "raw_unit",
+		"code", "loinc", "analyte", "unit_display", "unit_status", "raw_value", "raw_unit",
 		"raw_ref_range", "ref_kind", "result_kind", "result_basis",
 	}
 	for _, field := range shared {
@@ -309,6 +311,9 @@ var reconcileCases = []fixtureCase{
 	{"panel.detail.json", "PanelDetail", unmarshal[PanelDetail]},
 	{"analysis.request.json", "AnalysisRequest", unmarshal[AnalysisRequest]},
 	{"analysis.result.json", "AnalysisResult", unmarshal[AnalysisResult]},
+	{"analysis.feedback.request.json", "AnalysisFeedbackRequest", unmarshal[AnalysisFeedbackRequest]},
+	{"analysis.feedback.result.json", "AnalysisFeedbackResult", unmarshal[AnalysisFeedbackResult]},
+	{"analysis.metrics.json", "AnalysisMetrics", unmarshal[AnalysisMetrics]},
 }
 
 // TestFixturesReconcileOpenAPI 每个 fixture 对其声明的 OpenAPI component 校验;

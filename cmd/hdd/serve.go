@@ -46,7 +46,10 @@ func newServeHandler(d *deps) http.Handler {
 	mux.HandleFunc("GET /api/v1/members/{member_id}/panels/{panel}", handleGetPanelDetail(d))
 	// 分析端点(llm-analysis 票 04):事实层 + 永久快照;窗口 / 门控在 internal/analysis。
 	mux.HandleFunc("POST /api/v1/analyses", handleCreateAnalysis(d))
+	mux.HandleFunc("GET /api/v1/analyses/metrics", handleGetAnalysisMetrics(d))
 	mux.HandleFunc("GET /api/v1/analyses/{analysis_id}", handleGetAnalysis(d))
+	// 分析反馈(llm-analysis 票 09):只记录,不自动降级条目。
+	mux.HandleFunc("POST /api/v1/analyses/{analysis_id}/feedback", handleCreateAnalysisFeedback(d))
 	// 报告端点(票 06/07):时间线(成员过滤)、multipart 上传(sha256 幂等)、详情(含 OCR 行链接)。
 	mux.HandleFunc("GET /api/v1/reports", handleListReports(d.reports))
 	mux.HandleFunc("POST /api/v1/reports", handleUploadReport(d))

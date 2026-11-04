@@ -300,6 +300,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/analyses/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 周检指标
+         * @description 返回指定日期区间的分析数、反馈数与降级事件数,用于每周计算反馈率与降级率。
+         *     from / to 缺省为最近 7 天(含当天);日期格式 YYYY-MM-DD。
+         */
+        get: operations["getAnalysisMetrics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/analyses/{analysis_id}/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 记录「这不对」反馈
+         * @description 只记录 analysis_id、可选 entry_id、理由与时间;不自动降级条目。
+         */
+        post: operations["createAnalysisFeedback"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/analyses/{analysis_id}": {
         parameters: {
             query?: never;
@@ -538,6 +579,8 @@ export interface components {
             code?: string | null;
             /** @description LOINC 码;无 exact 码为 null */
             loinc?: string | null;
+            /** @description 分析物语义 key(如 alt/hemoglobin);框架层按此匹配,未映射为 null */
+            analyte?: string | null;
             /** @description 人类可读展示单位(UI 优先);缺失时回退 unit */
             unit_display?: string | null;
             /**
@@ -792,11 +835,40 @@ export interface components {
         };
         AnalysisLayers: {
             facts: components["schemas"]["AnalysisFacts"];
+            framework?: components["schemas"]["AnalysisFramework"];
+            explanation?: components["schemas"]["AnalysisExplanation"];
         };
         AnalysisQuota: {
             used_today: number;
             limit_today: number;
+            /** @description 今日解释层额度仍可用,或本次分析已保存了解释层。 */
             explanation_available: boolean;
+            /** @description 省略解释层的原因(quota_exhausted / llm_timeout / llm_invalid_json / no_entries 等)。 */
+            explanation_reason?: string;
+        };
+        /** @description 框架层:代码算得出的判读标签与固定解释文案;无规则时 labels 为空数组。 */
+        AnalysisFramework: {
+            labels: components["schemas"]["AnalysisFrameworkLabel"][];
+        };
+        AnalysisFrameworkLabel: {
+            code: string;
+            label: string;
+            explanation: string;
+            value: string | null;
+            evidence_ids: string[];
+            sources: components["schemas"]["AnalysisSource"][];
+        };
+        /** @description 解释层;无条目 / 失败时整层省略,不显示空状态。 */
+        AnalysisExplanation: {
+            sections: components["schemas"]["AnalysisExplanationSection"][];
+            /** @description 模型输出达到单次 output 上限被截断。 */
+            truncated: boolean;
+        };
+        AnalysisExplanationSection: {
+            entry_id: string;
+            evidence_ids: string[];
+            bridge_text: string;
+            source_ids?: components["schemas"]["AnalysisSource"][];
         };
         /**
          * @description 事实层只陈述数据与病历原文:纳入范围、偏离参考范围的指标项、与本人历史比较、
@@ -896,6 +968,13 @@ export interface components {
             /** Format: int64 */
             member_id: number;
             member_name: string;
+            /**
+             * @description 框架层年龄性别规则输入;旧快照可缺省。
+             * @enum {string}
+             */
+            member_sex?: "male" | "female";
+            /** @description 框架层年龄规则输入;旧快照可缺省。 */
+            member_birth_date?: string;
             panel: components["schemas"]["PanelCode"];
             entry: components["schemas"]["AnalysisEntry"];
             indicator_name: string | null;
@@ -903,6 +982,12 @@ export interface components {
             window_from: string;
             window_to: string;
             rule_version: string;
+            /** @description 解释层 prompt 版本;旧快照可缺省。 */
+            prompt_version?: string;
+            /** @description 命中的知识条目 id → version;旧快照/无条目时可缺省。 */
+            entry_versions?: {
+                [key: string]: string;
+            };
             /** @description 生成快照时的成员数据指纹;当前数据不同即 stale=true。 */
             data_version: string;
             points: components["schemas"]["AnalysisSnapshotPoint"][];
@@ -923,11 +1008,34 @@ export interface components {
             outside_window: boolean;
             section_kinds: string[];
         };
-        /** @description 解释层引用的标准 / 指南;事实层当前为空数组。 */
+        /** @description 框架层 / 解释层引用的标准或指南;由代码渲染,模型不得自行书写。 */
         AnalysisSource: {
             standard: string;
             note: string;
             url: string | null;
+        };
+        AnalysisFeedbackRequest: {
+            /** @description 可选;当前结果级按钮不传。 */
+            entry_id?: string;
+            reason: string;
+        };
+        AnalysisFeedbackResult: {
+            /** Format: int64 */
+            feedback_id: number;
+            /** Format: date-time */
+            created_at: string;
+        };
+        AnalysisMetrics: {
+            from: string;
+            to: string;
+            analyses: number;
+            feedback: number;
+            feedback_rate: number;
+            degradations: number;
+            degradation_rate: number;
+            degradation_kinds: {
+                [key: string]: number;
+            };
         };
         Error: {
             /** @description 中性事实侧错误说明(不诊断、不猜测) */
@@ -1454,6 +1562,58 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AnalysisResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getAnalysisMetrics: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 区间指标 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisMetrics"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+        };
+    };
+    createAnalysisFeedback: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                analysis_id: components["parameters"]["AnalysisID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnalysisFeedbackRequest"];
+            };
+        };
+        responses: {
+            /** @description 已记录 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisFeedbackResult"];
                 };
             };
             400: components["responses"]["BadRequest"];
