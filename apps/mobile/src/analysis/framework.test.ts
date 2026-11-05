@@ -6,15 +6,14 @@ import {
   QUOTA_UNAVAILABLE_TEXT,
   QUOTA_EXHAUSTED_TEXT,
   explanationUnavailableText,
-  frameworkSourceText,
   hasFrameworkLabels,
 } from './framework';
 
 describe('analysis framework display helpers', () => {
-  it('renders sources from code-supplied standards only', () => {
+  it('keeps sources from code-supplied standards only', () => {
     const framework = makeAnalysisFramework();
     expect(hasFrameworkLabels(framework)).toBe(true);
-    expect(frameworkSourceText(framework.labels[0])).toBe('ACG 2016');
+    expect(framework.labels[0].sources[0].standard).toBe('ACG 2016');
   });
 
   it('treats an empty framework as absent', () => {

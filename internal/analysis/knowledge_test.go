@@ -15,6 +15,8 @@ func knowledgePoint(analyte string, flag string) EvidencePoint {
 		contract.AnalyteAST:            "天门冬氨酸氨基转移酶测定",
 		contract.AnalyteALP:            "碱性磷酸酶测定",
 		contract.AnalyteBilirubinTotal: "总胆红素测定",
+		contract.AnalyteTotalProtein:   "总蛋白测定",
+		contract.AnalyteAlbumin:        "白蛋白测定",
 	}[analyte]
 	return EvidencePoint{
 		EvidenceID: "ev-r1-" + analyte,
@@ -51,6 +53,79 @@ func TestKnowledgeMatcherMatchesExactFlagCombination(t *testing.T) {
 		matched[0].Review.Decision != ReviewDecisionAccepted ||
 		matched[0].Review.ReviewedAt != "2026-11-02" {
 		t.Fatalf("entry = %+v", matched[0])
+	}
+}
+
+func TestKnowledgeMatcherMatchesLowFlags(t *testing.T) {
+	matcher, err := NewKnowledgeMatcher()
+	if err != nil {
+		t.Fatalf("load embedded knowledge: %v", err)
+	}
+	facts := knowledgeFacts(
+		knowledgePoint(contract.AnalyteTotalProtein, contract.FlagLow),
+		knowledgePoint(contract.AnalyteAlbumin, contract.FlagLow),
+	)
+	matched := matcher.Match(testRequest(EntryPanel, pipeline.PanelLiver, 12), facts)
+	if len(matched) != 1 || matched[0].ID != "liver-low-protein-albumin" {
+		t.Fatalf("matched = %+v, want liver-low-protein-albumin", matched)
+	}
+	if matched[0].Version != "1" || matched[0].Review.Decision != ReviewDecisionAccepted ||
+		matched[0].Review.ReviewedAt != "2026-11-05" {
+		t.Fatalf("entry = %+v", matched[0])
+	}
+
+	normal := matcher.Match(testRequest(EntryPanel, pipeline.PanelLiver, 12), knowledgeFacts(
+		knowledgePoint(contract.AnalyteTotalProtein, contract.FlagNormal),
+		knowledgePoint(contract.AnalyteAlbumin, contract.FlagNormal),
+	))
+	if len(normal) != 0 {
+		t.Fatalf("normal TP/ALB matched %+v, want none", normal)
+	}
+}
+
+func TestKnowledgeMatcherMatchesHighOrLowTrigger(t *testing.T) {
+	fsys := fstest.MapFS{
+		"knowledge/or.yaml": {Data: []byte(`id: or-trigger
+priority: 10
+trigger:
+  panel: liver
+  any_flag_high: [alanine_aminotransferase]
+  any_flag_low: [albumin]
+  all_normal: [alkaline_phosphatase]
+explanation: 条目原文
+review:
+  decision: accepted
+  reviewed_at: 2026-11-05
+version: 1
+`)},
+	}
+	entries, err := loadKnowledgeEntries(fsys)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	matcher := &KnowledgeMatcher{entries: entries}
+	req := testRequest(EntryPanel, pipeline.PanelLiver, 12)
+
+	low := matcher.Match(req, knowledgeFacts(
+		knowledgePoint(contract.AnalyteAlbumin, contract.FlagLow),
+		knowledgePoint(contract.AnalyteALP, contract.FlagNormal),
+	))
+	if len(low) != 1 {
+		t.Fatalf("low trigger matched = %+v, want one", low)
+	}
+	high := matcher.Match(req, knowledgeFacts(
+		knowledgePoint(contract.AnalyteALT, contract.FlagHigh),
+		knowledgePoint(contract.AnalyteALP, contract.FlagNormal),
+	))
+	if len(high) != 1 {
+		t.Fatalf("high trigger matched = %+v, want one", high)
+	}
+	blocked := matcher.Match(req, knowledgeFacts(
+		knowledgePoint(contract.AnalyteAlbumin, contract.FlagLow),
+		knowledgePoint(contract.AnalyteALP, contract.FlagHigh),
+	))
+	if len(blocked) != 0 {
+		t.Fatalf("all_normal blocked matched = %+v, want none", blocked)
 	}
 }
 
@@ -137,6 +212,24 @@ func TestEntryVersions(t *testing.T) {
 	versions := EntryVersions([]KnowledgeEntry{{ID: "a", Version: "2"}, {ID: "b", Version: "1"}})
 	if versions["a"] != "2" || versions["b"] != "1" || len(versions) != 2 {
 		t.Fatalf("versions = %v", versions)
+	}
+}
+
+func TestLoadKnowledgeEntriesRejectsMissingFlagTrigger(t *testing.T) {
+	fsys := fstest.MapFS{
+		"knowledge/bad.yaml": {Data: []byte(`id: bad
+priority: 10
+trigger:
+  panel: liver
+explanation: 条目原文
+review:
+  decision: accepted
+  reviewed_at: 2026-11-05
+version: 1
+`)},
+	}
+	if _, err := loadKnowledgeEntries(fsys); err == nil {
+		t.Fatal("entry without any_flag_high/any_flag_low should fail loading")
 	}
 }
 

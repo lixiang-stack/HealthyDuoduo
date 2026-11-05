@@ -210,6 +210,9 @@ func TestServeAnalysisPanelFacts(t *testing.T) {
 	if result.AnalysisID == 0 || result.Status != analysis.StatusSuccess || result.Stale {
 		t.Fatalf("result header = %+v", result)
 	}
+	if result.CreatedAt != "2026-11-03T12:00:00Z" {
+		t.Fatalf("created_at = %q, want fake store timestamp", result.CreatedAt)
+	}
 	if facts.Panel != "liver" || facts.Entry != analysis.EntryPanel || facts.Window.Months != 12 {
 		t.Fatalf("facts header = %+v", facts)
 	}

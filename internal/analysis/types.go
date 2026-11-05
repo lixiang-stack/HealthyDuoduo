@@ -247,6 +247,7 @@ type KnowledgeReview struct {
 type KnowledgeTrigger struct {
 	Panel       string
 	AnyFlagHigh []string
+	AnyFlagLow  []string
 	AllNormal   []string
 }
 

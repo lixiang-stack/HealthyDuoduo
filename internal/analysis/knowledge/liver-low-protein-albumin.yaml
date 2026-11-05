@@ -1,0 +1,41 @@
+id: liver-low-protein-albumin
+priority: 20
+trigger:
+  panel: liver
+  any_flag_low: [total_protein, albumin]
+  all_normal: []
+explanation: 总蛋白由白蛋白和球蛋白组成，总蛋白低不一定代表白蛋白低。白蛋白偏低可能与肝脏合成减少、蛋白质从肠道或尿液丢失、营养摄入不足或炎症有关；单次结果不能确定原因，需要结合症状、体重变化和医生复查。
+check_directions:
+  - 把结果和症状、近期体重变化、既往病史带给医生看，由医生判断是否复查。
+  - 医生可能根据情况安排尿蛋白检查。
+  - 如果同时有水肿、尿量明显减少或持续腹泻，请尽快让医生评估。
+general_advice:
+  - 按年龄和身体状况保持均衡饮食，不自行长期限蛋白。
+  - 不要自行使用蛋白粉或补充剂；是否需要补充由医生或营养师决定。
+  - 定期记录体重；儿童可记录生长曲线，复诊时带给医生。
+  - 不要因一次结果大幅改变饮食；先和医生确认原因。
+track_items: [TP, ALB]
+source_ids:
+  - standard: Duvall 2023
+    note: 总蛋白组成、低蛋白鉴别与检验干扰（通用综述）
+    url: https://doi.org/10.21037/jlpm-23-15
+  - standard: ACG 2017
+    note: 成人肝病评估；白蛋白合成、炎症影响与复查
+    url: https://doi.org/10.1038/ajg.2016.517
+  - standard: ASPEN 2021
+    note: 白蛋白是炎症标志，不是营养标志（通用）
+    url: https://doi.org/10.1002/ncp.10588
+  - standard: KDIGO 2021
+    note: 成人+儿童肾小球疾病；肾病综合征需蛋白尿
+    url: https://doi.org/10.1016/j.kint.2021.05.021
+  - standard: WS/T 578.1—2017
+    note: 中国居民能量与蛋白质参考摄入量（全人群）
+    url: https://www.nhc.gov.cn/ewebeditor/uploadfile/2017/10/20171017152901174.pdf
+  - standard: 中国居民膳食指南（2022）
+    note: 一般人群平衡膳食建议
+    url: http://dg.cnsoc.org/article/04/J4-AsD_DR3OLQMnHG0-jZA.html
+review:
+  decision: accepted
+  reviewed_at: 2026-11-05
+  note: "2026-11-05 按用户确认的通用方案实施；独立医学复核待补"
+version: 1

@@ -825,6 +825,11 @@ export interface components {
         AnalysisResult: {
             /** Format: int64 */
             analysis_id: number;
+            /**
+             * Format: date-time
+             * @description 分析快照生成时间(RFC3339);读取旧快照也返回原生成时间。
+             */
+            created_at: string;
             status: components["schemas"]["AnalysisStatus"];
             layers: components["schemas"]["AnalysisLayers"];
             snapshot: components["schemas"]["AnalysisSnapshot"];
@@ -907,7 +912,7 @@ export interface components {
         AnalysisWindow: {
             /** @description 用户选择的窗口月数(6 / 12 / 24)。 */
             months: number;
-            /** @description 实际使用的窗口起点;稀疏扩展时向前到 24 个月。 */
+            /** @description 用户选择的窗口起点；稀疏扩展按趋势键单独生效，不改变该字段。 */
             from: string;
             /** @description 窗口锚点 = 分析时刻当日。 */
             to: string;

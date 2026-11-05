@@ -52,6 +52,8 @@ const (
 	AnalyteAST            = "aspartate_aminotransferase"
 	AnalyteALP            = "alkaline_phosphatase"
 	AnalyteBilirubinTotal = "bilirubin_total"
+	AnalyteTotalProtein   = "total_protein"
+	AnalyteAlbumin        = "albumin"
 	AnalyteHemoglobin     = "hemoglobin"
 	AnalyteMCV            = "mean_corpuscular_volume"
 	AnalyteMCH            = "mean_corpuscular_hemoglobin"
