@@ -22,7 +22,7 @@ import (
 var _ pipeline.ReportStore = (*fakeServeStore)(nil)
 
 // ReviewItem 镜像 storage 的核对事务语义:定位指标项(缺失返回 nil, nil)、应用动作
-// (共享 pipeline.ApplyReviewAction——同源纯函数,SQL 版与 fake 版行为不得漂移)、
+// (共享 pipeline.ApplyReviewActionWithPolicy——同源纯函数,SQL 版与 fake 版行为不得漂移)、
 // append 修正对(仅修正)、报告状态单调派生(partial → success 当且仅当未核对低置信
 // 计数归零),返回动作后的报告级状态与计数。测试单请求串行,无并发,不镜像报告行锁
 // (锁由 storage 的 SQL 事务承担)。
@@ -37,7 +37,7 @@ func (f *fakeServeStore) ReviewItem(ctx context.Context, reportSha string, itemI
 		if it.ItemID != itemID {
 			continue
 		}
-		next, pair := pipeline.ApplyReviewAction(it, action)
+		next, pair := pipeline.ApplyReviewActionWithPolicy(it, action, nil)
 		r.items[i] = next
 		if pair != nil {
 			f.pairs = append(f.pairs, fakeCorrectionPair{itemID: it.ItemID, pair: *pair})

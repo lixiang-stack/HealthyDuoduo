@@ -23,9 +23,9 @@ import (
 )
 
 // deps 编排层依赖(接口在 internal/pipeline,实现在 internal/storage、internal/recognizer)。
-// store/members/reports/trends/backfill 为同一 *storage.Store 注入的窄端口(ISP:CLI 侧报告持久化、
-// 成员域、serve 报告域、serve 趋势域、存量回填各持所需方法,既有 fake 零膨胀);
-// classifier/rec 为同一识别服务客户端的两个消费面。
+// store/members/reports/trends 为同一 *storage.Store 注入的窄端口(ISP:CLI 侧报告持久化、
+// 成员域、serve 报告域、serve 趋势域各持所需方法,既有 fake 零膨胀);
+// rec 为识别服务客户端。
 type deps struct {
 	store         pipeline.Store
 	members       pipeline.MemberStore
@@ -38,8 +38,6 @@ type deps struct {
 	observability analysis.ObservabilityStore
 	explainer     *analysis.Explainer
 	analysisLimit int
-	backfill      pipeline.BackfillStore
-	classifier    pipeline.PanelClassifier
 	rec           pipeline.Recognizer
 	obj           pipeline.ObjectStore
 }

@@ -50,13 +50,6 @@ var (
 	flagSexRe      = regexp.MustCompile(`^[男女][::：]\s*`)
 )
 
-// ComputeFlag 旧数值入口:只做数值/单侧/区间比较,不加载定性策略。
-// 生产路径(修正重算)用 Compare,以便同时得到 flag_reason。
-func ComputeFlag(value, refRange *string) string {
-	flag, _ := Compare("", value, refRange, nil)
-	return flag
-}
-
 // RefRangeUpperBound 参考范围的数值上限(ULN):区间取上界,单侧 < / ≤ 取界值。
 // 单侧 > / ≥、标量与非数值范围没有可用的 ULN,返回 false。
 // 与 Compare 共用同一套范围解析,避免框架层另写一份格式判断。

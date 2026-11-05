@@ -14,7 +14,7 @@ import (
 
 // TestServeHealth GET /api/v1/health → 200 + {ok, version}(配对连通性校验契约)。
 func TestServeHealth(t *testing.T) {
-	d := &deps{store: fakeStoreCLI{}, rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
+	d := &deps{store: newFakeServeStore(), rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
 	srv := httptest.NewServer(newServeHandler(d))
 	defer srv.Close()
 
@@ -43,7 +43,7 @@ func TestServeHealth(t *testing.T) {
 
 // TestServeHealthPrefixFrozen API 前缀 /api/v1 冻结:裸 /health 不得响应。
 func TestServeHealthPrefixFrozen(t *testing.T) {
-	d := &deps{store: fakeStoreCLI{}, rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
+	d := &deps{store: newFakeServeStore(), rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
 	srv := httptest.NewServer(newServeHandler(d))
 	defer srv.Close()
 
@@ -60,7 +60,7 @@ func TestServeHealthPrefixFrozen(t *testing.T) {
 // TestRunServeRejectsUnknownFlag serve 参数错误走 usage(exit 2),不进监听。
 func TestRunServeRejectsUnknownFlag(t *testing.T) {
 	var out, errOut strings.Builder
-	d := &deps{store: fakeStoreCLI{}, rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
+	d := &deps{store: newFakeServeStore(), rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
 	if code := run(&out, &errOut, d, []string{"serve", "--bogus"}); code != exitUsage {
 		t.Fatalf("exit = %d, want %d", code, exitUsage)
 	}
@@ -72,7 +72,7 @@ func TestRunServeRejectsUnknownFlag(t *testing.T) {
 // TestRunServeRejectsPositionalArgs serve 不收位置参数。
 func TestRunServeRejectsPositionalArgs(t *testing.T) {
 	var out, errOut strings.Builder
-	d := &deps{store: fakeStoreCLI{}, rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
+	d := &deps{store: newFakeServeStore(), rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
 	if code := run(&out, &errOut, d, []string{"serve", "extra"}); code != exitUsage {
 		t.Fatalf("exit = %d, want %d", code, exitUsage)
 	}
@@ -84,7 +84,7 @@ func TestRunServeRejectsPositionalArgs(t *testing.T) {
 // TestRunServeBadAddr Listen 失败(非法地址)→ exit 1 且立即返回(不驻留)。
 func TestRunServeBadAddr(t *testing.T) {
 	var out, errOut strings.Builder
-	d := &deps{store: fakeStoreCLI{}, rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
+	d := &deps{store: newFakeServeStore(), rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
 	if code := run(&out, &errOut, d, []string{"serve", "--addr", "bogus:not-a-port"}); code != exitError {
 		t.Fatalf("exit = %d, want %d; stderr = %q", code, exitError, errOut.String())
 	}

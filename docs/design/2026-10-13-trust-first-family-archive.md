@@ -64,4 +64,4 @@
 - **契约**：HTTP 契约载体 = OpenAPI 3.1（`schemas/openapi.yaml`，`$ref` 复用识别端 schema）；API 面 12 端点定稿（`/api/v1` 前缀、item 用 BIGSERIAL `item_id` 不透明句柄、sha256 命中幂等返回 `duplicate:true`、新增 `fail_reason` 列、`--force` 对已核对报告 409）；`ocr_lines` 内嵌详情响应。M0 收缩 = 新增 migrations（member / 核对状态 / 修正对 / `fail_reason`）+ OpenAPI + HTTP fixtures，**识别端契约与存量 golden 不动**。
 - **趋势与 B2**：连接键 = 规范名 + 归一单位；Δ 基线 = 同键内 `report_date` 严格更早的最近一份（无日期/仅同日不显示）；跨单位族点段本期不连线、不提示——印形归一（`unit_conversions` / `ocr_forms`）在 ingest 已完成，无运行时换算、无系数表，留给未来真实需求驱动。新增风险登记：跨院 alias 覆盖率 M4 前实测（真实双院数据），低则补词典 alias，不做模糊匹配。
 - **部署与配对**：`hdd serve` 单二进制子命令（复用 `deps` 编排层；compose 已有 postgres/seaweedfs/recognizer，仅缺 hdd 服务）；**Mac（arm64）= 开发验证实例（M1）**、**NAS（amd64）= 家庭常驻实例（M2）**，同一份 compose 两处复用、镜像双架构；DHCP 保留 IP → 配对二维码 = 纯 URL 常量（ADR-0006）。Expo Go 只验「前台重试」语义，dev client 与后台静默续传为 M2 加分项非门禁。
-- **环境事实勘误（拷问中核实）**：`report_items.value` 已为 TEXT（`migrations/0002_item_value_to_text.sql`），`method` 列已存在（`0003_item_method.sql`）——需求文档对 value 字符串原样的依赖无存储障碍。
+- **环境事实勘误（拷问中核实）**：`report_items.value` 已为 TEXT、`method` 列已存在（现在统一由 `migrations/0019_init.sql` 定义）——需求文档对 value 字符串原样的依赖无存储障碍。

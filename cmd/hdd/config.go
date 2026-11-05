@@ -163,8 +163,6 @@ func openDeps(c config) (*deps, func(), error) {
 		quota:         st,
 		observability: st,
 		analysisLimit: c.analysisLimit,
-		backfill:      st,
-		classifier:    rec,
 		rec:           rec,
 		obj:           obj,
 	}

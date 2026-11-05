@@ -59,16 +59,10 @@ type LLMClient interface {
 	Complete(ctx context.Context, req LLMRequest) (LLMResponse, error)
 }
 
-// EntryMatcher 知识条目匹配端口;生产实现为 KnowledgeMatcher,测试可注入 fake / NoEntries。
+// EntryMatcher 知识条目匹配端口;生产实现为 KnowledgeMatcher,测试可注入 fake。
 type EntryMatcher interface {
 	Match(req Request, facts Facts) []KnowledgeEntry
 }
-
-// NoEntries 空匹配器:不调用云端、不消耗配额。
-type NoEntries struct{}
-
-// Match 永远返回空;解释层省略,前两层照常输出。
-func (NoEntries) Match(Request, Facts) []KnowledgeEntry { return nil }
 
 // Explainer 解释层编排;依赖全部注入,失败只返回原因,不向上抛错。
 type Explainer struct {

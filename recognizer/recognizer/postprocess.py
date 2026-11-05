@@ -54,7 +54,6 @@ from .contract import (
     ReportItem,
     ReportSection,
     Status,
-    allowed_panels,
     report_panels,
 )
 from .dash_recovery import recover_dash_fields
@@ -2125,37 +2124,6 @@ def run_postprocess(
         items=items,
         sections=sections or None,
     )
-
-
-def classify_items(
-    report_type: str, names: list[str]
-) -> tuple[list[Panel], list[Panel]]:
-    """按 report_type + 当前指标名重算项目组(/classify 与存量回填共用;spec §6.4)。
-
-    只查同一 report_type 下的词典(歧义项靠父类区分,如临检葡萄糖 → 尿常规),
-    未命中 → other。空 items:影像 → [imaging],其余 → [other]。
-    """
-    dicts = load_dicts()
-    if report_type not in {d.report_type for d in dicts} | {UNKNOWN_REPORT_TYPE}:
-        raise ValueError(f"unknown report_type: {report_type}")
-    allowed = allowed_panels(report_type)
-    item_panels: list[Panel] = []
-    for name in names:
-        panel = Panel.OTHER
-        for d in dicts:
-            if d.report_type != report_type:
-                continue
-            item, _ = _match_name(name, d)
-            if item is not None:
-                panel = item.panel
-                break
-        if panel not in allowed:
-            raise ValueError(
-                f"item {name!r} panel {panel.value!r} is not allowed "
-                f"for report_type {report_type!r}"
-            )
-        item_panels.append(panel)
-    return report_panels(report_type, Status.SUCCESS, item_panels), item_panels
 
 
 def _title_keyword_hit(d: LabDict, cells: list[_Cell]) -> bool:

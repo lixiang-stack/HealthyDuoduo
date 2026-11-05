@@ -4,7 +4,7 @@ Status: **IMPLEMENTED — independent medical review pending**（2026-11-05）
 
 范围：面向所有成员（儿童与成人）的通用知识条目调研；年龄特异证据单独标注，不能互相外推。
 
-> **实施状态（2026-11-05）：** 已按用户确认新增 `internal/analysis/knowledge/liver-low-protein-albumin.yaml`（`review.decision: accepted`，`review.note` 标注独立医学复核待补）。本文件 §4 文案是上线底稿；若独立医学复核调整文案，提升条目 `version` 并更新 review。§5.1 的 `rejected` 是调研阶段的占位示例，实际条目已按用户确认改为 `accepted`。
+> **实施状态（2026-11-05）：** 已按用户确认新增 `internal/analysis/knowledge/liver-low-protein-albumin.yaml`（`review.decision: accepted`，`review.note` 标注独立医学复核待补）。本文件 §4 文案是上线底稿；若独立医学复核调整文案，提升条目 `version` 并更新 review。
 
 ## 1. 决策问题与短答
 
@@ -39,9 +39,9 @@ Status: **IMPLEMENTED — independent medical review pending**（2026-11-05）
 
 **读法：** 低白蛋白而总蛋白正常并不矛盾——球蛋白升高可把总蛋白“撑”在正常范围；总蛋白低也不一定白蛋白低 [S6]。参考区间随年龄和检测方法变化：WS/T 780—2021 中 6 月–<13 岁白蛋白 39–54 g/L、13–18 岁 42–56 g/L；总蛋白 65–84、68–88 g/L [S1]。成人、妊娠期和老年人的参考范围或影响因素可能不同；单据范围优先，低于下限不等于疾病。
 
-## 4. 通用文案草案
+## 4. 通用文案（已实施，独立医学复核待补）
 
-> **DRAFT — requires medical review。以下文字不得写入 `internal/analysis/knowledge/`，也不得进入生产 YAML。**
+> 以下文案已写入 `internal/analysis/knowledge/liver-low-protein-albumin.yaml`（`review.decision: accepted`）。若独立医学复核调整文案，提升条目 `version` 并更新 `review`。
 
 **explanation（可能原因）**
 
@@ -70,101 +70,13 @@ Status: **IMPLEMENTED — independent medical review pending**（2026-11-05）
 
 > 成人补充剂与限蛋白建议为保守产品建议；直接证据来自儿童/青少年（S3、S16），不外推为成人疗效结论。
 
-## 5. 建议的 YAML 形状与触发扩展
+## 5. 实施记录
 
-### 5.1 YAML 形状
-
-```yaml
-# DRAFT — requires medical review；通用条目，适用于儿童与成人成员。
-id: liver-low-protein-albumin
-priority: 20
-trigger:
-  panel: liver
-  any_flag_low: [total_protein, albumin]
-  all_normal: []
-explanation: "<§4 explanation 原文>"
-check_directions:
-  - "<§4 check_directions 第 1 条>"
-  - "<§4 check_directions 第 2 条>"
-  - "<§4 check_directions 第 3 条>"
-general_advice:
-  - "<§4 general_advice 第 1 条>"
-  - "<§4 general_advice 第 2 条>"
-  - "<§4 general_advice 第 3 条>"
-  - "<§4 general_advice 第 4 条>"
-track_items: [TP, ALB]
-source_ids:
-  # 通用/成人
-  - standard: ACG 2017
-    note: 成人肝病评估；白蛋白合成、炎症影响与复查
-    url: https://doi.org/10.1038/ajg.2016.517
-  - standard: Duvall 2023
-    note: 总蛋白组成、低蛋白鉴别与检验干扰（通用综述）
-    url: https://doi.org/10.21037/jlpm-23-15
-  - standard: ASPEN 2021
-    note: 白蛋白是炎症标志，不是营养标志（通用）
-    url: https://doi.org/10.1002/ncp.10588
-  - standard: Ozen 2023
-    note: 蛋白丢失性肠病（通用综述）
-    url: https://doi.org/10.1056/NEJMra2301594
-  - standard: KDIGO 2021
-    note: 成人+儿童肾小球疾病；肾病综合征需蛋白尿
-    url: https://doi.org/10.1016/j.kint.2021.05.021
-  - standard: WS/T 578.1—2017
-    note: 中国居民能量与蛋白质参考摄入量（全人群）
-    url: https://www.nhc.gov.cn/ewebeditor/uploadfile/2017/10/20171017152901174.pdf
-  - standard: 中国居民膳食指南（2022）
-    note: 一般人群平衡膳食建议
-    url: http://dg.cnsoc.org/article/04/J4-AsD_DR3OLQMnHG0-jZA.html
-  # 年龄特异（仅用于相应年龄，不泛化）
-  - standard: WS/T 780—2021
-    note: 儿童总蛋白、白蛋白年龄别参考区间（仅儿童）
-    url: https://www.nhc.gov.cn/fzs/c100048/202105/481e639c307a4effa14957f4d0d738fd/files/1733125306220_90260.pdf
-  - standard: NICE NG75
-    note: 儿童生长迟缓识别与生长监测（仅儿童）
-    url: https://www.nice.org.uk/guidance/ng75
-  - standard: AAP 2016
-    note: 儿童/青少年性能增强物质（含蛋白补充剂）不推荐
-    url: https://doi.org/10.1542/peds.2016-1300
-  - standard: NASPGHAN/ESPGHAN 2019
-    note: 儿童慢性肝病避免低蛋白饮食（仅儿童）
-    url: https://doi.org/10.1097/MPG.0000000000002443
-review:
-  decision: rejected
-  reviewed_at: ""
-  note: "DRAFT — requires medical review；复核通过前不得改为 accepted"
-version: 1
-```
-
-`review.decision` 只能取 `accepted` / `rejected`，没有 `draft`。上面的 `rejected` 是占位；复核通过后改为 `accepted` 并填 `reviewed_at`。
-
-### 5.2 触发扩展（工程决定，不是医学主张）
-
-当前 `internal/analysis/knowledge.go` 的 `knowledgeTrigger` 只有 `any_flag_high` 与 `all_normal`；`triggerMatches` 在 `AnyFlagHigh` 为空时直接返回 false；loader 也把 `any_flag_high` 设为必填。低值条目即使写了也不会加载/命中。
-
-最小改动是增加对称字段：
-
-```go
-type knowledgeTrigger struct {
-	Panel       string   `yaml:"panel"`
-	AnyFlagHigh []string `yaml:"any_flag_high"`
-	AnyFlagLow  []string `yaml:"any_flag_low"`
-	AllNormal   []string `yaml:"all_normal"`
-}
-```
-
-语义：`any_flag_high` 与 `any_flag_low` 之间是 OR，列表内部也是 OR；`all_normal` 仍是 AND。校验改为“两个列表至少一个非空”。不要引入通用表达式或按指标指定 flag 的 map——当前只有这一种低值需求，YAGNI。
-
-`trigger` 不按成员年龄或性别设条件：低总蛋白/低白蛋白是化验指标，条目适用于所有成员；年龄只影响文案中的参考范围和生长建议。测试至少覆盖：低值单命中、高值旧条目仍命中、两个列表都空时加载失败、低值 + `all_normal` 不满足时不命中、高值与低值同时存在的 OR 行为。
-
-### 5.3 指标键缺口（第二个工程缺口）
-
-- `internal/contract/contract.go` 只有 ALT、AST、ALP、`bilirubin_total` 与 CBC 常量，没有 `AnalyteTotalProtein` / `AnalyteAlbumin`。
-- `recognizer/recognizer/chemistry_dict.yaml` 已有“总蛋白测定”（code `1100204A`，LOINC `2885-2`）和“白蛋白测定”（code `1100104A`，LOINC `1751-7`），但两项都**没有 `analyte` 字段**；识别端不会写语义 key，分析端就无法按 `total_protein` / `albumin` 匹配。
-- 按 `docs/agents/contracts.md`，加指标时必须给词典项写 `analyte`；`internal/analysis/analyte_contract_test.go` 还会校验 Go 常量与词典的 code/LOINC，新增常量后要同步更新期望表。
-- `schemas/report.schema.json` 的 `analyte` 是自由字符串，不是 enum；不需要改 OpenAPI/codegen，但要跑 Go/Python 契约测试与识别端词典测试。
-
-建议键名：`total_protein`、`albumin`。
+- 条目：`internal/analysis/knowledge/liver-low-protein-albumin.yaml`，`priority: 20`，`version: 1`。
+- 触发：`panel: liver` + `any_flag_low: [total_protein, albumin]`；`any_flag_high` / `any_flag_low` / `all_normal` 三者按 OR/AND 语义匹配，不再扩充通用表达式。
+- 指标键：`total_protein`、`albumin`（LOINC component 风格全称小写 snake_case）；识别端 `chemistry_dict.yaml` 与 Go `internal/contract` 已同步，`internal/analysis/analyte_contract_test.go` 锁定词典与常量的 code/LOINC。
+- 审核：`review.decision: accepted`，`reviewed_at: 2026-11-05`，`review.note` 标注独立医学复核待补。复核前文案不得再扩大适用范围。
+- 覆盖：新分析覆盖总蛋白/白蛋白 4/4；旧分析快照永久保留，仍显示「暂无对应解读」。
 
 ## 6. 不能说的话
 
@@ -217,8 +129,5 @@ type knowledgeTrigger struct {
 
 ## 9. 实施备注
 
-1. **当前已按用户确认实施，独立医学复核待补。** §4 文案、§6 禁区、§3 鉴别类别仍需临床医生签字；实际条目已为 `accepted`，`review.note` 记录了这一限制。条目是通用条目，不按成员年龄或性别分流；年龄特异判断必须另建条目并引用对应标准。
-2. **工程顺序：** 触发扩展（§5.2）→ 指标键与词典（§5.3）→ 条目 YAML → 测试。两步工程改动独立 commit；不要“先加条目、后补触发”，否则 loader 直接失败。
-3. **会破坏的既有期望：** App 目前把 TP/ALB 标为“暂无对应解读”；新增条目后要改 `apps/mobile/src/test/screens/analysis.test.tsx` 的相关断言与 fixture/快照，并检查 `internal/analysis/testdata/eval/fixtures.json` 中依赖“无条目”的期望。`internal/analysis/knowledge_test.go` 的 `knowledgePoint` 名称映射也要补 TP/Alb。
-4. **产品决策冲突：** `.scratch/analysis-result-ux/spec.md` §7 决策 8（2026-11-04）当前是“低蛋白/白蛋白先不新增医学条目，明确标未覆盖”。本文是复核该决策的输入，不构成推翻；实施前需产品负责人更新该决策与 `issues/09-result-conclusion-page.md`。
-5. **验收：** `go test ./...`、`go vet ./...`、`cd recognizer && uv run pytest`、`cd apps/mobile && npm run typecheck && npm test`；条目匹配单测覆盖 §5.2 五种情形；最后跑 `python3 scripts/check-docs.py`。
+1. **已实施，独立医学复核待补。** §4 文案、§6 禁区、§3 鉴别类别仍需临床医生签字；条目 `review.note` 已记录这一限制。条目是通用条目，不按成员年龄或性别分流；年龄特异判断必须另建条目并引用对应标准。
+2. **验收：** `go test ./...`、`go vet ./...`、`cd recognizer && uv run pytest`、`cd apps/mobile && npm run typecheck && npm test`；最后跑 `python3 scripts/check-docs.py`。
