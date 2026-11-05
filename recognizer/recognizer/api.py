@@ -14,8 +14,6 @@ from fastapi import FastAPI, Form, HTTPException, UploadFile, status
 from PIL import UnidentifiedImageError
 
 from .contract import (
-    ClassifyRequest,
-    ClassifyResponse,
     OCRResult,
     ReparseRequest,
     Report,
@@ -24,7 +22,7 @@ from .contract import (
 from .ocr import run_ocr
 from .orientation import detect_rotation, rotate_image
 from .paths import IMAGE_SUFFIXES
-from .postprocess import classify_items, run_postprocess
+from .postprocess import run_postprocess
 
 app = FastAPI(title="HealthyDuoduo Recognizer")
 
@@ -87,21 +85,6 @@ def report(
         normalized_image=base64.b64encode(data).decode("ascii") if rotation != 0 else None,
         image_rotation=rotation,
     )
-
-
-@app.post("/classify")
-def classify(payload: ClassifyRequest) -> ClassifyResponse:
-    """按 report_type + 当前指标名重算项目组(存量回填用;家长侧 OpenAPI 不暴露)。
-
-    与 postprocess 共用同一个 panel 解析器;不做 OCR,不读原图。
-    """
-    try:
-        panels, item_panels = classify_items(
-            payload.report_type, [item.name for item in payload.items]
-        )
-    except ValueError as exc:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
-    return ClassifyResponse(panels=panels, item_panels=item_panels)
 
 
 @app.post("/reparse")

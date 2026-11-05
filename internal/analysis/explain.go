@@ -59,16 +59,10 @@ type LLMClient interface {
 	Complete(ctx context.Context, req LLMRequest) (LLMResponse, error)
 }
 
-// EntryMatcher 知识条目匹配端口;生产实现为 KnowledgeMatcher,测试可注入 fake / NoEntries。
+// EntryMatcher 知识条目匹配端口;生产实现为 KnowledgeMatcher,测试可注入 fake。
 type EntryMatcher interface {
 	Match(req Request, facts Facts) []KnowledgeEntry
 }
-
-// NoEntries 空匹配器:不调用云端、不消耗配额。
-type NoEntries struct{}
-
-// Match 永远返回空;解释层省略,前两层照常输出。
-func (NoEntries) Match(Request, Facts) []KnowledgeEntry { return nil }
 
 // Explainer 解释层编排;依赖全部注入,失败只返回原因,不向上抛错。
 type Explainer struct {
@@ -110,23 +104,42 @@ func (e *Explainer) Explain(ctx context.Context, analysisID int64, req Request, 
 		return nil, ExplanationReasonInputTooLarge
 	}
 	mapping = filterEvidenceMapping(pack, mapping)
-	if e.Quota != nil {
-		_, allowed, err := e.Quota.ConsumeLLMQuota(ctx, analysisID, e.DailyLimit)
-		if err != nil {
-			e.record(ctx, analysisID, EventLLMError, "consume quota: "+err.Error())
-			return nil, ExplanationReasonError
-		}
-		if !allowed {
-			e.record(ctx, analysisID, EventQuotaExhausted, "daily explanation quota exhausted")
-			return nil, ExplanationReasonQuotaExhausted
-		}
+	if reason := e.consumeQuota(ctx, analysisID); reason != "" {
+		return nil, reason
 	}
 	user, err := json.Marshal(pack)
 	if err != nil {
 		e.record(ctx, analysisID, EventLLMError, "marshal evidence: "+err.Error())
 		return nil, ExplanationReasonError
 	}
+	return e.complete(ctx, analysisID, user, entries, mapping)
+}
 
+// consumeQuota 解释层配额;空字符串表示放行。
+func (e *Explainer) consumeQuota(ctx context.Context, analysisID int64) string {
+	if e.Quota == nil {
+		return ""
+	}
+	_, allowed, err := e.Quota.ConsumeLLMQuota(ctx, analysisID, e.DailyLimit)
+	if err != nil {
+		e.record(ctx, analysisID, EventLLMError, "consume quota: "+err.Error())
+		return ExplanationReasonError
+	}
+	if !allowed {
+		e.record(ctx, analysisID, EventQuotaExhausted, "daily explanation quota exhausted")
+		return ExplanationReasonQuotaExhausted
+	}
+	return ""
+}
+
+// complete 调用模型并校验输出;失败时按原因记事件并返回省略原因。
+func (e *Explainer) complete(
+	ctx context.Context,
+	analysisID int64,
+	user []byte,
+	entries []KnowledgeEntry,
+	mapping EvidenceMapping,
+) (*Explanation, string) {
 	var lastReason string
 	for attempt := 0; attempt < llmMaxAttempts; attempt++ {
 		response, err := e.Client.Complete(ctx, LLMRequest{

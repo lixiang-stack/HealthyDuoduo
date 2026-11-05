@@ -158,7 +158,7 @@ def report_panels(
 ) -> list[Panel]:
     """报告级项目组:失败 → other;有指标项 → 排序聚合;无指标项 → 叙述型 panel / other。
 
-    postprocess 与 /classify 共用这一条规则,避免两套 fallback 漂移(spec §6.3/§6.4)。
+    与 postprocess 的抽取路径共用这一条规则,避免两套 fallback 漂移(spec §6.3)。
     """
     panels = list(item_panels)
     if status is Status.FAILED:
@@ -392,30 +392,3 @@ class ReparseRequest(BaseModel):
 
     ocr_result: OCRResult
     date: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
-
-
-class ClassifyItem(BaseModel):
-    """POST /classify 请求里的一个指标项(当前指标名 + 单位)。"""
-
-    model_config = ConfigDict(extra="forbid")
-
-    name: str = Field(min_length=1)
-    unit: str | None = None
-
-
-class ClassifyRequest(BaseModel):
-    """POST /classify 请求体:按 report_type + 当前指标名重算项目组。"""
-
-    model_config = ConfigDict(extra="forbid")
-
-    report_type: str = Field(min_length=1)
-    items: list[ClassifyItem]
-
-
-class ClassifyResponse(BaseModel):
-    """POST /classify 响应:item_panels 与请求 items 等长同序。"""
-
-    model_config = ConfigDict(extra="forbid")
-
-    panels: list[Panel] = Field(min_length=1)
-    item_panels: list[Panel]

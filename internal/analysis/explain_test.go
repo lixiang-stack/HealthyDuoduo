@@ -202,7 +202,7 @@ func TestExplainBridgeTextRejected(t *testing.T) {
 
 func TestExplainNoEntriesDoesNotCallLLM(t *testing.T) {
 	client := &fakeLLM{responses: []LLMResponse{{Content: validExplanationJSON}}}
-	explainer, quota, events := explanationTestExplainer(client, NoEntries{})
+	explainer, quota, events := explanationTestExplainer(client, fakeMatcher{})
 	explanation, reason := explainer.Explain(context.Background(), 7, testRequest(EntryPanel, "liver", 12), explanationTestFacts())
 	if explanation != nil || reason != ExplanationReasonNoEntries {
 		t.Fatalf("explanation = %+v, reason = %q", explanation, reason)

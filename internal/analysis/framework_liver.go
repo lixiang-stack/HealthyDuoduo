@@ -57,40 +57,8 @@ func liverLabels(facts Facts, pointsByReport map[string][]EvidencePoint) []Frame
 }
 
 func liverRValueLabel(alt, alp foundPoint) (FrameworkLabel, bool) {
-	if !alt.ok || !alp.ok {
-		return FrameworkLabel{}, false
-	}
-	altValue, ok := numericValue(alt.point.Value)
-	if !ok {
-		return FrameworkLabel{}, false
-	}
-	alpValue, ok := numericValue(alp.point.Value)
-	if !ok || alpValue <= 0 {
-		return FrameworkLabel{}, false
-	}
-	altULN, ok := pipeline.RefRangeUpperBound(alt.point.RefRange)
-	if !ok || altULN <= 0 {
-		return FrameworkLabel{}, false
-	}
-	alpULN, ok := pipeline.RefRangeUpperBound(alp.point.RefRange)
-	if !ok || alpULN <= 0 {
-		return FrameworkLabel{}, false
-	}
-	altHigh := altValue > altULN
-	alpHigher := alpValue > alpULN
-	if !altHigh && !alpHigher {
-		return FrameworkLabel{}, false
-	}
-	// 分类用原始比值,展示才四舍五入;否则 4.9975 会先显示成 5.00 再被判成肝细胞型。
-	r := (altValue / altULN) / (alpValue / alpULN)
-	// 固定解释必须与实际升高方向一致:肝细胞型要求转氨酶升高,
-	// 胆汁淤积型要求碱性磷酸酶升高,混合型要求两者都升高。
-	switch {
-	case r >= 5 && !altHigh:
-		return FrameworkLabel{}, false
-	case r <= 2 && !alpHigher:
-		return FrameworkLabel{}, false
-	case r > 2 && r < 5 && (!altHigh || !alpHigher):
+	r, altHigh, alpHigher, ok := liverRValue(alt, alp)
+	if !ok || !rValueDirectionValid(r, altHigh, alpHigher) {
 		return FrameworkLabel{}, false
 	}
 	label, explanation := rValuePattern(r)
@@ -103,6 +71,50 @@ func liverRValueLabel(alt, alp foundPoint) (FrameworkLabel, bool) {
 		EvidenceIDs: evidenceIDs(alt.point, alp.point),
 		Sources:     liverRSources,
 	}, true
+}
+
+// liverRValue 计算 R 值并报告两侧是否高于各自 ULN;输入不足时 ok=false。
+func liverRValue(alt, alp foundPoint) (r float64, altHigh, alpHigher, ok bool) {
+	if !alt.ok || !alp.ok {
+		return 0, false, false, false
+	}
+	altValue, valid := numericValue(alt.point.Value)
+	if !valid {
+		return 0, false, false, false
+	}
+	alpValue, valid := numericValue(alp.point.Value)
+	if !valid || alpValue <= 0 {
+		return 0, false, false, false
+	}
+	altULN, valid := pipeline.RefRangeUpperBound(alt.point.RefRange)
+	if !valid || altULN <= 0 {
+		return 0, false, false, false
+	}
+	alpULN, valid := pipeline.RefRangeUpperBound(alp.point.RefRange)
+	if !valid || alpULN <= 0 {
+		return 0, false, false, false
+	}
+	altHigh = altValue > altULN
+	alpHigher = alpValue > alpULN
+	if !altHigh && !alpHigher {
+		return 0, false, false, false
+	}
+	// 分类用原始比值,展示才四舍五入;否则 4.9975 会先显示成 5.00 再被判成肝细胞型。
+	return (altValue / altULN) / (alpValue / alpULN), altHigh, alpHigher, true
+}
+
+// rValueDirectionValid 固定解释必须与实际升高方向一致:肝细胞型要求转氨酶升高,
+// 胆汁淤积型要求碱性磷酸酶升高,混合型要求两者都升高。
+func rValueDirectionValid(r float64, altHigh, alpHigher bool) bool {
+	switch {
+	case r >= 5 && !altHigh:
+		return false
+	case r <= 2 && !alpHigher:
+		return false
+	case r > 2 && r < 5 && (!altHigh || !alpHigher):
+		return false
+	}
+	return true
 }
 
 func rValuePattern(r float64) (string, string) {

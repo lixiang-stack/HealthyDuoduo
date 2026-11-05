@@ -28,7 +28,7 @@ This repo mirrors the same contract through several layers. Use this page as a n
 - Narrative report kinds: `recognizer/recognizer/postprocess.py` (`NARRATIVE_BODY_SECTION_KINDS`) → `internal/pipeline/reports.go` (`hasReportBody`) → `recognizer/tools/e2e.py` (`verify_narrative_reports`) → App `sections.ts` / `status.ts`.
 - Report summary/detail projection: `internal/httpapi/types.go` ↔ `schemas/openapi.yaml` ↔ App `api/reports.ts`.
 - Analysis facts: `internal/analysis` (`Facts` / `Snapshot` JSON tags) ↔ `schemas/openapi.yaml` `AnalysisFacts` / `AnalysisSnapshot` ↔ App `api/analyses.ts`; facts window / gating changes must keep the snapshot rule version in sync.
-- Analysis degradation events: `internal/analysis/explain.go` `Event*` constants ↔ `internal/storage/migrations/0016_analysis_observability.sql` `analysis_events.kind` CHECK ↔ `AnalysisMetrics.degradation_kinds`. Add a kind in all three places or the insert fails.
+- Analysis degradation events: `internal/analysis/explain.go` `Event*` constants ↔ `internal/storage/migrations/0019_init.sql` `analysis_events.kind` CHECK ↔ `AnalysisMetrics.degradation_kinds`. Add a kind in all three places or the insert fails.
 
 ## Change checklist
 

@@ -50,13 +50,6 @@ var (
 	flagSexRe      = regexp.MustCompile(`^[男女][::：]\s*`)
 )
 
-// ComputeFlag 旧数值入口:只做数值/单侧/区间比较,不加载定性策略。
-// 生产路径(修正重算)用 Compare,以便同时得到 flag_reason。
-func ComputeFlag(value, refRange *string) string {
-	flag, _ := Compare("", value, refRange, nil)
-	return flag
-}
-
 // RefRangeUpperBound 参考范围的数值上限(ULN):区间取上界,单侧 < / ≤ 取界值。
 // 单侧 > / ≥、标量与非数值范围没有可用的 ULN,返回 false。
 // 与 Compare 共用同一套范围解析,避免框架层另写一份格式判断。
@@ -180,42 +173,73 @@ func compareNumeric(vform, rform numForm) (string, string) {
 		}
 		rform = numForm{kind: "interval", a: 0, b: 0}
 	}
-	if rform.kind == "interval" {
-		if rform.a > rform.b {
-			return FlagUnknown, FlagReasonOther
-		}
-		if vform.kind == "scalar" {
-			switch {
-			case vform.a < rform.a:
-				return FlagLow, ""
-			case vform.a > rform.b:
-				return FlagHigh, ""
-			default:
-				return FlagNormal, ""
+	switch rform.kind {
+	case "interval":
+		return compareIntervalRef(vform, rform)
+	case "bound":
+		if vform.kind == "bound" {
+			if flag, reason, handled := compareBoundRef(vform, rform); handled {
+				return flag, reason
 			}
 		}
-		vlo, vhi, ok := valueInterval(vform)
-		if !ok {
-			return FlagUnknown, FlagReasonOther
-		}
-		return compareIntervals(vlo, vhi, rform.a, rform.b)
+		return compareOneSidedRef(vform, rform)
+	default:
+		return compareOneSidedRef(vform, rform)
 	}
-	if vform.kind == "bound" {
-		vUpper := vform.op == "<" || vform.op == "≤"
-		rUpper := rform.op == "<" || rform.op == "≤"
-		if vUpper && rUpper {
-			if vform.a < rform.a || (vform.a == rform.a && !(vform.op == "≤" && rform.op == "<")) {
-				return FlagNormal, ""
-			}
-			return FlagUnknown, FlagReasonIndeterminate
-		}
-		if !vUpper && !rUpper {
-			if vform.a > rform.a || (vform.a == rform.a && !(vform.op == "≥" && rform.op == ">")) {
-				return FlagNormal, ""
-			}
-			return FlagUnknown, FlagReasonIndeterminate
+}
+
+// compareIntervalRef 参考为区间:标量值直接比上下界,区间值走区间比较。
+func compareIntervalRef(vform, rform numForm) (string, string) {
+	if rform.a > rform.b {
+		return FlagUnknown, FlagReasonOther
+	}
+	if vform.kind == "scalar" {
+		switch {
+		case vform.a < rform.a:
+			return FlagLow, ""
+		case vform.a > rform.b:
+			return FlagHigh, ""
+		default:
+			return FlagNormal, ""
 		}
 	}
+	vlo, vhi, ok := valueInterval(vform)
+	if !ok {
+		return FlagUnknown, FlagReasonOther
+	}
+	return compareIntervals(vlo, vhi, rform.a, rform.b)
+}
+
+// compareBoundRef 值与参考同为单侧界:同向界可直接判定;异向界交给一侧比较。
+// handled=false 表示方向不一致,调用方继续走 compareOneSidedRef。
+func compareBoundRef(vform, rform numForm) (string, string, bool) {
+	vUpper := vform.op == "<" || vform.op == "≤"
+	rUpper := rform.op == "<" || rform.op == "≤"
+	if vUpper != rUpper {
+		return "", "", false
+	}
+	if vUpper {
+		return compareUpperBounds(vform, rform)
+	}
+	return compareLowerBounds(vform, rform)
+}
+
+func compareUpperBounds(vform, rform numForm) (string, string, bool) {
+	if vform.a < rform.a || (vform.a == rform.a && !(vform.op == "≤" && rform.op == "<")) {
+		return FlagNormal, "", true
+	}
+	return FlagUnknown, FlagReasonIndeterminate, true
+}
+
+func compareLowerBounds(vform, rform numForm) (string, string, bool) {
+	if vform.a > rform.a || (vform.a == rform.a && !(vform.op == "≥" && rform.op == ">")) {
+		return FlagNormal, "", true
+	}
+	return FlagUnknown, FlagReasonIndeterminate, true
+}
+
+// compareOneSidedRef 参考为单侧界(< / ≤ / > / ≥):按值域与界值的位置判定。
+func compareOneSidedRef(vform, rform numForm) (string, string) {
 	vlo, vhi, ok := valueInterval(vform)
 	if !ok {
 		return FlagUnknown, FlagReasonOther

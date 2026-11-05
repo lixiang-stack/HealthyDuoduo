@@ -1,22 +1,20 @@
 package storage
 
-// 迁移冒烟:goose 链(0001..0013)应用后 schema 形状符合契约(票 02 / llm-analysis 票 01)。
+// 迁移冒烟:唯一的 0019_init.sql 应用后,schema 形状符合当前契约。
 // 需要真库:设 HDD_TEST_DSN(如 postgres://postgres:smoke@127.0.0.1:55432/postgres)后运行;
 // 未设则整体 Skip——CI 门禁跑 go test ./... 时默认跳过,共享栈验证走 e2e 外环
-// (docs/agents/e2e.md「schemas/迁移」行)。冒烟姿势:一次性 PG 容器 + 本测试。
+// (docs/agents/e2e.md「schemas/迁移」行)。姿势:一次性 PG 容器 + 本测试。
 
 import (
 	"context"
-	"database/sql"
 	"os"
 	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/pressly/goose/v3"
 )
 
-func TestMigrationSmokeM0Contract(t *testing.T) {
+func TestMigrationSchema(t *testing.T) {
 	dsn := os.Getenv("HDD_TEST_DSN")
 	if dsn == "" {
 		t.Skip("HDD_TEST_DSN not set: migration smoke runs against a disposable PG container")
@@ -31,7 +29,7 @@ func TestMigrationSmokeM0Contract(t *testing.T) {
 		t.Fatalf("migrate: %v", err)
 	}
 
-	// goose 已升到 0019 且幂等(Open 内重复 Migrate 不报错)。
+	// 基线固定在 version 19:已跑过旧 0018/0019 的本地库跳过,新库也从这里开始。
 	var latest int
 	if err := pool.QueryRow(ctx, `SELECT max(version_id) FROM goose_db_version`).Scan(&latest); err != nil {
 		t.Fatalf("read goose version: %v", err)
@@ -40,100 +38,149 @@ func TestMigrationSmokeM0Contract(t *testing.T) {
 		t.Fatalf("goose version = %d, want 19", latest)
 	}
 
-	// reports.sections(0007,ADR-0008):可选报告段落 JSONB,可空(存量/非叙述型 NULL)。
-	t.Run("report sections column", func(t *testing.T) {
-		var dataType string
-		var nullable string
-		if err := pool.QueryRow(ctx, `SELECT data_type, is_nullable FROM information_schema.columns
-			WHERE table_name='reports' AND column_name='sections'`).Scan(&dataType, &nullable); err != nil {
-			t.Fatal(err)
+	t.Run("tables", func(t *testing.T) {
+		want := []string{
+			"analyses", "analysis_events", "analysis_feedback", "analysis_llm_calls",
+			"correction_pairs", "growth_records", "images", "members", "ocr_results",
+			"report_items", "reports",
 		}
-		if dataType != "jsonb" || nullable != "YES" {
-			t.Fatalf("sections = %s/%s, want jsonb/YES(非叙述型/存量 NULL)", dataType, nullable)
-		}
-	})
-
-	// report_items.ocr_line_numbers(0005):识别端直吐的组成行下标,可空(存量未回填)。
-	t.Run("report item ocr line numbers column", func(t *testing.T) {
-		var dataType string
-		var nullable string
-		if err := pool.QueryRow(ctx, `SELECT data_type, is_nullable FROM information_schema.columns
-			WHERE table_name='report_items' AND column_name='ocr_line_numbers'`).Scan(&dataType, &nullable); err != nil {
-			t.Fatal(err)
-		}
-		if dataType != "ARRAY" || nullable != "YES" {
-			t.Fatalf("ocr_line_numbers = %s/%s, want ARRAY/YES(存量行 NULL)", dataType, nullable)
-		}
-	})
-
-	// report_items.flag_reason(0009):unknown 原因,可空(非 unknown 不输出)。
-	t.Run("report item flag reason column", func(t *testing.T) {
-		var dataType string
-		var nullable string
-		if err := pool.QueryRow(ctx, `SELECT data_type, is_nullable FROM information_schema.columns
-			WHERE table_name='report_items' AND column_name='flag_reason'`).Scan(&dataType, &nullable); err != nil {
-			t.Fatal(err)
-		}
-		if dataType != "text" || nullable != "YES" {
-			t.Fatalf("flag_reason = %s/%s, want text/YES(非 unknown 为 NULL)", dataType, nullable)
-		}
-	})
-
-	// 0012:标准层字段全部可空 text(旧行 NULL,读取不报错;本期只做透传)。
-	t.Run("report item standard fields columns", func(t *testing.T) {
-		for _, column := range []string{
-			"code", "loinc", "analyte", "unit_display", "unit_status", "raw_value", "raw_unit",
-			"raw_ref_range", "ref_kind", "result_kind", "result_basis",
-		} {
-			var dataType, nullable string
-			if err := pool.QueryRow(ctx, `SELECT data_type, is_nullable FROM information_schema.columns
-				WHERE table_name='report_items' AND column_name=$1`, column).
-				Scan(&dataType, &nullable); err != nil {
-				t.Fatalf("%s: %v", column, err)
-			}
-			if dataType != "text" || nullable != "YES" {
-				t.Errorf("%s = %s/%s, want text/YES(未产出/存量行 NULL)", column, dataType, nullable)
-			}
-		}
-	})
-
-	// 0011:项目组列带安全默认(存量行归 other / 空 panels),索引已建。
-	t.Run("report panels columns and indexes", func(t *testing.T) {
-		var itemType, itemNullable, itemDefault string
-		if err := pool.QueryRow(ctx, `SELECT data_type, is_nullable, column_default
-			FROM information_schema.columns
-			WHERE table_name='report_items' AND column_name='panel'`).
-			Scan(&itemType, &itemNullable, &itemDefault); err != nil {
-			t.Fatal(err)
-		}
-		if itemType != "text" || itemNullable != "NO" || itemDefault != "'other'::text" {
-			t.Fatalf("report_items.panel = %s/%s default %q, want text/NO/'other'::text",
-				itemType, itemNullable, itemDefault)
-		}
-		var reportType, reportNullable, reportDefault string
-		if err := pool.QueryRow(ctx, `SELECT data_type, is_nullable, column_default
-			FROM information_schema.columns
-			WHERE table_name='reports' AND column_name='panels'`).
-			Scan(&reportType, &reportNullable, &reportDefault); err != nil {
-			t.Fatal(err)
-		}
-		if reportType != "ARRAY" || reportNullable != "NO" || reportDefault != "'{}'::text[]" {
-			t.Fatalf("reports.panels = %s/%s default %q, want ARRAY/NO/'{}'::text[]",
-				reportType, reportNullable, reportDefault)
-		}
-		for _, index := range []string{"report_items_report_panel_idx", "reports_member_date_idx"} {
+		for _, table := range want {
 			var n int
-			if err := pool.QueryRow(ctx, `SELECT COUNT(*) FROM pg_indexes
+			if err := pool.QueryRow(ctx, `SELECT count(*) FROM information_schema.tables
+				WHERE table_schema='public' AND table_name=$1`, table).Scan(&n); err != nil {
+				t.Fatal(err)
+			}
+			if n != 1 {
+				t.Errorf("table %s missing", table)
+			}
+		}
+	})
+
+	t.Run("indexes", func(t *testing.T) {
+		for _, index := range []string{
+			"reports_member_date_idx",
+			"report_items_report_panel_idx",
+			"growth_records_member_measured_idx",
+			"analyses_member_created_idx",
+			"analysis_feedback_created_idx",
+			"analysis_feedback_analysis_idx",
+			"analysis_events_created_idx",
+			"analysis_events_analysis_idx",
+			"analysis_llm_calls_created_idx",
+		} {
+			var n int
+			if err := pool.QueryRow(ctx, `SELECT count(*) FROM pg_indexes
 				WHERE indexname = $1`, index).Scan(&n); err != nil {
 				t.Fatal(err)
 			}
 			if n != 1 {
-				t.Errorf("index %s missing (got %d)", index, n)
+				t.Errorf("index %s missing", index)
 			}
 		}
 	})
 
-	// 子测试共享种子:两份报告(一份有主、一份存量 CLI 时代无主)与图像/OCR 留痕。
+	t.Run("report columns", func(t *testing.T) {
+		// reports.sections 可空(非叙述型/存量 NULL);panels 为项目组聚合。
+		var sectionsType, sectionsNullable, panelsType, panelsNullable, panelsDefault string
+		if err := pool.QueryRow(ctx, `SELECT
+			max(data_type) FILTER (WHERE column_name='sections'),
+			max(is_nullable) FILTER (WHERE column_name='sections'),
+			max(data_type) FILTER (WHERE column_name='panels'),
+			max(is_nullable) FILTER (WHERE column_name='panels'),
+			max(column_default) FILTER (WHERE column_name='panels')
+			FROM information_schema.columns WHERE table_name='reports'`).
+			Scan(&sectionsType, &sectionsNullable, &panelsType, &panelsNullable, &panelsDefault); err != nil {
+			t.Fatal(err)
+		}
+		if sectionsType != "jsonb" || sectionsNullable != "YES" {
+			t.Fatalf("sections = %s/%s, want jsonb/YES", sectionsType, sectionsNullable)
+		}
+		if panelsType != "ARRAY" || panelsNullable != "NO" || panelsDefault != "'{}'::text[]" {
+			t.Fatalf("panels = %s/%s default %q, want ARRAY/NO/'{}'::text[]",
+				panelsType, panelsNullable, panelsDefault)
+		}
+	})
+
+	t.Run("report item columns", func(t *testing.T) {
+		cases := []struct {
+			column   string
+			dataType string
+			nullable string
+		}{
+			{"value", "text", "YES"},
+			{"method", "text", "YES"},
+			{"ocr_line_numbers", "ARRAY", "YES"},
+			{"flag_reason", "text", "YES"},
+			{"panel", "text", "NO"},
+			{"review_status", "text", "NO"},
+			{"analyte", "text", "YES"},
+		}
+		for _, c := range cases {
+			var dataType, nullable string
+			if err := pool.QueryRow(ctx, `SELECT data_type, is_nullable
+				FROM information_schema.columns WHERE table_name='report_items' AND column_name=$1`,
+				c.column).Scan(&dataType, &nullable); err != nil {
+				t.Fatalf("%s: %v", c.column, err)
+			}
+			if dataType != c.dataType || nullable != c.nullable {
+				t.Errorf("report_items.%s = %s/%s, want %s/%s",
+					c.column, dataType, nullable, c.dataType, c.nullable)
+			}
+		}
+		var panelDefault, reviewDefault string
+		if err := pool.QueryRow(ctx, `SELECT
+			max(column_default) FILTER (WHERE column_name='panel'),
+			max(column_default) FILTER (WHERE column_name='review_status')
+			FROM information_schema.columns WHERE table_name='report_items'`).
+			Scan(&panelDefault, &reviewDefault); err != nil {
+			t.Fatal(err)
+		}
+		if panelDefault != "'other'::text" {
+			t.Errorf("report_items.panel default = %q, want 'other'::text", panelDefault)
+		}
+		if reviewDefault != "'unreviewed'::text" {
+			t.Errorf("report_items.review_status default = %q, want 'unreviewed'::text", reviewDefault)
+		}
+	})
+
+	t.Run("member profile columns", func(t *testing.T) {
+		rows, err := pool.Query(ctx, `SELECT column_name, is_nullable FROM information_schema.columns
+			WHERE table_name='members' ORDER BY column_name`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer rows.Close()
+		cols := map[string]string{}
+		for rows.Next() {
+			var name, nullable string
+			if err := rows.Scan(&name, &nullable); err != nil {
+				t.Fatal(err)
+			}
+			cols[name] = nullable
+		}
+		if err := rows.Err(); err != nil {
+			t.Fatal(err)
+		}
+		want := map[string]bool{
+			"id": false, "name": false, "sex": false, "birth_date": false, "created_at": false,
+		}
+		if len(cols) != len(want) {
+			t.Fatalf("members columns = %v, want %d profile columns", cols, len(want))
+		}
+		for name := range want {
+			if _, ok := cols[name]; !ok {
+				t.Fatalf("members missing column %q", name)
+			}
+		}
+		if cols["sex"] != "NO" || cols["birth_date"] != "NO" {
+			t.Fatalf("sex/birth_date nullable = %s/%s, want NO/NO", cols["sex"], cols["birth_date"])
+		}
+		if _, ok := cols["is_child"]; ok {
+			t.Fatal("is_child column still present, want derived-only")
+		}
+	})
+
+	// 子测试共享种子:一名成员、两份报告(一份有主、一份存量无主)与图像/OCR 留痕。
 	if _, err := pool.Exec(ctx, `INSERT INTO members (id, name, sex, birth_date)
 		VALUES (1, 'user_test', 'male', '2020-01-01')`); err != nil {
 		t.Fatalf("seed member: %v", err)
@@ -151,158 +198,6 @@ func TestMigrationSmokeM0Contract(t *testing.T) {
 		t.Fatalf("seed reports: %v (member ownership on new rows, NULL on unowned)", err)
 	}
 
-	// 成员模型(0013):显示名 + 性别 + 出生日期;is_child 改为服务端派生,
-	// 不再落列;sex / birth_date 为 NOT NULL。
-	t.Run("members profile columns", func(t *testing.T) {
-		rows, err := pool.Query(ctx, `SELECT column_name, is_nullable, column_default FROM information_schema.columns
-			WHERE table_name='members' ORDER BY column_name`)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer rows.Close()
-		cols := map[string][2]string{}
-		for rows.Next() {
-			var name, nullable string
-			var def *string
-			if err := rows.Scan(&name, &nullable, &def); err != nil {
-				t.Fatal(err)
-			}
-			value := ""
-			if def != nil {
-				value = *def
-			}
-			cols[name] = [2]string{nullable, value}
-		}
-		if err := rows.Err(); err != nil {
-			t.Fatal(err)
-		}
-		want := map[string]bool{
-			"id": false, "name": false, "sex": false, "birth_date": false, "created_at": false,
-		}
-		if len(cols) != len(want) {
-			t.Fatalf("members columns = %v, want %d profile columns", cols, len(want))
-		}
-		for name := range want {
-			if _, ok := cols[name]; !ok {
-				t.Fatalf("members missing column %q", name)
-			}
-		}
-		if cols["sex"][0] != "NO" || cols["birth_date"][0] != "NO" {
-			t.Fatalf("sex/birth_date nullable = %s/%s, want NO/NO", cols["sex"][0], cols["birth_date"][0])
-		}
-		if _, ok := cols["is_child"]; ok {
-			t.Fatal("is_child column still present, want derived-only")
-		}
-	})
-
-	// 生长记录(0014):测量日期 / 身高体重至少一项 / 来源枚举;BMI 不落列。
-	t.Run("growth records columns", func(t *testing.T) {
-		want := map[string]bool{
-			"id": false, "member_id": false, "measured_on": false, "height_cm": true,
-			"weight_kg": true, "source": false, "created_at": false,
-		}
-		rows, err := pool.Query(ctx, `SELECT column_name, is_nullable FROM information_schema.columns
-			WHERE table_name='growth_records'`)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer rows.Close()
-		cols := map[string]string{}
-		for rows.Next() {
-			var name, nullable string
-			if err := rows.Scan(&name, &nullable); err != nil {
-				t.Fatal(err)
-			}
-			cols[name] = nullable
-		}
-		if err := rows.Err(); err != nil {
-			t.Fatal(err)
-		}
-		if len(cols) != len(want) {
-			t.Fatalf("growth_records columns = %v, want %d", cols, len(want))
-		}
-		for name, nullable := range want {
-			got, ok := cols[name]
-			if !ok {
-				t.Fatalf("growth_records missing column %q", name)
-			}
-			wantNullable := "NO"
-			if nullable {
-				wantNullable = "YES"
-			}
-			if got != wantNullable {
-				t.Errorf("growth_records.%s nullable = %s, want %s", name, got, wantNullable)
-			}
-		}
-		if _, err := pool.Exec(ctx, `INSERT INTO growth_records (member_id, measured_on, source)
-			VALUES (1, '2026-10-01', 'measured')`); err == nil {
-			t.Fatal("growth record without height/weight accepted, want CHECK rejection")
-		} else if !strings.Contains(err.Error(), "growth_records_measurement_present") {
-			t.Fatalf("expected measurement check violation, got %v", err)
-		}
-		if _, err := pool.Exec(ctx, `INSERT INTO growth_records
-			(member_id, measured_on, height_cm, source) VALUES (1, '2026-10-01', 118.5, 'scale')`); err == nil {
-			t.Fatal("invalid growth source accepted, want CHECK rejection")
-		} else if !strings.Contains(err.Error(), "growth_records_source_check") {
-			t.Fatalf("expected source check violation, got %v", err)
-		}
-	})
-
-	// 分析快照(0015):事实层 / 快照 JSONB 永久保留;入口与窗口枚举受 CHECK 约束。
-	t.Run("analyses columns", func(t *testing.T) {
-		want := map[string]bool{
-			"id": false, "member_id": false, "panel": false, "entry": false,
-			"indicator_name": true, "window_months": false, "status": false,
-			"layers": false, "snapshot": false, "sources": false, "created_at": false,
-		}
-		rows, err := pool.Query(ctx, `SELECT column_name, is_nullable, data_type FROM information_schema.columns
-			WHERE table_name='analyses'`)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer rows.Close()
-		cols := map[string][2]string{}
-		for rows.Next() {
-			var name, nullable, dataType string
-			if err := rows.Scan(&name, &nullable, &dataType); err != nil {
-				t.Fatal(err)
-			}
-			cols[name] = [2]string{nullable, dataType}
-		}
-		if err := rows.Err(); err != nil {
-			t.Fatal(err)
-		}
-		if len(cols) != len(want) {
-			t.Fatalf("analyses columns = %v, want %d", cols, len(want))
-		}
-		for name, nullable := range want {
-			got, ok := cols[name]
-			if !ok {
-				t.Fatalf("analyses missing column %q", name)
-			}
-			wantNullable := "NO"
-			if nullable {
-				wantNullable = "YES"
-			}
-			if got[0] != wantNullable {
-				t.Errorf("analyses.%s nullable = %s, want %s", name, got[0], wantNullable)
-			}
-		}
-		for _, jsonColumn := range []string{"layers", "snapshot", "sources"} {
-			if got := cols[jsonColumn][1]; got != "jsonb" {
-				t.Errorf("analyses.%s type = %s, want jsonb", jsonColumn, got)
-			}
-		}
-		if _, err := pool.Exec(ctx, `INSERT INTO analyses
-			(member_id, panel, entry, window_months, status, layers, snapshot)
-			VALUES (1, 'liver', 'report', 12, 'success', '{}', '{}')`); err == nil {
-			t.Fatal("invalid analysis entry accepted, want CHECK rejection")
-		} else if !strings.Contains(err.Error(), "analyses_entry_check") {
-			t.Fatalf("expected entry check violation, got %v", err)
-		}
-	})
-
-	// 报告表:成员归属可空(存量 CLI 时代报告无主)+ fail_reason。
 	t.Run("reports ownership and fail reason", func(t *testing.T) {
 		var failReasonNullable, memberNullable string
 		if err := pool.QueryRow(ctx, `SELECT
@@ -326,17 +221,7 @@ func TestMigrationSmokeM0Contract(t *testing.T) {
 		}
 	})
 
-	// 核对状态默认 unreviewed(存量项自动归未核对),非法值被 CHECK 拒绝——
-	// 断言误差来源是约束本身(名字精确匹配),不是 FK 等其他报错造成的假绿。
 	t.Run("review status default and check", func(t *testing.T) {
-		var def string
-		if err := pool.QueryRow(ctx, `SELECT column_default FROM information_schema.columns
-			WHERE table_name='report_items' AND column_name='review_status'`).Scan(&def); err != nil {
-			t.Fatal(err)
-		}
-		if def != "'unreviewed'::text" {
-			t.Fatalf("review_status default = %q, want 'unreviewed'::text", def)
-		}
 		if _, err := pool.Exec(ctx, `INSERT INTO report_items
 			(report_sha256, name, flag, raw_text, low_confidence, review_status)
 			VALUES ('a', 'junk', 'normal', 'junk', false, 'retracted')`); err == nil {
@@ -346,7 +231,6 @@ func TestMigrationSmokeM0Contract(t *testing.T) {
 		}
 	})
 
-	// 修正对表 append-only 形状 + 随报告级联删除(票 10 删除边界)。
 	t.Run("correction pairs cascade", func(t *testing.T) {
 		if _, err := pool.Exec(ctx, `INSERT INTO report_items
 			(id, report_sha256, name, flag, raw_text, low_confidence, review_status)
@@ -358,18 +242,9 @@ func TestMigrationSmokeM0Contract(t *testing.T) {
 			 after_name, after_value, after_unit, after_ref_range, raw_text, ocr_line_numbers)
 			VALUES (11, '血红蛋白','128','g/L','115-150', '血红蛋白','168','g/L','115-150',
 				'血红蛋白 128 g/L 115-150', ARRAY[0,1,2])`); err != nil {
-			t.Fatalf("seed correction pair: %v (before→after full quad)", err)
+			t.Fatalf("seed correction pair: %v", err)
 		}
-		var owned, unowned int
-		if err := pool.QueryRow(ctx, `SELECT
-			count(*) FILTER (WHERE member_id = 1), count(*) FILTER (WHERE member_id IS NULL)
-			FROM reports`).Scan(&owned, &unowned); err != nil {
-			t.Fatal(err)
-		}
-		if owned != 1 || unowned != 1 {
-			t.Fatalf("report ownership rows = %d owned / %d unowned, want 1/1", owned, unowned)
-		}
-		// 报告删除 → items 级联(0001) → 修正对随之清除(留痕边界:images/ocr_results 保留)。
+		// 报告删除 → items 级联 → 修正对随之清除(留痕边界:images/ocr_results 保留)。
 		if _, err := pool.Exec(ctx, `DELETE FROM reports WHERE image_sha256 = 'a'`); err != nil {
 			t.Fatalf("delete report: %v", err)
 		}
@@ -384,8 +259,39 @@ func TestMigrationSmokeM0Contract(t *testing.T) {
 		}
 	})
 
-	// 分析反馈 / 降级事件 / 配额(0016):CHECK 约束 + 成员删除级联。
-	t.Run("analysis observability tables", func(t *testing.T) {
+	t.Run("growth and analysis constraints", func(t *testing.T) {
+		var growthNullable map[string]string
+		rows, err := pool.Query(ctx, `SELECT column_name, is_nullable FROM information_schema.columns
+			WHERE table_name='growth_records'`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		growthNullable = map[string]string{}
+		for rows.Next() {
+			var name, nullable string
+			if err := rows.Scan(&name, &nullable); err != nil {
+				t.Fatal(err)
+			}
+			growthNullable[name] = nullable
+		}
+		rows.Close()
+		if growthNullable["height_cm"] != "YES" || growthNullable["weight_kg"] != "YES" {
+			t.Fatalf("growth height/weight nullable = %s/%s, want YES/YES",
+				growthNullable["height_cm"], growthNullable["weight_kg"])
+		}
+		if _, err := pool.Exec(ctx, `INSERT INTO growth_records (member_id, measured_on, source)
+			VALUES (1, '2026-10-01', 'measured')`); err == nil {
+			t.Fatal("growth record without height/weight accepted, want CHECK rejection")
+		} else if !strings.Contains(err.Error(), "growth_records_measurement_present") {
+			t.Fatalf("expected measurement check violation, got %v", err)
+		}
+		if _, err := pool.Exec(ctx, `INSERT INTO growth_records
+			(member_id, measured_on, height_cm, source) VALUES (1, '2026-10-01', 118.5, 'scale')`); err == nil {
+			t.Fatal("invalid growth source accepted, want CHECK rejection")
+		} else if !strings.Contains(err.Error(), "growth_records_source_check") {
+			t.Fatalf("expected source check violation, got %v", err)
+		}
+
 		var analysisID int64
 		if err := pool.QueryRow(ctx, `INSERT INTO analyses
 			(member_id, panel, entry, window_months, status, layers, snapshot)
@@ -393,9 +299,12 @@ func TestMigrationSmokeM0Contract(t *testing.T) {
 			RETURNING id`).Scan(&analysisID); err != nil {
 			t.Fatalf("seed analysis: %v", err)
 		}
-		if _, err := pool.Exec(ctx, `INSERT INTO analysis_feedback
-			(analysis_id, reason) VALUES ($1, '解释和数值对不上')`, analysisID); err != nil {
-			t.Fatalf("seed feedback: %v", err)
+		if _, err := pool.Exec(ctx, `INSERT INTO analyses
+			(member_id, panel, entry, window_months, status, layers, snapshot)
+			VALUES (1, 'liver', 'report', 12, 'success', '{}', '{}')`); err == nil {
+			t.Fatal("invalid analysis entry accepted, want CHECK rejection")
+		} else if !strings.Contains(err.Error(), "analyses_entry_check") {
+			t.Fatalf("expected entry check violation, got %v", err)
 		}
 		if _, err := pool.Exec(ctx, `INSERT INTO analysis_feedback
 			(analysis_id, reason) VALUES ($1, '')`, analysisID); err == nil {
@@ -404,417 +313,44 @@ func TestMigrationSmokeM0Contract(t *testing.T) {
 			t.Fatalf("expected feedback reason check violation, got %v", err)
 		}
 		if _, err := pool.Exec(ctx, `INSERT INTO analysis_events
-			(analysis_id, kind) VALUES ($1, 'llm_timeout')`, analysisID); err != nil {
-			t.Fatalf("seed event: %v", err)
-		}
-		if _, err := pool.Exec(ctx, `INSERT INTO analysis_events
 			(analysis_id, kind) VALUES ($1, 'bogus')`, analysisID); err == nil {
 			t.Fatal("unknown event kind accepted, want CHECK rejection")
 		} else if !strings.Contains(err.Error(), "analysis_events_kind_check") {
 			t.Fatalf("expected event kind check violation, got %v", err)
 		}
-		if _, err := pool.Exec(ctx, `INSERT INTO analysis_llm_calls
-			(analysis_id) VALUES ($1)`, analysisID); err != nil {
+		if _, err := pool.Exec(ctx, `INSERT INTO analysis_events
+			(analysis_id, kind) VALUES ($1, 'llm_timeout')`, analysisID); err != nil {
+			t.Fatalf("seed event: %v", err)
+		}
+		if _, err := pool.Exec(ctx, `INSERT INTO analysis_llm_calls (analysis_id) VALUES ($1)`, analysisID); err != nil {
 			t.Fatalf("seed llm call: %v", err)
 		}
 	})
 
-	// 成员删除级联生长记录与分析快照(0014/0015)。
-	t.Run("member delete cascades growth and analyses", func(t *testing.T) {
-		if _, err := pool.Exec(ctx, `INSERT INTO growth_records
-			(member_id, measured_on, height_cm, source) VALUES (1, '2026-10-01', 118.5, 'measured')`); err != nil {
-			t.Fatalf("seed growth: %v", err)
-		}
-		if _, err := pool.Exec(ctx, `INSERT INTO analyses
-			(member_id, panel, entry, window_months, status, layers, snapshot)
-			VALUES (1, 'liver', 'panel', 12, 'success', '{"facts":{}}', '{}')`); err != nil {
-			t.Fatalf("seed analysis: %v", err)
-		}
+	t.Run("member delete cascades owned data", func(t *testing.T) {
 		if _, err := pool.Exec(ctx, `DELETE FROM members WHERE id = 1`); err != nil {
 			t.Fatalf("delete member: %v", err)
 		}
-		var growth, analyses, feedback, events, calls int
+		var growth, analyses, feedback, events, calls, ownedReports int
 		if err := pool.QueryRow(ctx, `SELECT
 			(SELECT count(*) FROM growth_records), (SELECT count(*) FROM analyses),
 			(SELECT count(*) FROM analysis_feedback), (SELECT count(*) FROM analysis_events),
-			(SELECT count(*) FROM analysis_llm_calls)`).
-			Scan(&growth, &analyses, &feedback, &events, &calls); err != nil {
+			(SELECT count(*) FROM analysis_llm_calls),
+			(SELECT count(*) FROM reports WHERE member_id = 1)`).
+			Scan(&growth, &analyses, &feedback, &events, &calls, &ownedReports); err != nil {
 			t.Fatal(err)
 		}
-		if growth != 0 || analyses != 0 || feedback != 0 || events != 0 || calls != 0 {
-			t.Fatalf("after member delete: growth=%d analyses=%d feedback=%d events=%d calls=%d, want all 0",
-				growth, analyses, feedback, events, calls)
+		if growth != 0 || analyses != 0 || feedback != 0 || events != 0 || calls != 0 || ownedReports != 0 {
+			t.Fatalf("after member delete: growth=%d analyses=%d feedback=%d events=%d calls=%d reports=%d, want all 0",
+				growth, analyses, feedback, events, calls, ownedReports)
+		}
+		// 无主存量报告不受成员删除影响。
+		var unowned int
+		if err := pool.QueryRow(ctx, `SELECT count(*) FROM reports WHERE image_sha256='b'`).Scan(&unowned); err != nil {
+			t.Fatal(err)
+		}
+		if unowned != 1 {
+			t.Fatalf("unowned report rows = %d, want 1", unowned)
 		}
 	})
-}
-
-// TestMigration0008DeletesImagingItems 0008 一次性清理:影像报告 items 与其修正对删除,
-// 报告行与其他类别 items 保留(票 04;reparse 后仍为零 items,可经上方用例另行验证)。
-func TestMigration0008DeletesImagingItems(t *testing.T) {
-	dsn := os.Getenv("HDD_TEST_DSN")
-	if dsn == "" {
-		t.Skip("HDD_TEST_DSN not set: migration smoke runs against a disposable PG container")
-	}
-	ctx := context.Background()
-	db, err := sql.Open("pgx", dsn)
-	if err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	defer db.Close()
-	goose.SetBaseFS(migrationsFS)
-	if err := goose.SetDialect("postgres"); err != nil {
-		t.Fatalf("goose dialect: %v", err)
-	}
-	if err := goose.UpContext(ctx, db, migrationsDir); err != nil {
-		t.Fatalf("up to latest: %v", err)
-	}
-	if err := goose.DownToContext(ctx, db, migrationsDir, 7); err != nil {
-		t.Fatalf("down to 0007: %v", err)
-	}
-	defer func() {
-		if _, err := db.ExecContext(context.Background(), `
-			DELETE FROM reports WHERE image_sha256 IN ('img-imaging','img-cbc');
-			DELETE FROM ocr_results WHERE image_sha256 IN ('img-imaging','img-cbc');
-			DELETE FROM images WHERE sha256 IN ('img-imaging','img-cbc');`); err != nil {
-			t.Logf("cleanup seeded rows: %v", err)
-		}
-	}()
-	if _, err := db.ExecContext(ctx, `
-		INSERT INTO images (sha256, original_filename) VALUES ('img-imaging', 'us.jpg'), ('img-cbc', 'cbc.jpg');
-		INSERT INTO ocr_results (image_sha256, engine_output) VALUES ('img-imaging', '{}'), ('img-cbc', '{}');
-		INSERT INTO reports (image_sha256, ocr_result_id, report_type, status, sections)
-		VALUES ('img-imaging', (SELECT id FROM ocr_results WHERE image_sha256='img-imaging'),
-		        '影像', 'success', '[{"kind":"impression","text":"正常。","ocr_line_numbers":[0]}]'::jsonb),
-		       ('img-cbc', (SELECT id FROM ocr_results WHERE image_sha256='img-cbc'),
-		        '血常规', 'success', NULL);
-		INSERT INTO report_items (report_sha256, name, flag, raw_text, low_confidence)
-		VALUES ('img-cbc', '血红蛋白', 'normal', '血红蛋白 128 g/L', false);`); err != nil {
-		t.Fatalf("seed: %v", err)
-	}
-	var imagingItemID int64
-	if err := db.QueryRowContext(ctx, `INSERT INTO report_items
-		(report_sha256, name, flag, raw_text, low_confidence)
-		VALUES ('img-imaging', '股骨长', 'unknown', '股骨长 22mm', false) RETURNING id`).
-		Scan(&imagingItemID); err != nil {
-		t.Fatalf("seed imaging item: %v", err)
-	}
-	var pairID int64
-	if err := db.QueryRowContext(ctx, `INSERT INTO correction_pairs
-		(item_id, before_name, before_value, before_unit, before_ref_range,
-		 after_name, after_value, after_unit, after_ref_range, raw_text, ocr_line_numbers)
-		VALUES ($1, '股骨长','22','mm',NULL, '股骨长','23','mm',NULL, '股骨长 22mm', ARRAY[0])
-		RETURNING id`, imagingItemID).Scan(&pairID); err != nil {
-		t.Fatalf("seed correction pair: %v", err)
-	}
-	if err := goose.UpContext(ctx, db, migrationsDir); err != nil {
-		t.Fatalf("up 0008: %v", err)
-	}
-	var reports, imagingItems, cbcItems, pairs int
-	if err := db.QueryRowContext(ctx, `SELECT
-		(SELECT count(*) FROM reports WHERE image_sha256 IN ('img-imaging','img-cbc')),
-		(SELECT count(*) FROM report_items WHERE report_sha256='img-imaging'),
-		(SELECT count(*) FROM report_items WHERE report_sha256='img-cbc'),
-		(SELECT count(*) FROM correction_pairs WHERE id=$1)`, pairID).
-		Scan(&reports, &imagingItems, &cbcItems, &pairs); err != nil {
-		t.Fatal(err)
-	}
-	if reports != 2 || imagingItems != 0 || cbcItems != 1 || pairs != 0 {
-		t.Fatalf("after 0008: reports=%d imaging_items=%d cbc_items=%d pairs=%d, want 2/0/1/0",
-			reports, imagingItems, cbcItems, pairs)
-	}
-}
-
-// TestMigration0011LegacyDefaults 0011 升降版:0001..0010 下种旧行,升到 0011 后
-// 旧行安全默认(report_items.panel=other,reports.panels={}),无需回填即可读。
-func TestMigration0011LegacyDefaults(t *testing.T) {
-	dsn := os.Getenv("HDD_TEST_DSN")
-	if dsn == "" {
-		t.Skip("HDD_TEST_DSN not set: migration smoke runs against a disposable PG container")
-	}
-	ctx := context.Background()
-	db, err := sql.Open("pgx", dsn)
-	if err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	defer db.Close()
-	goose.SetBaseFS(migrationsFS)
-	if err := goose.SetDialect("postgres"); err != nil {
-		t.Fatalf("goose dialect: %v", err)
-	}
-	if err := goose.UpContext(ctx, db, migrationsDir); err != nil {
-		t.Fatalf("up to latest: %v", err)
-	}
-	if err := goose.DownToContext(ctx, db, migrationsDir, 10); err != nil {
-		t.Fatalf("down to 0010: %v", err)
-	}
-	defer func() {
-		if _, err := db.ExecContext(context.Background(), `
-			DELETE FROM reports WHERE image_sha256 = 'img-pre-0011';
-			DELETE FROM ocr_results WHERE image_sha256 = 'img-pre-0011';
-			DELETE FROM images WHERE sha256 = 'img-pre-0011';`); err != nil {
-			t.Logf("cleanup seeded rows: %v", err)
-		}
-	}()
-	if _, err := db.ExecContext(ctx, `
-		INSERT INTO images (sha256, original_filename) VALUES ('img-pre-0011', 'old.jpg');
-		INSERT INTO ocr_results (image_sha256, engine_output) VALUES ('img-pre-0011', '{}');
-		INSERT INTO reports (image_sha256, ocr_result_id, report_type, status)
-		VALUES ('img-pre-0011', (SELECT id FROM ocr_results WHERE image_sha256='img-pre-0011'),
-		        '血常规', 'success');
-		INSERT INTO report_items (report_sha256, name, flag, raw_text, low_confidence)
-		VALUES ('img-pre-0011', '血红蛋白', 'normal', '血红蛋白 128 g/L', false);`); err != nil {
-		t.Fatalf("seed pre-0011 rows: %v", err)
-	}
-	if err := goose.UpContext(ctx, db, migrationsDir); err != nil {
-		t.Fatalf("up 0011: %v", err)
-	}
-	var panelCount int
-	if err := db.QueryRowContext(ctx, `SELECT COALESCE(array_length(panels, 1), 0)
-		FROM reports WHERE image_sha256='img-pre-0011'`).Scan(&panelCount); err != nil {
-		t.Fatal(err)
-	}
-	if panelCount != 0 {
-		t.Fatalf("legacy reports.panels has %d entries, want empty(未回填时 App 回退 report_type)", panelCount)
-	}
-	var panel string
-	if err := db.QueryRowContext(ctx, `SELECT panel FROM report_items WHERE report_sha256='img-pre-0011'`).
-		Scan(&panel); err != nil {
-		t.Fatal(err)
-	}
-	if panel != "other" {
-		t.Fatalf("legacy report_items.panel = %q, want other", panel)
-	}
-}
-
-// TestMigrationAnalyteBackfillAndRename 0017 回填 analyte,0018 统一为全称 key,
-// 0019 补回填总蛋白/白蛋白;未知指标保持 NULL。新报告由识别端直接写入新 key。
-func TestMigrationAnalyteBackfillAndRename(t *testing.T) {
-	dsn := os.Getenv("HDD_TEST_DSN")
-	if dsn == "" {
-		t.Skip("HDD_TEST_DSN not set: migration smoke runs against a disposable PG container")
-	}
-	ctx := context.Background()
-	db, err := sql.Open("pgx", dsn)
-	if err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	defer db.Close()
-	goose.SetBaseFS(migrationsFS)
-	if err := goose.SetDialect("postgres"); err != nil {
-		t.Fatalf("goose dialect: %v", err)
-	}
-	if err := goose.UpContext(ctx, db, migrationsDir); err != nil {
-		t.Fatalf("up to latest: %v", err)
-	}
-	if err := goose.DownToContext(ctx, db, migrationsDir, 16); err != nil {
-		t.Fatalf("down to 0016: %v", err)
-	}
-	defer func() {
-		if _, err := db.ExecContext(context.Background(), `
-			DELETE FROM reports WHERE image_sha256 = 'img-pre-0017';
-			DELETE FROM ocr_results WHERE image_sha256 = 'img-pre-0017';
-			DELETE FROM images WHERE sha256 = 'img-pre-0017';`); err != nil {
-			t.Logf("cleanup seeded rows: %v", err)
-		}
-	}()
-	if _, err := db.ExecContext(ctx, `
-		INSERT INTO images (sha256, original_filename) VALUES ('img-pre-0017', 'old.jpg');
-		INSERT INTO ocr_results (image_sha256, engine_output) VALUES ('img-pre-0017', '{}');
-		INSERT INTO reports (image_sha256, ocr_result_id, report_type, status)
-		VALUES ('img-pre-0017', (SELECT id FROM ocr_results WHERE image_sha256='img-pre-0017'),
-		        '生化', 'success');
-		INSERT INTO report_items (report_sha256, name, code, loinc, flag, raw_text, low_confidence) VALUES
-			('img-pre-0017', 'ALT', '1500104A', NULL, 'normal', 'ALT', false),
-			('img-pre-0017', 'RDW-CV', NULL, '788-0', 'normal', 'RDW-CV', false),
-			('img-pre-0017', 'TBIL', '1700504A', '1975-2', 'normal', 'TBIL', false),
-			('img-pre-0017', 'TP', '1100204A', '2885-2', 'normal', 'TP', false),
-			('img-pre-0017', 'ALB', '1100104A', '1751-7', 'normal', 'ALB', false),
-			('img-pre-0017', 'Other', '9999999', NULL, 'normal', 'Other', false);`); err != nil {
-		t.Fatalf("seed pre-0017 rows: %v", err)
-	}
-	if err := goose.UpToContext(ctx, db, migrationsDir, 17); err != nil {
-		t.Fatalf("up 0017: %v", err)
-	}
-	got := analyteKeys(t, db)
-	if got["ALT"] != "alt" || got["RDW-CV"] != "rdw_cv" ||
-		got["TBIL"] != "" || got["TP"] != "" || got["ALB"] != "" || got["Other"] != "" {
-		t.Fatalf("0017 analytes = %+v, want ALT=alt, RDW-CV=rdw_cv, TBIL/TP/ALB/Other empty", got)
-	}
-	if err := goose.UpToContext(ctx, db, migrationsDir, 18); err != nil {
-		t.Fatalf("up 0018: %v", err)
-	}
-	got = analyteKeys(t, db)
-	if got["ALT"] != "alanine_aminotransferase" ||
-		got["RDW-CV"] != "erythrocyte_distribution_width_cv" ||
-		got["TBIL"] != "bilirubin_total" || got["TP"] != "" || got["ALB"] != "" || got["Other"] != "" {
-		t.Fatalf("0018 analytes = %+v, want full keys, TP/ALB/Other empty", got)
-	}
-	if err := goose.UpToContext(ctx, db, migrationsDir, 19); err != nil {
-		t.Fatalf("up 0019: %v", err)
-	}
-	got = analyteKeys(t, db)
-	if got["TP"] != "total_protein" || got["ALB"] != "albumin" || got["Other"] != "" {
-		t.Fatalf("0019 analytes = %+v, want TP=total_protein, ALB=albumin, Other empty", got)
-	}
-}
-
-func analyteKeys(t *testing.T, db *sql.DB) map[string]string {
-	t.Helper()
-	rows, err := db.Query(`SELECT name, COALESCE(analyte, '')
-		FROM report_items WHERE report_sha256='img-pre-0017' ORDER BY name`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer rows.Close()
-	got := map[string]string{}
-	for rows.Next() {
-		var name, analyte string
-		if err := rows.Scan(&name, &analyte); err != nil {
-			t.Fatal(err)
-		}
-		got[name] = analyte
-	}
-	if err := rows.Err(); err != nil {
-		t.Fatal(err)
-	}
-	return got
-}
-
-// TestMigration0007DownUp 0007 升降版:down 删除 sections 列,up 重新加回(0006 为空占位)。
-func TestMigration0007DownUp(t *testing.T) {
-	dsn := os.Getenv("HDD_TEST_DSN")
-	if dsn == "" {
-		t.Skip("HDD_TEST_DSN not set: migration smoke runs against a disposable PG container")
-	}
-	ctx := context.Background()
-	db, err := sql.Open("pgx", dsn)
-	if err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	defer db.Close()
-	goose.SetBaseFS(migrationsFS)
-	if err := goose.SetDialect("postgres"); err != nil {
-		t.Fatalf("goose dialect: %v", err)
-	}
-	if err := goose.UpContext(ctx, db, migrationsDir); err != nil {
-		t.Fatalf("up to latest: %v", err)
-	}
-	if err := goose.DownToContext(ctx, db, migrationsDir, 6); err != nil {
-		t.Fatalf("down to 0005: %v", err)
-	}
-	var n int
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM information_schema.columns
-		WHERE table_name='reports' AND column_name='sections'`).Scan(&n); err != nil {
-		t.Fatal(err)
-	}
-	if n != 0 {
-		t.Fatalf("sections column survived down migration")
-	}
-	if err := goose.UpContext(ctx, db, migrationsDir); err != nil {
-		t.Fatalf("up after down: %v", err)
-	}
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM information_schema.columns
-		WHERE table_name='reports' AND column_name='sections'`).Scan(&n); err != nil {
-		t.Fatal(err)
-	}
-	if n != 1 {
-		t.Fatalf("sections column missing after re-up")
-	}
-}
-
-// TestMigration0013ClearsMembersAndUnownedReports 0013 的破坏性语义:
-// 未上线阶段清空 members,但保留 reports/图像/OCR,只把 reports.member_id 置空。
-// 通过先降到 0012、按旧形状种一行成员与归属报告、再升到 0013 验证真实迁移路径。
-func TestMigration0013ClearsMembersAndUnownedReports(t *testing.T) {
-	dsn := os.Getenv("HDD_TEST_DSN")
-	if dsn == "" {
-		t.Skip("HDD_TEST_DSN not set: migration smoke runs against a disposable PG container")
-	}
-	ctx := context.Background()
-	db, err := sql.Open("pgx", dsn)
-	if err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	defer db.Close()
-	goose.SetBaseFS(migrationsFS)
-	if err := goose.SetDialect("postgres"); err != nil {
-		t.Fatalf("goose dialect: %v", err)
-	}
-	if err := goose.UpContext(ctx, db, migrationsDir); err != nil {
-		t.Fatalf("up to latest: %v", err)
-	}
-	if err := goose.DownToContext(ctx, db, migrationsDir, 12); err != nil {
-		t.Fatalf("down to 0012: %v", err)
-	}
-
-	const sha = "migration-0013-member-report"
-	if _, err := db.ExecContext(ctx, `INSERT INTO images (sha256, original_filename)
-		VALUES ($1, 'pre-launch.jpg')`, sha); err != nil {
-		t.Fatalf("seed image: %v", err)
-	}
-	var ocrID int64
-	if err := db.QueryRowContext(ctx, `INSERT INTO ocr_results (image_sha256, engine_output)
-		VALUES ($1, '{}') RETURNING id`, sha).Scan(&ocrID); err != nil {
-		t.Fatalf("seed ocr: %v", err)
-	}
-	var memberID int64
-	if err := db.QueryRowContext(ctx, `INSERT INTO members (name, is_child)
-		VALUES ('迁移前成员', true) RETURNING id`).Scan(&memberID); err != nil {
-		t.Fatalf("seed member: %v", err)
-	}
-	if _, err := db.ExecContext(ctx, `INSERT INTO reports
-		(image_sha256, ocr_result_id, report_type, report_date, status, member_id, panels)
-		VALUES ($1, $2, '血常规', '2026-10-01', 'success', $3, '{cbc}')`,
-		sha, ocrID, memberID); err != nil {
-		t.Fatalf("seed report: %v", err)
-	}
-
-	if err := goose.UpContext(ctx, db, migrationsDir); err != nil {
-		t.Fatalf("up to 0013: %v", err)
-	}
-
-	var members int
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM members WHERE id = $1`, memberID).Scan(&members); err != nil {
-		t.Fatal(err)
-	}
-	if members != 0 {
-		t.Errorf("member rows = %d, want 0 (0013 clears members)", members)
-	}
-	var reportOwner sql.NullInt64
-	if err := db.QueryRowContext(ctx, `SELECT member_id FROM reports WHERE image_sha256 = $1`, sha).
-		Scan(&reportOwner); err != nil {
-		t.Fatalf("report row missing after 0013: %v", err)
-	}
-	if reportOwner.Valid {
-		t.Errorf("report member_id = %d, want NULL (ownership released)", reportOwner.Int64)
-	}
-	var images, ocrs int
-	if err := db.QueryRowContext(ctx, `SELECT
-		(SELECT COUNT(*) FROM images WHERE sha256 = $1),
-		(SELECT COUNT(*) FROM ocr_results WHERE image_sha256 = $1)`, sha).Scan(&images, &ocrs); err != nil {
-		t.Fatal(err)
-	}
-	if images != 1 || ocrs != 1 {
-		t.Errorf("image/ocr rows = %d/%d, want 1/1 (history retained)", images, ocrs)
-	}
-	var isChildCols, precisionCols int
-	if err := db.QueryRowContext(ctx, `SELECT
-		(SELECT COUNT(*) FROM information_schema.columns WHERE table_name='members' AND column_name='is_child'),
-		(SELECT COUNT(*) FROM information_schema.columns WHERE table_name='members' AND column_name='birth_date_precision')`).
-		Scan(&isChildCols, &precisionCols); err != nil {
-		t.Fatal(err)
-	}
-	if isChildCols != 0 || precisionCols != 0 {
-		t.Errorf("legacy is_child/precision columns = %d/%d, want 0/0", isChildCols, precisionCols)
-	}
-
-	for _, query := range []string{
-		`DELETE FROM reports WHERE image_sha256 = $1`,
-		`DELETE FROM ocr_results WHERE image_sha256 = $1`,
-		`DELETE FROM images WHERE sha256 = $1`,
-	} {
-		if _, err := db.ExecContext(ctx, query, sha); err != nil {
-			t.Fatalf("cleanup: %v", err)
-		}
-	}
 }

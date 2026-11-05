@@ -54,7 +54,6 @@ from .contract import (
     ReportItem,
     ReportSection,
     Status,
-    allowed_panels,
     report_panels,
 )
 from .dash_recovery import recover_dash_fields
@@ -549,68 +548,82 @@ def _decompose(text: str, d: LabDict) -> tuple[str | None, str | None, str | Non
     s = _ARROW_RE.sub(" ", s).strip()
     # 范围分隔符两侧的空白坍缩('2.00 - 7.00' → '2.00-7.00'),不影响单位词(单位不含波浪/横杠分隔形)
     s = re.sub(r"\s*([~～\-–—])\s*", r"\1", s)
-    value: str | None = None
-    ref: str | None = None
-    unit: str | None = None
     # 词典单位字面前缀(含 * 前缀形态);单位按命中的原文切片保留大小写。
     # 前缀命中后剩余片段若只是标点(如 "mmol/L." 的 "."),仍以前缀为准。
     rest = s
     unit_from_prefix = _unit_match(rest, d)
     if unit_from_prefix is not None:
         rest = rest[len(unit_from_prefix) :].strip()
-    m = _RANGE_RE.search(rest)
-    if m:
-        head, tail = rest[: m.start()].strip(), rest[m.end() :].strip()
-        rtext = m.group(0)
-        if head and _SEX_LABEL_RE.fullmatch(head):
-            rtext = head + m.group(0)  # 性别前缀参考范围保留原文(如 男:0-15)
-        ref = rtext
-        if head and _NUMBER_RE.fullmatch(head):
-            value = head
-        if tail:
-            unit = _unit_or_none(tail, d)
+    if _RANGE_RE.search(rest):
+        value, ref, unit = _decompose_range(rest, d)
     else:
-        # 数字熔尾段单位:值+单位无空白一格('39.3fL'、'3.78D');尾段须是词典登记的
-        # 单位字面(如 fL/IU)才算单位,否则尾段丢弃只保 value(乱珠如 'D')。
-        # '109/L'/'1012/L' 首段数字熔 '/' 不属尾字面,落到单位分支保留原文单位。
-        m2 = re.fullmatch(rf"({_NUM})([A-Za-z][A-Za-z0-9/^.%]*)", rest)
-        if m2 and m2.group(2).lower() in {l.lower() for l in d.unit_literals}:
-            value, unit = m2.group(1), m2.group(2)
-        elif m2:
-            value = m2.group(1)
-        else:
-            # 比较(值熔断比较式):38.201<8 mg/L
-            m = _CMP_RE.search(rest)
-            if m:
-                head, tail = rest[: m.start()].strip(), rest[m.end() :].strip()
-                hv = _NUMBER_TAIL_RE.search(head)
-                if hv:
-                    value = hv.group(1)
-                ref = m.group(0)
-                if tail:
-                    unit = _unit_or_none(tail, d)
-            elif _NUMBER_RE.fullmatch(rest.strip()):
-                value = rest.strip()
-            elif m := re.fullmatch(rf"({_NUM})%", rest.strip()):
-                # 数值百分号熔一格('22.8%'、'31%'):value + unit,不当作纯单位。
-                value, unit = m.group(1), "%"
-            elif rest.strip() and _ASCII_UNIT_RE.fullmatch(rest.strip()):
-                # 单位字面:ASCII 数字/字母/%/^~// 形态(g/L、fL、pg、f1、109/L、1012/L);
-                # 纯中文词(审核者：、结果、赵志佳)或含中文的垃圾不成立
-                unit = _unit_or_none(rest, d)
-            else:
-                # 白分隔熔断格:值+箭头+单位一格(webwxgetmsgimg_12 '2.19 ↑ IU/L'、
-                # webwxgetmsgimg_20 '37.1 %'、'85.3 fL')。首段数值 → value;
-                # 中段若为范围 → ref;尾段 ASCII 单位形 → unit。order: NUM [RANGE] [UNIT]
-                toks = rest.split()
-                if len(toks) >= 2 and _NUMBER_RE.fullmatch(toks[0]):
-                    value = toks[0]
-                    for tok in toks[1:]:
-                        if ref is None and _RANGE_RE.fullmatch(tok):
-                            ref = tok
-                        elif unit is None and _ASCII_UNIT_RE.fullmatch(tok) and not _NUMBER_RE.fullmatch(tok):
-                            unit = _unit_or_none(tok, d)
+        value, ref, unit = _decompose_non_range(rest, d)
     return value, ref, unit_from_prefix or unit
+
+
+def _decompose_range(rest: str, d: LabDict) -> tuple[str | None, str | None, str | None]:
+    """范围分支:值 / 性别前缀 / 参考范围 / 尾随单位。"""
+    m = _RANGE_RE.search(rest)
+    if m is None:
+        return None, None, None
+    head, tail = rest[: m.start()].strip(), rest[m.end() :].strip()
+    rtext = m.group(0)
+    if head and _SEX_LABEL_RE.fullmatch(head):
+        rtext = head + m.group(0)  # 性别前缀参考范围保留原文(如 男:0-15)
+    value = head if head and _NUMBER_RE.fullmatch(head) else None
+    unit = _unit_or_none(tail, d) if tail else None
+    return value, rtext, unit
+
+
+def _decompose_non_range(rest: str, d: LabDict) -> tuple[str | None, str | None, str | None]:
+    """非范围分支:数字熔单位 / 比较式 / 纯值 / 百分号 / ASCII 单位 / 白分隔熔断。"""
+    # 数字熔尾段单位:值+单位无空白一格('39.3fL'、'3.78D');尾段须是词典登记的
+    # 单位字面(如 fL/IU)才算单位,否则尾段丢弃只保 value(乱珠如 'D')。
+    # '109/L'/'1012/L' 首段数字熔 '/' 不属尾字面,落到单位分支保留原文单位。
+    m2 = re.fullmatch(rf"({_NUM})([A-Za-z][A-Za-z0-9/^.%]*)", rest)
+    if m2 and m2.group(2).lower() in {l.lower() for l in d.unit_literals}:
+        return m2.group(1), None, m2.group(2)
+    if m2:
+        return m2.group(1), None, None
+    # 比较(值熔断比较式):38.201<8 mg/L
+    if m := _CMP_RE.search(rest):
+        return _decompose_comparison(rest, m, d)
+    if _NUMBER_RE.fullmatch(rest.strip()):
+        return rest.strip(), None, None
+    if m := re.fullmatch(rf"({_NUM})%", rest.strip()):
+        # 数值百分号熔一格('22.8%'、'31%'):value + unit,不当作纯单位。
+        return m.group(1), None, "%"
+    if rest.strip() and _ASCII_UNIT_RE.fullmatch(rest.strip()):
+        # 单位字面:ASCII 数字/字母/%/^~// 形态(g/L、fL、pg、f1、109/L、1012/L);
+        # 纯中文词(审核者：、结果、赵志佳)或含中文的垃圾不成立
+        return None, None, _unit_or_none(rest, d)
+    return _decompose_whitespace(rest, d)
+
+
+def _decompose_comparison(
+    rest: str, m: re.Match[str], d: LabDict
+) -> tuple[str | None, str | None, str | None]:
+    head, tail = rest[: m.start()].strip(), rest[m.end() :].strip()
+    hv = _NUMBER_TAIL_RE.search(head)
+    value = hv.group(1) if hv else None
+    unit = _unit_or_none(tail, d) if tail else None
+    return value, m.group(0), unit
+
+
+def _decompose_whitespace(rest: str, d: LabDict) -> tuple[str | None, str | None, str | None]:
+    """白分隔熔断格:值+箭头+单位一格(webwxgetmsgimg_12 '2.19 ↑ IU/L'、
+    webwxgetmsgimg_20 '37.1 %'、'85.3 fL')。首段数值 → value;
+    中段若为范围 → ref;尾段 ASCII 单位形 → unit。order: NUM [RANGE] [UNIT]"""
+    value = ref = unit = None
+    toks = rest.split()
+    if len(toks) >= 2 and _NUMBER_RE.fullmatch(toks[0]):
+        value = toks[0]
+        for tok in toks[1:]:
+            if ref is None and _RANGE_RE.fullmatch(tok):
+                ref = tok
+            elif unit is None and _ASCII_UNIT_RE.fullmatch(tok) and not _NUMBER_RE.fullmatch(tok):
+                unit = _unit_or_none(tok, d)
+    return value, ref, unit
 
 
 _TIER_LABEL_RE = re.compile(r"^[\u4e00-\u9fff]{1,4}$")
@@ -804,34 +817,56 @@ def _compare_numeric(vform: _NumForm, rform: _NumForm) -> tuple[Flag, FlagReason
             return Flag.UNKNOWN, FlagReason.SCALAR_REF
         rform = _NumForm("interval", 0.0, 0.0)
     if rform.kind == "interval":
-        if rform.a > rform.b:
-            return Flag.UNKNOWN, FlagReason.OTHER
-        if vform.kind == "scalar":
-            v = vform.a
-            if v < rform.a:
-                return Flag.LOW, None
-            if v > rform.b:
-                return Flag.HIGH, None
+        return _compare_interval_ref(vform, rform)
+    if rform.kind == "bound" and vform.kind == "bound":
+        result = _compare_bound_ref(vform, rform)
+        if result is not None:
+            return result
+    return _compare_one_sided_ref(vform, rform)
+
+
+def _compare_interval_ref(
+    vform: _NumForm, rform: _NumForm
+) -> tuple[Flag, FlagReason | None]:
+    if rform.a > rform.b:
+        return Flag.UNKNOWN, FlagReason.OTHER
+    if vform.kind == "scalar":
+        v = vform.a
+        if v < rform.a:
+            return Flag.LOW, None
+        if v > rform.b:
+            return Flag.HIGH, None
+        return Flag.NORMAL, None
+    vints = _value_interval(vform)
+    if vints is None:
+        return Flag.UNKNOWN, FlagReason.OTHER
+    return _compare_intervals(*vints, rform.a, rform.b)
+
+
+def _compare_bound_ref(
+    vform: _NumForm, rform: _NumForm
+) -> tuple[Flag, FlagReason | None] | None:
+    """值与参考同为单侧界:同向界直接判定;异向界返回 None 交给一侧比较。"""
+    v_upper = vform.op in "<≤"
+    r_upper = rform.op in "<≤"
+    if v_upper and r_upper:
+        if vform.a < rform.a or (
+            vform.a == rform.a and not (vform.op == "≤" and rform.op == "<")
+        ):
             return Flag.NORMAL, None
-        vints = _value_interval(vform)
-        if vints is None:
-            return Flag.UNKNOWN, FlagReason.OTHER
-        return _compare_intervals(*vints, rform.a, rform.b)
-    if vform.kind == "bound":
-        v_upper = vform.op in "<≤"
-        r_upper = rform.op in "<≤"
-        if v_upper and r_upper:
-            if vform.a < rform.a or (
-                vform.a == rform.a and not (vform.op == "≤" and rform.op == "<")
-            ):
-                return Flag.NORMAL, None
-            return Flag.UNKNOWN, FlagReason.INDETERMINATE
-        if not v_upper and not r_upper:
-            if vform.a > rform.a or (
-                vform.a == rform.a and not (vform.op == "≥" and rform.op == ">")
-            ):
-                return Flag.NORMAL, None
-            return Flag.UNKNOWN, FlagReason.INDETERMINATE
+        return Flag.UNKNOWN, FlagReason.INDETERMINATE
+    if not v_upper and not r_upper:
+        if vform.a > rform.a or (
+            vform.a == rform.a and not (vform.op == "≥" and rform.op == ">")
+        ):
+            return Flag.NORMAL, None
+        return Flag.UNKNOWN, FlagReason.INDETERMINATE
+    return None
+
+
+def _compare_one_sided_ref(
+    vform: _NumForm, rform: _NumForm
+) -> tuple[Flag, FlagReason | None]:
     vints = _value_interval(vform)
     if vints is None:
         return Flag.UNKNOWN, FlagReason.OTHER
@@ -1262,56 +1297,15 @@ def _standardize_item(
     """按 spec §3.2 生成标准字段;pending 仍输出 canonical,但 unit_status=unverified。"""
     printed = _clean_unit_text(unit) if unit else None
     kind = item.result_kind
-    out_value, out_ref = value, ref
-    out_unit: str | None = None
-    out_display: str | None = None
-    unresolved = False
     numeric_value = value is not None and _num_form(value) is not None
     numeric_ref = ref is not None and _num_form_strict(ref) is not None
 
     if kind in _UNIT_BEARING_KINDS:
-        if kind == "ratio" and not printed:
-            # 计算项(PTR/INR/A/G)无印形单位;数值存在即按 ratio 的 UCUM 1 输出。
-            if numeric_value:
-                out_unit = item.canonical_unit or "1"
-                out_display = item.unit_display or "1"
-        elif item.canonical_unit == "1" and not printed:
-            # 无量纲定量项(pH/比重):1 本身就是该结果的定义,不依赖印形单位。
-            if numeric_value:
-                out_unit = "1"
-                out_display = item.unit_display or "1"
-            else:
-                unresolved = True
-        elif kind == "arbitrary" and not printed:
-            unresolved = numeric_value
-        else:
-            resolved = _resolve_standard_unit(item, printed)
-            if (
-                resolved is None
-                and printed is None
-                and numeric_value
-                and item.default_unit
-                and _unit_key(item.default_unit)
-                in {_unit_key(item.canonical_unit or ""), _unit_key(item.unit_display or "")}
-            ):
-                out_unit, out_display = item.canonical_unit, item.unit_display or item.canonical_unit
-                if _outside_plausible(out_value, item.plausible_range):
-                    out_unit, out_display = None, None
-                    unresolved = True
-                resolved = (out_unit, out_display, UnitConversion(type="exact", factor=1, source="item default unit"))
-            if resolved is None:
-                unresolved = printed is not None or numeric_value
-            else:
-                out_unit, out_display, conversion = resolved
-                out_value = _convert_text(value, conversion)
-                if numeric_ref:
-                    out_ref = _convert_text(ref, conversion, ref=True)
-                if _outside_plausible(out_value, item.plausible_range) or _outside_plausible(
-                    out_ref, item.plausible_range
-                ):
-                    out_value, out_ref = value, ref
-                    out_unit, out_display = None, None
-                    unresolved = True
+        out_value, out_ref, out_unit, out_display, unresolved = _standard_unit_fields(
+            item, value, ref, printed, kind, numeric_value, numeric_ref
+        )
+    else:
+        out_value, out_ref, out_unit, out_display, unresolved = value, ref, None, None, False
 
     unit_status: str | None
     if kind in _UNIT_BEARING_KINDS:
@@ -1333,6 +1327,88 @@ def _standardize_item(
         result_basis=item.result_basis,
         low_confidence=low_score or unresolved,
     )
+
+
+def _standard_unit_fields(
+    item: DictItem,
+    value: str | None,
+    ref: str | None,
+    printed: str | None,
+    kind: str,
+    numeric_value: bool,
+    numeric_ref: bool,
+) -> tuple[str | None, str | None, str | None, str | None, bool]:
+    """单位承载类型的分支:计算项 / 无量纲 / 任意单位 / 词典单位解析与换算。"""
+    special = _standard_unit_special(item, printed, kind, numeric_value)
+    if special is not None:
+        out_unit, out_display, unresolved = special
+        return value, ref, out_unit, out_display, unresolved
+    return _resolve_standard_unit_fields(
+        item, value, ref, printed, numeric_value, numeric_ref
+    )
+
+
+def _standard_unit_special(
+    item: DictItem, printed: str | None, kind: str, numeric_value: bool
+) -> tuple[str | None, str | None, bool] | None:
+    """不依赖印形单位的三种特例;None 表示走通用单位解析。"""
+    if kind == "ratio" and not printed:
+        # 计算项(PTR/INR/A/G)无印形单位;数值存在即按 ratio 的 UCUM 1 输出。
+        if numeric_value:
+            return item.canonical_unit or "1", item.unit_display or "1", False
+        return None, None, False
+    if item.canonical_unit == "1" and not printed:
+        # 无量纲定量项(pH/比重):1 本身就是该结果的定义,不依赖印形单位。
+        if numeric_value:
+            return "1", item.unit_display or "1", False
+        return None, None, True
+    if kind == "arbitrary" and not printed:
+        return None, None, numeric_value
+    return None
+
+
+def _resolve_standard_unit_fields(
+    item: DictItem,
+    value: str | None,
+    ref: str | None,
+    printed: str | None,
+    numeric_value: bool,
+    numeric_ref: bool,
+) -> tuple[str | None, str | None, str | None, str | None, bool]:
+    """通用路径:词典单位解析、default_unit 回退、换算与 plausible 检查。"""
+    out_value, out_ref = value, ref
+    out_unit: str | None = None
+    out_display: str | None = None
+    unresolved = False
+
+    resolved = _resolve_standard_unit(item, printed)
+    if (
+        resolved is None
+        and printed is None
+        and numeric_value
+        and item.default_unit
+        and _unit_key(item.default_unit)
+        in {_unit_key(item.canonical_unit or ""), _unit_key(item.unit_display or "")}
+    ):
+        out_unit, out_display = item.canonical_unit, item.unit_display or item.canonical_unit
+        if _outside_plausible(out_value, item.plausible_range):
+            out_unit, out_display = None, None
+            unresolved = True
+        resolved = (out_unit, out_display, UnitConversion(type="exact", factor=1, source="item default unit"))
+    if resolved is None:
+        unresolved = printed is not None or numeric_value
+    else:
+        out_unit, out_display, conversion = resolved
+        out_value = _convert_text(value, conversion)
+        if numeric_ref:
+            out_ref = _convert_text(ref, conversion, ref=True)
+        if _outside_plausible(out_value, item.plausible_range) or _outside_plausible(
+            out_ref, item.plausible_range
+        ):
+            out_value, out_ref = value, ref
+            out_unit, out_display = None, None
+            unresolved = True
+    return out_value, out_ref, out_unit, out_display, unresolved
 
 
 def _undecorate(text: str) -> str:
@@ -1509,6 +1585,7 @@ def _extract_items(
     借全局中心补齐,如 lft_05 第二张表无名称列)。"""
     if not header_bands:
         return []
+
     seg_cells: dict[int, list[_Cell]] = {i: [] for i in range(len(header_bands))}
     band_tops = [min(c.y0 for c in b) for b in header_bands]
     for c in cells:
@@ -1566,21 +1643,15 @@ def _extract_items(
                 out.extend((cx, role, 0, False, 0) for cx, _ in lst)
         return out
 
-    items: list[tuple[DictItem, _RowPiece]] = []
-    for si, band in enumerate(header_bands):
-        seg = seg_cells[si]
-        if not seg:
-            continue
-        bcols = band_columns(band)
-
-        # 1. 逐格归 (角色, 块)
-        # 列归属 = 最近表头列中心(中点分区,不设固定偏离上限)。名称列左对齐,长文本格的
-        # 中心随文本长度向右漂移(实测免疫单「抗Ribosomal P抗体」中心偏离名称列头 398px),
-        # 固定容差会把这类格整格丢弃、整行漏抽(故选整行/整单缩水)。页面级垃圾格(标题/
-        # 落款)照常归到最近列:与词典不命中且与数据行 dy 超限,不产出伪指标项(样本语料
-        # golden 与全量真实数据回归锁定)。
+    def assign_cells(
+        seg: list[_Cell], bcols: list[tuple[float, str, int, bool, int]]
+    ) -> tuple[dict[tuple[str, int], list[_Cell]], set[int]]:
+        """逐格归 (角色, 块)。列归属 = 最近表头列中心(中点分区,不设固定偏离上限)。
+        名称列左对齐,长文本格的中心随文本长度向右漂移(实测免疫单「抗Ribosomal P抗体」
+        中心偏离名称列头 398px),固定容差会把这类格整格丢弃、整行漏抽。页面级垃圾格
+        (标题/落款)照常归到最近列:与词典不命中且与数据行 dy 超限,不产出伪指标项。"""
         assigned: dict[tuple[str, int], list[_Cell]] = {}
-        cell_ref_kw: set[int] = set()  # 复合 value 表头列(文本含参考范围)的格 id → 其 r 可进 ref 位
+        cell_ref_kw: set[int] = set()  # 复合 value 表头列的格 id → 其 r 可进 ref 位
         for c in seg:
             best_role, best_idx, best_blk, best_d = None, 0, 0, float("inf")
             best_ref_kw = False
@@ -1593,150 +1664,196 @@ def _extract_items(
                 if best_ref_kw and best_role == "value":
                     cell_ref_kw.add(id(c))
                 ny[id(c)] = c.cy - col_shift(best_role, best_idx)
+        return assigned, cell_ref_kw
 
-        blocks = sorted({blk for (role, blk) in assigned if role in ("name", "aux", "value", "unit", "ref")})
-        for blk in blocks:
-            # 2. 名称候选(名称列/代号列兜底;结果列的名称熔断格也纳入,如 cbc_04 血清淀粉样蛋白A17.05)
-            names: list[tuple[float, DictItem, str | None, _Cell]] = []
-            for role in ("name", "aux", "value"):
-                for c in assigned.get((role, blk), []):
-                    it, fv = _match_name(c.text, d)
-                    if it is not None:
-                        names.append((ny.get(id(c), c.cy), it, fv, c))
-            names.sort(key=lambda t: t[0])
-            # 3. 相邻(近距)同典名合并为一行;项目名熔断的数值优先作为本行 value
-            rows: list[_RowPiece] = []
-            for cy, it, fv, c in names:
-                if rows and rows[-1].item is not None and rows[-1].item.name == it.name:
-                    rows[-1].item = it
-                    if rows[-1].fused_value is None:
-                        rows[-1].fused_value = fv
-                    rows[-1].raw_cells.append(c)
-                    rows[-1].low_score |= c.score < LOW_SCORE_THRESHOLD
-                else:
-                    rows.append(
-                        _RowPiece(cy=cy, item=it, fused_value=fv, raw_cells=[c],
-                                  low_score=c.score < LOW_SCORE_THRESHOLD)
-                    )
-            for row in rows:
-                if row.fused_value is not None:
-                    row.value = row.fused_value  # 名称熔断数值优先于外围碎片
-            # 4. 碎片配对:先「结果」列做**互最近直配**——名称格常印在数据行上方,若结果格
-            #    与某行互为最近且偏移 > 0.25×行距,直接落该行并用其 y 作为该行数据行 y
-            #    (避免最近 y 把上一行的参考配到下一行,如 lft_05 顶部);其余碎片按 |dy|
-            #    贪心配对(上限 0.6×行距)。
-            if len(rows) >= 2:
-                pitches = sorted(b - a for a, b in zip([r.cy for r in rows], [r.cy for r in rows[1:]]))
-                pitch = pitches[len(pitches) // 2]
-                cap = max(_PIECE_CAP_MIN_PX, _PIECE_CAP_FACTOR * pitch)
+    def name_rows(assigned: dict[tuple[str, int], list[_Cell]], blk: int) -> list[_RowPiece]:
+        """名称候选(名称列/代号列兜底;结果列的名称熔断格也纳入,如 cbc_04
+        血清淀粉样蛋白A17.05),相邻同典名合并为一行;熔断数值优先作为本行 value。"""
+        names: list[tuple[float, DictItem, str | None, _Cell]] = []
+        for role in ("name", "aux", "value"):
+            for c in assigned.get((role, blk), []):
+                it, fv = _match_name(c.text, d)
+                if it is not None:
+                    names.append((ny.get(id(c), c.cy), it, fv, c))
+        names.sort(key=lambda t: t[0])
+        rows: list[_RowPiece] = []
+        for cy, it, fv, c in names:
+            if rows and rows[-1].item is not None and rows[-1].item.name == it.name:
+                rows[-1].item = it
+                if rows[-1].fused_value is None:
+                    rows[-1].fused_value = fv
+                rows[-1].raw_cells.append(c)
+                rows[-1].low_score |= c.score < LOW_SCORE_THRESHOLD
             else:
-                pitch = _PIECE_CAP_DEFAULT_PX
-                cap = _PIECE_CAP_DEFAULT_PX
-            used: set[int] = set()
-            value_cells = [c for c in assigned.get(("value", blk), []) if any(_decompose(c.text, d))]
-            if value_cells and rows:
-                row_of = {id(c): min(rows, key=lambda r: abs(ny.get(id(c), c.cy) - r.cy)) for c in value_cells}
-                cell_of = {id(r): min(value_cells, key=lambda c: abs(ny.get(id(c), c.cy) - r.cy)) for r in rows}
-                for c in value_cells:
-                    row = row_of[id(c)]
-                    if cell_of.get(id(row)) is c and (ny.get(id(c), c.cy) - row.cy) > 0.25 * pitch:
-                        v, _, _ = _decompose(c.text, d)
-                        if v is not None and row.value is None:
-                            row.absorb(c, v, None, None)
-                            row.cy = ny.get(id(c), c.cy)
-                            used.add(id(c))
-            pieces: list[tuple[_Cell, str, _RowPiece, float, str | None]] = []
-            for role in ("value", "method", "unit", "ref"):
-                for c in assigned.get((role, blk), []):
-                    if id(c) in used:
-                        continue
-                    v, r, u = _decompose(c.text, d)
-                    qual = None
-                    if v is None and r is None and u is None:
-                        if role == "value" or role == "ref":
-                            qual = _qualitative_value(c.text)
-                        elif role == "method":
-                            qual = _method_value(c.text)
-                        if qual is None:
-                            continue
-                    for row in rows:
-                        dy = abs(ny.get(id(c), c.cy) - row.cy)
-                        if dy <= cap:
-                            pieces.append((c, role, row, dy, qual))
-            # 吸收顺序:value 角色碎片优先(value 列才是 value 槽的权属;其他角色碎片
-            # 熔出的 v 不能抢在 value 列之前,如 glu_01 糖化 '6.50'(value 列)必须
-            # 先于乱珠单位格 '1 %' 熔出的 '1'落地),同角色再按 (dy,cx) 贪心。
-            pieces.sort(key=lambda t: (t[1] != "value", t[3], t[0].cx))
-            for c, role, row, _, qual in pieces:
-                if c in row.raw_cells or id(c) in used:
-                    continue
-                if qual:
-                    # 定性结果格(阳性(+)/阴性(一)/核均质型/B型/RhD(+)/淡黄/Normal…)
-                    # 印刷原样进 value 位(string 契约);flag 维持 unknown。
-                    # 检测方法格 → method 位(检测方法/实验方法列)。
-                    if role == "value" and row.value is None:
-                        row.absorb(c, qual, None, None)
-                        used.add(id(c))
-                    elif role == "ref" and row.ref is None:
-                        row.absorb(c, None, qual, None)
-                        used.add(id(c))
-                    elif role == "method" and row.method is None:
-                        row.absorb(c, None, None, None, qual)
-                        used.add(id(c))
+                rows.append(
+                    _RowPiece(cy=cy, item=it, fused_value=fv, raw_cells=[c],
+                              low_score=c.score < LOW_SCORE_THRESHOLD)
+                )
+        for row in rows:
+            if row.fused_value is not None:
+                row.value = row.fused_value  # 名称熔断数值优先于外围碎片
+        return rows
+
+    def row_pitch(rows: list[_RowPiece]) -> tuple[float, float]:
+        if len(rows) >= 2:
+            pitches = sorted(b - a for a, b in zip([r.cy for r in rows], [r.cy for r in rows[1:]]))
+            pitch = pitches[len(pitches) // 2]
+            cap = max(_PIECE_CAP_MIN_PX, _PIECE_CAP_FACTOR * pitch)
+        else:
+            pitch = _PIECE_CAP_DEFAULT_PX
+            cap = _PIECE_CAP_DEFAULT_PX
+        return pitch, cap
+
+    def absorb_direct_values(
+        rows: list[_RowPiece], value_cells: list[_Cell], used: set[int], pitch: float
+    ) -> None:
+        """结果列互最近直配:名称格常印在数据行上方,若结果格与某行互为最近且偏移
+        > 0.25×行距,直接落该行并用其 y 作为该行数据行 y(避免最近 y 把上一行的参考
+        配到下一行,如 lft_05 顶部)。"""
+        if not value_cells or not rows:
+            return
+        row_of = {id(c): min(rows, key=lambda r: abs(ny.get(id(c), c.cy) - r.cy)) for c in value_cells}
+        cell_of = {id(r): min(value_cells, key=lambda c: abs(ny.get(id(c), c.cy) - r.cy)) for r in rows}
+        for c in value_cells:
+            row = row_of[id(c)]
+            if cell_of.get(id(row)) is c and (ny.get(id(c), c.cy) - row.cy) > 0.25 * pitch:
+                v, _, _ = _decompose(c.text, d)
+                if v is not None and row.value is None:
+                    row.absorb(c, v, None, None)
+                    row.cy = ny.get(id(c), c.cy)
+                    used.add(id(c))
+
+    def collect_pieces(
+        rows: list[_RowPiece],
+        assigned: dict[tuple[str, int], list[_Cell]],
+        blk: int,
+        used: set[int],
+        cap: float,
+    ) -> list[tuple[_Cell, str, _RowPiece, float, str | None]]:
+        """除已直配格外的 value/method/unit/ref 碎片,按 |dy| 上限挂到候选行;
+        吸收顺序:value 角色优先(value 列才是 value 槽的权属),同角色按 (dy,cx) 贪心。"""
+        pieces: list[tuple[_Cell, str, _RowPiece, float, str | None]] = []
+        for role in ("value", "method", "unit", "ref"):
+            for c in assigned.get((role, blk), []):
+                if id(c) in used:
                     continue
                 v, r, u = _decompose(c.text, d)
-                # 参考列的单标量 0(如 NRBC 的 "0")在 _decompose 里被当成 value;
-                # 按列角色改回 ref,交给 ComputeFlag 的标量 0 规则比较。非 0 标量
-                # 语义不明,维持原行为(不进 ref 位,避免把 OCR 乱码当参考区间)。
-                ref_value = r
-                if role == "ref" and ref_value is None and v is not None and u is None and float(v) == 0:
-                    ref_value = v
-                    v = None
-                # 值列的纯比较式(<2.00,结果低于检出限)不是参考区间:拆不出数值时其 r
-                # 不进 ref 位,避免挤掉参考列真格(如 webwxgetmsgimg_1 抗dsDNA抗体
-                # "<2.00"值列 挤掉 "0-30"参考列)。复合表头列(「结果判定参考范围」)
-                # 的值格其 r 本是完全区间,仍照旧吸收;熔断式(38.201<8,带首部数值)不受限。
-                ref_ok = ref_value is not None and not (role == "value" and v is None and id(c) not in cell_ref_kw)
-                if (v is not None and row.value is None) or (ref_ok and row.ref is None) or (
-                    u is not None and row.unit is None
-                ):
-                    row.absorb(c, v, ref_value if ref_ok else None, u)
-                    used.add(id(c))
-                elif role == "value" and v is None and r is not None and row.value is None:
-                    # 值列的纯比较式/范围式(<2.00、1-2)= 检出限或范围型结果,value 契约是
-                    # 印刷原样字符串,可直接承载;不占 ref 位,参考列真格正常配对。
-                    row.absorb(c, r, None, None)
-                    used.add(id(c))
-            # 4.5 分级参考区间:参考列下方同行内空行的解读档挂回指标行。
-            _attach_tier_refs(rows, assigned.get(("ref", blk), []), d)
+                qual = None
+                if v is None and r is None and u is None:
+                    if role == "value" or role == "ref":
+                        qual = _qualitative_value(c.text)
+                    elif role == "method":
+                        qual = _method_value(c.text)
+                    if qual is None:
+                        continue
+                for row in rows:
+                    dy = abs(ny.get(id(c), c.cy) - row.cy)
+                    if dy <= cap:
+                        pieces.append((c, role, row, dy, qual))
+        pieces.sort(key=lambda t: (t[1] != "value", t[3], t[0].cx))
+        return pieces
 
-            # 5. 出项
-            for row in rows:
-                if row.value is None and row.fused_value is not None:
-                    row.value = row.fused_value
-                if row.value is None and row.ref is None and row.unit is None and row.fused_value is None:
-                    # 零碎片行:竖排回退——名称格正下方同列最近数值格(产筛/糖耐量等
-                    # 竖列头版式,webwxgetmsgimg_17/_18);找到则吸收,否则该行仅名称在案。
-                    vcell, vval = _vertical_value(cells, row.raw_cells[0], d)
-                    if vval is not None:
-                        row.absorb(vcell, vval, None, None)
-                items.append((row.item, row))
-    # 同 canonical 名去重:一图一标准名只留一行——同名重复命中多为页脚/直方图图例
-    # 的再命中(webwxgetmsgimg_19:真 血小板 145.00 行 + 图例 'PLT' 幽灵行)。
-    # 保留碎片(吸收格)多/有 value 的行;并列时注册表序(先者)。
-    dedup: dict[str, tuple[DictItem, _RowPiece]] = {}
-    for it, row in items:
-        prev = dedup.get(it.name)
-        if prev is not None:
-            # 保留吸收格多(value 视同两格权重)者;并列留先者。
-            score_new = len(row.raw_cells) + (5 if row.value is not None else 0)
-            score_old = len(prev[1].raw_cells) + (5 if prev[1].value is not None else 0)
-            if score_new > score_old:
+    def absorb_qualitative(row: _RowPiece, c: _Cell, role: str, qual: str, used: set[int]) -> None:
+        """定性结果格 → value;检测方法格 → method;参考列定性值 → ref。"""
+        if role == "value" and row.value is None:
+            row.absorb(c, qual, None, None)
+            used.add(id(c))
+        elif role == "ref" and row.ref is None:
+            row.absorb(c, None, qual, None)
+            used.add(id(c))
+        elif role == "method" and row.method is None:
+            row.absorb(c, None, None, None, qual)
+            used.add(id(c))
+
+    def absorb_numeric(row: _RowPiece, c: _Cell, role: str, cell_ref_kw: set[int], used: set[int]) -> None:
+        """数值/单位/参考碎片吸收;保留参考列标量 0、值列纯比较式与复合表头特例。"""
+        v, r, u = _decompose(c.text, d)
+        # 参考列的单标量 0(如 NRBC 的 "0")在 _decompose 里被当成 value;
+        # 按列角色改回 ref,交给 ComputeFlag 的标量 0 规则比较。非 0 标量
+        # 语义不明,维持原行为(不进 ref 位,避免把 OCR 乱码当参考区间)。
+        ref_value = r
+        if role == "ref" and ref_value is None and v is not None and u is None and float(v) == 0:
+            ref_value = v
+            v = None
+        # 值列的纯比较式(<2.00,结果低于检出限)不是参考区间:拆不出数值时其 r
+        # 不进 ref 位,避免挤掉参考列真格(如 webwxgetmsgimg_1 抗dsDNA抗体
+        # "<2.00"值列 挤掉 "0-30"参考列)。复合表头列(「结果判定参考范围」)
+        # 的值格其 r 本是完全区间,仍照旧吸收;熔断式(38.201<8,带首部数值)不受限。
+        ref_ok = ref_value is not None and not (role == "value" and v is None and id(c) not in cell_ref_kw)
+        if (v is not None and row.value is None) or (ref_ok and row.ref is None) or (
+            u is not None and row.unit is None
+        ):
+            row.absorb(c, v, ref_value if ref_ok else None, u)
+            used.add(id(c))
+        elif role == "value" and v is None and r is not None and row.value is None:
+            # 值列的纯比较式/范围式(<2.00、1-2)= 检出限或范围型结果,value 契约是
+            # 印刷原样字符串,可直接承载;不占 ref 位,参考列真格正常配对。
+            row.absorb(c, r, None, None)
+            used.add(id(c))
+
+    def pair_pieces(
+        rows: list[_RowPiece],
+        assigned: dict[tuple[str, int], list[_Cell]],
+        cell_ref_kw: set[int],
+        blk: int,
+    ) -> None:
+        """碎片配对:先结果列互最近直配,再按 |dy| 贪心吸收,最后挂分级参考区间。"""
+        pitch, cap = row_pitch(rows)
+        used: set[int] = set()
+        value_cells = [c for c in assigned.get(("value", blk), []) if any(_decompose(c.text, d))]
+        absorb_direct_values(rows, value_cells, used, pitch)
+        pieces = collect_pieces(rows, assigned, blk, used, cap)
+        for c, role, row, _, qual in pieces:
+            if c in row.raw_cells or id(c) in used:
+                continue
+            if qual:
+                absorb_qualitative(row, c, role, qual, used)
+                continue
+            absorb_numeric(row, c, role, cell_ref_kw, used)
+        # 4.5 分级参考区间:参考列下方同行内空行的解读档挂回指标行。
+        _attach_tier_refs(rows, assigned.get(("ref", blk), []), d)
+
+    def emit_rows(rows: list[_RowPiece]) -> None:
+        for row in rows:
+            if row.value is None and row.fused_value is not None:
+                row.value = row.fused_value
+            if row.value is None and row.ref is None and row.unit is None and row.fused_value is None:
+                # 零碎片行:竖排回退——名称格正下方同列最近数值格(产筛/糖耐量等
+                # 竖列头版式,webwxgetmsgimg_17/_18);找到则吸收,否则该行仅名称在案。
+                vcell, vval = _vertical_value(cells, row.raw_cells[0], d)
+                if vval is not None:
+                    row.absorb(vcell, vval, None, None)
+            items.append((row.item, row))
+
+    def dedup_items() -> list[tuple[DictItem, _RowPiece]]:
+        """同 canonical 名去重:一图一标准名只留一行——同名重复命中多为页脚/直方图
+        图例的再命中(webwxgetmsgimg_19:真 血小板 145.00 行 + 图例 'PLT' 幽灵行)。
+        保留碎片(吸收格)多/有 value 的行;并列时注册表序(先者)。"""
+        dedup: dict[str, tuple[DictItem, _RowPiece]] = {}
+        for it, row in items:
+            prev = dedup.get(it.name)
+            if prev is not None:
+                score_new = len(row.raw_cells) + (5 if row.value is not None else 0)
+                score_old = len(prev[1].raw_cells) + (5 if prev[1].value is not None else 0)
+                if score_new > score_old:
+                    dedup[it.name] = (it, row)
+            else:
                 dedup[it.name] = (it, row)
-        else:
-            dedup[it.name] = (it, row)
-    return list(dedup.values())
+        return list(dedup.values())
 
+    items: list[tuple[DictItem, _RowPiece]] = []
+    for si, band in enumerate(header_bands):
+        seg = seg_cells[si]
+        if not seg:
+            continue
+        bcols = band_columns(band)
+        assigned, cell_ref_kw = assign_cells(seg, bcols)
+        blocks = sorted({blk for (role, blk) in assigned if role in ("name", "aux", "value", "unit", "ref")})
+        for blk in blocks:
+            rows = name_rows(assigned, blk)
+            pair_pieces(rows, assigned, cell_ref_kw, blk)
+            emit_rows(rows)
+    return dedup_items()
 
 def _extract_narrative(cells: list[_Cell], d: LabDict) -> list[tuple[DictItem, _RowPiece]]:
     """影像叙述体抽取(P3;category.mode=narrative):无表头带,别名 + 桥接符 +
@@ -1999,15 +2116,7 @@ def run_postprocess(
             items=[],
         )
     d, pairs = selected
-    if d.report_type == CLINICAL_NOTE_REPORT_TYPE:
-        date = _find_date(
-            cells,
-            date_hint,
-            labels=CLINICAL_NOTE_DATE_LABELS,
-            independent_fallback=False,
-        )
-    else:
-        date = _find_date(cells, date_hint)
+    date = _report_date(cells, d, date_hint)
     sections = _extract_sections(
         ocr.txts,
         d.section_anchors,
@@ -2015,107 +2124,10 @@ def run_postprocess(
         d.section_stop_prefixes,
         d.section_stop_patterns,
     )
-
-    items: list[ReportItem] = []
-    for it, piece in pairs:
-        raw_cells = sorted(piece.raw_cells, key=lambda c: c.cx)
-        raw_text = "  ".join(c.text.strip() for c in raw_cells) or (piece.ref or "")
-        flag, flag_reason = _compare(it.name, piece.value, piece.ref)
-        if flag is Flag.UNKNOWN:
-            flag_reason = _extraction_reason(piece, flag_reason, raw_text)
-        else:
-            flag_reason = None
-        low_conf = piece.low_score
-        value, unit, ref_range = piece.value, None, piece.ref
-        standard: dict[str, object] = {}
-        if it.standard_schema:
-            out = _standardize_item(it, piece.value, piece.unit, piece.ref, low_conf)
-            value, unit, ref_range = out.value, out.unit, out.ref_range
-            low_conf = out.low_confidence
-            standard = {
-                "code": it.code or it.local_code,
-                "loinc": it.loinc,
-                "analyte": it.analyte,
-                "unit_display": out.unit_display,
-                "unit_status": out.unit_status,
-                "raw_value": out.raw_value,
-                "raw_unit": out.raw_unit,
-                "raw_ref_range": out.raw_ref_range,
-                "ref_kind": out.ref_kind,
-                "result_kind": out.result_kind,
-                "result_basis": out.result_basis,
-            }
-        else:
-            unit = _normalize_unit(piece.unit, piece.item)
-        items.append(
-            ReportItem(
-                name=it.name,
-                panel=it.panel,
-                value=value,
-                unit=unit,
-                ref_range=ref_range,
-                method=piece.method,
-                flag=flag,
-                flag_reason=flag_reason,
-                low_confidence=low_conf,
-                raw_text=raw_text,
-                ocr_line_numbers=[c.line for c in raw_cells],
-                **standard,
-            )
-        )
-
+    items = _build_report_items(pairs, d)
     if image is not None and items:
-        dict_items = {it.name: it for it in d.items}
-        for index, (value, ref_range) in recover_dash_fields(image, ocr, items).items():
-            item = items[index]
-            flag, reason = _compare(item.name, value, ref_range)
-            standard = dict_items.get(item.name)
-            if standard is not None and standard.standard_schema:
-                out = _standardize_item(
-                    standard, value, item.raw_unit, ref_range, item.low_confidence
-                )
-                items[index] = item.model_copy(
-                    update={
-                        "value": out.value,
-                        "ref_range": out.ref_range,
-                        "unit": out.unit,
-                        "unit_display": out.unit_display,
-                        "unit_status": out.unit_status,
-                        "raw_value": out.raw_value,
-                        "raw_ref_range": out.raw_ref_range,
-                        "ref_kind": out.ref_kind,
-                        "low_confidence": out.low_confidence,
-                        "flag": flag,
-                        "flag_reason": reason if flag is Flag.UNKNOWN else None,
-                    }
-                )
-                continue
-            items[index] = item.model_copy(
-                update={
-                    "value": value,
-                    "ref_range": ref_range,
-                    "flag": flag,
-                    "flag_reason": reason if flag is Flag.UNKNOWN else None,
-                }
-            )
-    partial = any(item.value is None for item in items)
-
-    if d.min_section_hits > 0:
-        # 按正文段落分类的报告(影像)只反映叙述正文:至少一段 findings/impression →
-        # success,否则 failed;日期未印、低置信都不再降级 partial(票 04)。
-        has_body = any(s.kind in NARRATIVE_BODY_SECTION_KINDS for s in sections)
-        status = Status.SUCCESS if has_body else Status.FAILED
-    elif not items:
-        status = Status.FAILED
-    else:
-        performed = [it for it in items if it.flag is not Flag.NOT_TESTED]
-        low_conf_majority = bool(performed) and (
-            sum(1 for it in performed if it.low_confidence) / len(performed) >= LOW_CONF_PARTIAL_RATIO
-        )
-        if partial or date is None or low_conf_majority:
-            status = Status.PARTIAL
-        else:
-            status = Status.SUCCESS
+        _recover_dash_items(items, image, ocr, d)
+    status = _derive_report_status(items, sections, date, d)
     panels = report_panels(d.report_type, status, (item.panel for item in items))
     return Report(
         report_type=d.report_type,
@@ -2127,35 +2139,129 @@ def run_postprocess(
     )
 
 
-def classify_items(
-    report_type: str, names: list[str]
-) -> tuple[list[Panel], list[Panel]]:
-    """按 report_type + 当前指标名重算项目组(/classify 与存量回填共用;spec §6.4)。
+def _report_date(cells: list[_Cell], d: LabDict, date_hint: str | None) -> str | None:
+    """病历优先记录日期;其余报告用通用日期抽取。"""
+    if d.report_type == CLINICAL_NOTE_REPORT_TYPE:
+        return _find_date(
+            cells,
+            date_hint,
+            labels=CLINICAL_NOTE_DATE_LABELS,
+            independent_fallback=False,
+        )
+    return _find_date(cells, date_hint)
 
-    只查同一 report_type 下的词典(歧义项靠父类区分,如临检葡萄糖 → 尿常规),
-    未命中 → other。空 items:影像 → [imaging],其余 → [other]。
-    """
-    dicts = load_dicts()
-    if report_type not in {d.report_type for d in dicts} | {UNKNOWN_REPORT_TYPE}:
-        raise ValueError(f"unknown report_type: {report_type}")
-    allowed = allowed_panels(report_type)
-    item_panels: list[Panel] = []
-    for name in names:
-        panel = Panel.OTHER
-        for d in dicts:
-            if d.report_type != report_type:
-                continue
-            item, _ = _match_name(name, d)
-            if item is not None:
-                panel = item.panel
-                break
-        if panel not in allowed:
-            raise ValueError(
-                f"item {name!r} panel {panel.value!r} is not allowed "
-                f"for report_type {report_type!r}"
+
+def _build_report_items(
+    pairs: list[tuple[DictItem, _RowPiece]], d: LabDict
+) -> list[ReportItem]:
+    return [_build_report_item(it, piece, d) for it, piece in pairs]
+
+
+def _build_report_item(it: DictItem, piece: _RowPiece, d: LabDict) -> ReportItem:
+    """单个抽取产物 → 契约 ReportItem:flag、标准层字段与原文行链接。"""
+    raw_cells = sorted(piece.raw_cells, key=lambda c: c.cx)
+    raw_text = "  ".join(c.text.strip() for c in raw_cells) or (piece.ref or "")
+    flag, flag_reason = _compare(it.name, piece.value, piece.ref)
+    if flag is Flag.UNKNOWN:
+        flag_reason = _extraction_reason(piece, flag_reason, raw_text)
+    else:
+        flag_reason = None
+    low_conf = piece.low_score
+    value, unit, ref_range = piece.value, None, piece.ref
+    standard: dict[str, object] = {}
+    if it.standard_schema:
+        out = _standardize_item(it, piece.value, piece.unit, piece.ref, low_conf)
+        value, unit, ref_range = out.value, out.unit, out.ref_range
+        low_conf = out.low_confidence
+        standard = {
+            "code": it.code or it.local_code,
+            "loinc": it.loinc,
+            "analyte": it.analyte,
+            "unit_display": out.unit_display,
+            "unit_status": out.unit_status,
+            "raw_value": out.raw_value,
+            "raw_unit": out.raw_unit,
+            "raw_ref_range": out.raw_ref_range,
+            "ref_kind": out.ref_kind,
+            "result_kind": out.result_kind,
+            "result_basis": out.result_basis,
+        }
+    else:
+        unit = _normalize_unit(piece.unit, piece.item)
+    return ReportItem(
+        name=it.name,
+        panel=it.panel,
+        value=value,
+        unit=unit,
+        ref_range=ref_range,
+        method=piece.method,
+        flag=flag,
+        flag_reason=flag_reason,
+        low_confidence=low_conf,
+        raw_text=raw_text,
+        ocr_line_numbers=[c.line for c in raw_cells],
+        **standard,
+    )
+
+
+def _recover_dash_items(
+    items: list[ReportItem], image: bytes, ocr: OCRResult, d: LabDict
+) -> None:
+    """用原图像素补回 OCR 漏掉的孤立短横(仅 result/reference 两格)。"""
+    dict_items = {it.name: it for it in d.items}
+    for index, (value, ref_range) in recover_dash_fields(image, ocr, items).items():
+        item = items[index]
+        flag, reason = _compare(item.name, value, ref_range)
+        standard = dict_items.get(item.name)
+        if standard is not None and standard.standard_schema:
+            out = _standardize_item(
+                standard, value, item.raw_unit, ref_range, item.low_confidence
             )
-        item_panels.append(panel)
-    return report_panels(report_type, Status.SUCCESS, item_panels), item_panels
+            items[index] = item.model_copy(
+                update={
+                    "value": out.value,
+                    "ref_range": out.ref_range,
+                    "unit": out.unit,
+                    "unit_display": out.unit_display,
+                    "unit_status": out.unit_status,
+                    "raw_value": out.raw_value,
+                    "raw_ref_range": out.raw_ref_range,
+                    "ref_kind": out.ref_kind,
+                    "low_confidence": out.low_confidence,
+                    "flag": flag,
+                    "flag_reason": reason if flag is Flag.UNKNOWN else None,
+                }
+            )
+            continue
+        items[index] = item.model_copy(
+            update={
+                "value": value,
+                "ref_range": ref_range,
+                "flag": flag,
+                "flag_reason": reason if flag is Flag.UNKNOWN else None,
+            }
+        )
+
+
+def _derive_report_status(
+    items: list[ReportItem], sections: list[ReportSection], date: str | None, d: LabDict
+) -> Status:
+    """报告状态:叙述型看正文段落;其余看空项/缺值/缺日期/低置信多数。"""
+    partial = any(item.value is None for item in items)
+    if d.min_section_hits > 0:
+        # 按正文段落分类的报告(影像)只反映叙述正文:至少一段 findings/impression →
+        # success,否则 failed;日期未印、低置信都不再降级 partial(票 04)。
+        has_body = any(s.kind in NARRATIVE_BODY_SECTION_KINDS for s in sections)
+        return Status.SUCCESS if has_body else Status.FAILED
+    if not items:
+        return Status.FAILED
+    performed = [it for it in items if it.flag is not Flag.NOT_TESTED]
+    low_conf_majority = bool(performed) and (
+        sum(1 for it in performed if it.low_confidence) / len(performed) >= LOW_CONF_PARTIAL_RATIO
+    )
+    if partial or date is None or low_conf_majority:
+        return Status.PARTIAL
+    return Status.SUCCESS
 
 
 def _title_keyword_hit(d: LabDict, cells: list[_Cell]) -> bool:

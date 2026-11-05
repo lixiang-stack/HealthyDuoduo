@@ -43,21 +43,6 @@ type GrowthList struct {
 	Records []GrowthRecord `json:"records"`
 }
 
-// MemberCreate POST /members 请求体:member_id/created_at/is_child 由服务端产生,不收;
-// name/sex/birth_date 必填。
-type MemberCreate struct {
-	Name      string `json:"name"`
-	Sex       string `json:"sex"`
-	BirthDate string `json:"birth_date"`
-}
-
-// MemberUpdate PATCH /members/{member_id} 请求体:至少一项;删除成员见 DELETE。
-type MemberUpdate struct {
-	Name      *string `json:"name,omitempty"`
-	Sex       *string `json:"sex,omitempty"`
-	BirthDate *string `json:"birth_date,omitempty"`
-}
-
 // MembersList GET /members 响应信封;列表按 member_id 升序(创建序)返回。
 type MembersList struct {
 	Members []Member `json:"members"`

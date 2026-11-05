@@ -43,7 +43,7 @@ func newPanelsTestServer(t *testing.T) (*httptest.Server, *fakePanelStore) {
 		details:   map[int64]map[string]pipeline.PanelDetail{},
 	}
 	d := &deps{
-		store: fakeStoreCLI{}, rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{},
+		store: newFakeServeStore(), rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{},
 		members: ms, panels: ps,
 	}
 	srv := httptest.NewServer(newServeHandler(d))

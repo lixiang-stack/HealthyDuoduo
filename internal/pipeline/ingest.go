@@ -36,19 +36,12 @@ func ImageSha256Hex(data []byte) string {
 // 身份、幂等、--force 语义与 Ingest 完全一致。
 func IngestImage(ctx context.Context, st Store, rec Recognizer, obj ObjectStore, data []byte, filename, date string, force bool) (*IngestOutcome, error) {
 	sha := ImageSha256Hex(data)
-	img, err := st.ImageBySha256(ctx, sha)
+	img, outcome, done, err := lookupCachedIngest(ctx, st, rec, sha, date, force)
 	if err != nil {
-		return nil, fmt.Errorf("query images: %w", err)
+		return nil, err
 	}
-
-	if img != nil {
-		outcome, done, err := cachedOutcome(ctx, st, rec, sha, date, force)
-		if err != nil {
-			return nil, err
-		}
-		if done {
-			return outcome, nil
-		}
+	if done {
+		return outcome, nil
 	}
 
 	normalized, ocr, report, err := rec.Report(ctx, data, filename, date)
@@ -59,26 +52,17 @@ func IngestImage(ctx context.Context, st Store, rec Recognizer, obj ObjectStore,
 	if len(normalized) > 0 && !bytes.Equal(normalized, data) {
 		data = normalized
 		sha = ImageSha256Hex(data)
-		img, err = st.ImageBySha256(ctx, sha)
+		img, outcome, done, err = lookupCachedIngest(ctx, st, rec, sha, date, force)
 		if err != nil {
-			return nil, fmt.Errorf("query images: %w", err)
+			return nil, err
 		}
-		if img != nil {
-			outcome, done, err := cachedOutcome(ctx, st, rec, sha, date, force)
-			if err != nil {
-				return nil, err
-			}
-			if done {
-				return outcome, nil
-			}
+		if done {
+			return outcome, nil
 		}
 	}
 	if img == nil {
-		if err := obj.Put(ctx, sha, data); err != nil {
-			return nil, fmt.Errorf("upload image to object store: %w", err)
-		}
-		if err := st.CreateImage(ctx, sha, filename); err != nil {
-			return nil, fmt.Errorf("write images: %w", err)
+		if err := storeNewImage(ctx, st, obj, sha, data, filename); err != nil {
+			return nil, err
 		}
 	}
 	raw, err := json.Marshal(ocr)
@@ -97,6 +81,34 @@ func IngestImage(ctx context.Context, st Store, rec Recognizer, obj ObjectStore,
 		kind = KindForced
 	}
 	return &IngestOutcome{Sha256: sha, Kind: kind, Report: report}, nil
+}
+
+// lookupCachedIngest 按内容身份查已入库图像;命中且可短路时返回 done=true。
+func lookupCachedIngest(
+	ctx context.Context, st Store, rec Recognizer, sha, date string, force bool,
+) (*Image, *IngestOutcome, bool, error) {
+	img, err := st.ImageBySha256(ctx, sha)
+	if err != nil {
+		return nil, nil, false, fmt.Errorf("query images: %w", err)
+	}
+	if img == nil {
+		return nil, nil, false, nil
+	}
+	outcome, done, err := cachedOutcome(ctx, st, rec, sha, date, force)
+	if err != nil {
+		return nil, nil, false, err
+	}
+	return img, outcome, done, nil
+}
+
+func storeNewImage(ctx context.Context, st Store, obj ObjectStore, sha string, data []byte, filename string) error {
+	if err := obj.Put(ctx, sha, data); err != nil {
+		return fmt.Errorf("upload image to object store: %w", err)
+	}
+	if err := st.CreateImage(ctx, sha, filename); err != nil {
+		return fmt.Errorf("write images: %w", err)
+	}
+	return nil
 }
 
 // cachedOutcome 已入库图像的报告快路径:命中且非 force 时返回缓存/日期补录结果;

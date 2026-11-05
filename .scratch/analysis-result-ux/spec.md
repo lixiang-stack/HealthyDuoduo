@@ -165,7 +165,6 @@ Status: ready-for-human
 
 - `.scratch/analysis-result-ux/prototype/README.md`
 - `.scratch/analysis-result-ux/prototype/prototype.html`
-- `.scratch/analysis-result-ux/prototype/shots/00-contact-sheet.png`
 
 **已选方案 A（2026-11-05）。**
 

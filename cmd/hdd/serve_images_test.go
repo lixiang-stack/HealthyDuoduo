@@ -29,7 +29,7 @@ func sampleImageBytes(t *testing.T) []byte {
 // newImagesTestServer 图像端点的 handler 栈(对象存储预置一个键)。
 func newImagesTestServer(t *testing.T, objects map[string][]byte) *httptest.Server {
 	t.Helper()
-	d := &deps{store: fakeStoreCLI{}, rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{objects: objects}}
+	d := &deps{store: newFakeServeStore(), rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{objects: objects}}
 	srv := httptest.NewServer(newServeHandler(d))
 	t.Cleanup(srv.Close)
 	return srv

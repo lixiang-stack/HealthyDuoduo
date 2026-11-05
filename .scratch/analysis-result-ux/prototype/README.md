@@ -99,13 +99,3 @@
 ## 文件
 
 - `prototype.html` — 可切换三个方案；`?variant=a|b|c|all`
-- `shots/00-contact-sheet.png` — 三方案首屏对比
-- `shots/01-variant-a-top.png`
-- `shots/02-variant-a-source-sheet.png`
-- `shots/03-variant-a-feedback-sheet.png`
-- `shots/04-variant-b-top.png`
-- `shots/05-variant-b-history.png`
-- `shots/06-variant-c-top.png`
-- `shots/07-variant-c-evidence.png`
-- `shots/08-variant-a-bottom.png`
-- `shots/09-variant-a-summary.png`

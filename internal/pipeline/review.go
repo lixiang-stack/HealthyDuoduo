@@ -45,16 +45,8 @@ type ReviewOutcome struct {
 	UnreviewedLowConfidenceCount int
 }
 
-// ApplyReviewAction 在 current 上应用核对动作,返回更新后的指标项与修正对
-// (确认返回 nil 对;纯函数,存储事务与测试 fake 共用)。修正覆盖传入的纸面事实、
-// 按修正后的 value × ref_range 重算 flag、置 corrected。每次修正产出恰一条
-// (重放同一修正为 no-op 对,最终生效状态不变——ADR-0005 决策可重复、重试安全)。
-func ApplyReviewAction(current ReportItemRow, action ReviewAction) (ReportItemRow, *CorrectionPairRecord) {
-	return applyReviewAction(current, action, nil)
-}
-
-// ApplyReviewActionWithPolicy 同 ApplyReviewAction,但用显式比较策略重算 flag/reason。
-// 生产路径(Store.ReviewItem)注入共享策略;旧调用方不传策略时退化为数值比较。
+// ApplyReviewActionWithPolicy 在 current 上应用核对动作,返回更新后的指标项与修正对。
+// 生产路径(Store.ReviewItem)注入共享策略;nil 时退化为数值比较。
 func ApplyReviewActionWithPolicy(
 	current ReportItemRow,
 	action ReviewAction,

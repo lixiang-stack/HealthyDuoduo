@@ -15,37 +15,6 @@ import (
 	"healthyduoduo/internal/pipeline"
 )
 
-// fakeStoreCLI 默认空库;trendRet 注入 trend 查询的期望行集。
-type fakeStoreCLI struct {
-	trendRet []pipeline.TrendRow
-}
-
-func (fakeStoreCLI) ImageBySha256(ctx context.Context, sha string) (*pipeline.Image, error) {
-	return nil, nil
-}
-func (fakeStoreCLI) CreateImage(ctx context.Context, sha, filename string) error { return nil }
-func (fakeStoreCLI) AppendOCRResult(ctx context.Context, imageSha string, raw []byte) (int64, error) {
-	return 2, nil
-}
-func (fakeStoreCLI) ReportByImage(ctx context.Context, imageSha string) (*pipeline.ReportRow, bool, error) {
-	return nil, false, nil
-}
-func (fakeStoreCLI) ListReports(ctx context.Context, typ, date string) ([]pipeline.ReportRow, error) {
-	return []pipeline.ReportRow{}, nil
-}
-func (fakeStoreCLI) ItemsByImage(ctx context.Context, reportSha string) ([]contract.ReportItem, error) {
-	return nil, nil
-}
-func (fakeStoreCLI) OCRResultJSON(ctx context.Context, id int64) ([]byte, error) {
-	return []byte("{}"), nil
-}
-func (fakeStoreCLI) WriteReport(ctx context.Context, reportSha string, ocrID int64, report contract.Report, _ *string) error {
-	return nil
-}
-func (f fakeStoreCLI) TrendByName(ctx context.Context, item, reportType string) ([]pipeline.TrendRow, error) {
-	return f.trendRet, nil
-}
-
 type fakeRecognizerCLI struct{}
 
 func (fakeRecognizerCLI) Report(ctx context.Context, image []byte, filename, date string) ([]byte, *contract.OCRResult, *contract.Report, error) {
@@ -76,13 +45,20 @@ func (f fakeObjectsCLI) Get(ctx context.Context, key string) ([]byte, error) {
 
 func str(s string) *string { return &s }
 
+// newTrendStore CLI trend 用例的 Store fixture:注入期望趋势行。
+func newTrendStore(rows []pipeline.TrendRow) *fakeServeStore {
+	st := newFakeServeStore()
+	st.trendRet = rows
+	return st
+}
+
 func TestRunIngestPrintsSha(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "img.jpeg")
 	if err := os.WriteFile(path, []byte("fake"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	var out, errOut bytes.Buffer
-	d := &deps{store: fakeStoreCLI{}, rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
+	d := &deps{store: newFakeServeStore(), rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
 	if code := run(&out, &errOut, d, []string{"ingest", path, "--date", "2026-10-01"}); code != 0 {
 		t.Fatalf("exit = %d, stderr = %q", code, errOut.String())
 	}
@@ -93,7 +69,7 @@ func TestRunIngestPrintsSha(t *testing.T) {
 
 func TestRunListPrintsHeader(t *testing.T) {
 	var out, errOut bytes.Buffer
-	d := &deps{store: fakeStoreCLI{}, rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
+	d := &deps{store: newFakeServeStore(), rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
 	if code := run(&out, &errOut, d, []string{"list"}); code != 0 {
 		t.Fatalf("exit = %d, stderr = %q", code, errOut.String())
 	}
@@ -106,7 +82,7 @@ func TestRunListPrintsHeader(t *testing.T) {
 
 func TestRunUnknownCommand_Usage(t *testing.T) {
 	var out, errOut bytes.Buffer
-	d := &deps{store: fakeStoreCLI{}, rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
+	d := &deps{store: newFakeServeStore(), rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
 	if code := run(&out, &errOut, d, []string{"bogus"}); code != 2 {
 		t.Fatalf("exit = %d, want 2", code)
 	}
@@ -117,7 +93,7 @@ func TestRunUnknownCommand_Usage(t *testing.T) {
 
 func TestRunNoArgs(t *testing.T) {
 	var out, errOut bytes.Buffer
-	d := &deps{store: fakeStoreCLI{}, rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
+	d := &deps{store: newFakeServeStore(), rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
 	if code := run(&out, &errOut, d, nil); code != 2 || !strings.Contains(errOut.String(), "usage:") {
 		t.Fatalf("exit = %d stderr = %q", code, errOut.String())
 	}
@@ -125,7 +101,7 @@ func TestRunNoArgs(t *testing.T) {
 
 func TestRunIngestRejectsBadDate(t *testing.T) {
 	var out, errOut bytes.Buffer
-	d := &deps{store: fakeStoreCLI{}, rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
+	d := &deps{store: newFakeServeStore(), rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
 	if code := run(&out, &errOut, d, []string{"ingest", "a.jpeg", "--date", "2026/10/01"}); code != 2 {
 		t.Fatalf("exit = %d, want 2", code)
 	}
@@ -134,7 +110,7 @@ func TestRunIngestRejectsBadDate(t *testing.T) {
 // 未知 flag(--preprocess 已移除)→ usage 错误(exit 2)。
 func TestRunIngestRejectsUnknownFlag(t *testing.T) {
 	var out, errOut bytes.Buffer
-	d := &deps{store: fakeStoreCLI{}, rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
+	d := &deps{store: newFakeServeStore(), rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
 	if code := run(&out, &errOut, d, []string{"ingest", "a.jpeg", "--preprocess"}); code != 2 {
 		t.Fatalf("exit = %d, want 2", code)
 	}
@@ -154,7 +130,7 @@ func TestTypeDisplayRoundTrip(t *testing.T) {
 
 func TestRunListRejectsBadDate(t *testing.T) {
 	var out, errOut bytes.Buffer
-	d := &deps{store: fakeStoreCLI{}, rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
+	d := &deps{store: newFakeServeStore(), rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
 	if code := run(&out, &errOut, d, []string{"list", "--date", "garbage"}); code != 2 {
 		t.Fatalf("exit = %d, want 2", code)
 	}
@@ -162,10 +138,10 @@ func TestRunListRejectsBadDate(t *testing.T) {
 
 func TestRunTrendPrintsTrendRows(t *testing.T) {
 	v, v2, unit := "128", "136", "g/L"
-	d := &deps{store: fakeStoreCLI{trendRet: []pipeline.TrendRow{
+	d := &deps{store: newTrendStore([]pipeline.TrendRow{
 		{Sha256: strings.Repeat("a", 64), ReportType: "血常规", ReportDate: str("2026-01-02"), Value: &v, Unit: &unit, Flag: "normal"},
 		{Sha256: strings.Repeat("b", 64), ReportType: "血常规", ReportDate: str("2026-03-01"), Value: &v2, Unit: &unit, Flag: "high"},
-	}}, rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
+	}), rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
 	var out, errOut bytes.Buffer
 	if code := run(&out, &errOut, d, []string{"trend", "血红蛋白"}); code != 0 {
 		t.Fatalf("exit = %d, stderr = %q", code, errOut.String())
@@ -184,7 +160,7 @@ func TestRunTrendPrintsTrendRows(t *testing.T) {
 
 func TestRunTrendRequiresExactlyOneItemName(t *testing.T) {
 	var out, errOut bytes.Buffer
-	d := &deps{store: fakeStoreCLI{}, rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
+	d := &deps{store: newFakeServeStore(), rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
 	if code := run(&out, &errOut, d, []string{"trend"}); code != 2 {
 		t.Fatalf("exit = %d, want 2", code)
 	}
@@ -198,10 +174,10 @@ func TestRunTrendExcludesUnverifiedUnitsByDefault(t *testing.T) {
 	v1, v2, unit := "128", "136", "g/L"
 	unverified := "unverified"
 	verified := "verified"
-	d := &deps{store: fakeStoreCLI{trendRet: []pipeline.TrendRow{
+	d := &deps{store: newTrendStore([]pipeline.TrendRow{
 		{Sha256: strings.Repeat("a", 64), ReportType: "血常规", ReportDate: str("2026-01-02"), Value: &v1, Unit: &unit, UnitStatus: &unverified, Flag: "normal"},
 		{Sha256: strings.Repeat("b", 64), ReportType: "血常规", ReportDate: str("2026-03-01"), Value: &v2, Unit: &unit, UnitStatus: &verified, Flag: "high"},
-	}}, rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
+	}), rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
 	var out, errOut bytes.Buffer
 	if code := run(&out, &errOut, d, []string{"trend", "血红蛋白"}); code != 0 {
 		t.Fatalf("exit = %d, stderr = %q", code, errOut.String())
@@ -226,11 +202,11 @@ func TestRunTrendExcludesUnverifiedUnitsByDefault(t *testing.T) {
 func TestRunTrendExcludesLowQualityPointsByDefault(t *testing.T) {
 	// 质量门:低置信(决策 #7)或 flag=unknown 的点默认隐藏,--all 全量展示。
 	v1, v2, unit := "128", "136", "g/L"
-	d := &deps{store: fakeStoreCLI{trendRet: []pipeline.TrendRow{
+	d := &deps{store: newTrendStore([]pipeline.TrendRow{
 		{Sha256: strings.Repeat("a", 64), ReportType: "血常规", ReportDate: str("2026-01-02"), Value: &v1, Unit: &unit, Flag: "unknown"},
 		{Sha256: strings.Repeat("b", 64), ReportType: "血常规", ReportDate: str("2026-02-02"), Value: &v1, Unit: &unit, Flag: "normal", LowConfidence: true},
 		{Sha256: strings.Repeat("c", 64), ReportType: "血常规", ReportDate: str("2026-03-01"), Value: &v2, Unit: &unit, Flag: "normal"},
-	}}, rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
+	}), rec: fakeRecognizerCLI{}, obj: fakeObjectsCLI{}}
 	var out, errOut bytes.Buffer
 	if code := run(&out, &errOut, d, []string{"trend", "血红蛋白"}); code != 0 {
 		t.Fatalf("exit = %d, stderr = %q", code, errOut.String())

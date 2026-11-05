@@ -37,6 +37,7 @@ type fakeServeStore struct {
 	order     []string         // 报告插入序(时间线迭代确定化)
 	reports   map[string]*fakeServeReport
 	pairs     []fakeCorrectionPair // correction_pairs 追加记录(仅修正产生)
+	trendRet  []pipeline.TrendRow  // CLI trend 用例注入的期望行集
 }
 
 // fakeCorrectionPair 修正对 + 所属指标项 id(correction_pairs.item_id 的镜像:
@@ -152,7 +153,7 @@ func (f *fakeServeStore) OCRResultJSON(ctx context.Context, ocrID int64) ([]byte
 }
 
 func (f *fakeServeStore) TrendByName(ctx context.Context, itemName, reportType string) ([]pipeline.TrendRow, error) {
-	return nil, nil
+	return f.trendRet, nil
 }
 
 // WriteReport 镜像 storage upsert:报告字段全量覆盖(fail_reason 随写),items 全量

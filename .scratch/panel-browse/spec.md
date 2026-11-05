@@ -2,6 +2,8 @@
 
 Status: ready-for-agent（2026-10-27 需求分析与原型选型定稿）
 
+> **2026-11-05 更新：** `hdd backfill-panels`、`POST /classify` 与 `classify_items` 已随未上线阶段仓库精简删除；新报告在识别时直接写入 `panel`。下文回填相关段落保留为历史记录。
+
 **范围：** 识别服务指标项级项目组（`panel`）+ 报告级项目组聚合（`panels`）；Go 持久化 / API / 存量回填；App 家庭首页、双 Tab、档案「按时间 / 按项目」、项目详情、报告详情按项目分组、异常指标页改按项目分组。不含诊断、建议、复查提醒。
 
 **依据：** `CONTEXT.md`（报告 / 报告类别 / 指标项 / 成员 / 家长 / 核对）· `docs/design/2026-10-13-viz-and-client-spec.md`（v1.3，成员主轴与 M3）· `.scratch/member-overview/spec.md` · `.scratch/abnormal-trends/spec.md` · `docs/adr/0005-review-final-value-and-correction-pairs.md` · `docs/adr/0011-report-item-not-tested-state.md` · 现有实现 `recognizer/recognizer/*`、`internal/{pipeline,storage,httpapi}/*`、`apps/mobile/src/app/*`。医学依据与参考文档见 §5.5。
@@ -50,7 +52,7 @@ Status: ready-for-agent（2026-10-27 需求分析与原型选型定稿）
 | 12 | 存量回填 | 新增识别服务 `POST /classify`（report_type + 当前指标名 → 项目组），`hdd backfill-panels` 只更新 panel 列，不重写指标项 / 核对状态。不用 `/reparse` 回填。 |
 | 13 | ADR | 新增 `docs/adr/0012-item-level-panels.md`。 |
 
-**原型（一次性，未入库到产品代码）：** `.scratch/panel-browse/prototype/prototype.html` + `prototype/shots/`。联系表见 `shots/00-contact-sheet.png`。
+**原型（一次性，未入库到产品代码）：** `.scratch/panel-browse/prototype/prototype.html`。
 
 ---
 

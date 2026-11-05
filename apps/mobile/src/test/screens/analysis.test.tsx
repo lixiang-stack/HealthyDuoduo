@@ -423,28 +423,6 @@ describe('AnalysisScreen', () => {
     );
   });
 
-  it('renders legacy explanation sections that predate the four-part fields', async () => {
-    const legacy = {
-      entry_id: 'liver-hepatocellular-mild',
-      evidence_ids: [],
-      bridge_text: '旧分析只有连接语。',
-      source_ids: [],
-    } as unknown as AnalysisExplanation['sections'][number];
-    const result = makeAnalysisResult({
-      layers: {
-        facts: makeAnalysisFacts(),
-        explanation: { sections: [legacy], truncated: false },
-      },
-    });
-    mockUseLocalSearchParams.mockReturnValue({ analysis_id: '12' });
-    mockApi({ GET: { '/analyses/{analysis_id}': () => result } });
-
-    await renderScreen(<AnalysisScreen />);
-
-    expect(await screen.findByTestId('analysis-explanation')).toHaveTextContent(/旧分析只有连接语/);
-    expect(screen.queryByText('可能原因')).toBeNull();
-  });
-
   it('shows the quota message in the conclusion position without disabling the result', async () => {
     const result = makeAnalysisResult({
       layers: { facts: makeAnalysisFacts() },

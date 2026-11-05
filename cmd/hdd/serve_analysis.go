@@ -4,6 +4,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"strconv"
@@ -36,173 +37,248 @@ const (
 	narrativePanelMessage      = "narrative panel is not analyzable"
 )
 
+// parsedAnalysisRequest 是校验后的创建请求:panel 已按 entry 归一,window 已取默认值。
+type parsedAnalysisRequest struct {
+	body   httpapi.AnalysisRequest
+	panel  string
+	months int
+}
+
+// analysisInputs 是创建分析所需的成员 / 指标点 / 病历 / 生长记录快照。
+type analysisInputs struct {
+	member *pipeline.Member
+	panel  string
+	points []analysis.InputPoint
+	notes  []analysis.InputNote
+	growth *analysis.InputGrowth
+}
+
+// builtAnalysis 是待落库的纯计算结果;handler 之后只负责保存与解释层。
+type builtAnalysis struct {
+	record    analysis.Record
+	request   analysis.Request
+	facts     analysis.Facts
+	framework analysis.Framework
+}
+
+// parseAnalysisRequest 解码并校验创建请求;返回 (status=0) 表示通过。
+// status/message 直接映射既有 400 文案,保证契约不变。
+func parseAnalysisRequest(r *http.Request) (*parsedAnalysisRequest, int, string) {
+	var body httpapi.AnalysisRequest
+	if err := decodeJSONBody(r, &body); err != nil {
+		return nil, http.StatusBadRequest, err.Error()
+	}
+	if status, message := validateAnalysisIdentity(body); status != 0 {
+		return nil, status, message
+	}
+	months, status, message := analysisWindow(body)
+	if status != 0 {
+		return nil, status, message
+	}
+	panel, status, message := resolveAnalysisPanel(body)
+	if status != 0 {
+		return nil, status, message
+	}
+	return &parsedAnalysisRequest{body: body, panel: panel, months: months}, 0, ""
+}
+
+func validateAnalysisIdentity(body httpapi.AnalysisRequest) (int, string) {
+	if body.MemberID <= 0 {
+		return http.StatusBadRequest, "member_id is required"
+	}
+	if body.Entry != analysis.EntryPanel && body.Entry != analysis.EntryIndicator &&
+		body.Entry != analysis.EntryClinicalNote {
+		return http.StatusBadRequest, invalidAnalysisEntry
+	}
+	return 0, ""
+}
+
+func analysisWindow(body httpapi.AnalysisRequest) (int, int, string) {
+	months := analysis.DefaultWindowMonths
+	if body.WindowMonths != nil {
+		months = *body.WindowMonths
+	}
+	if months != 6 && months != 12 && months != 24 {
+		return 0, http.StatusBadRequest, invalidAnalysisWindow
+	}
+	return months, 0, ""
+}
+
+func resolveAnalysisPanel(body httpapi.AnalysisRequest) (string, int, string) {
+	panel := body.Panel
+	if !pipeline.IsValidPanel(panel) {
+		return "", http.StatusBadRequest, invalidPanelMessage
+	}
+	if body.Entry == analysis.EntryClinicalNote {
+		panel = pipeline.PanelClinicalNote
+		if body.ReportSHA == nil || *body.ReportSHA == "" {
+			return "", http.StatusBadRequest, analysisClinicalNoteNeeded
+		}
+	} else if pipeline.IsNarrativePanel(panel) {
+		return "", http.StatusBadRequest, narrativePanelMessage
+	}
+	if body.Entry == analysis.EntryIndicator && (body.IndicatorName == nil || *body.IndicatorName == "") {
+		return "", http.StatusBadRequest, analysisIndicatorNeeded
+	}
+	return panel, 0, ""
+}
+
+// loadAnalysisInputs 读取成员与入口对应的指标点 / 病历 / 生长记录。
+// 顺序保持原 handler:成员 → indicator panel 推导 → points → notes → 病历校验 → growth。
+func loadAnalysisInputs(ctx context.Context, d *deps, parsed *parsedAnalysisRequest) (*analysisInputs, int, string) {
+	body := parsed.body
+	member, err := d.members.MemberByID(ctx, body.MemberID)
+	if err != nil {
+		return nil, http.StatusInternalServerError, "read member failed"
+	}
+	if member == nil {
+		return nil, http.StatusNotFound, memberNotFoundMessage
+	}
+
+	panel := parsed.panel
+	if body.Entry == analysis.EntryIndicator {
+		derived, err := d.analyses.IndicatorPanel(ctx, member.MemberID, *body.IndicatorName)
+		if err != nil {
+			return nil, http.StatusInternalServerError, "read indicator failed"
+		}
+		if derived == "" {
+			return nil, http.StatusNotFound, indicatorNotFoundMessage
+		}
+		if pipeline.IsNarrativePanel(derived) {
+			return nil, http.StatusBadRequest, narrativePanelMessage
+		}
+		panel = derived
+	}
+
+	points, err := d.analyses.AnalysisPoints(ctx, member.MemberID, panel)
+	if err != nil {
+		return nil, http.StatusInternalServerError, "read analysis points failed"
+	}
+	notes, err := d.analyses.ClinicalNotes(ctx, member.MemberID)
+	if err != nil {
+		return nil, http.StatusInternalServerError, "read clinical notes failed"
+	}
+	if body.Entry == analysis.EntryClinicalNote && !containsNote(notes, *body.ReportSHA) {
+		return nil, http.StatusNotFound, analysisReportNotFound
+	}
+	growth, err := d.analyses.LatestGrowth(ctx, member.MemberID)
+	if err != nil {
+		return nil, http.StatusInternalServerError, "read latest growth failed"
+	}
+	return &analysisInputs{member: member, panel: panel, points: points, notes: notes, growth: growth}, 0, ""
+}
+
+// buildAnalysisRecord 计算事实层 / 框架层 / 快照并组装落库记录。
+func buildAnalysisRecord(ctx context.Context, d *deps, parsed *parsedAnalysisRequest, inputs *analysisInputs) (*builtAnalysis, int, string) {
+	body := parsed.body
+	req := analysis.Request{
+		MemberID:        inputs.member.MemberID,
+		MemberName:      inputs.member.Name,
+		MemberSex:       inputs.member.Sex,
+		MemberBirthDate: inputs.member.BirthDate,
+		Panel:           inputs.panel,
+		Entry:           body.Entry,
+		IndicatorName:   pointerText(body.IndicatorName),
+		ReportSHA:       pointerText(body.ReportSHA),
+		WindowMonths:    parsed.months,
+		Now:             time.Now(),
+	}
+	facts := analysis.BuildFacts(req, inputs.points, inputs.notes)
+	status := analysis.StatusSuccess
+	if facts.InsufficientEvidence {
+		status = analysis.StatusInsufficientEvidence
+	}
+	// 信任门控全未通过时框架层与解释层不输出(spec §4.15 规则 3)。
+	framework := analysis.Framework{Labels: []analysis.FrameworkLabel{}}
+	if !facts.InsufficientEvidence {
+		framework = analysis.BuildFramework(req, facts, inputs.growth)
+	}
+	dataVersion, err := d.analyses.DataVersion(ctx, inputs.member.MemberID)
+	if err != nil {
+		return nil, http.StatusInternalServerError, "read analysis data version failed"
+	}
+	snapshot := analysis.BuildSnapshot(req, facts)
+	snapshot.DataVersion = dataVersion
+	if d.explainer != nil && !facts.InsufficientEvidence {
+		snapshot.EntryVersions = analysis.EntryVersions(d.explainer.Match(req, facts))
+	}
+	record := analysis.Record{
+		MemberID:      inputs.member.MemberID,
+		Panel:         inputs.panel,
+		Entry:         body.Entry,
+		IndicatorName: body.IndicatorName,
+		WindowMonths:  parsed.months,
+		Status:        status,
+		Facts:         facts,
+		Framework:     framework,
+		Snapshot:      snapshot,
+		Sources:       analysis.FrameworkSources(framework),
+	}
+	return &builtAnalysis{record: record, request: req, facts: facts, framework: framework}, 0, ""
+}
+
+// saveAnalysisRecord 落库 + 降级事件 + 解释层;解释层失败时返回 500 前不写响应。
+func saveAnalysisRecord(ctx context.Context, d *deps, built *builtAnalysis) (*analysis.Record, int, string) {
+	saved, err := d.analyses.SaveAnalysis(ctx, built.record)
+	if err != nil {
+		return nil, http.StatusInternalServerError, "save analysis failed"
+	}
+	if built.facts.InsufficientEvidence && hasTrustGateFailure(built.facts) && d.observability != nil {
+		_ = d.observability.RecordAnalysisEvent(ctx, saved.AnalysisID, analysis.EventTrustGateFailed, "")
+	}
+	if d.explainer != nil && !built.facts.InsufficientEvidence {
+		explanation, reason := d.explainer.Explain(ctx, saved.AnalysisID, built.request, built.facts)
+		sources := analysis.MergeSources(analysis.FrameworkSources(built.framework), analysis.ExplanationSources(explanation))
+		if err := d.analyses.UpdateAnalysisExplanation(ctx, saved.AnalysisID, explanation, reason, sources); err != nil {
+			return nil, http.StatusInternalServerError, "save analysis explanation failed"
+		}
+		saved.Explanation = explanation
+		saved.ExplanationReason = reason
+		saved.Sources = sources
+	}
+	return saved, 0, ""
+}
+
+// writeAnalysisResult 读取解释层配额并以 201 返回;配额读取失败降级为可用状态。
+func writeAnalysisResult(w http.ResponseWriter, r *http.Request, d *deps, saved *analysis.Record) {
+	quota, quotaErr := d.analysisQuota(r, saved)
+	if quotaErr != nil {
+		log.Printf("analysis quota read failed: %v", quotaErr)
+		reason := "quota_unavailable"
+		quota = httpapi.AnalysisQuota{
+			UsedToday:            0,
+			LimitToday:           d.analysisDailyLimit(),
+			ExplanationAvailable: true,
+			ExplanationReason:    &reason,
+		}
+	}
+	writeJSON(w, http.StatusCreated, toAPIAnalysisResult(*saved, quota))
+}
+
 // handleCreateAnalysis POST /api/v1/analyses:建事实层分析并永久保存快照。
 func handleCreateAnalysis(d *deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var body httpapi.AnalysisRequest
-		if err := decodeJSONBody(r, &body); err != nil {
-			writeErrorJSON(w, http.StatusBadRequest, err.Error())
+		parsed, status, message := parseAnalysisRequest(r)
+		if status != 0 {
+			writeErrorJSON(w, status, message)
 			return
 		}
-		if body.MemberID <= 0 {
-			writeErrorJSON(w, http.StatusBadRequest, "member_id is required")
+		inputs, status, message := loadAnalysisInputs(r.Context(), d, parsed)
+		if status != 0 {
+			writeErrorJSON(w, status, message)
 			return
 		}
-		if body.Entry != analysis.EntryPanel && body.Entry != analysis.EntryIndicator &&
-			body.Entry != analysis.EntryClinicalNote {
-			writeErrorJSON(w, http.StatusBadRequest, invalidAnalysisEntry)
+		built, status, message := buildAnalysisRecord(r.Context(), d, parsed, inputs)
+		if status != 0 {
+			writeErrorJSON(w, status, message)
 			return
 		}
-		months := analysis.DefaultWindowMonths
-		if body.WindowMonths != nil {
-			months = *body.WindowMonths
-		}
-		if months != 6 && months != 12 && months != 24 {
-			writeErrorJSON(w, http.StatusBadRequest, invalidAnalysisWindow)
+		saved, status, message := saveAnalysisRecord(r.Context(), d, built)
+		if status != 0 {
+			writeErrorJSON(w, status, message)
 			return
 		}
-		panel := body.Panel
-		if !pipeline.IsValidPanel(panel) {
-			writeErrorJSON(w, http.StatusBadRequest, invalidPanelMessage)
-			return
-		}
-		if body.Entry == analysis.EntryClinicalNote {
-			panel = pipeline.PanelClinicalNote
-			if body.ReportSHA == nil || *body.ReportSHA == "" {
-				writeErrorJSON(w, http.StatusBadRequest, analysisClinicalNoteNeeded)
-				return
-			}
-		} else if pipeline.IsNarrativePanel(panel) {
-			writeErrorJSON(w, http.StatusBadRequest, narrativePanelMessage)
-			return
-		}
-		if body.Entry == analysis.EntryIndicator && (body.IndicatorName == nil || *body.IndicatorName == "") {
-			writeErrorJSON(w, http.StatusBadRequest, analysisIndicatorNeeded)
-			return
-		}
-
-		member, err := d.members.MemberByID(r.Context(), body.MemberID)
-		if err != nil {
-			writeErrorJSON(w, http.StatusInternalServerError, "read member failed")
-			return
-		}
-		if member == nil {
-			writeErrorJSON(w, http.StatusNotFound, memberNotFoundMessage)
-			return
-		}
-
-		if body.Entry == analysis.EntryIndicator {
-			derived, err := d.analyses.IndicatorPanel(r.Context(), member.MemberID, *body.IndicatorName)
-			if err != nil {
-				writeErrorJSON(w, http.StatusInternalServerError, "read indicator failed")
-				return
-			}
-			if derived == "" {
-				writeErrorJSON(w, http.StatusNotFound, indicatorNotFoundMessage)
-				return
-			}
-			if pipeline.IsNarrativePanel(derived) {
-				writeErrorJSON(w, http.StatusBadRequest, narrativePanelMessage)
-				return
-			}
-			panel = derived
-		}
-
-		points, err := d.analyses.AnalysisPoints(r.Context(), member.MemberID, panel)
-		if err != nil {
-			writeErrorJSON(w, http.StatusInternalServerError, "read analysis points failed")
-			return
-		}
-		notes, err := d.analyses.ClinicalNotes(r.Context(), member.MemberID)
-		if err != nil {
-			writeErrorJSON(w, http.StatusInternalServerError, "read clinical notes failed")
-			return
-		}
-		if body.Entry == analysis.EntryClinicalNote && !containsNote(notes, *body.ReportSHA) {
-			writeErrorJSON(w, http.StatusNotFound, analysisReportNotFound)
-			return
-		}
-
-		growth, err := d.analyses.LatestGrowth(r.Context(), member.MemberID)
-		if err != nil {
-			writeErrorJSON(w, http.StatusInternalServerError, "read latest growth failed")
-			return
-		}
-		req := analysis.Request{
-			MemberID:        member.MemberID,
-			MemberName:      member.Name,
-			MemberSex:       member.Sex,
-			MemberBirthDate: member.BirthDate,
-			Panel:           panel,
-			Entry:           body.Entry,
-			IndicatorName:   pointerText(body.IndicatorName),
-			ReportSHA:       pointerText(body.ReportSHA),
-			WindowMonths:    months,
-			Now:             time.Now(),
-		}
-		facts := analysis.BuildFacts(req, points, notes)
-		status := analysis.StatusSuccess
-		if facts.InsufficientEvidence {
-			status = analysis.StatusInsufficientEvidence
-		}
-		// 信任门控全未通过时框架层与解释层不输出(spec §4.15 规则 3)。
-		framework := analysis.Framework{Labels: []analysis.FrameworkLabel{}}
-		if !facts.InsufficientEvidence {
-			framework = analysis.BuildFramework(req, facts, growth)
-		}
-		dataVersion, err := d.analyses.DataVersion(r.Context(), member.MemberID)
-		if err != nil {
-			writeErrorJSON(w, http.StatusInternalServerError, "read analysis data version failed")
-			return
-		}
-		snapshot := analysis.BuildSnapshot(req, facts)
-		snapshot.DataVersion = dataVersion
-		if d.explainer != nil && !facts.InsufficientEvidence {
-			snapshot.EntryVersions = analysis.EntryVersions(d.explainer.Match(req, facts))
-		}
-		record := analysis.Record{
-			MemberID:      member.MemberID,
-			Panel:         panel,
-			Entry:         body.Entry,
-			IndicatorName: body.IndicatorName,
-			WindowMonths:  months,
-			Status:        status,
-			Facts:         facts,
-			Framework:     framework,
-			Snapshot:      snapshot,
-			Sources:       analysis.FrameworkSources(framework),
-		}
-		saved, err := d.analyses.SaveAnalysis(r.Context(), record)
-		if err != nil {
-			writeErrorJSON(w, http.StatusInternalServerError, "save analysis failed")
-			return
-		}
-		if facts.InsufficientEvidence && hasTrustGateFailure(facts) && d.observability != nil {
-			_ = d.observability.RecordAnalysisEvent(r.Context(), saved.AnalysisID, analysis.EventTrustGateFailed, "")
-		}
-		if d.explainer != nil && !facts.InsufficientEvidence {
-			explanation, reason := d.explainer.Explain(r.Context(), saved.AnalysisID, req, facts)
-			sources := analysis.MergeSources(analysis.FrameworkSources(framework), analysis.ExplanationSources(explanation))
-			if err := d.analyses.UpdateAnalysisExplanation(r.Context(), saved.AnalysisID, explanation, reason, sources); err != nil {
-				writeErrorJSON(w, http.StatusInternalServerError, "save analysis explanation failed")
-				return
-			}
-			saved.Explanation = explanation
-			saved.ExplanationReason = reason
-			saved.Sources = sources
-		}
-		quota, quotaErr := d.analysisQuota(r, saved)
-		if quotaErr != nil {
-			log.Printf("analysis quota read failed: %v", quotaErr)
-			reason := "quota_unavailable"
-			quota = httpapi.AnalysisQuota{
-				UsedToday:            0,
-				LimitToday:           d.analysisDailyLimit(),
-				ExplanationAvailable: true,
-				ExplanationReason:    &reason,
-			}
-		}
-		writeJSON(w, http.StatusCreated, toAPIAnalysisResult(*saved, quota))
+		writeAnalysisResult(w, r, d, saved)
 	}
 }
 

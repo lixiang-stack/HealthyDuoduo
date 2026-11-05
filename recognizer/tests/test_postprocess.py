@@ -21,7 +21,7 @@ import yaml
 
 from recognizer import paths
 from recognizer import postprocess as _postprocess
-from recognizer.contract import OCRResult, Panel
+from recognizer.contract import OCRResult
 from recognizer.golden import date_hint_for, image_bytes_for
 from recognizer.postprocess import _build_dict, run_postprocess
 
@@ -705,22 +705,6 @@ def test_imaging_success_panels_imaging() -> None:
     assert r.items == []
     assert r.panels == ["imaging"]
 
-
-def test_classify_rejects_parent_child_violation(monkeypatch) -> None:
-    """词典配置越界时 /classify 明确拒绝,不返回非法 panel。"""
-    bad_item = _postprocess.DictItem(
-        name="坏项", aliases=("坏项",), units=frozenset(), panel=Panel.THYROID
-    )
-    bad = _postprocess.LabDict(
-        report_type="临检",
-        title_keywords=(),
-        min_matched_items=1,
-        items=(bad_item,),
-        alias_map={"坏项": bad_item},
-    )
-    monkeypatch.setattr(_postprocess, "load_dicts", lambda: (bad,))
-    with pytest.raises(ValueError, match="not allowed"):
-        _postprocess.classify_items("临检", ["坏项"])
 
 
 # ---------- 叙述型报告(影像;票 04:段落主体,不抽取指标项) ----------

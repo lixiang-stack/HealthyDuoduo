@@ -104,6 +104,7 @@ App 屏幕测试随 `npm test` 运行；合并 UI 改动前按 `apps/mobile/ANDR
 - `docs/design/`：设计与实施计划
 - `docs/agents/e2e.md`：Pipeline E2E
 - `docs/agents/documentation.md`：文档约定
+- `docs/agents/complexity.md`：增量复杂度信号
 - `docs/agents/prototype-driven-development.md`：前端方案选型与原型规范
 - `.scratch/<feature>/`：本地 spec 与 ticket
 

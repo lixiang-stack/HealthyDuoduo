@@ -1,4 +1,4 @@
-// ApplyReviewAction 单元测试:确认/修正的生效值、flag 重算与修正对形状
+// ApplyReviewActionWithPolicy 单元测试:确认/修正的生效值、flag 重算与修正对形状
 // (ADR-0005:确认不产生修正对;每次修正 append 一条,before = 上次生效值)。
 package pipeline
 
@@ -28,7 +28,7 @@ func reviewRow() ReportItemRow {
 
 func TestApplyReviewActionConfirm(t *testing.T) {
 	row := reviewRow()
-	next, pair := ApplyReviewAction(row, ReviewAction{Confirm: true})
+	next, pair := ApplyReviewActionWithPolicy(row, ReviewAction{Confirm: true}, nil)
 	if pair != nil {
 		t.Fatalf("confirm pair = %+v, want nil(确认不产生修正对)", pair)
 	}
@@ -45,7 +45,7 @@ func TestApplyReviewActionConfirm(t *testing.T) {
 
 func TestApplyReviewActionCorrectValue(t *testing.T) {
 	row := reviewRow()
-	next, pair := ApplyReviewAction(row, ReviewAction{Value: str("5.6")})
+	next, pair := ApplyReviewActionWithPolicy(row, ReviewAction{Value: str("5.6")}, nil)
 	if next.ReviewStatus != ReviewStatusCorrected {
 		t.Errorf("review_status = %q, want corrected", next.ReviewStatus)
 	}
@@ -75,7 +75,7 @@ func TestApplyReviewActionCorrectValue(t *testing.T) {
 
 func TestApplyReviewActionCorrectRefRangeOnly(t *testing.T) {
 	row := reviewRow() // value 10.8、ref 3-10 → high
-	next, pair := ApplyReviewAction(row, ReviewAction{RefRange: str("3-12")})
+	next, pair := ApplyReviewActionWithPolicy(row, ReviewAction{RefRange: str("3-12")}, nil)
 	if next.Flag != FlagNormal {
 		t.Errorf("flag = %q, want normal (10.8 × 3-12 重算)", next.Flag)
 	}
@@ -89,8 +89,8 @@ func TestApplyReviewActionCorrectRefRangeOnly(t *testing.T) {
 
 func TestApplyReviewActionCorrectRepeatable(t *testing.T) {
 	row := reviewRow()
-	first, _ := ApplyReviewAction(row, ReviewAction{Value: str("5.6")})
-	second, pair := ApplyReviewAction(first, ReviewAction{Value: str("5.6")})
+	first, _ := ApplyReviewActionWithPolicy(row, ReviewAction{Value: str("5.6")}, nil)
+	second, pair := ApplyReviewActionWithPolicy(first, ReviewAction{Value: str("5.6")}, nil)
 	// 重放同一修正:生效状态不变;修正对 before = 上次生效值(no-op 对,ADR-0005 决策可重复)。
 	if *second.Value != "5.6" || second.ReviewStatus != ReviewStatusCorrected || second.Flag != FlagNormal {
 		t.Errorf("replayed correction state = %+v, want 与首次一致", second)
@@ -102,7 +102,7 @@ func TestApplyReviewActionCorrectRepeatable(t *testing.T) {
 
 func TestApplyReviewActionCorrectNameAndUnit(t *testing.T) {
 	row := reviewRow()
-	next, pair := ApplyReviewAction(row, ReviewAction{Name: str("单核细胞百分比"), Unit: str("pct")})
+	next, pair := ApplyReviewActionWithPolicy(row, ReviewAction{Name: str("单核细胞百分比"), Unit: str("pct")}, nil)
 	if next.Name != "单核细胞百分比" || *next.Unit != "pct" {
 		t.Errorf("facts = %q/%v, want 单核细胞百分比/pct", next.Name, *next.Unit)
 	}
@@ -126,7 +126,7 @@ func TestApplyReviewActionScalarZeroReference(t *testing.T) {
 			RawText:  "有核红细胞绝对值  NRBC#  0.00  *10",
 		},
 	}
-	next, _ := ApplyReviewAction(row, ReviewAction{RefRange: str("0")})
+	next, _ := ApplyReviewActionWithPolicy(row, ReviewAction{RefRange: str("0")}, nil)
 	if next.Flag != FlagNormal || next.FlagReason != nil {
 		t.Fatalf("scalar 0 correction = %q/%v, want normal/nil", next.Flag, next.FlagReason)
 	}
@@ -144,7 +144,7 @@ func TestApplyReviewActionNoReference(t *testing.T) {
 			RawText:  "NEUT  中性细胞数  4.19",
 		},
 	}
-	next, pair := ApplyReviewAction(row, ReviewAction{NoReference: true})
+	next, pair := ApplyReviewActionWithPolicy(row, ReviewAction{NoReference: true}, nil)
 	if pair != nil {
 		t.Fatalf("no_reference pair = %+v, want nil(不改纸面事实)", pair)
 	}
@@ -195,7 +195,7 @@ func TestApplyReviewActionWithPolicyQualitative(t *testing.T) {
 
 func TestApplyReviewActionCorrectToUnparsable(t *testing.T) {
 	row := reviewRow()
-	next, _ := ApplyReviewAction(row, ReviewAction{Value: str("查")})
+	next, _ := ApplyReviewActionWithPolicy(row, ReviewAction{Value: str("查")}, nil)
 	if next.Flag != FlagUnknown {
 		t.Errorf("flag = %q, want unknown(不可数值化不猜)", next.Flag)
 	}
