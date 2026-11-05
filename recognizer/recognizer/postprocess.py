@@ -1339,29 +1339,47 @@ def _standard_unit_fields(
     numeric_ref: bool,
 ) -> tuple[str | None, str | None, str | None, str | None, bool]:
     """单位承载类型的分支:计算项 / 无量纲 / 任意单位 / 词典单位解析与换算。"""
+    special = _standard_unit_special(item, printed, kind, numeric_value)
+    if special is not None:
+        out_unit, out_display, unresolved = special
+        return value, ref, out_unit, out_display, unresolved
+    return _resolve_standard_unit_fields(
+        item, value, ref, printed, numeric_value, numeric_ref
+    )
+
+
+def _standard_unit_special(
+    item: DictItem, printed: str | None, kind: str, numeric_value: bool
+) -> tuple[str | None, str | None, bool] | None:
+    """不依赖印形单位的三种特例;None 表示走通用单位解析。"""
+    if kind == "ratio" and not printed:
+        # 计算项(PTR/INR/A/G)无印形单位;数值存在即按 ratio 的 UCUM 1 输出。
+        if numeric_value:
+            return item.canonical_unit or "1", item.unit_display or "1", False
+        return None, None, False
+    if item.canonical_unit == "1" and not printed:
+        # 无量纲定量项(pH/比重):1 本身就是该结果的定义,不依赖印形单位。
+        if numeric_value:
+            return "1", item.unit_display or "1", False
+        return None, None, True
+    if kind == "arbitrary" and not printed:
+        return None, None, numeric_value
+    return None
+
+
+def _resolve_standard_unit_fields(
+    item: DictItem,
+    value: str | None,
+    ref: str | None,
+    printed: str | None,
+    numeric_value: bool,
+    numeric_ref: bool,
+) -> tuple[str | None, str | None, str | None, str | None, bool]:
+    """通用路径:词典单位解析、default_unit 回退、换算与 plausible 检查。"""
     out_value, out_ref = value, ref
     out_unit: str | None = None
     out_display: str | None = None
     unresolved = False
-
-    if kind == "ratio" and not printed:
-        # 计算项(PTR/INR/A/G)无印形单位;数值存在即按 ratio 的 UCUM 1 输出。
-        if numeric_value:
-            out_unit = item.canonical_unit or "1"
-            out_display = item.unit_display or "1"
-        return out_value, out_ref, out_unit, out_display, unresolved
-
-    if item.canonical_unit == "1" and not printed:
-        # 无量纲定量项(pH/比重):1 本身就是该结果的定义,不依赖印形单位。
-        if numeric_value:
-            out_unit = "1"
-            out_display = item.unit_display or "1"
-        else:
-            unresolved = True
-        return out_value, out_ref, out_unit, out_display, unresolved
-
-    if kind == "arbitrary" and not printed:
-        return out_value, out_ref, out_unit, out_display, numeric_value
 
     resolved = _resolve_standard_unit(item, printed)
     if (

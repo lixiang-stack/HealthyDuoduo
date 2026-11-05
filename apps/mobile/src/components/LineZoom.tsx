@@ -1,12 +1,12 @@
 // LineZoom 图像缩放至 OCR 行对应区域(核对三方对照的图像一侧;票 02 起详情页
 // 段落卡共用):行框并集经 zoomCrop 定位(整段行文尽可能大地装进视口);原始尺寸
 // 经 Image.getSize 取得。
-import { useEffect, useState } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from "react";
+import { Image, StyleSheet, Text, View } from "react-native";
 
-import type { OcrLineLink } from '../api/reports';
-import { colors } from './theme';
-import { unionBox, zoomCrop, type Size } from './zoom';
+import type { OcrLineLink } from "../api/reports";
+import { colors } from "./theme";
+import { unionBox, zoomCrop, type Size } from "./zoom";
 
 /** OCR 行缩放视口高(px):约三分之一屏宽,行文读到字级。 */
 const ZOOM_VIEWPORT_HEIGHT = 96;
@@ -29,43 +29,14 @@ export function LineZoom({
   highlight?: boolean;
 }) {
   const [viewport, setViewport] = useState<Size>();
-  const [imageState, setImageState] = useState<ImageState>();
+  const current = useNaturalSize(imageUrl);
+  const { crop, failed, highlightStyle } = lineZoomView(
+    current,
+    lines,
+    viewport,
+    highlight,
+  );
 
-  useEffect(() => {
-    let cancelled = false;
-    Image.getSize(
-      imageUrl,
-      (width, height) => {
-        if (!cancelled) {
-          setImageState({ url: imageUrl, natural: { width, height }, failed: false });
-        }
-      },
-      () => {
-        if (!cancelled) {
-          setImageState({ url: imageUrl, failed: true });
-        }
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [imageUrl]);
-
-  // 只认当前 URL 的加载结果;URL 变化时旧结果自然失效,无需在 effect 里同步清状态。
-  const current = imageState?.url === imageUrl ? imageState : undefined;
-  const crop = viewport && current?.natural ? zoomCrop(current.natural, lines, viewport) : undefined;
-  const failed = current?.failed ?? false;
-  const box = highlight ? unionBox(lines) : undefined;
-  const scale = crop && current?.natural ? crop.width / current.natural.width : undefined;
-  const highlightStyle =
-    box && crop && scale
-      ? {
-          left: crop.left + box.x * scale,
-          top: crop.top + box.y * scale,
-          width: box.w * scale,
-          height: box.h * scale,
-        }
-      : undefined;
   return (
     <View
       testID={testID}
@@ -78,7 +49,7 @@ export function LineZoom({
         <Image
           source={{ uri: imageUrl }}
           style={{
-            position: 'absolute',
+            position: "absolute",
             left: crop.left,
             top: crop.top,
             width: crop.width,
@@ -93,9 +64,68 @@ export function LineZoom({
           style={[styles.highlight, highlightStyle]}
         />
       ) : null}
-      {failed ? <Text style={styles.zoomHint}>图像区域载入失败,以上文原文与解析值为准</Text> : null}
+      {failed ? (
+        <Text style={styles.zoomHint}>
+          图像区域载入失败,以上文原文与解析值为准
+        </Text>
+      ) : null}
     </View>
   );
+}
+
+// 只认当前 URL 的图片尺寸结果;URL 变化时旧结果自然失效。
+function useNaturalSize(imageUrl: string): ImageState | undefined {
+  const [imageState, setImageState] = useState<ImageState>();
+  useEffect(() => {
+    let cancelled = false;
+    Image.getSize(
+      imageUrl,
+      (width, height) => {
+        if (!cancelled) {
+          setImageState({
+            url: imageUrl,
+            natural: { width, height },
+            failed: false,
+          });
+        }
+      },
+      () => {
+        if (!cancelled) {
+          setImageState({ url: imageUrl, failed: true });
+        }
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [imageUrl]);
+  return imageState?.url === imageUrl ? imageState : undefined;
+}
+
+function lineZoomView(
+  current: ImageState | undefined,
+  lines: OcrLineLink[],
+  viewport: Size | undefined,
+  highlight: boolean,
+) {
+  const crop =
+    viewport && current?.natural
+      ? zoomCrop(current.natural, lines, viewport)
+      : undefined;
+  const failed = current?.failed ?? false;
+  const box = highlight ? unionBox(lines) : undefined;
+  const scale =
+    crop && current?.natural ? crop.width / current.natural.width : undefined;
+  const highlightStyle =
+    box && crop && scale
+      ? {
+          left: crop.left + box.x * scale,
+          top: crop.top + box.y * scale,
+          width: box.w * scale,
+          height: box.h * scale,
+        }
+      : undefined;
+  return { crop, failed, highlightStyle };
 }
 
 const styles = StyleSheet.create({
@@ -104,14 +134,19 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: 8,
     marginTop: 4,
-    overflow: 'hidden',
-    justifyContent: 'center',
+    overflow: "hidden",
+    justifyContent: "center",
   },
   highlight: {
-    position: 'absolute',
+    position: "absolute",
     borderWidth: 2,
     borderColor: colors.accent,
     borderRadius: 3,
   },
-  zoomHint: { fontSize: 12, color: colors.muted, textAlign: 'center', paddingHorizontal: 8 },
+  zoomHint: {
+    fontSize: 12,
+    color: colors.muted,
+    textAlign: "center",
+    paddingHorizontal: 8,
+  },
 });

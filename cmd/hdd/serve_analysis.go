@@ -68,36 +68,59 @@ func parseAnalysisRequest(r *http.Request) (*parsedAnalysisRequest, int, string)
 	if err := decodeJSONBody(r, &body); err != nil {
 		return nil, http.StatusBadRequest, err.Error()
 	}
+	if status, message := validateAnalysisIdentity(body); status != 0 {
+		return nil, status, message
+	}
+	months, status, message := analysisWindow(body)
+	if status != 0 {
+		return nil, status, message
+	}
+	panel, status, message := resolveAnalysisPanel(body)
+	if status != 0 {
+		return nil, status, message
+	}
+	return &parsedAnalysisRequest{body: body, panel: panel, months: months}, 0, ""
+}
+
+func validateAnalysisIdentity(body httpapi.AnalysisRequest) (int, string) {
 	if body.MemberID <= 0 {
-		return nil, http.StatusBadRequest, "member_id is required"
+		return http.StatusBadRequest, "member_id is required"
 	}
 	if body.Entry != analysis.EntryPanel && body.Entry != analysis.EntryIndicator &&
 		body.Entry != analysis.EntryClinicalNote {
-		return nil, http.StatusBadRequest, invalidAnalysisEntry
+		return http.StatusBadRequest, invalidAnalysisEntry
 	}
+	return 0, ""
+}
+
+func analysisWindow(body httpapi.AnalysisRequest) (int, int, string) {
 	months := analysis.DefaultWindowMonths
 	if body.WindowMonths != nil {
 		months = *body.WindowMonths
 	}
 	if months != 6 && months != 12 && months != 24 {
-		return nil, http.StatusBadRequest, invalidAnalysisWindow
+		return 0, http.StatusBadRequest, invalidAnalysisWindow
 	}
+	return months, 0, ""
+}
+
+func resolveAnalysisPanel(body httpapi.AnalysisRequest) (string, int, string) {
 	panel := body.Panel
 	if !pipeline.IsValidPanel(panel) {
-		return nil, http.StatusBadRequest, invalidPanelMessage
+		return "", http.StatusBadRequest, invalidPanelMessage
 	}
 	if body.Entry == analysis.EntryClinicalNote {
 		panel = pipeline.PanelClinicalNote
 		if body.ReportSHA == nil || *body.ReportSHA == "" {
-			return nil, http.StatusBadRequest, analysisClinicalNoteNeeded
+			return "", http.StatusBadRequest, analysisClinicalNoteNeeded
 		}
 	} else if pipeline.IsNarrativePanel(panel) {
-		return nil, http.StatusBadRequest, narrativePanelMessage
+		return "", http.StatusBadRequest, narrativePanelMessage
 	}
 	if body.Entry == analysis.EntryIndicator && (body.IndicatorName == nil || *body.IndicatorName == "") {
-		return nil, http.StatusBadRequest, analysisIndicatorNeeded
+		return "", http.StatusBadRequest, analysisIndicatorNeeded
 	}
-	return &parsedAnalysisRequest{body: body, panel: panel, months: months}, 0, ""
+	return panel, 0, ""
 }
 
 // loadAnalysisInputs 读取成员与入口对应的指标点 / 病历 / 生长记录。

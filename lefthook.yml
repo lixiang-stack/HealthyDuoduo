@@ -44,6 +44,9 @@ pre-commit:
       run: cd apps/mobile && npm run codegen && git diff --exit-code -- src/api/schema.d.ts
     docs:
       run: python3 scripts/check-docs.py --staged
+    complexity:
+      # 非阻断信号:只报告新增/变复杂的函数;脚本始终 exit 0。
+      run: python3 scripts/complexity.py --staged || true
     path-case:
       run: python3 scripts/check-path-case.py --staged
     shell-syntax:
@@ -67,5 +70,7 @@ pre-push:
     git-policy:
       run: bash scripts/git/check-push.sh {1}
       use_stdin: true
+    complexity:
+      run: python3 scripts/complexity.py --push || true
     storage-tests:
       run: bash scripts/pre-push-storage.sh

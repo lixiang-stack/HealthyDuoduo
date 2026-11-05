@@ -119,6 +119,13 @@
 - 改存储 / 迁移或新增服务端派生字段时，跑 `scripts/test-db.sh`；fake 必须镜像真实派生规则，详见 `docs/agents/testing.md`。
 - 测试数据尽量用真实 golden，不用凭空捏造的占位数据。
 
+## 复杂度信号
+
+- commit / push 时 `scripts/complexity.py` 自动打印增量复杂度摘要，**不阻断**提交；`HDD_COMPLEXITY=0` 可跳过。
+- 看到 `new` 或 `increased` 时，读取 `$(git rev-parse --git-dir)/hdd-complexity/report.md`，判断能否低成本拆分；不拆则在 commit message 或回复里说明理由。
+- 存量函数不要求处理；全量盘点手动运行 `python3 scripts/complexity.py --audit`。
+- 阈值、增量口径与工具回退见 `docs/agents/complexity.md`。
+
 ## 文档规则
 
 核心：文档可追溯**需求与设计的变迁过程**。

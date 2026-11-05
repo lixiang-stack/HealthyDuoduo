@@ -494,8 +494,44 @@ function CompactItemRow({
   onOpen: (trend: PanelTrend) => void;
   onAnalyze: (name: string) => void;
 }) {
-  const latest = item.latest;
   const trend = panelTrendOf(item, reportTypeById);
+  return (
+    <View style={styles.compactRow}>
+      {trend ? (
+        <Pressable
+          testID={`panel-item-${index}`}
+          accessibilityRole="button"
+          onPress={() => onOpen(trend)}
+          style={styles.compactBody}
+        >
+          <CompactItemSummary item={item} index={index} />
+          <Text style={styles.detailLink}>查看趋势 ›</Text>
+        </Pressable>
+      ) : (
+        <View testID={`panel-item-${index}`} style={styles.compactBody}>
+          <CompactItemSummary item={item} index={index} />
+        </View>
+      )}
+      <Pressable
+        testID={`panel-item-analyze-${index}`}
+        accessibilityRole="button"
+        onPress={() => onAnalyze(item.name)}
+      >
+        <Text style={styles.detailLink}>分析这个指标 ›</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+// 正常/未知/未检测项的紧凑展示:名称、值、单位、参考范围与最近日期。
+function CompactItemSummary({
+  item,
+  index,
+}: {
+  item: PanelItem;
+  index: number;
+}) {
+  const latest = item.latest;
   const notTested = latest === null && item.not_tested_count > 0;
   const color = latest ? FLAG_COLORS[latest.flag] : colors.muted;
   const flagText = latest
@@ -507,7 +543,7 @@ function CompactItemRow({
     latest !== null && latest.low_confidence && !latest.reviewed;
   const value = latest?.value ?? (notTested ? "未检测" : "—");
 
-  const content = (
+  return (
     <>
       <View style={styles.compactHeader}>
         <Text style={styles.itemName}>{item.name}</Text>
@@ -542,33 +578,6 @@ function CompactItemRow({
         </Text>
       ) : null}
     </>
-  );
-
-  return (
-    <View style={styles.compactRow}>
-      {trend ? (
-        <Pressable
-          testID={`panel-item-${index}`}
-          accessibilityRole="button"
-          onPress={() => onOpen(trend)}
-          style={styles.compactBody}
-        >
-          {content}
-          <Text style={styles.detailLink}>查看趋势 ›</Text>
-        </Pressable>
-      ) : (
-        <View testID={`panel-item-${index}`} style={styles.compactBody}>
-          {content}
-        </View>
-      )}
-      <Pressable
-        testID={`panel-item-analyze-${index}`}
-        accessibilityRole="button"
-        onPress={() => onAnalyze(item.name)}
-      >
-        <Text style={styles.detailLink}>分析这个指标 ›</Text>
-      </Pressable>
-    </View>
   );
 }
 

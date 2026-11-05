@@ -215,19 +215,27 @@ func compareIntervalRef(vform, rform numForm) (string, string) {
 func compareBoundRef(vform, rform numForm) (string, string, bool) {
 	vUpper := vform.op == "<" || vform.op == "≤"
 	rUpper := rform.op == "<" || rform.op == "≤"
-	if vUpper && rUpper {
-		if vform.a < rform.a || (vform.a == rform.a && !(vform.op == "≤" && rform.op == "<")) {
-			return FlagNormal, "", true
-		}
-		return FlagUnknown, FlagReasonIndeterminate, true
+	if vUpper != rUpper {
+		return "", "", false
 	}
-	if !vUpper && !rUpper {
-		if vform.a > rform.a || (vform.a == rform.a && !(vform.op == "≥" && rform.op == ">")) {
-			return FlagNormal, "", true
-		}
-		return FlagUnknown, FlagReasonIndeterminate, true
+	if vUpper {
+		return compareUpperBounds(vform, rform)
 	}
-	return "", "", false
+	return compareLowerBounds(vform, rform)
+}
+
+func compareUpperBounds(vform, rform numForm) (string, string, bool) {
+	if vform.a < rform.a || (vform.a == rform.a && !(vform.op == "≤" && rform.op == "<")) {
+		return FlagNormal, "", true
+	}
+	return FlagUnknown, FlagReasonIndeterminate, true
+}
+
+func compareLowerBounds(vform, rform numForm) (string, string, bool) {
+	if vform.a > rform.a || (vform.a == rform.a && !(vform.op == "≥" && rform.op == ">")) {
+		return FlagNormal, "", true
+	}
+	return FlagUnknown, FlagReasonIndeterminate, true
 }
 
 // compareOneSidedRef 参考为单侧界(< / ≤ / > / ≥):按值域与界值的位置判定。
