@@ -38,39 +38,47 @@ type reviewBody struct {
 func (b reviewBody) reviewAction() (*pipeline.ReviewAction, error) {
 	switch b.Action {
 	case reviewActionConfirm:
-		if b.Value.set || b.Unit.set || b.Name.set || b.RefRange.set {
+		if b.hasCorrection() {
 			return nil, errors.New("confirm must not carry correction fields")
 		}
 		return &pipeline.ReviewAction{Confirm: true}, nil
 	case reviewActionNoReference:
-		if b.Value.set || b.Unit.set || b.Name.set || b.RefRange.set {
+		if b.hasCorrection() {
 			return nil, errors.New("no_reference must not carry correction fields")
 		}
 		return &pipeline.ReviewAction{NoReference: true}, nil
 	case reviewActionCorrect:
-		if !b.Value.set && !b.Unit.set && !b.Name.set && !b.RefRange.set {
+		if !b.hasCorrection() {
 			return nil, errors.New("correct requires at least one of value, unit, name, ref_range")
 		}
 		if b.Name.set && b.Name.value == "" {
 			return nil, errors.New("name must be a non-empty string")
 		}
-		action := &pipeline.ReviewAction{}
-		if b.Value.set {
-			action.Value = &b.Value.value
-		}
-		if b.Unit.set {
-			action.Unit = &b.Unit.value
-		}
-		if b.Name.set {
-			action.Name = &b.Name.value
-		}
-		if b.RefRange.set {
-			action.RefRange = &b.RefRange.value
-		}
-		return action, nil
+		return b.correctionAction(), nil
 	default:
 		return nil, errors.New(`action must be "confirm", "correct" or "no_reference"`)
 	}
+}
+
+func (b reviewBody) hasCorrection() bool {
+	return b.Value.set || b.Unit.set || b.Name.set || b.RefRange.set
+}
+
+func (b reviewBody) correctionAction() *pipeline.ReviewAction {
+	action := &pipeline.ReviewAction{}
+	if b.Value.set {
+		action.Value = &b.Value.value
+	}
+	if b.Unit.set {
+		action.Unit = &b.Unit.value
+	}
+	if b.Name.set {
+		action.Name = &b.Name.value
+	}
+	if b.RefRange.set {
+		action.RefRange = &b.RefRange.value
+	}
+	return action
 }
 
 // handleReviewItem PATCH /api/v1/reports/{report_id}/items/{item_id}:核对(确认/修正)。

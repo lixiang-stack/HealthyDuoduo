@@ -104,23 +104,42 @@ func (e *Explainer) Explain(ctx context.Context, analysisID int64, req Request, 
 		return nil, ExplanationReasonInputTooLarge
 	}
 	mapping = filterEvidenceMapping(pack, mapping)
-	if e.Quota != nil {
-		_, allowed, err := e.Quota.ConsumeLLMQuota(ctx, analysisID, e.DailyLimit)
-		if err != nil {
-			e.record(ctx, analysisID, EventLLMError, "consume quota: "+err.Error())
-			return nil, ExplanationReasonError
-		}
-		if !allowed {
-			e.record(ctx, analysisID, EventQuotaExhausted, "daily explanation quota exhausted")
-			return nil, ExplanationReasonQuotaExhausted
-		}
+	if reason := e.consumeQuota(ctx, analysisID); reason != "" {
+		return nil, reason
 	}
 	user, err := json.Marshal(pack)
 	if err != nil {
 		e.record(ctx, analysisID, EventLLMError, "marshal evidence: "+err.Error())
 		return nil, ExplanationReasonError
 	}
+	return e.complete(ctx, analysisID, user, entries, mapping)
+}
 
+// consumeQuota 解释层配额;空字符串表示放行。
+func (e *Explainer) consumeQuota(ctx context.Context, analysisID int64) string {
+	if e.Quota == nil {
+		return ""
+	}
+	_, allowed, err := e.Quota.ConsumeLLMQuota(ctx, analysisID, e.DailyLimit)
+	if err != nil {
+		e.record(ctx, analysisID, EventLLMError, "consume quota: "+err.Error())
+		return ExplanationReasonError
+	}
+	if !allowed {
+		e.record(ctx, analysisID, EventQuotaExhausted, "daily explanation quota exhausted")
+		return ExplanationReasonQuotaExhausted
+	}
+	return ""
+}
+
+// complete 调用模型并校验输出;失败时按原因记事件并返回省略原因。
+func (e *Explainer) complete(
+	ctx context.Context,
+	analysisID int64,
+	user []byte,
+	entries []KnowledgeEntry,
+	mapping EvidenceMapping,
+) (*Explanation, string) {
 	var lastReason string
 	for attempt := 0; attempt < llmMaxAttempts; attempt++ {
 		response, err := e.Client.Complete(ctx, LLMRequest{

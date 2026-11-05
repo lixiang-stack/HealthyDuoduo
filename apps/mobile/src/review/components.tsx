@@ -1,16 +1,21 @@
 // 核对交互组件(票 09):指标项核对卡(确认/修正/编辑器;核对页与详情页共用)与
 // OCR 行区域缩放对照 LineZoom。flag 只展示服务端返回值(修正后由服务端按值×范围
 // 重算),无手改入口;修正字段限 name/value/unit/ref_range 四项纸面事实。
-import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useState } from "react";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
-import type { ApiClient } from '../api/client';
-import { reviewItem, type ReportItem, type ReviewResult } from '../api/reports';
-import { LineZoom } from '../components/LineZoom';
-import { colors } from '../components/theme';
-import { FLAG_COLORS } from '../reports/colors';
-import { parseNumericForm, parseRefRange, stripLayout, type StripLayout } from '../reports/refRange';
-import { itemFlagLabel, MISSING_REF_RANGE_LABEL } from '../reports/status';
+import type { ApiClient } from "../api/client";
+import { reviewItem, type ReportItem, type ReviewResult } from "../api/reports";
+import { LineZoom } from "../components/LineZoom";
+import { colors } from "../components/theme";
+import { FLAG_COLORS } from "../reports/colors";
+import {
+  parseNumericForm,
+  parseRefRange,
+  stripLayout,
+  type StripLayout,
+} from "../reports/refRange";
+import { itemFlagLabel, MISSING_REF_RANGE_LABEL } from "../reports/status";
 import {
   buildCorrection,
   canMarkNoReference,
@@ -23,7 +28,7 @@ import {
   shouldShowZoom,
   unitStatusLabel,
   type CorrectionDraft,
-} from './items';
+} from "./items";
 
 // ReviewItemCard 指标项核对卡:与详情指标项同一展示(名称/值/单位/参考范围/条带/
 // 原文/低置信高亮)+ 核对状态标签、确认/修正动作与四项纸面事实编辑器。
@@ -48,9 +53,14 @@ export function ReviewItemCard({
   const [error, setError] = useState<string>();
 
   // 非编辑态直接用最新生效值;编辑态保留用户输入(单响应刷新不覆盖正在编辑的草稿)。
-  const currentDraft = editing ? (draft ?? draftFromItem(item)) : draftFromItem(item);
+  const currentDraft = editing
+    ? (draft ?? draftFromItem(item))
+    : draftFromItem(item);
   const correction = buildCorrection(item, currentDraft);
-  const layout = stripLayout(parseRefRange(item.ref_range), parseNumericForm(item.value));
+  const layout = stripLayout(
+    parseRefRange(item.ref_range),
+    parseNumericForm(item.value),
+  );
   const flagColor = FLAG_COLORS[item.flag];
   const statusLabel = reviewStatusLabel(item.review_status);
   const showZoom = shouldShowZoom(item, { open: zoomOpen, editing });
@@ -58,7 +68,9 @@ export function ReviewItemCard({
   const displayName = displayItemName(item);
   const displayUnit = displayItemUnit(item);
   const rawUnit = item.raw_unit ? `原文单位 ${item.raw_unit}` : null;
-  const unitMeta = [rawUnit, unitStatusLabel(item.unit_status)].filter(Boolean).join(' · ');
+  const unitMeta = [rawUnit, unitStatusLabel(item.unit_status)]
+    .filter(Boolean)
+    .join(" · ");
 
   const submit = async (request: Parameters<typeof reviewItem>[3]) => {
     setBusy(true);
@@ -68,43 +80,125 @@ export function ReviewItemCard({
       setEditing(false);
       setDraft(undefined);
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : String(submitError));
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : String(submitError),
+      );
     } finally {
       setBusy(false);
     }
   };
 
-  const field = (key: keyof CorrectionDraft, label: string) => (
-    <View style={styles.editorField} key={key}>
-      <Text style={styles.editorLabel}>{label}</Text>
-      <TextInput
-        testID={`review-field-${key}-${item.item_id}`}
-        style={styles.editorInput}
-        value={currentDraft[key]}
-        onChangeText={(text) =>
-          setDraft((prev) => ({ ...(prev ?? draftFromItem(item)), [key]: text }))
-        }
-        placeholder={label}
-        placeholderTextColor={colors.muted}
-      />
-    </View>
-  );
-
   return (
     <View
       testID={`review-item-${item.item_id}`}
-      style={[styles.itemCard, item.low_confidence && styles.itemCardLowConfidence]}
+      style={[
+        styles.itemCard,
+        item.low_confidence && styles.itemCardLowConfidence,
+      ]}
     >
+      <ReviewItemSummary
+        item={item}
+        displayName={displayName}
+        displayUnit={displayUnit}
+        flagColor={flagColor}
+        statusLabel={statusLabel}
+        layout={layout}
+        showZoom={showZoom}
+        showZoomToggle={item.ocr_lines.length > 0 && !editing}
+        imageUrl={imageUrl}
+        unitMeta={unitMeta}
+        onToggleZoom={() => setZoomOpen(!showZoom)}
+      />
+
+      {editing ? (
+        <ReviewItemEditor
+          item={item}
+          draft={currentDraft}
+          correction={correction}
+          busy={busy}
+          onSubmit={() => correction && void submit(correction)}
+          onCancel={() => {
+            setEditing(false);
+            setDraft(undefined);
+          }}
+          onChange={(key, text) =>
+            setDraft((prev) => ({
+              ...(prev ?? draftFromItem(item)),
+              [key]: text,
+            }))
+          }
+        />
+      ) : (
+        <ReviewItemActions
+          item={item}
+          actions={actions}
+          busy={busy}
+          onConfirm={() => void submit({ action: "confirm" })}
+          onBackfill={() => {
+            setDraft(undefined);
+            setEditing(true);
+          }}
+          onCorrect={() => {
+            setDraft(undefined);
+            setEditing(true);
+          }}
+          onNoReference={() => void submit({ action: "no_reference" })}
+        />
+      )}
+      {actions.helper ? (
+        <Text style={styles.itemHelper}>{actions.helper}</Text>
+      ) : null}
+      {error ? <Text style={styles.error}>核对失败:{error}</Text> : null}
+    </View>
+  );
+}
+
+// 指标项展示区:名称/值/参考范围/条带/原因/原图定位/原文与单位。
+function ReviewItemSummary({
+  item,
+  displayName,
+  displayUnit,
+  flagColor,
+  statusLabel,
+  layout,
+  showZoom,
+  showZoomToggle,
+  imageUrl,
+  unitMeta,
+  onToggleZoom,
+}: {
+  item: ReportItem;
+  displayName: string;
+  displayUnit: string | null;
+  flagColor: string;
+  statusLabel: string | undefined;
+  layout: StripLayout | null;
+  showZoom: boolean;
+  showZoomToggle: boolean;
+  imageUrl: string;
+  unitMeta: string;
+  onToggleZoom: () => void;
+}) {
+  return (
+    <>
       <View style={styles.itemHeader}>
         <Text style={styles.itemName}>{displayName}</Text>
         {item.low_confidence ? <Text style={styles.lowTag}>低置信</Text> : null}
-        {statusLabel ? <Text style={styles.reviewTag}>{statusLabel}</Text> : null}
-        <Text style={[styles.itemFlag, { color: flagColor }]}>{itemFlagLabel(item)}</Text>
+        {statusLabel ? (
+          <Text style={styles.reviewTag}>{statusLabel}</Text>
+        ) : null}
+        <Text style={[styles.itemFlag, { color: flagColor }]}>
+          {itemFlagLabel(item)}
+        </Text>
       </View>
       <View style={styles.itemValueRow}>
         <Text style={[styles.itemValue, { color: flagColor }]}>
-          {item.value ?? '—'}
-          {displayUnit ? <Text style={styles.itemUnit}> {displayUnit}</Text> : null}
+          {item.value ?? "—"}
+          {displayUnit ? (
+            <Text style={styles.itemUnit}> {displayUnit}</Text>
+          ) : null}
         </Text>
         {item.ref_range ? (
           <Text style={styles.itemRef}>参考 {item.ref_range}</Text>
@@ -113,8 +207,11 @@ export function ReviewItemCard({
         )}
       </View>
       {layout ? <MetricStrip layout={layout} color={flagColor} /> : null}
-      {item.flag === 'unknown' && flagReasonText(item.flag_reason) ? (
-        <Text testID={`review-reason-${item.item_id}`} style={styles.itemReason}>
+      {item.flag === "unknown" && flagReasonText(item.flag_reason) ? (
+        <Text
+          testID={`review-reason-${item.item_id}`}
+          style={styles.itemReason}
+        >
           {flagReasonText(item.flag_reason)}
         </Text>
       ) : null}
@@ -127,111 +224,161 @@ export function ReviewItemCard({
       ) : null}
       <Text style={styles.itemRaw}>原文:{item.raw_text}</Text>
       {unitMeta ? (
-        <Text testID={`review-unit-meta-${item.item_id}`} style={styles.itemRaw}>
+        <Text
+          testID={`review-unit-meta-${item.item_id}`}
+          style={styles.itemRaw}
+        >
           {unitMeta}
         </Text>
       ) : null}
-      {item.ocr_lines.length > 0 && !editing ? (
+      {showZoomToggle ? (
         <Pressable
           testID={`review-zoom-toggle-${item.item_id}`}
-          onPress={() => setZoomOpen(!showZoom)}
+          onPress={onToggleZoom}
         >
           <Text style={styles.zoomLink}>
-            {showZoom ? '收起原图定位' : '查看原图定位'}
+            {showZoom ? "收起原图定位" : "查看原图定位"}
           </Text>
         </Pressable>
       ) : null}
+    </>
+  );
+}
 
-      {editing ? (
-        <View style={styles.editor}>
-          {field('name', '名称')}
-          {field('value', '数值')}
-          {field('unit', '单位')}
-          {field('ref_range', '参考范围')}
-          <View style={styles.actions}>
-            <Pressable
-              testID={`review-save-${item.item_id}`}
-              style={[styles.actionPrimary, (!correction || busy) && styles.actionDisabled]}
-              disabled={!correction || busy}
-              onPress={() => correction && void submit(correction)}
-            >
-              <Text style={styles.actionPrimaryText}>保存修正</Text>
-            </Pressable>
-            <Pressable
-              testID={`review-cancel-${item.item_id}`}
-              style={styles.actionGhost}
-              disabled={busy}
-              onPress={() => {
-                setEditing(false);
-                setDraft(undefined);
-              }}
-            >
-              <Text style={styles.actionGhostText}>取消</Text>
-            </Pressable>
-          </View>
-        </View>
-      ) : (
-        <View style={styles.actions}>
-          {/* 可操作 unknown 只给补录主操作;低置信未核对给确认;其余无 filled。
-              每卡最多一个 filled primary(票 02 口径)。 */}
-          {actions.primary === 'confirm' ? (
-            <Pressable
-              testID={`review-confirm-${item.item_id}`}
-              style={[styles.actionPrimary, busy && styles.actionDisabled]}
-              disabled={busy}
-              onPress={() => void submit({ action: 'confirm' })}
-            >
-              <Text style={styles.actionPrimaryText}>确认</Text>
-            </Pressable>
-          ) : null}
-          {actions.primary === 'backfill' ? (
-            <Pressable
-              testID={`review-backfill-${item.item_id}`}
-              style={[styles.actionPrimary, busy && styles.actionDisabled]}
-              disabled={busy}
-              onPress={() => {
-                setDraft(undefined);
-                setEditing(true);
-              }}
-            >
-              <Text style={styles.actionPrimaryText}>补录缺失信息</Text>
-            </Pressable>
-          ) : null}
-          {actions.primary !== 'backfill' ? (
-            <Pressable
-              testID={`review-correct-${item.item_id}`}
-              style={styles.actionGhost}
-              disabled={busy}
-              onPress={() => {
-                setDraft(undefined);
-                setEditing(true);
-              }}
-            >
-              <Text style={styles.actionGhostText}>{actions.correctLabel}</Text>
-            </Pressable>
-          ) : null}
-          {canMarkNoReference(item) ? (
-            <Pressable
-              testID={`review-no-reference-${item.item_id}`}
-              style={styles.actionGhost}
-              disabled={busy}
-              onPress={() => void submit({ action: 'no_reference' })}
-            >
-              <Text style={styles.actionGhostText}>标记无参考范围</Text>
-            </Pressable>
-          ) : null}
-        </View>
-      )}
-      {actions.helper ? <Text style={styles.itemHelper}>{actions.helper}</Text> : null}
-      {error ? <Text style={styles.error}>核对失败:{error}</Text> : null}
+// 四项纸面事实编辑器:名称 / 数值 / 单位 / 参考范围;保存只发差异字段。
+function ReviewItemEditor({
+  item,
+  draft,
+  correction,
+  busy,
+  onSubmit,
+  onCancel,
+  onChange,
+}: {
+  item: ReportItem;
+  draft: CorrectionDraft;
+  correction: ReturnType<typeof buildCorrection>;
+  busy: boolean;
+  onSubmit: () => void;
+  onCancel: () => void;
+  onChange: (key: keyof CorrectionDraft, text: string) => void;
+}) {
+  const field = (key: keyof CorrectionDraft, label: string) => (
+    <View style={styles.editorField} key={key}>
+      <Text style={styles.editorLabel}>{label}</Text>
+      <TextInput
+        testID={`review-field-${key}-${item.item_id}`}
+        style={styles.editorInput}
+        value={draft[key]}
+        onChangeText={(text) => onChange(key, text)}
+        placeholder={label}
+        placeholderTextColor={colors.muted}
+      />
+    </View>
+  );
+
+  return (
+    <View style={styles.editor}>
+      {field("name", "名称")}
+      {field("value", "数值")}
+      {field("unit", "单位")}
+      {field("ref_range", "参考范围")}
+      <View style={styles.actions}>
+        <Pressable
+          testID={`review-save-${item.item_id}`}
+          style={[
+            styles.actionPrimary,
+            (!correction || busy) && styles.actionDisabled,
+          ]}
+          disabled={!correction || busy}
+          onPress={onSubmit}
+        >
+          <Text style={styles.actionPrimaryText}>保存修正</Text>
+        </Pressable>
+        <Pressable
+          testID={`review-cancel-${item.item_id}`}
+          style={styles.actionGhost}
+          disabled={busy}
+          onPress={onCancel}
+        >
+          <Text style={styles.actionGhostText}>取消</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
 
-// MetricStrip 参考范围条带(票 07 画法):条 = 正常区(中性灰;标量参考退化为细
-// 基准线),点 = 当前值(flag 色;空心 = 带不等号的非精确值,置于条端外),
-// 跨度条 = 区间值(spec:区间无点)。几何全部来自 stripLayout(纯逻辑)。
-function MetricStrip({ layout, color }: { layout: StripLayout; color: string }) {
+// 非编辑态动作:可操作 unknown 只给补录主操作;低置信未核对给确认;每卡最多一个 filled primary。
+function ReviewItemActions({
+  item,
+  actions,
+  busy,
+  onConfirm,
+  onBackfill,
+  onCorrect,
+  onNoReference,
+}: {
+  item: ReportItem;
+  actions: ReturnType<typeof reviewActions>;
+  busy: boolean;
+  onConfirm: () => void;
+  onBackfill: () => void;
+  onCorrect: () => void;
+  onNoReference: () => void;
+}) {
+  return (
+    <View style={styles.actions}>
+      {actions.primary === "confirm" ? (
+        <Pressable
+          testID={`review-confirm-${item.item_id}`}
+          style={[styles.actionPrimary, busy && styles.actionDisabled]}
+          disabled={busy}
+          onPress={onConfirm}
+        >
+          <Text style={styles.actionPrimaryText}>确认</Text>
+        </Pressable>
+      ) : null}
+      {actions.primary === "backfill" ? (
+        <Pressable
+          testID={`review-backfill-${item.item_id}`}
+          style={[styles.actionPrimary, busy && styles.actionDisabled]}
+          disabled={busy}
+          onPress={onBackfill}
+        >
+          <Text style={styles.actionPrimaryText}>补录缺失信息</Text>
+        </Pressable>
+      ) : null}
+      {actions.primary !== "backfill" ? (
+        <Pressable
+          testID={`review-correct-${item.item_id}`}
+          style={styles.actionGhost}
+          disabled={busy}
+          onPress={onCorrect}
+        >
+          <Text style={styles.actionGhostText}>{actions.correctLabel}</Text>
+        </Pressable>
+      ) : null}
+      {canMarkNoReference(item) ? (
+        <Pressable
+          testID={`review-no-reference-${item.item_id}`}
+          style={styles.actionGhost}
+          disabled={busy}
+          onPress={onNoReference}
+        >
+          <Text style={styles.actionGhostText}>标记无参考范围</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+function MetricStrip({
+  layout,
+  color,
+}: {
+  layout: StripLayout;
+  color: string;
+}) {
   const { band, marker } = layout;
   const scalarBand = band.start === band.end;
   return (
@@ -246,7 +393,7 @@ function MetricStrip({ layout, color }: { layout: StripLayout; color: string }) 
           },
         ]}
       />
-      {marker?.kind === 'span' ? (
+      {marker?.kind === "span" ? (
         <View
           style={[
             styles.stripSpan,
@@ -258,7 +405,7 @@ function MetricStrip({ layout, color }: { layout: StripLayout; color: string }) 
           ]}
         />
       ) : null}
-      {marker?.kind === 'dot' ? (
+      {marker?.kind === "dot" ? (
         <View
           style={[
             styles.stripDot,
@@ -280,7 +427,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   itemCardLowConfidence: { borderColor: colors.accent },
-  itemHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  itemHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
   itemName: { flex: 1, fontSize: 15, color: colors.text },
   lowTag: {
     fontSize: 11,
@@ -302,12 +449,12 @@ const styles = StyleSheet.create({
   },
   itemFlag: { fontSize: 13 },
   itemValueRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "baseline",
     gap: 8,
   },
-  itemValue: { fontSize: 20, fontVariant: ['tabular-nums'] },
+  itemValue: { fontSize: 20, fontVariant: ["tabular-nums"] },
   itemUnit: { fontSize: 13 },
   itemRef: { fontSize: 13, color: colors.muted },
   itemReason: { fontSize: 12, color: colors.muted, lineHeight: 18 },
@@ -321,16 +468,16 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   stripBand: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     bottom: 0,
     backgroundColor: colors.muted,
     borderRadius: 6,
   },
   stripBandLine: { marginLeft: -1, borderRadius: 1 },
-  stripSpan: { position: 'absolute', top: 4, height: 4, borderRadius: 2 },
+  stripSpan: { position: "absolute", top: 4, height: 4, borderRadius: 2 },
   stripDot: {
-    position: 'absolute',
+    position: "absolute",
     top: 1,
     width: 10,
     height: 10,
@@ -351,7 +498,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: colors.text,
   },
-  actions: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 4 },
+  actions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginTop: 4,
+  },
   actionPrimary: {
     paddingVertical: 8,
     paddingHorizontal: 16,

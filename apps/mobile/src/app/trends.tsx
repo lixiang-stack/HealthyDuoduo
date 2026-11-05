@@ -1,33 +1,40 @@
-import { Link, router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Link, router, useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
-import type { PanelItem, ReportSummary } from '../api/reports';
-import { AnalysisConsentModal } from '../analysis/ConsentModal';
-import { TimeRangeModal } from '../analysis/TimeRangeModal';
-import { useStartAnalysis } from '../analysis/useStartAnalysis';
-import { sharedStyles } from '../components/styles';
-import { colors } from '../components/theme';
-import { MemberChips } from '../members/components';
-import { useCurrentMember } from '../members/CurrentMemberContext';
-import { FLAG_COLORS } from '../reports/colors';
+import type { PanelItem, ReportSummary } from "../api/reports";
+import { AnalysisConsentModal } from "../analysis/ConsentModal";
+import { TimeRangeModal } from "../analysis/TimeRangeModal";
+import { useStartAnalysis } from "../analysis/useStartAnalysis";
+import { sharedStyles } from "../components/styles";
+import { colors } from "../components/theme";
+import { MemberChips } from "../members/components";
+import { useCurrentMember } from "../members/CurrentMemberContext";
+import { FLAG_COLORS } from "../reports/colors";
 import {
   panelTrendOf,
   type AbnormalPanelGroup,
   type PanelTrend,
-} from '../reports/panelOverview';
-import { panelLabel, type PanelCode } from '../reports/panels';
-import { flagLabel, panelDateLabel, refRangeLabel } from '../reports/status';
-import { TrendDetailSheet } from '../reports/TrendDetailSheet';
-import { TrendSparkline } from '../reports/TrendChart';
+} from "../reports/panelOverview";
+import { panelLabel, type PanelCode } from "../reports/panels";
+import { flagLabel, panelDateLabel, refRangeLabel } from "../reports/status";
+import { TrendDetailSheet } from "../reports/TrendDetailSheet";
+import { TrendSparkline } from "../reports/TrendChart";
 import {
   displayTrendUnit,
   formatSeriesMeta,
   TREND_UNAVAILABLE_LABEL,
-} from '../reports/trends';
-import { useAbnormalPanelGroups } from '../reports/useAbnormalPanelGroups';
-import { useMemberPanels } from '../reports/useMemberPanels';
-import { useMemberReports } from '../reports/useMemberReports';
+} from "../reports/trends";
+import { useAbnormalPanelGroups } from "../reports/useAbnormalPanelGroups";
+import { useMemberPanels } from "../reports/useMemberPanels";
+import { useMemberReports } from "../reports/useMemberReports";
 
 type SelectedTrend = PanelTrend & { panel: PanelCode };
 
@@ -38,25 +45,27 @@ export default function TrendsScreen() {
   const { currentMemberId, selectMember } = useCurrentMember();
   const { state: reportsState, reload } = useMemberReports(currentMemberId);
 
-  const ready = reportsState.status === 'ready';
+  const ready = reportsState.status === "ready";
   const selectedMemberId =
     ready && reportsState.hasCurrentMember ? currentMemberId : undefined;
   const selected = selectedMemberId !== undefined;
-  const reportsForCurrent = ready && reportsState.reportsMemberId === currentMemberId;
+  const reportsForCurrent =
+    ready && reportsState.reportsMemberId === currentMemberId;
   const switching = selected && !reportsForCurrent;
-  const reports = selected && reportsForCurrent ? reportsState.reports : undefined;
+  const reports =
+    selected && reportsForCurrent ? reportsState.reports : undefined;
   const members = ready ? reportsState.members : [];
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {reportsState.status === 'loading' || switching ? (
+      {reportsState.status === "loading" || switching ? (
         <View style={sharedStyles.horizontal}>
           <ActivityIndicator />
           <Text style={sharedStyles.muted}>正在加载异常指标…</Text>
         </View>
       ) : null}
 
-      {reportsState.status === 'unconfigured' ? (
+      {reportsState.status === "unconfigured" ? (
         <Text style={sharedStyles.muted}>
           尚未配置后端地址，请先到
           <Link href="/settings" style={styles.link}>
@@ -66,7 +75,7 @@ export default function TrendsScreen() {
         </Text>
       ) : null}
 
-      {reportsState.status === 'error' ? (
+      {reportsState.status === "error" ? (
         <View style={styles.stack}>
           <Text style={styles.fail}>加载失败:{reportsState.detail}</Text>
           <Pressable style={styles.button} onPress={() => void reload()}>
@@ -94,7 +103,9 @@ export default function TrendsScreen() {
                 onSelect={selectMember}
               />
               {selectedMemberId === undefined ? (
-                <Text style={sharedStyles.muted}>选择一个成员查看异常指标。</Text>
+                <Text style={sharedStyles.muted}>
+                  选择一个成员查看异常指标。
+                </Text>
               ) : reports === undefined ? null : reports.length === 0 ? (
                 <View testID="trend-empty-reports" style={styles.stack}>
                   <Text style={sharedStyles.muted}>这位成员还没有检查单。</Text>
@@ -115,9 +126,15 @@ export default function TrendsScreen() {
 
 // 项目列表就绪后再按 abnormal_count 取项目详情;未选成员 / 列表 loading 由外层与
 // 本组件的 loading 分支呈现。
-function AbnormalPanels({ memberId, reports }: { memberId: number; reports: ReportSummary[] }) {
+function AbnormalPanels({
+  memberId,
+  reports,
+}: {
+  memberId: number;
+  reports: ReportSummary[];
+}) {
   const { state, reload } = useMemberPanels(memberId);
-  const panels = state.status === 'ready' ? state.panels : undefined;
+  const panels = state.status === "ready" ? state.panels : undefined;
   const groupsState = useAbnormalPanelGroups(memberId, panels);
   const [detailTrend, setDetailTrend] = useState<SelectedTrend>();
   const analysis = useStartAnalysis(memberId, detailTrend?.panel);
@@ -141,67 +158,35 @@ function AbnormalPanels({ memberId, reports }: { memberId: number; reports: Repo
     reports.map((report) => [report.report_id, report.report_type]),
   );
   const errorDetail =
-    state.status === 'error'
+    state.status === "error"
       ? state.detail
-      : groupsState.status === 'error'
+      : groupsState.status === "error"
         ? groupsState.detail
         : undefined;
   const loading =
     !errorDetail &&
-    (state.status === 'loading' ||
-      (state.status === 'ready' &&
-        (groupsState.status === 'loading' || groupsState.status === 'idle')));
+    (state.status === "loading" ||
+      (state.status === "ready" &&
+        (groupsState.status === "loading" || groupsState.status === "idle")));
 
   return (
     <>
-      <View style={styles.stack}>
-        {loading ? (
-          <View style={sharedStyles.horizontal}>
-            <ActivityIndicator />
-            <Text style={sharedStyles.muted}>正在加载异常指标…</Text>
-          </View>
-        ) : null}
-
-        {!errorDetail &&
-        (state.status === 'unconfigured' || groupsState.status === 'unconfigured') ? (
-          <Text style={sharedStyles.muted}>
-            尚未配置后端地址，请先到
-            <Link href="/settings" style={styles.link}>
-              设置
-            </Link>
-            填写。
-          </Text>
-        ) : null}
-
-        {errorDetail ? (
-          <View style={styles.stack}>
-            <Text style={styles.fail}>加载失败:{errorDetail}</Text>
-            <Pressable style={styles.button} onPress={() => void reload()}>
-              <Text style={styles.buttonText}>重试</Text>
-            </Pressable>
-          </View>
-        ) : null}
-
-        {groupsState.status === 'ready' && groupsState.groups.length === 0 ? (
-          <View testID="trend-empty-abnormal" style={styles.stack}>
-            <Text style={sharedStyles.muted}>这位成员暂时没有异常指标。</Text>
-            <Link href="/timeline" style={styles.link}>
-              查看全部档案
-            </Link>
-          </View>
-        ) : null}
-
-        {groupsState.status === 'ready' && groupsState.groups.length > 0 ? (
-          <PanelGroups
-            groups={groupsState.groups}
-            reportTypeById={reportTypeById}
-            onSelectRow={openTrend}
-          />
-        ) : null}
-      </View>
+      <AbnormalPanelsBody
+        loading={loading}
+        errorDetail={errorDetail}
+        unconfigured={
+          !errorDetail &&
+          (state.status === "unconfigured" ||
+            groupsState.status === "unconfigured")
+        }
+        groups={groupsState.status === "ready" ? groupsState.groups : undefined}
+        reportTypeById={reportTypeById}
+        onRetry={() => void reload()}
+        onSelectRow={openTrend}
+      />
       {detailTrend ? (
         <TrendDetailSheet
-          key={`${detailTrend.panel}-${detailTrend.name}-${detailTrend.series.unit ?? ''}`}
+          key={`${detailTrend.panel}-${detailTrend.name}-${detailTrend.series.unit ?? ""}`}
           name={detailTrend.name}
           reportType={detailTrend.reportType}
           reportDate={detailTrend.reportDate}
@@ -213,12 +198,12 @@ function AbnormalPanels({ memberId, reports }: { memberId: number; reports: Repo
             setLastImageReportId(point.report_id);
             setSheetHidden(true);
             router.push({
-              pathname: '/image/[report_id]',
+              pathname: "/image/[report_id]",
               params: {
                 report_id: point.report_id,
                 name: detailTrend.name,
-                unit: detailTrend.series.unit ?? '',
-                report_date: point.report_date ?? '',
+                unit: detailTrend.series.unit ?? "",
+                report_date: point.report_date ?? "",
               },
             });
           }}
@@ -232,12 +217,12 @@ function AbnormalPanels({ memberId, reports }: { memberId: number; reports: Repo
             setSheetHidden(false);
             setLastImageReportId(undefined);
             setDetailTrend(undefined);
-            void analysis.start('indicator', name);
+            void analysis.start("indicator", name);
           }}
         />
       ) : null}
       <TimeRangeModal
-        key={analysis.rangeOpen ? 'range-open' : 'range-closed'}
+        key={analysis.rangeOpen ? "range-open" : "range-closed"}
         visible={analysis.rangeOpen}
         busy={analysis.starting}
         onConfirm={(months) => void analysis.confirmRange(months)}
@@ -250,6 +235,72 @@ function AbnormalPanels({ memberId, reports }: { memberId: number; reports: Repo
         onCancel={analysis.cancelConsent}
       />
     </>
+  );
+}
+
+// 异常指标列表的纯呈现:加载 / 未配置 / 错误 / 空态 / 分组。
+function AbnormalPanelsBody({
+  loading,
+  errorDetail,
+  unconfigured,
+  groups,
+  reportTypeById,
+  onRetry,
+  onSelectRow,
+}: {
+  loading: boolean;
+  errorDetail?: string;
+  unconfigured: boolean;
+  groups: AbnormalPanelGroup[] | undefined;
+  reportTypeById: Record<string, string>;
+  onRetry: () => void;
+  onSelectRow: (trend: SelectedTrend) => void;
+}) {
+  return (
+    <View style={styles.stack}>
+      {loading ? (
+        <View style={sharedStyles.horizontal}>
+          <ActivityIndicator />
+          <Text style={sharedStyles.muted}>正在加载异常指标…</Text>
+        </View>
+      ) : null}
+
+      {unconfigured ? (
+        <Text style={sharedStyles.muted}>
+          尚未配置后端地址，请先到
+          <Link href="/settings" style={styles.link}>
+            设置
+          </Link>
+          填写。
+        </Text>
+      ) : null}
+
+      {errorDetail ? (
+        <View style={styles.stack}>
+          <Text style={styles.fail}>加载失败:{errorDetail}</Text>
+          <Pressable style={styles.button} onPress={onRetry}>
+            <Text style={styles.buttonText}>重试</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
+      {groups !== undefined && groups.length === 0 ? (
+        <View testID="trend-empty-abnormal" style={styles.stack}>
+          <Text style={sharedStyles.muted}>这位成员暂时没有异常指标。</Text>
+          <Link href="/timeline" style={styles.link}>
+            查看全部档案
+          </Link>
+        </View>
+      ) : null}
+
+      {groups !== undefined && groups.length > 0 ? (
+        <PanelGroups
+          groups={groups}
+          reportTypeById={reportTypeById}
+          onSelectRow={onSelectRow}
+        />
+      ) : null}
+    </View>
   );
 }
 
@@ -277,17 +328,21 @@ function PanelGroups({
         灰色带 = 参考范围
       </Text>
       {groups.map((group, groupIndex) => (
-        <View key={group.panel} testID={`trend-panel-${groupIndex}`} style={styles.group}>
+        <View
+          key={group.panel}
+          testID={`trend-panel-${groupIndex}`}
+          style={styles.group}
+        >
           <View style={styles.groupHeader}>
             <Text style={styles.panelBadge}>{panelLabel(group.panel)}</Text>
             <Text style={styles.groupMeta}>
-              {panelDateLabel(group.reportDate, false)} ·{' '}
+              {panelDateLabel(group.reportDate, false)} ·{" "}
               <Text style={styles.groupCount}>{group.items.length} 项异常</Text>
             </Text>
           </View>
           {group.items.map((item, index) => (
             <AbnormalIndicatorCard
-              key={`${group.panel}-${item.key}-${item.unit ?? ''}`}
+              key={`${group.panel}-${item.key}-${item.unit ?? ""}`}
               panel={group.panel}
               item={item}
               index={starts[groupIndex] + index}
@@ -330,18 +385,23 @@ function AbnormalIndicatorCard({
       <View style={styles.cardHeader}>
         <Text style={styles.itemName}>{item.name}</Text>
         {lowConfidence ? <Text style={styles.lowTag}>低置信</Text> : null}
-        <Text style={[styles.flag, { color: flagColor }]}>{flagLabel(latest.flag)}</Text>
+        <Text style={[styles.flag, { color: flagColor }]}>
+          {flagLabel(latest.flag)}
+        </Text>
       </View>
       <View style={styles.valueRow}>
         <View style={styles.valueWithTag}>
           <Text style={[styles.value, { color: flagColor }]}>
-            {latest.value ?? '—'}
+            {latest.value ?? "—"}
             {displayTrendUnit(latest) ? (
               <Text style={styles.unit}> {displayTrendUnit(latest)}</Text>
             ) : null}
           </Text>
           {item.latest_report_not_tested ? (
-            <Text testID={`trend-item-not-tested-${index}`} style={styles.notTestedTag}>
+            <Text
+              testID={`trend-item-not-tested-${index}`}
+              style={styles.notTestedTag}
+            >
               最近一次未检测
             </Text>
           ) : null}
@@ -351,10 +411,15 @@ function AbnormalIndicatorCard({
       {trend.series.chartPoints.length === 0 ? (
         <Text style={styles.emptyChart}>{TREND_UNAVAILABLE_LABEL}</Text>
       ) : (
-        <TrendSparkline series={trend.series} name={item.name} testID={`trend-sparkline-${index}`} />
+        <TrendSparkline
+          series={trend.series}
+          name={item.name}
+          testID={`trend-sparkline-${index}`}
+        />
       )}
       <Text style={styles.meta}>
-        {panelLabel(panel)} · {formatSeriesMeta(trend.series, { reportDate: latest.report_date })}
+        {panelLabel(panel)} ·{" "}
+        {formatSeriesMeta(trend.series, { reportDate: latest.report_date })}
       </Text>
       <Text style={styles.detailLink}>查看趋势 ›</Text>
     </Pressable>
@@ -365,13 +430,23 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: 24, gap: 12 },
   stack: { gap: 12 },
-  summary: { fontSize: 15, color: colors.fail, fontWeight: '600' },
-  group: { gap: 8, borderLeftWidth: 3, borderLeftColor: colors.accent, paddingLeft: 10 },
-  groupHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  summary: { fontSize: 15, color: colors.fail, fontWeight: "600" },
+  group: {
+    gap: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.accent,
+    paddingLeft: 10,
+  },
+  groupHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flexWrap: "wrap",
+  },
   panelBadge: {
     fontSize: 13,
     color: colors.accent,
-    fontWeight: '600',
+    fontWeight: "600",
     borderWidth: 1,
     borderColor: colors.accent,
     borderRadius: 10,
@@ -379,7 +454,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   groupMeta: { fontSize: 13, color: colors.muted },
-  groupCount: { color: colors.fail, fontWeight: '600' },
+  groupCount: { color: colors.fail, fontWeight: "600" },
   card: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -387,7 +462,7 @@ const styles = StyleSheet.create({
     padding: 12,
     gap: 6,
   },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  cardHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
   itemName: { flex: 1, fontSize: 15, color: colors.text },
   lowTag: {
     fontSize: 11,
@@ -400,23 +475,29 @@ const styles = StyleSheet.create({
   },
   flag: { fontSize: 13 },
   valueRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "baseline",
     gap: 8,
   },
-  valueWithTag: { flex: 1, flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: 8 },
+  valueWithTag: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "baseline",
+    flexWrap: "wrap",
+    gap: 8,
+  },
   notTestedTag: { fontSize: 11, color: colors.muted },
-  value: { fontSize: 20, fontVariant: ['tabular-nums'] },
+  value: { fontSize: 20, fontVariant: ["tabular-nums"] },
   unit: { fontSize: 13 },
   ref: { fontSize: 13, color: colors.muted },
   emptyChart: { fontSize: 12, color: colors.muted },
   meta: { fontSize: 12, color: colors.muted, lineHeight: 18 },
-  detailLink: { alignSelf: 'flex-end', fontSize: 13, color: colors.accent },
+  detailLink: { alignSelf: "flex-end", fontSize: 13, color: colors.accent },
   fail: { fontSize: 13, color: colors.fail },
   link: { color: colors.accent, fontSize: 15 },
   button: {
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
     paddingVertical: 10,
     paddingHorizontal: 16,
     backgroundColor: colors.accent,

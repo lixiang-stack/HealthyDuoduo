@@ -1,38 +1,54 @@
-import { Link, router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Link,
+  router,
+  Stack,
+  useFocusEffect,
+  useLocalSearchParams,
+} from "expo-router";
+import { useCallback, useState } from "react";
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
-import type { PanelItem } from '../../api/reports';
-import { AnalysisConsentModal } from '../../analysis/ConsentModal';
-import { TimeRangeModal } from '../../analysis/TimeRangeModal';
-import { useStartAnalysis } from '../../analysis/useStartAnalysis';
-import { sharedStyles } from '../../components/styles';
-import { colors } from '../../components/theme';
-import { useCurrentMember } from '../../members/CurrentMemberContext';
-import { FLAG_COLORS } from '../../reports/colors';
+import type { PanelItem } from "../../api/reports";
+import { AnalysisConsentModal } from "../../analysis/ConsentModal";
+import { TimeRangeModal } from "../../analysis/TimeRangeModal";
+import { useStartAnalysis } from "../../analysis/useStartAnalysis";
+import { sharedStyles } from "../../components/styles";
+import { colors } from "../../components/theme";
+import { useCurrentMember } from "../../members/CurrentMemberContext";
+import { FLAG_COLORS } from "../../reports/colors";
 import {
   panelTrendOf,
   parsePanelParam,
   panelSourceLabel,
   splitPanelItems,
   type PanelTrend,
-} from '../../reports/panelOverview';
-import { panelLabel } from '../../reports/panels';
+} from "../../reports/panelOverview";
+import { panelLabel } from "../../reports/panels";
 import {
   DATE_UNKNOWN_LABEL,
   flagLabel,
   itemFlagLabel,
   panelDateLabel,
   refRangeLabel,
-} from '../../reports/status';
-import { TrendDetailSheet } from '../../reports/TrendDetailSheet';
-import { TrendSparkline } from '../../reports/TrendChart';
+} from "../../reports/status";
+import { TrendDetailSheet } from "../../reports/TrendDetailSheet";
+import { TrendSparkline } from "../../reports/TrendChart";
 import {
   displayTrendUnit,
   formatSeriesMeta,
   TREND_UNAVAILABLE_LABEL,
-} from '../../reports/trends';
-import { usePanelDetail } from '../../reports/usePanelDetail';
+} from "../../reports/trends";
+import {
+  usePanelDetail,
+  type PanelDetailState,
+} from "../../reports/usePanelDetail";
 
 /** 其余项超过此数时默认折叠(血常规等大项目)。 */
 const REST_COLLAPSED_THRESHOLD = 12;
@@ -64,22 +80,25 @@ export default function PanelDetailScreen() {
     setDetailTrend(trend);
   };
 
-  const detail = state.status === 'ready' ? state.detail : undefined;
-  const memberName = state.status === 'ready' ? state.memberName : undefined;
+  const detail = state.status === "ready" ? state.detail : undefined;
+  const memberName = state.status === "ready" ? state.memberName : undefined;
   const latestFailedReportId =
-    state.status === 'ready' ? state.latestFailedReportId : undefined;
-  const reportTypeById = state.status === 'ready' ? state.reportTypeById : {};
+    state.status === "ready" ? state.latestFailedReportId : undefined;
+  const reportTypeById = state.status === "ready" ? state.reportTypeById : {};
   const groups = detail ? splitPanelItems(detail.items) : undefined;
   const restCollapsed =
     groups !== undefined &&
     groups.rest.length > REST_COLLAPSED_THRESHOLD &&
     !restExpanded;
-  const title = panel ? panelLabel(panel) : '项目详情';
+  const title = panel ? panelLabel(panel) : "项目详情";
 
   return (
     <>
       <Stack.Screen options={{ title }} />
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+      >
         {panel === undefined ? (
           <View style={styles.stack}>
             <Text style={sharedStyles.muted}>这个项目不存在。</Text>
@@ -89,20 +108,25 @@ export default function PanelDetailScreen() {
           </View>
         ) : (
           <>
-            {state.status === 'loading' ? (
+            {state.status === "loading" ? (
               <View style={sharedStyles.horizontal}>
                 <ActivityIndicator />
                 <Text style={sharedStyles.muted}>正在加载项目详情…</Text>
               </View>
             ) : null}
 
-            {state.status === 'unconfigured' ? (
+            {state.status === "unconfigured" ? (
               <Text style={sharedStyles.muted}>
-                尚未配置后端地址,请先到<Link href="/settings" style={styles.link}>设置</Link>填写。
+                尚未配置后端地址,请先到
+                <Link href="/settings" style={styles.link}>
+                  设置
+                </Link>
+                填写。
               </Text>
             ) : null}
 
-            {currentMemberId === undefined && state.status !== 'unconfigured' ? (
+            {currentMemberId === undefined &&
+            state.status !== "unconfigured" ? (
               <View style={styles.stack}>
                 <Text style={sharedStyles.muted}>选择一个成员查看其档案。</Text>
                 <Link href="/" style={styles.link}>
@@ -111,7 +135,7 @@ export default function PanelDetailScreen() {
               </View>
             ) : null}
 
-            {state.status === 'error' ? (
+            {state.status === "error" ? (
               <View style={styles.stack}>
                 <Text style={styles.fail}>加载失败:{state.detail}</Text>
                 <Pressable style={styles.button} onPress={() => void reload()}>
@@ -121,128 +145,21 @@ export default function PanelDetailScreen() {
             ) : null}
 
             {detail && groups ? (
-              <View style={styles.stack}>
-                <Text testID="panel-detail-heading" style={styles.heading}>
-                  {title}
-                </Text>
-                <Text testID="panel-detail-meta" style={sharedStyles.muted}>
-                  {[
-                    memberName,
-                    panelDateLabel(detail.latest_report_date, detail.narrative, detail.panel),
-                    `${detail.report_count} 份报告`,
-                    `${groups.abnormal.length} 项异常`,
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </Text>
-                {panelSourceLabel(detail.panel, detail.report_types) ? (
-                  <Text testID="panel-source-label" style={sharedStyles.muted}>
-                    {panelSourceLabel(detail.panel, detail.report_types)}
-                  </Text>
-                ) : null}
-                <Pressable
-                  testID="panel-analyze"
-                  accessibilityRole="button"
-                  style={[styles.analyzeButton, analysis.starting && styles.analyzeButtonDisabled]}
-                  onPress={() => void analysis.start('panel')}
-                  disabled={analysis.starting}
-                >
-                  <Text style={styles.analyzeButtonText}>
-                    {analysis.starting ? '正在分析…' : '分析这个项目'}
-                  </Text>
-                </Pressable>
-                {analysis.error ? <Text style={styles.fail}>{analysis.error}</Text> : null}
-                {latestFailedReportId ? (
-                  <Link
-                    asChild
-                    href={{
-                      pathname: '/report/[report_id]',
-                      params: { report_id: latestFailedReportId },
-                    }}
-                  >
-                    <Pressable testID="panel-latest-failed">
-                      <Text style={styles.fail}>另有更新的一份识别失败报告 ›</Text>
-                    </Pressable>
-                  </Link>
-                ) : null}
-
-                {detail.items.length === 0 ? (
-                  <View testID="panel-empty" style={styles.stack}>
-                    <Text style={sharedStyles.muted}>这个项目还没有可展示的指标。</Text>
-                    <Pressable testID="panel-back-to-panels" onPress={() => router.back()}>
-                      <Text style={styles.link}>返回按项目</Text>
-                    </Pressable>
-                  </View>
-                ) : (
-                  <>
-                    {groups.abnormal.length > 0 ? (
-                      <>
-                        <Text testID="panel-abnormal-title" style={styles.sectionTitle}>
-                          异常 {groups.abnormal.length} 项
-                        </Text>
-                        <Text testID="panel-band-legend" style={styles.meta}>
-                          灰色带 = 参考范围
-                        </Text>
-                      </>
-                    ) : null}
-                    {groups.abnormal.map((item, index) => (
-                      <AbnormalItemCard
-                        key={`${item.key}-${item.unit ?? ''}`}
-                        item={item}
-                        index={index}
-                        reportTypeById={reportTypeById}
-                        onOpen={openTrend}
-                        onAnalyze={(name) => void analysis.start('indicator', name)}
-                      />
-                    ))}
-
-                    {groups.rest.length > 0 ? (
-                      <>
-                        <Pressable
-                          testID="panel-rest-toggle"
-                          disabled={groups.rest.length <= REST_COLLAPSED_THRESHOLD}
-                          onPress={() => setRestExpanded((prev) => !prev)}
-                        >
-                          <Text testID="panel-rest-title" style={styles.sectionTitle}>
-                            其余 {groups.rest.length} 项
-                            {groups.rest.length > REST_COLLAPSED_THRESHOLD
-                              ? restCollapsed
-                                ? ' ›'
-                                : ' ⌄'
-                              : ''}
-                          </Text>
-                        </Pressable>
-                        {!restCollapsed
-                          ? groups.rest.map((item, index) => (
-                              <CompactItemRow
-                                key={`${item.key}-${item.unit ?? ''}`}
-                                item={item}
-                                index={groups.abnormal.length + index}
-                                reportTypeById={reportTypeById}
-                                onOpen={openTrend}
-                                onAnalyze={(name) => void analysis.start('indicator', name)}
-                              />
-                            ))
-                          : null}
-                      </>
-                    ) : null}
-                  </>
-                )}
-
-                <Link
-                  asChild
-                  href={{
-                    pathname: '/timeline',
-                    params: { panel: detail.panel },
-                  }}
-                >
-                  <Pressable testID="panel-reports-link">
-                    <Text style={styles.link}>
-                      查看包含该项目的报告（{detail.report_count} 份）›
-                    </Text>
-                  </Pressable>
-                </Link>
-              </View>
+              <PanelDetailReadyView
+                detail={detail}
+                groups={groups}
+                title={title}
+                memberName={memberName}
+                latestFailedReportId={latestFailedReportId}
+                reportTypeById={reportTypeById}
+                analysis={analysis}
+                restCollapsed={restCollapsed}
+                onToggleRest={() => setRestExpanded((prev) => !prev)}
+                onOpenTrend={openTrend}
+                onAnalyzeIndicator={(name) =>
+                  void analysis.start("indicator", name)
+                }
+              />
             ) : null}
           </>
         )}
@@ -261,12 +178,12 @@ export default function PanelDetailScreen() {
             setLastImageReportId(point.report_id);
             setSheetHidden(true);
             router.push({
-              pathname: '/image/[report_id]',
+              pathname: "/image/[report_id]",
               params: {
                 report_id: point.report_id,
                 name: detailTrend.name,
-                unit: detailTrend.series.unit ?? '',
-                report_date: point.report_date ?? '',
+                unit: detailTrend.series.unit ?? "",
+                report_date: point.report_date ?? "",
               },
             });
           }}
@@ -280,12 +197,12 @@ export default function PanelDetailScreen() {
             setSheetHidden(false);
             setLastImageReportId(undefined);
             setDetailTrend(undefined);
-            void analysis.start('indicator', name);
+            void analysis.start("indicator", name);
           }}
         />
       ) : null}
       <TimeRangeModal
-        key={analysis.rangeOpen ? 'range-open' : 'range-closed'}
+        key={analysis.rangeOpen ? "range-open" : "range-closed"}
         visible={analysis.rangeOpen}
         busy={analysis.starting}
         onConfirm={(months) => void analysis.confirmRange(months)}
@@ -297,6 +214,197 @@ export default function PanelDetailScreen() {
         onConfirm={() => void analysis.confirmConsent()}
         onCancel={analysis.cancelConsent}
       />
+    </>
+  );
+}
+
+type PanelGroups = ReturnType<typeof splitPanelItems>;
+type ReadyPanelDetailState = Extract<PanelDetailState, { status: "ready" }>;
+
+function PanelDetailReadyView({
+  detail,
+  groups,
+  title,
+  memberName,
+  latestFailedReportId,
+  reportTypeById,
+  analysis,
+  restCollapsed,
+  onToggleRest,
+  onOpenTrend,
+  onAnalyzeIndicator,
+}: {
+  detail: ReadyPanelDetailState["detail"];
+  groups: PanelGroups;
+  title: string;
+  memberName?: string;
+  latestFailedReportId?: string;
+  reportTypeById: Record<string, string>;
+  analysis: ReturnType<typeof useStartAnalysis>;
+  restCollapsed: boolean;
+  onToggleRest: () => void;
+  onOpenTrend: (trend: PanelTrend) => void;
+  onAnalyzeIndicator: (name: string) => void;
+}) {
+  return (
+    <View style={styles.stack}>
+      <Text testID="panel-detail-heading" style={styles.heading}>
+        {title}
+      </Text>
+      <Text testID="panel-detail-meta" style={sharedStyles.muted}>
+        {[
+          memberName,
+          panelDateLabel(
+            detail.latest_report_date,
+            detail.narrative,
+            detail.panel,
+          ),
+          `${detail.report_count} 份报告`,
+          `${groups.abnormal.length} 项异常`,
+        ]
+          .filter(Boolean)
+          .join(" · ")}
+      </Text>
+      {panelSourceLabel(detail.panel, detail.report_types) ? (
+        <Text testID="panel-source-label" style={sharedStyles.muted}>
+          {panelSourceLabel(detail.panel, detail.report_types)}
+        </Text>
+      ) : null}
+      <Pressable
+        testID="panel-analyze"
+        accessibilityRole="button"
+        style={[
+          styles.analyzeButton,
+          analysis.starting && styles.analyzeButtonDisabled,
+        ]}
+        onPress={() => void analysis.start("panel")}
+        disabled={analysis.starting}
+      >
+        <Text style={styles.analyzeButtonText}>
+          {analysis.starting ? "正在分析…" : "分析这个项目"}
+        </Text>
+      </Pressable>
+      {analysis.error ? (
+        <Text style={styles.fail}>{analysis.error}</Text>
+      ) : null}
+      {latestFailedReportId ? (
+        <Link
+          asChild
+          href={{
+            pathname: "/report/[report_id]",
+            params: { report_id: latestFailedReportId },
+          }}
+        >
+          <Pressable testID="panel-latest-failed">
+            <Text style={styles.fail}>另有更新的一份识别失败报告 ›</Text>
+          </Pressable>
+        </Link>
+      ) : null}
+
+      <PanelItemsSection
+        groups={groups}
+        reportTypeById={reportTypeById}
+        restCollapsed={restCollapsed}
+        onToggleRest={onToggleRest}
+        onOpenTrend={onOpenTrend}
+        onAnalyzeIndicator={onAnalyzeIndicator}
+      />
+
+      <Link
+        asChild
+        href={{
+          pathname: "/timeline",
+          params: { panel: detail.panel },
+        }}
+      >
+        <Pressable testID="panel-reports-link">
+          <Text style={styles.link}>
+            查看包含该项目的报告（{detail.report_count} 份）›
+          </Text>
+        </Pressable>
+      </Link>
+    </View>
+  );
+}
+
+function PanelItemsSection({
+  groups,
+  reportTypeById,
+  restCollapsed,
+  onToggleRest,
+  onOpenTrend,
+  onAnalyzeIndicator,
+}: {
+  groups: PanelGroups;
+  reportTypeById: Record<string, string>;
+  restCollapsed: boolean;
+  onToggleRest: () => void;
+  onOpenTrend: (trend: PanelTrend) => void;
+  onAnalyzeIndicator: (name: string) => void;
+}) {
+  if (groups.abnormal.length === 0 && groups.rest.length === 0) {
+    return (
+      <View testID="panel-empty" style={styles.stack}>
+        <Text style={sharedStyles.muted}>这个项目还没有可展示的指标。</Text>
+        <Pressable testID="panel-back-to-panels" onPress={() => router.back()}>
+          <Text style={styles.link}>返回按项目</Text>
+        </Pressable>
+      </View>
+    );
+  }
+  return (
+    <>
+      {groups.abnormal.length > 0 ? (
+        <>
+          <Text testID="panel-abnormal-title" style={styles.sectionTitle}>
+            异常 {groups.abnormal.length} 项
+          </Text>
+          <Text testID="panel-band-legend" style={styles.meta}>
+            灰色带 = 参考范围
+          </Text>
+        </>
+      ) : null}
+      {groups.abnormal.map((item, index) => (
+        <AbnormalItemCard
+          key={`${item.key}-${item.unit ?? ""}`}
+          item={item}
+          index={index}
+          reportTypeById={reportTypeById}
+          onOpen={onOpenTrend}
+          onAnalyze={onAnalyzeIndicator}
+        />
+      ))}
+
+      {groups.rest.length > 0 ? (
+        <>
+          <Pressable
+            testID="panel-rest-toggle"
+            disabled={groups.rest.length <= REST_COLLAPSED_THRESHOLD}
+            onPress={onToggleRest}
+          >
+            <Text testID="panel-rest-title" style={styles.sectionTitle}>
+              其余 {groups.rest.length} 项
+              {groups.rest.length > REST_COLLAPSED_THRESHOLD
+                ? restCollapsed
+                  ? " ›"
+                  : " ⌄"
+                : ""}
+            </Text>
+          </Pressable>
+          {!restCollapsed
+            ? groups.rest.map((item, index) => (
+                <CompactItemRow
+                  key={`${item.key}-${item.unit ?? ""}`}
+                  item={item}
+                  index={groups.abnormal.length + index}
+                  reportTypeById={reportTypeById}
+                  onOpen={onOpenTrend}
+                  onAnalyze={onAnalyzeIndicator}
+                />
+              ))
+            : null}
+        </>
+      ) : null}
     </>
   );
 }
@@ -334,13 +442,16 @@ function AbnormalItemCard({
         <View style={styles.valueRow}>
           <View style={styles.valueWithTag}>
             <Text style={[styles.value, { color }]}>
-              {latest.value ?? '—'}
+              {latest.value ?? "—"}
               {latest && displayTrendUnit(latest) ? (
                 <Text style={styles.unit}> {displayTrendUnit(latest)}</Text>
               ) : null}
             </Text>
             {item.latest_report_not_tested ? (
-              <Text testID={`panel-item-not-tested-${index}`} style={styles.notTestedTag}>
+              <Text
+                testID={`panel-item-not-tested-${index}`}
+                style={styles.notTestedTag}
+              >
                 最近一次未检测
               </Text>
             ) : null}
@@ -387,9 +498,14 @@ function CompactItemRow({
   const trend = panelTrendOf(item, reportTypeById);
   const notTested = latest === null && item.not_tested_count > 0;
   const color = latest ? FLAG_COLORS[latest.flag] : colors.muted;
-  const flagText = latest ? itemFlagLabel({ flag: latest.flag }) : notTested ? '未检测' : '—';
-  const lowConfidence = latest !== null && latest.low_confidence && !latest.reviewed;
-  const value = latest?.value ?? (notTested ? '未检测' : '—');
+  const flagText = latest
+    ? itemFlagLabel({ flag: latest.flag })
+    : notTested
+      ? "未检测"
+      : "—";
+  const lowConfidence =
+    latest !== null && latest.low_confidence && !latest.reviewed;
+  const value = latest?.value ?? (notTested ? "未检测" : "—");
 
   const content = (
     <>
@@ -407,17 +523,22 @@ function CompactItemRow({
             ) : null}
           </Text>
           {item.latest_report_not_tested && latest ? (
-            <Text testID={`panel-item-not-tested-${index}`} style={styles.notTestedTag}>
+            <Text
+              testID={`panel-item-not-tested-${index}`}
+              style={styles.notTestedTag}
+            >
               最近一次未检测
             </Text>
           ) : null}
         </View>
-        <Text style={styles.ref}>{latest ? refRangeLabel(item.ref_range) : ''}</Text>
+        <Text style={styles.ref}>
+          {latest ? refRangeLabel(item.ref_range) : ""}
+        </Text>
       </View>
       {latest ? (
         <Text testID={`panel-item-date-${index}`} style={styles.meta}>
           {latest.report_date ?? DATE_UNKNOWN_LABEL}
-          {item.report_count > 1 ? ` · ${item.report_count} 份报告` : ''}
+          {item.report_count > 1 ? ` · ${item.report_count} 份报告` : ""}
         </Text>
       ) : null}
     </>
@@ -455,7 +576,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: 24, gap: 12, paddingBottom: 32 },
   stack: { gap: 12 },
-  heading: { fontSize: 22, color: colors.text, fontWeight: '600' },
+  heading: { fontSize: 22, color: colors.text, fontWeight: "600" },
   sectionTitle: { fontSize: 13, color: colors.muted, marginTop: 4 },
   card: {
     borderWidth: 1,
@@ -465,7 +586,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   cardBody: { gap: 6 },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  cardHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
   compactRow: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -474,7 +595,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   compactBody: { gap: 4 },
-  compactHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  compactHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
   itemName: { flex: 1, fontSize: 15, color: colors.text },
   lowTag: {
     fontSize: 11,
@@ -488,21 +609,27 @@ const styles = StyleSheet.create({
   notTestedTag: { fontSize: 11, color: colors.muted },
   flag: { fontSize: 13 },
   valueRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "baseline",
     gap: 8,
   },
-  valueWithTag: { flex: 1, flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: 8 },
-  value: { fontSize: 20, fontVariant: ['tabular-nums'] },
-  compactValue: { fontSize: 16, fontVariant: ['tabular-nums'] },
+  valueWithTag: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "baseline",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  value: { fontSize: 20, fontVariant: ["tabular-nums"] },
+  compactValue: { fontSize: 16, fontVariant: ["tabular-nums"] },
   unit: { fontSize: 13 },
   ref: { fontSize: 13, color: colors.muted },
   emptyChart: { fontSize: 12, color: colors.muted },
   meta: { fontSize: 12, color: colors.muted, lineHeight: 18 },
-  detailLink: { alignSelf: 'flex-end', fontSize: 13, color: colors.accent },
+  detailLink: { alignSelf: "flex-end", fontSize: 13, color: colors.accent },
   analyzeButton: {
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
     paddingVertical: 10,
     paddingHorizontal: 16,
     backgroundColor: colors.accent,
@@ -513,7 +640,7 @@ const styles = StyleSheet.create({
   fail: { fontSize: 13, color: colors.fail },
   link: { color: colors.accent, fontSize: 15 },
   button: {
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
     paddingVertical: 10,
     paddingHorizontal: 16,
     backgroundColor: colors.accent,

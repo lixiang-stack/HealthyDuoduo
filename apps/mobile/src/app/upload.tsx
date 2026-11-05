@@ -1,17 +1,29 @@
-import { Link, useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Link, useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
-import { listMembers, type Member } from '../api/members';
-import { uploadReport } from '../api/reports';
-import { resolveApiClient, type ResolvedApiClient } from '../api/resolveClient';
-import { sharedStyles } from '../components/styles';
-import { colors } from '../components/theme';
-import { MemberChips } from '../members/components';
-import { useCurrentMember } from '../members/CurrentMemberContext';
-import { pickImage, type ImageSource, type PickedImage } from '../platform/imagePicker';
-import { needsReview } from '../review/items';
-import { uploadResultText, uploadWaitText } from '../reports/status';
+import { listMembers, type Member } from "../api/members";
+import { uploadReport } from "../api/reports";
+import { resolveApiClient, type ResolvedApiClient } from "../api/resolveClient";
+import { sharedStyles } from "../components/styles";
+import { colors } from "../components/theme";
+import { MemberChips } from "../members/components";
+import { useCurrentMember } from "../members/CurrentMemberContext";
+import {
+  pickImage,
+  type ImageSource,
+  type PickedImage,
+} from "../platform/imagePicker";
+import { needsReview } from "../review/items";
+import { uploadResultText, uploadWaitText } from "../reports/status";
 import {
   appendPickedImages,
   MAX_UPLOAD_IMAGES,
@@ -20,18 +32,18 @@ import {
   uploadImagesSerially,
   uploadOutcomeLabel,
   type UploadOutcome,
-} from '../reports/uploadBatch';
+} from "../reports/uploadBatch";
 
 // 上传页(票 06;多图批次):相册多选/拍照逐张追加 → 确认归属成员(整批同一成员)
 // → 逐张串行 multipart 直传、同步等待识别。单张失败不阻断后续;整批完成后
 // 逐行给出核对/查看入口,只重试传输失败的图。
 type ScreenState =
-  | { status: 'loading' }
-  | { status: 'unconfigured' }
-  | { status: 'error'; detail: string }
-  | { status: 'ready'; members: Member[] };
+  | { status: "loading" }
+  | { status: "unconfigured" }
+  | { status: "error"; detail: string }
+  | { status: "ready"; members: Member[] };
 
-type UploadPhase = 'idle' | 'uploading' | 'done';
+type UploadPhase = "idle" | "uploading" | "done";
 
 function rowStatusText(
   outcome: UploadOutcome | undefined,
@@ -41,16 +53,16 @@ function rowStatusText(
   if (outcome !== undefined) {
     return uploadOutcomeLabel(outcome);
   }
-  if (phase !== 'uploading') {
+  if (phase !== "uploading") {
     return undefined;
   }
-  return active ? '识别中…' : '等待识别';
+  return active ? "识别中…" : "等待识别";
 }
 
 function summaryText(settled: UploadOutcome[]): string {
   if (settled.length === 1) {
     const [outcome] = settled;
-    return outcome.kind === 'done'
+    return outcome.kind === "done"
       ? uploadResultText(outcome.result)
       : `上传失败:${outcome.message}`;
   }
@@ -60,7 +72,9 @@ function summaryText(settled: UploadOutcome[]): string {
 function summaryFailed(settled: UploadOutcome[]): boolean {
   if (settled.length === 1) {
     const [outcome] = settled;
-    return outcome.kind === 'failed' || outcome.result.report.status === 'failed';
+    return (
+      outcome.kind === "failed" || outcome.result.report.status === "failed"
+    );
   }
   return uploadBatchCounts(settled).failed > 0;
 }
@@ -97,17 +111,20 @@ function UploadRow({
           </Text>
         ) : null}
       </View>
-      {phase === 'idle' ? (
-        <Pressable testID={`upload-remove-${index}`} onPress={() => onRemove(index)}>
+      {phase === "idle" ? (
+        <Pressable
+          testID={`upload-remove-${index}`}
+          onPress={() => onRemove(index)}
+        >
           <Text style={styles.link}>移除</Text>
         </Pressable>
       ) : null}
-      {phase === 'done' && outcome?.kind === 'done' ? (
+      {phase === "done" && outcome?.kind === "done" ? (
         needsReview(outcome.result.report) ? (
           <Link
             asChild
             href={{
-              pathname: '/review/[report_id]',
+              pathname: "/review/[report_id]",
               params: { report_id: outcome.result.report.report_id },
             }}
           >
@@ -119,7 +136,7 @@ function UploadRow({
           <Link
             asChild
             href={{
-              pathname: '/report/[report_id]',
+              pathname: "/report/[report_id]",
               params: { report_id: outcome.result.report.report_id },
             }}
           >
@@ -137,7 +154,7 @@ function rowStatusStyle(outcome: UploadOutcome | undefined) {
   if (outcome === undefined) {
     return sharedStyles.muted;
   }
-  if (outcome.kind === 'failed' || outcome.result.report.status === 'failed') {
+  if (outcome.kind === "failed" || outcome.result.report.status === "failed") {
     return styles.fail;
   }
   if (!outcome.result.duplicate && needsReview(outcome.result.report)) {
@@ -148,10 +165,10 @@ function rowStatusStyle(outcome: UploadOutcome | undefined) {
 
 export default function UploadScreen() {
   const { currentMemberId, selectMember } = useCurrentMember();
-  const [state, setState] = useState<ScreenState>({ status: 'loading' });
+  const [state, setState] = useState<ScreenState>({ status: "loading" });
   const [images, setImages] = useState<PickedImage[]>([]);
   const [outcomes, setOutcomes] = useState<(UploadOutcome | undefined)[]>([]);
-  const [phase, setPhase] = useState<UploadPhase>('idle');
+  const [phase, setPhase] = useState<UploadPhase>("idle");
   const [activeIndex, setActiveIndex] = useState<number>();
   const [picking, setPicking] = useState(false);
   const [pickMessage, setPickMessage] = useState<string>();
@@ -160,13 +177,19 @@ export default function UploadScreen() {
   const reload = useCallback(async () => {
     const resolved = await resolveApiClient();
     if (!resolved) {
-      setState({ status: 'unconfigured' });
+      setState({ status: "unconfigured" });
       return;
     }
     try {
-      setState({ status: 'ready', members: await listMembers(resolved.client) });
+      setState({
+        status: "ready",
+        members: await listMembers(resolved.client),
+      });
     } catch (error) {
-      setState({ status: 'error', detail: error instanceof Error ? error.message : String(error) });
+      setState({
+        status: "error",
+        detail: error instanceof Error ? error.message : String(error),
+      });
     }
   }, []);
 
@@ -179,7 +202,7 @@ export default function UploadScreen() {
   // 上传等待计时:超时阈值后展示确认后端可达的提示(此处不中止请求;
   // 单张请求由 uploadReport 的 180s 超时兜底)。
   useEffect(() => {
-    if (phase !== 'uploading') {
+    if (phase !== "uploading") {
       return;
     }
     const startedAt = Date.now();
@@ -189,7 +212,7 @@ export default function UploadScreen() {
 
   const onPick = useCallback(
     async (source: ImageSource) => {
-      if (phase !== 'idle' || picking) {
+      if (phase !== "idle" || picking) {
         return;
       }
       const remaining = MAX_UPLOAD_IMAGES - images.length;
@@ -202,20 +225,28 @@ export default function UploadScreen() {
       try {
         const result = await pickImage(source, remaining);
         switch (result.kind) {
-          case 'picked': {
-            const { images: next, discarded } = appendPickedImages(images, result.images);
+          case "picked": {
+            const { images: next, discarded } = appendPickedImages(
+              images,
+              result.images,
+            );
             const accepted = next.length - images.length;
             setImages(next);
-            setOutcomes((prev) => [...prev, ...Array.from({ length: accepted }, () => undefined)]);
+            setOutcomes((prev) => [
+              ...prev,
+              ...Array.from({ length: accepted }, () => undefined),
+            ]);
             if (discarded > 0) {
-              setPickMessage(`最多 ${MAX_UPLOAD_IMAGES} 张,已忽略多选的 ${discarded} 张`);
+              setPickMessage(
+                `最多 ${MAX_UPLOAD_IMAGES} 张,已忽略多选的 ${discarded} 张`,
+              );
             }
             break;
           }
-          case 'cancelled':
+          case "cancelled":
             break;
-          case 'denied':
-            setPickMessage('需要相机/相册权限才能选择检查单照片');
+          case "denied":
+            setPickMessage("需要相机/相册权限才能选择检查单照片");
             break;
         }
       } catch (error) {
@@ -229,7 +260,7 @@ export default function UploadScreen() {
 
   const onRemove = useCallback(
     (index: number) => {
-      if (phase !== 'idle') {
+      if (phase !== "idle") {
         return;
       }
       setImages((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
@@ -238,18 +269,24 @@ export default function UploadScreen() {
     [phase],
   );
 
-  const members = state.status === 'ready' ? state.members : [];
+  const members = state.status === "ready" ? state.members : [];
   // 仅当持久化的当前成员仍在服务端列表里才算已选择(清库/换后端后旧 id 可能已失效)。
-  const selectedMemberId = members.find((m) => m.member_id === currentMemberId)?.member_id;
+  const selectedMemberId = members.find(
+    (m) => m.member_id === currentMemberId,
+  )?.member_id;
 
   const runUpload = useCallback(
     async (indexes: number[]) => {
-      if (selectedMemberId === undefined || indexes.length === 0 || phase === 'uploading') {
+      if (
+        selectedMemberId === undefined ||
+        indexes.length === 0 ||
+        phase === "uploading"
+      ) {
         return;
       }
       const memberId = selectedMemberId;
       setPickMessage(undefined);
-      setPhase('uploading');
+      setPhase("uploading");
       setElapsedMs(0);
       setActiveIndex(undefined);
 
@@ -257,18 +294,23 @@ export default function UploadScreen() {
       try {
         resolved = await resolveApiClient();
       } catch (error) {
-        setState({ status: 'error', detail: error instanceof Error ? error.message : String(error) });
-        setPhase('idle');
+        setState({
+          status: "error",
+          detail: error instanceof Error ? error.message : String(error),
+        });
+        setPhase("idle");
         return;
       }
       if (!resolved) {
-        setState({ status: 'unconfigured' });
-        setPhase('idle');
+        setState({ status: "unconfigured" });
+        setPhase("idle");
         return;
       }
 
       setOutcomes((prev) =>
-        prev.map((outcome, index) => (indexes.includes(index) ? undefined : outcome)),
+        prev.map((outcome, index) =>
+          indexes.includes(index) ? undefined : outcome,
+        ),
       );
       const client = resolved.client;
       try {
@@ -288,22 +330,24 @@ export default function UploadScreen() {
         );
       } finally {
         setActiveIndex(undefined);
-        setPhase('done');
+        setPhase("done");
       }
     },
     [selectedMemberId, images, phase],
   );
 
-  const settled = outcomes.filter((outcome): outcome is UploadOutcome => outcome !== undefined);
+  const settled = outcomes.filter(
+    (outcome): outcome is UploadOutcome => outcome !== undefined,
+  );
   const retryIndexes = outcomes.flatMap((outcome, index) =>
-    outcome?.kind === 'failed' ? [index] : [],
+    outcome?.kind === "failed" ? [index] : [],
   );
   const canUpload =
-    state.status === 'ready' &&
+    state.status === "ready" &&
     members.length > 0 &&
     selectedMemberId !== undefined &&
     images.length > 0 &&
-    phase === 'idle' &&
+    phase === "idle" &&
     !picking;
   const pickDisabled = picking || images.length >= MAX_UPLOAD_IMAGES;
 
@@ -321,7 +365,7 @@ export default function UploadScreen() {
   const onContinue = useCallback(() => {
     setImages([]);
     setOutcomes([]);
-    setPhase('idle');
+    setPhase("idle");
     setActiveIndex(undefined);
     setPickMessage(undefined);
     setElapsedMs(0);
@@ -332,20 +376,24 @@ export default function UploadScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {state.status === 'loading' ? (
+      {state.status === "loading" ? (
         <View style={sharedStyles.horizontal}>
           <ActivityIndicator />
           <Text style={sharedStyles.muted}>正在加载…</Text>
         </View>
       ) : null}
 
-      {state.status === 'unconfigured' ? (
+      {state.status === "unconfigured" ? (
         <Text style={sharedStyles.muted}>
-          尚未配置后端地址,请先到<Link href="/settings" style={styles.link}>设置</Link>填写。
+          尚未配置后端地址,请先到
+          <Link href="/settings" style={styles.link}>
+            设置
+          </Link>
+          填写。
         </Text>
       ) : null}
 
-      {state.status === 'error' ? (
+      {state.status === "error" ? (
         <View style={styles.stack}>
           <Text style={styles.fail}>加载失败:{state.detail}</Text>
           <Pressable style={styles.button} onPress={() => void reload()}>
@@ -354,123 +402,213 @@ export default function UploadScreen() {
         </View>
       ) : null}
 
-      {state.status === 'ready' ? (
-        <View style={styles.stack}>
-          {members.length === 0 ? (
-            <Text style={sharedStyles.muted}>
-              还没有家庭成员。先到<Link href="/members" style={styles.link}>家庭成员</Link>建一个,再上传检查单。
-            </Text>
-          ) : (
-            <>
-              <Text style={sharedStyles.label}>归属成员</Text>
-              <MemberChips
-                members={members}
-                selectedId={selectedMemberId}
-                disabled={phase !== 'idle'}
-                onSelect={selectMember}
-              />
-              {selectedMemberId === undefined ? (
-                <Text style={sharedStyles.muted}>先选择检查单归属哪位成员。</Text>
-              ) : null}
-
-              <Text style={sharedStyles.label}>检查单照片</Text>
-              {images.length > 0 ? (
-                <Text testID="upload-selected-count" style={sharedStyles.muted}>
-                  已选 {images.length}/{MAX_UPLOAD_IMAGES} 张
-                </Text>
-              ) : null}
-              {images.map((image, index) => (
-                <UploadRow
-                  key={`${image.uri}-${index}`}
-                  image={image}
-                  index={index}
-                  outcome={outcomes[index]}
-                  phase={phase}
-                  active={activeIndex === index}
-                  onRemove={onRemove}
-                />
-              ))}
-              {phase === 'idle' ? (
-                <View style={sharedStyles.horizontal}>
-                  <Pressable
-                    style={styles.buttonGhost}
-                    onPress={() => void onPick('camera')}
-                    disabled={pickDisabled}
-                  >
-                    <Text style={pickDisabled ? styles.disabledText : styles.link}>拍照</Text>
-                  </Pressable>
-                  <Pressable
-                    testID="upload-pick-library"
-                    style={styles.buttonGhost}
-                    onPress={() => void onPick('library')}
-                    disabled={pickDisabled}
-                  >
-                    <Text style={pickDisabled ? styles.disabledText : styles.link}>
-                      从相册选择
-                    </Text>
-                  </Pressable>
-                </View>
-              ) : null}
-              {pickMessage ? <Text style={sharedStyles.muted}>{pickMessage}</Text> : null}
-
-              {phase !== 'done' ? (
-                <Pressable
-                  testID="upload-submit"
-                  style={[styles.button, !canUpload && styles.buttonDisabled]}
-                  onPress={onUpload}
-                  disabled={!canUpload}
-                >
-                  <Text style={styles.buttonText}>
-                    {images.length > 1 ? `上传并识别(${images.length} 张)` : '上传并识别'}
-                  </Text>
-                </Pressable>
-              ) : null}
-
-              {phase === 'uploading' ? (
-                <View style={sharedStyles.horizontal}>
-                  <ActivityIndicator />
-                  <View style={styles.progress}>
-                    <Text testID="upload-progress">
-                      {activeIndex === undefined
-                        ? '正在准备上传…'
-                        : `正在识别 ${activeIndex + 1}/${images.length}`}
-                    </Text>
-                    <Text style={sharedStyles.muted}>{uploadWaitText(elapsedMs)}</Text>
-                  </View>
-                </View>
-              ) : null}
-
-              {phase === 'done' && settled.length > 0 ? (
-                <View style={styles.card}>
-                  <Text testID="upload-result" style={uploadFailed ? styles.fail : styles.success}>
-                    {summary}
-                  </Text>
-                  <View style={styles.actions}>
-                    {retryIndexes.length > 0 ? (
-                      <Pressable testID="upload-retry" style={styles.button} onPress={onRetry}>
-                        <Text style={styles.buttonText}>重试失败的 {retryIndexes.length} 张</Text>
-                      </Pressable>
-                    ) : null}
-                    <Link asChild href="/timeline">
-                      <Pressable testID="upload-open-timeline">
-                        <Text style={styles.link}>去档案查看</Text>
-                      </Pressable>
-                    </Link>
-                    <Pressable
-                      testID="upload-continue"
-                      style={styles.buttonGhost}
-                      onPress={onContinue}
-                    >
-                      <Text style={styles.link}>继续上传</Text>
-                    </Pressable>
-                  </View>
-                </View>
-              ) : null}
-            </>
-          )}
-        </View>
+      {state.status === "ready" ? (
+        <UploadReadyView
+          members={members}
+          selectedMemberId={selectedMemberId}
+          selectMember={selectMember}
+          phase={phase}
+          images={images}
+          outcomes={outcomes}
+          settled={settled}
+          activeIndex={activeIndex}
+          pickDisabled={pickDisabled}
+          pickMessage={pickMessage}
+          canUpload={canUpload}
+          elapsedMs={elapsedMs}
+          summary={summary}
+          uploadFailed={uploadFailed}
+          retryIndexes={retryIndexes}
+          onPick={onPick}
+          onRemove={onRemove}
+          onUpload={onUpload}
+          onRetry={onRetry}
+          onContinue={onContinue}
+        />
       ) : null}
     </ScrollView>
+  );
+}
+
+function UploadReadyView({
+  members,
+  selectedMemberId,
+  selectMember,
+  phase,
+  images,
+  outcomes,
+  settled,
+  activeIndex,
+  pickDisabled,
+  pickMessage,
+  canUpload,
+  elapsedMs,
+  summary,
+  uploadFailed,
+  retryIndexes,
+  onPick,
+  onRemove,
+  onUpload,
+  onRetry,
+  onContinue,
+}: {
+  members: Member[];
+  selectedMemberId?: number;
+  selectMember: (id: number) => void;
+  phase: UploadPhase;
+  images: PickedImage[];
+  outcomes: (UploadOutcome | undefined)[];
+  settled: UploadOutcome[];
+  activeIndex?: number;
+  pickDisabled: boolean;
+  pickMessage?: string;
+  canUpload: boolean;
+  elapsedMs: number;
+  summary: string;
+  uploadFailed: boolean;
+  retryIndexes: number[];
+  onPick: (source: ImageSource) => void;
+  onRemove: (index: number) => void;
+  onUpload: () => void;
+  onRetry: () => void;
+  onContinue: () => void;
+}) {
+  return (
+    <View style={styles.stack}>
+      {members.length === 0 ? (
+        <Text style={sharedStyles.muted}>
+          还没有家庭成员。先到
+          <Link href="/members" style={styles.link}>
+            家庭成员
+          </Link>
+          建一个,再上传检查单。
+        </Text>
+      ) : (
+        <>
+          <Text style={sharedStyles.label}>归属成员</Text>
+          <MemberChips
+            members={members}
+            selectedId={selectedMemberId}
+            disabled={phase !== "idle"}
+            onSelect={selectMember}
+          />
+          {selectedMemberId === undefined ? (
+            <Text style={sharedStyles.muted}>先选择检查单归属哪位成员。</Text>
+          ) : null}
+
+          <Text style={sharedStyles.label}>检查单照片</Text>
+          {images.length > 0 ? (
+            <Text testID="upload-selected-count" style={sharedStyles.muted}>
+              已选 {images.length}/{MAX_UPLOAD_IMAGES} 张
+            </Text>
+          ) : null}
+          {images.map((image, index) => (
+            <UploadRow
+              key={`${image.uri}-${index}`}
+              image={image}
+              index={index}
+              outcome={outcomes[index]}
+              phase={phase}
+              active={activeIndex === index}
+              onRemove={onRemove}
+            />
+          ))}
+          {phase === "idle" ? (
+            <View style={sharedStyles.horizontal}>
+              <Pressable
+                style={styles.buttonGhost}
+                onPress={() => void onPick("camera")}
+                disabled={pickDisabled}
+              >
+                <Text style={pickDisabled ? styles.disabledText : styles.link}>
+                  拍照
+                </Text>
+              </Pressable>
+              <Pressable
+                testID="upload-pick-library"
+                style={styles.buttonGhost}
+                onPress={() => void onPick("library")}
+                disabled={pickDisabled}
+              >
+                <Text style={pickDisabled ? styles.disabledText : styles.link}>
+                  从相册选择
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
+          {pickMessage ? (
+            <Text style={sharedStyles.muted}>{pickMessage}</Text>
+          ) : null}
+
+          {phase !== "done" ? (
+            <Pressable
+              testID="upload-submit"
+              style={[styles.button, !canUpload && styles.buttonDisabled]}
+              onPress={onUpload}
+              disabled={!canUpload}
+            >
+              <Text style={styles.buttonText}>
+                {images.length > 1
+                  ? `上传并识别(${images.length} 张)`
+                  : "上传并识别"}
+              </Text>
+            </Pressable>
+          ) : null}
+
+          {phase === "uploading" ? (
+            <View style={sharedStyles.horizontal}>
+              <ActivityIndicator />
+              <View style={styles.progress}>
+                <Text testID="upload-progress">
+                  {activeIndex === undefined
+                    ? "正在准备上传…"
+                    : `正在识别 ${activeIndex + 1}/${images.length}`}
+                </Text>
+                <Text style={sharedStyles.muted}>
+                  {uploadWaitText(elapsedMs)}
+                </Text>
+              </View>
+            </View>
+          ) : null}
+
+          {phase === "done" && settled.length > 0 ? (
+            <View style={styles.card}>
+              <Text
+                testID="upload-result"
+                style={uploadFailed ? styles.fail : styles.success}
+              >
+                {summary}
+              </Text>
+              <View style={styles.actions}>
+                {retryIndexes.length > 0 ? (
+                  <Pressable
+                    testID="upload-retry"
+                    style={styles.button}
+                    onPress={onRetry}
+                  >
+                    <Text style={styles.buttonText}>
+                      重试失败的 {retryIndexes.length} 张
+                    </Text>
+                  </Pressable>
+                ) : null}
+                <Link asChild href="/timeline">
+                  <Pressable testID="upload-open-timeline">
+                    <Text style={styles.link}>去档案查看</Text>
+                  </Pressable>
+                </Link>
+                <Pressable
+                  testID="upload-continue"
+                  style={styles.buttonGhost}
+                  onPress={onContinue}
+                >
+                  <Text style={styles.link}>继续上传</Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : null}
+        </>
+      )}
+    </View>
   );
 }
 
@@ -483,16 +621,33 @@ const styles = StyleSheet.create({
   review: { fontSize: 13, color: colors.accent, lineHeight: 20 },
   link: { color: colors.accent, fontSize: 15 },
   disabledText: { color: colors.muted, fontSize: 15 },
-  card: { borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, gap: 8 },
-  actions: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
+  card: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    padding: 12,
+    gap: 8,
+  },
+  actions: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
+  },
   progress: { flex: 1, gap: 2 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  row: { flexDirection: "row", alignItems: "center", gap: 12 },
   rowBody: { flex: 1, gap: 2 },
   fileName: { fontSize: 13, color: colors.text },
   rowStatus: { fontSize: 13, lineHeight: 20 },
-  thumb: { width: 64, height: 64, borderRadius: 8, borderWidth: 1, borderColor: colors.border },
+  thumb: {
+    width: 64,
+    height: 64,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   button: {
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
     paddingVertical: 10,
     paddingHorizontal: 16,
     backgroundColor: colors.accent,
