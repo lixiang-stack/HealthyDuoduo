@@ -279,6 +279,7 @@ func toAPIAnalysisResult(record analysis.Record, quota httpapi.AnalysisQuota) ht
 	}
 	return httpapi.AnalysisResult{
 		AnalysisID: record.AnalysisID,
+		CreatedAt:  record.CreatedAt.Format(time.RFC3339),
 		Status:     record.Status,
 		Layers:     layers,
 		Snapshot:   record.Snapshot,

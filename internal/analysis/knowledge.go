@@ -36,6 +36,7 @@ type knowledgeFile struct {
 type knowledgeTrigger struct {
 	Panel       string   `yaml:"panel"`
 	AnyFlagHigh []string `yaml:"any_flag_high"`
+	AnyFlagLow  []string `yaml:"any_flag_low"`
 	AllNormal   []string `yaml:"all_normal"`
 }
 
@@ -99,7 +100,7 @@ func triggerMatches(trigger KnowledgeTrigger, panel string, latest map[string]Ev
 	if trigger.Panel == "" || trigger.Panel != panel {
 		return false
 	}
-	if len(trigger.AnyFlagHigh) == 0 {
+	if len(trigger.AnyFlagHigh) == 0 && len(trigger.AnyFlagLow) == 0 {
 		return false
 	}
 	anyHigh := false
@@ -109,7 +110,14 @@ func triggerMatches(trigger KnowledgeTrigger, panel string, latest map[string]Ev
 			break
 		}
 	}
-	if !anyHigh {
+	anyLow := false
+	for _, analyte := range trigger.AnyFlagLow {
+		if point, ok := latest[analyte]; ok && point.Flag == contract.FlagLow {
+			anyLow = true
+			break
+		}
+	}
+	if !anyHigh && !anyLow {
 		return false
 	}
 	for _, analyte := range trigger.AllNormal {
@@ -184,8 +192,8 @@ func (file knowledgeFile) entry(path string) (KnowledgeEntry, error) {
 	if strings.TrimSpace(file.Trigger.Panel) == "" {
 		return KnowledgeEntry{}, fmt.Errorf("%s: trigger.panel is required", path)
 	}
-	if len(file.Trigger.AnyFlagHigh) == 0 {
-		return KnowledgeEntry{}, fmt.Errorf("%s: trigger.any_flag_high is required", path)
+	if len(file.Trigger.AnyFlagHigh) == 0 && len(file.Trigger.AnyFlagLow) == 0 {
+		return KnowledgeEntry{}, fmt.Errorf("%s: trigger.any_flag_high or any_flag_low is required", path)
 	}
 	sources := make([]Source, 0, len(file.Sources))
 	for _, source := range file.Sources {
@@ -197,9 +205,14 @@ func (file knowledgeFile) entry(path string) (KnowledgeEntry, error) {
 		sources = append(sources, Source{Standard: standard, Note: note, URL: source.URL})
 	}
 	return KnowledgeEntry{
-		ID:              id,
-		Priority:        file.Priority,
-		Trigger:         KnowledgeTrigger{Panel: file.Trigger.Panel, AnyFlagHigh: file.Trigger.AnyFlagHigh, AllNormal: file.Trigger.AllNormal},
+		ID:       id,
+		Priority: file.Priority,
+		Trigger: KnowledgeTrigger{
+			Panel:       file.Trigger.Panel,
+			AnyFlagHigh: file.Trigger.AnyFlagHigh,
+			AnyFlagLow:  file.Trigger.AnyFlagLow,
+			AllNormal:   file.Trigger.AllNormal,
+		},
 		Version:         strconv.Itoa(file.Version),
 		Review:          KnowledgeReview{Decision: file.Review.Decision, ReviewedAt: file.Review.ReviewedAt, Note: file.Review.Note},
 		Explanation:     strings.TrimSpace(file.Explanation),

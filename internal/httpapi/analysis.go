@@ -36,6 +36,7 @@ type AnalysisQuota struct {
 // 三层结果、快照、来源与配额;stale=true 表示数据已更新。
 type AnalysisResult struct {
 	AnalysisID int64             `json:"analysis_id"`
+	CreatedAt  string            `json:"created_at"`
 	Status     string            `json:"status"`
 	Layers     AnalysisLayers    `json:"layers"`
 	Snapshot   analysis.Snapshot `json:"snapshot"`

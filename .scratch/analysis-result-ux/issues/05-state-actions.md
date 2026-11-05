@@ -2,18 +2,38 @@
 
 **What to build:** 结果页能说明分析有多旧、哪些状态影响了什么，并提供重新分析、重试解读、切换时间范围等下一步动作。
 
-**Blocked by:** 01；`created_at` / `entry_updated` / 部分拒绝如果需要改契约，先确认
+**Blocked by:** 01；`entry_updated` / 部分拒绝如果需要改契约，先确认
 
-**Status:** needs-triage
+**Status:** ready-for-human
 
-- [ ] 显示分析生成时间；旧分析可见
-- [ ] `stale=true` 提供“基于最新数据重新分析”，沿用原 panel/window，创建新快照
-- [ ] 结果页可切换 6/12/24 个月并创建新分析，不覆盖旧快照
+- [x] 显示分析生成时间；旧分析可见（`AnalysisResult.created_at`，结果页「生成于 YYYY-MM-DD HH:mm」）
+- [x] `stale=true` 提供“基于最新数据重新分析”，沿用原 panel/window，创建新快照
+- [x] 结果页可切换 6/12/24 个月并创建新分析，不覆盖旧快照
 - [ ] 云端失败显示“重试解读”；不要每次重试都新建分析（若后端无端点，先记录契约缺口）
 - [ ] 部分 section 被拒绝时显示“有 N 段解读未通过校验，已省略”
-- [ ] 截断状态保留提示，并说明只影响解释层
-- [ ] “这不对”改为明确范围：结果级 / 条目级；条目级反馈携带 `entry_id`
-- [ ] 8 个状态各有文案、影响范围、下一步
-- [ ] 如需 `created_at` / `entry_updated` / `partial_rejected`，先改 OpenAPI，再同步 Go/App/codegen/fixtures
+- [x] 截断状态保留提示，并说明只影响解释层
+- [x] 结果级反馈保留；合并解读卡后条目级反馈入口暂未保留（见 08）
+- [ ] 8 个状态各有文案、影响范围、下一步（当前 7/8）
+- [x] `created_at` 已进 OpenAPI / Go / App / fixtures
+- [ ] `entry_updated` / `partial_rejected` 仍需改契约，再做 UI
 
 **依据：** `.scratch/analysis-result-ux/spec.md` §2.6；`research.md` B3、B5。
+
+## Comments
+
+**2026-11-04 — implemented frontend-only, contract gaps recorded**
+
+- 已实现：stale 重跑、结果页 6/12/24 个月切换（新建 analysis_id，旧快照保留）、截断提示、结果级反馈；条目级反馈在合并卡后暂未保留。
+- 从报告详情返回时静默刷新，保留展开状态与滚动位置；快照版本已按方案 A 从结果页移除。
+- 已实现 7/8 状态文案与下一步：无条目、额度用尽、云端失败、截断、旧分析、证据不足、额度未知。部分拒绝状态依赖后端返回被拒段信息，暂未显示。
+- 2026-11-05 已补 `created_at`：结果页显示「生成于 YYYY-MM-DD HH:mm」，旧分析可见生成时间。
+- 未做：
+  - `entry_updated` 未实现，需比较快照 `entry_versions` 与当前条目版本。
+  - 部分拒绝需要后端返回 `rejected_sections`（或等价字段），当前只写 `bridge_text_rejected` 事件。
+  - 「重试解读」需要后端在原分析上重跑解释层的端点；当前只显示「可稍后重新分析」，不新建快照。
+- 病历入口的重跑/切换范围缺少 `report_sha` 快照字段，页面明确引导回原病历详情页发起，避免错误地分析另一份病历。
+- 真机已覆盖过期提示、重跑、范围切换、结果级反馈；条目级反馈随合并卡移除。
+
+**2026-11-05 方案 A 复核**
+
+2026-11-05 方案 A 复核：快照版本已从结果页移除；stale 重跑、范围切换、结果级反馈保留；条目级反馈随合并卡移除，待补。

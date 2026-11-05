@@ -281,6 +281,7 @@ export function makeAnalysisFramework(overrides: Partial<AnalysisFramework> = {}
 export function makeAnalysisResult(overrides: Partial<AnalysisResult> = {}): AnalysisResult {
   return {
     analysis_id: 12,
+    created_at: '2026-11-05T06:20:00Z',
     status: 'success',
     layers: { facts: makeAnalysisFacts(), framework: makeAnalysisFramework() },
     snapshot: {

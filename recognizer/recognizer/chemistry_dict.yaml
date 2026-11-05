@@ -122,6 +122,7 @@ items:
         source: legacy printed name (pre-standardization dictionary)
     code: 1100204A
     loinc: 2885-2
+    analyte: total_protein
     local_code:
     source_status: primary
     review_status: approved
@@ -149,6 +150,7 @@ items:
         source: legacy printed name (pre-standardization dictionary)
     code: 1100104A
     loinc: 1751-7
+    analyte: albumin
     local_code:
     source_status: primary
     review_status: approved

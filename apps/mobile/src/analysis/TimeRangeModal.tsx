@@ -3,7 +3,10 @@
 import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import type { AnalysisWindowMonths } from '../api/analyses';
+import {
+  ANALYSIS_DEFAULT_WINDOW_MONTHS,
+  type AnalysisWindowMonths,
+} from '../api/analyses';
 import { colors } from '../components/theme';
 
 const RANGE_OPTIONS: readonly { value: AnalysisWindowMonths; label: string }[] = [
@@ -15,22 +18,26 @@ const RANGE_OPTIONS: readonly { value: AnalysisWindowMonths; label: string }[] =
 export function TimeRangeModal({
   visible,
   busy,
+  initialMonths = ANALYSIS_DEFAULT_WINDOW_MONTHS,
   onConfirm,
   onCancel,
 }: {
   visible: boolean;
   busy: boolean;
+  initialMonths?: AnalysisWindowMonths;
   onConfirm: (months: AnalysisWindowMonths) => void;
   onCancel: () => void;
 }) {
-  const [selected, setSelected] = useState<AnalysisWindowMonths>(12);
+  const [selected, setSelected] = useState<AnalysisWindowMonths>(initialMonths);
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
       <View style={styles.backdrop}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onCancel} />
         <View testID="analysis-range" style={styles.sheet}>
           <Text style={styles.title}>选择分析时间范围</Text>
-          <Text style={styles.hint}>默认最近 12 个月；可查看 6 或 24 个月。</Text>
+          <Text style={styles.hint}>
+            当前为 {initialMonths} 个月；可改为 6 / 12 / 24 个月。
+          </Text>
           <View style={styles.options}>
             {RANGE_OPTIONS.map((option) => {
               const active = option.value === selected;

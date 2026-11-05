@@ -31,13 +31,13 @@ func TestMigrationSmokeM0Contract(t *testing.T) {
 		t.Fatalf("migrate: %v", err)
 	}
 
-	// goose 已升到 0018 且幂等(Open 内重复 Migrate 不报错)。
+	// goose 已升到 0019 且幂等(Open 内重复 Migrate 不报错)。
 	var latest int
 	if err := pool.QueryRow(ctx, `SELECT max(version_id) FROM goose_db_version`).Scan(&latest); err != nil {
 		t.Fatalf("read goose version: %v", err)
 	}
-	if latest != 18 {
-		t.Fatalf("goose version = %d, want 18", latest)
+	if latest != 19 {
+		t.Fatalf("goose version = %d, want 19", latest)
 	}
 
 	// reports.sections(0007,ADR-0008):可选报告段落 JSONB,可空(存量/非叙述型 NULL)。
@@ -586,8 +586,8 @@ func TestMigration0011LegacyDefaults(t *testing.T) {
 	}
 }
 
-// TestMigrationAnalyteBackfillAndRename 0017 回填 analyte,0018 统一为全称 key;
-// 未知指标保持 NULL。新报告由识别端直接写入新 key。
+// TestMigrationAnalyteBackfillAndRename 0017 回填 analyte,0018 统一为全称 key,
+// 0019 补回填总蛋白/白蛋白;未知指标保持 NULL。新报告由识别端直接写入新 key。
 func TestMigrationAnalyteBackfillAndRename(t *testing.T) {
 	dsn := os.Getenv("HDD_TEST_DSN")
 	if dsn == "" {
@@ -627,6 +627,8 @@ func TestMigrationAnalyteBackfillAndRename(t *testing.T) {
 			('img-pre-0017', 'ALT', '1500104A', NULL, 'normal', 'ALT', false),
 			('img-pre-0017', 'RDW-CV', NULL, '788-0', 'normal', 'RDW-CV', false),
 			('img-pre-0017', 'TBIL', '1700504A', '1975-2', 'normal', 'TBIL', false),
+			('img-pre-0017', 'TP', '1100204A', '2885-2', 'normal', 'TP', false),
+			('img-pre-0017', 'ALB', '1100104A', '1751-7', 'normal', 'ALB', false),
 			('img-pre-0017', 'Other', '9999999', NULL, 'normal', 'Other', false);`); err != nil {
 		t.Fatalf("seed pre-0017 rows: %v", err)
 	}
@@ -635,17 +637,24 @@ func TestMigrationAnalyteBackfillAndRename(t *testing.T) {
 	}
 	got := analyteKeys(t, db)
 	if got["ALT"] != "alt" || got["RDW-CV"] != "rdw_cv" ||
-		got["TBIL"] != "" || got["Other"] != "" {
-		t.Fatalf("0017 analytes = %+v, want ALT=alt, RDW-CV=rdw_cv, TBIL/Other empty", got)
+		got["TBIL"] != "" || got["TP"] != "" || got["ALB"] != "" || got["Other"] != "" {
+		t.Fatalf("0017 analytes = %+v, want ALT=alt, RDW-CV=rdw_cv, TBIL/TP/ALB/Other empty", got)
 	}
-	if err := goose.UpContext(ctx, db, migrationsDir); err != nil {
+	if err := goose.UpToContext(ctx, db, migrationsDir, 18); err != nil {
 		t.Fatalf("up 0018: %v", err)
 	}
 	got = analyteKeys(t, db)
 	if got["ALT"] != "alanine_aminotransferase" ||
 		got["RDW-CV"] != "erythrocyte_distribution_width_cv" ||
-		got["TBIL"] != "bilirubin_total" || got["Other"] != "" {
-		t.Fatalf("0018 analytes = %+v, want full keys and Other empty", got)
+		got["TBIL"] != "bilirubin_total" || got["TP"] != "" || got["ALB"] != "" || got["Other"] != "" {
+		t.Fatalf("0018 analytes = %+v, want full keys, TP/ALB/Other empty", got)
+	}
+	if err := goose.UpToContext(ctx, db, migrationsDir, 19); err != nil {
+		t.Fatalf("up 0019: %v", err)
+	}
+	got = analyteKeys(t, db)
+	if got["TP"] != "total_protein" || got["ALB"] != "albumin" || got["Other"] != "" {
+		t.Fatalf("0019 analytes = %+v, want TP=total_protein, ALB=albumin, Other empty", got)
 	}
 }
 

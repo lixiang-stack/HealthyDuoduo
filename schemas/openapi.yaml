@@ -1277,11 +1277,15 @@ components:
     AnalysisResult:
       type: object
       additionalProperties: false
-      required: [analysis_id, status, layers, snapshot, sources, quota, stale]
+      required: [analysis_id, created_at, status, layers, snapshot, sources, quota, stale]
       properties:
         analysis_id:
           type: integer
           format: int64
+        created_at:
+          type: string
+          format: date-time
+          description: 分析快照生成时间(RFC3339);读取旧快照也返回原生成时间。
         status:
           $ref: "#/components/schemas/AnalysisStatus"
         layers:
@@ -1445,7 +1449,7 @@ components:
         from:
           type: string
           pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
-          description: 实际使用的窗口起点;稀疏扩展时向前到 24 个月。
+          description: 用户选择的窗口起点；稀疏扩展按趋势键单独生效，不改变该字段。
         to:
           type: string
           pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"

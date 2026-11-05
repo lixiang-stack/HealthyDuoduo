@@ -1,0 +1,657 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HealthyDuoduo · 分析结果页优化原型</title>
+<style>
+  :root {
+    --text: #111827;
+    --muted: #6b7280;
+    --faint: #9ca3af;
+    --accent: #2563eb;
+    --ok: #15803d;
+    --fail: #b91c1c;
+    --low: #1d4ed8;
+    --border: #d1d5db;
+    --line: #e5e7eb;
+    --soft: #f8fafc;
+    --chip: #f3f4f6;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: #e5e7eb;
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  button { font: inherit; color: inherit; border: 0; background: none; padding: 0; cursor: pointer; }
+
+  .stage { display: flex; gap: 18px; align-items: flex-start; justify-content: center; padding: 24px; }
+  .phone-wrap { width: 393px; flex: 0 0 393px; }
+  .caption { min-height: 72px; margin: 0 4px 10px; font-size: 13px; line-height: 20px; color: #374151; }
+  .caption b { display: block; color: #111827; font-size: 14px; margin-bottom: 2px; }
+  .caption em { font-style: normal; color: var(--accent); }
+
+  .device {
+    width: 393px; height: 873px; position: relative; overflow: hidden;
+    background: #fff; border: 1px solid #cbd5e1; border-radius: 18px;
+    box-shadow: 0 18px 42px rgba(15,23,42,.16);
+  }
+  .device.c-evidence .result-view { display: none; }
+  .device.c-evidence .evidence-view { display: block; }
+  .evidence-view { display: none; }
+
+  .statusbar {
+    height: 34px; padding: 8px 18px 0; display: flex; align-items: flex-start; justify-content: space-between;
+    font-size: 11px; font-weight: 650; color: var(--text); background: #fff;
+  }
+  .appbar {
+    height: 52px; padding: 0 16px; display: flex; align-items: center; gap: 10px;
+    border-bottom: 1px solid #f1f5f9; background: #fff;
+  }
+  .appbar .back { font-size: 30px; line-height: 1; color: var(--text); margin-top: -3px; }
+  .appbar .title { flex: 1; font-size: 17px; font-weight: 650; letter-spacing: .1px; }
+  .appbar .right { font-size: 20px; color: var(--muted); letter-spacing: 1px; }
+  .scroll { height: calc(873px - 86px); overflow-y: auto; padding: 18px 18px 30px; scrollbar-width: none; }
+  .scroll::-webkit-scrollbar { display: none; }
+
+  .meta { font-size: 13px; color: var(--muted); line-height: 20px; }
+  .window { font-size: 12px; color: var(--muted); line-height: 18px; margin-top: 2px; }
+  .section-head { display: flex; align-items: baseline; justify-content: space-between; margin: 20px 2px 8px; gap: 8px; }
+  .section-head h2 { margin: 0; font-size: 15px; font-weight: 650; }
+  .section-head .aside { font-size: 12px; color: var(--muted); }
+  .card { border: 1px solid var(--border); border-radius: 12px; padding: 14px; background: #fff; }
+  .card + .card { margin-top: 8px; }
+  .eyebrow { font-size: 12px; font-weight: 650; color: var(--accent); letter-spacing: .2px; }
+  .headline { margin-top: 6px; font-size: 20px; line-height: 29px; font-weight: 700; letter-spacing: -.1px; }
+  .disclaimer { margin-top: 8px; font-size: 12px; color: var(--muted); line-height: 18px; }
+  .coverage { margin-top: 14px; padding: 12px; border-radius: 10px; background: #f8fbff; border: 1px solid #dbeafe; }
+  .coverage-line { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 14px; font-weight: 600; }
+  .coverage-sub { margin-top: 5px; font-size: 12px; color: var(--muted); line-height: 18px; }
+  .bar { height: 6px; border-radius: 3px; background: #dbeafe; margin-top: 9px; overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 50%; border-radius: 3px; background: var(--accent); }
+  .part { margin-top: 14px; }
+  .part h3 { margin: 0 0 4px; font-size: 15px; font-weight: 650; }
+  .part p { margin: 0; font-size: 14px; line-height: 22px; color: var(--text); }
+  .part ul { margin: 0; padding-left: 18px; }
+  .part li { font-size: 14px; line-height: 22px; margin: 2px 0; }
+  .source-line { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); line-height: 18px; }
+  .textlink { color: var(--accent); font-size: 13px; line-height: 20px; }
+  .quiet-link { color: var(--muted); font-size: 12px; line-height: 18px; }
+  .card-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 12px; }
+  .pill { display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; padding: 3px 8px; font-size: 11px; line-height: 16px; white-space: nowrap; }
+  .pill.ok { color: var(--ok); background: #f0fdf4; border: 1px solid #bbf7d0; }
+  .pill.warn { color: #92400e; background: #fffbeb; border: 1px solid #fde68a; }
+  .pill.accent { color: var(--accent); background: #eff6ff; border: 1px solid #bfdbfe; }
+  .pill.muted { color: var(--muted); background: var(--chip); border: 1px solid var(--line); }
+  .muted { color: var(--muted); }
+  .small { font-size: 12px; line-height: 18px; }
+
+  .grade-row { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-top: 1px solid #f1f5f9; }
+  .grade-row:first-of-type { border-top: 0; padding-top: 0; }
+  .grade-main { flex: 1; min-width: 0; }
+  .grade-title { display: flex; align-items: baseline; gap: 8px; font-size: 14px; font-weight: 600; }
+  .grade-value { color: var(--text); font-weight: 700; }
+  .grade-value.ok { color: var(--ok); }
+  .grade-note { margin-top: 3px; font-size: 12px; color: var(--muted); line-height: 18px; }
+  .grade-source { margin-top: 5px; font-size: 11px; color: var(--faint); line-height: 16px; }
+
+  .result-row { display: flex; align-items: center; gap: 10px; padding: 11px 0; border-top: 1px solid #f1f5f9; }
+  .result-row:first-of-type { border-top: 0; padding-top: 0; }
+  .result-main { flex: 1; min-width: 0; }
+  .result-name { font-size: 14px; font-weight: 600; }
+  .result-meta { margin-top: 2px; font-size: 12px; color: var(--muted); }
+  .result-value { font-size: 17px; font-weight: 650; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+  .flag-high { color: var(--fail); }
+  .flag-low { color: var(--low); }
+  .flag-normal { color: var(--ok); }
+  .cov-note { margin-top: 10px; padding-top: 10px; border-top: 1px solid #f1f5f9; font-size: 12px; color: var(--muted); line-height: 18px; }
+  .chev { color: #9ca3af; font-size: 20px; line-height: 1; }
+
+  .note-block + .note-block { margin-top: 12px; }
+  .note-label { font-size: 12px; color: var(--muted); margin-bottom: 3px; }
+  .note-text { font-size: 14px; line-height: 22px; }
+  .warning { margin-top: 12px; padding-top: 10px; border-top: 1px solid #fef2f2; font-size: 12px; line-height: 18px; color: var(--fail); }
+
+  .data-card p { margin: 0 0 6px; font-size: 13px; line-height: 20px; color: var(--text); }
+  .data-card p:last-of-type { margin-bottom: 0; }
+  .data-card .textlink { display: inline-block; margin-top: 10px; }
+  .scope-em { font-weight: 650; }
+  .scope-note { margin-top: 8px; padding-top: 8px; border-top: 1px solid #f1f5f9; font-size: 12px; color: var(--muted); line-height: 18px; }
+
+  .history-summary { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+  .history-summary .pill { font-size: 12px; padding: 4px 9px; }
+  .history-toggle { margin-left: auto; }
+  .history-body { margin-top: 10px; border-top: 1px solid #f1f5f9; padding-top: 4px; }
+  .history-row { display: flex; align-items: baseline; gap: 8px; padding: 9px 0; border-bottom: 1px solid #f1f5f9; }
+  .history-row:last-child { border-bottom: 0; }
+  .history-name { flex: 1; font-size: 13px; font-weight: 600; }
+  .history-points { font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .history-state { font-size: 11px; white-space: nowrap; }
+  .history-sub { margin-top: 2px; font-size: 11px; color: var(--muted); line-height: 16px; }
+  .history-group { margin: 10px 0 0; font-size: 12px; font-weight: 650; color: var(--text); }
+  .history-foot { margin-top: 10px; padding-top: 8px; border-top: 1px solid #f1f5f9; font-size: 11px; color: var(--muted); line-height: 17px; }
+
+  .actions { display: flex; gap: 8px; margin-top: 20px; }
+  .btn { min-height: 44px; border-radius: 10px; padding: 0 14px; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; }
+  .btn.secondary { border: 1px solid var(--border); color: var(--text); background: #fff; }
+  .btn.primary { background: var(--accent); color: #fff; font-weight: 650; }
+  .btn.quiet { color: var(--muted); border: 1px solid var(--line); background: #fff; }
+  .statement { margin: 18px 2px 0; font-size: 11px; color: var(--faint); line-height: 17px; }
+
+  .start-block { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+  .start-card { border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+  .start-card h3 { margin: 0 0 6px; font-size: 15px; font-weight: 650; }
+  .start-card p { margin: 0 0 8px; font-size: 13px; line-height: 20px; color: var(--muted); }
+  .start-card .btn { width: 100%; }
+
+  .sheet-backdrop { position: absolute; inset: 0; background: rgba(17,24,39,.45); display: none; align-items: flex-end; z-index: 30; }
+  .sheet-backdrop.open { display: flex; }
+  .sheet { width: 100%; background: #fff; border-radius: 18px 18px 0 0; padding: 10px 18px 20px; box-shadow: 0 -10px 30px rgba(0,0,0,.12); }
+  .sheet-handle { width: 38px; height: 4px; border-radius: 2px; background: var(--border); margin: 0 auto 14px; }
+  .sheet h3 { margin: 0 0 4px; font-size: 17px; font-weight: 700; }
+  .sheet .sources { margin-top: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .source-item { border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+  .source-title { font-size: 14px; font-weight: 650; }
+  .source-org { margin-top: 2px; font-size: 12px; color: var(--muted); }
+  .source-desc { margin-top: 6px; font-size: 12px; line-height: 18px; color: var(--text); }
+  .source-actions { display: flex; margin-top: 8px; }
+  .source-actions .btn { min-height: 38px; font-size: 13px; }
+  .sheet .btn + .btn { margin-top: 8px; }
+  .feedback-options { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .feedback-option { border: 1px solid var(--border); border-radius: 999px; padding: 9px 12px; font-size: 13px; }
+  .feedback-option.active { border-color: var(--accent); background: #eff6ff; color: var(--accent); font-weight: 650; }
+  .feedback-hint { margin-top: 10px; font-size: 11px; color: var(--muted); line-height: 17px; }
+
+  .evidence-view .scroll { padding-top: 18px; }
+  .evidence-head { margin: 0 2px 8px; }
+  .evidence-head h2 { margin: 0; font-size: 16px; font-weight: 700; }
+  .evidence-head p { margin: 4px 0 0; font-size: 12px; color: var(--muted); line-height: 18px; }
+  .evidence-row { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-top: 1px solid #f1f5f9; }
+  .evidence-row:first-of-type { border-top: 0; padding-top: 0; }
+  .evidence-row .dot { margin-top: 7px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex: 0 0 7px; }
+  .evidence-row.main .dot { background: var(--ok); }
+  .evidence-row.warn .dot { background: #d97706; }
+  .evidence-row-main { flex: 1; min-width: 0; }
+  .evidence-row-title { font-size: 13px; font-weight: 650; }
+  .evidence-row-text { margin-top: 2px; font-size: 12px; color: var(--muted); line-height: 18px; }
+
+  @media (max-width: 900px) {
+    .stage { flex-direction: column; align-items: center; }
+    .caption { min-height: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+  <!-- ===================== A ===================== -->
+  <section class="phone-wrap" data-variant="a">
+    <div class="caption">
+      <b>方案 A · 结论页 + 回肝功项目页看明细</b>
+      只回答“这意味着什么、下一步做什么”；异常清单保留 4 行，历史趋势、窗口前参考交回「肝功」项目页；BMI 交回成员页。<em>推荐</em>
+    </div>
+    <div class="device" id="device-a">
+      <div class="statusbar"><span>9:41</span><span>5G &nbsp; 74%</span></div>
+      <div class="appbar"><span class="back">‹</span><span class="title">肝功分析</span><span class="right">•••</span></div>
+      <div class="scroll">
+        <div class="meta">小明 · 8 岁 · 肝功</div>
+        <div class="window">2025-11-05 — 2026-11-05 · 近 12 个月</div>
+        <div class="window">生成于 2026-11-05 14:35</div>
+
+        <div class="card" id="a-explanation" style="margin-top:12px">
+          <div class="eyebrow">本次解读</div>
+          <div class="headline">转氨酶轻度升高；总蛋白、白蛋白偏低需要医生判断</div>
+          <div class="coverage">
+            <div class="coverage-line"><span>4 项异常里，本次解读解释了 4 项</span></div>
+            <div class="bar"><i></i></div>
+            <div class="coverage-sub">本次 4 项异常都有对应解读；仍需结合医生意见。</div>
+          </div>
+          <div class="disclaimer">这是解读，不是诊断。</div>
+
+          <div class="part">
+            <h3>可能原因</h3>
+            <ul>
+              <li>转氨酶升高而碱性磷酸酶和胆红素正常，通常提示肝细胞受累，而不是胆道淤积。</li>
+              <li>总蛋白由白蛋白和球蛋白组成，总蛋白低不一定代表白蛋白低。白蛋白偏低可能与肝脏合成减少、蛋白质从肠道或尿液丢失、营养摄入不足或炎症有关；单次结果不能确定原因。</li>
+            </ul>
+          </div>
+          <div class="part">
+            <h3>进一步检查</h3>
+            <ul>
+              <li>复查肝功能，观察是否持续升高。</li>
+              <li>把结果和症状、近期体重变化、既往病史带给医生看，由医生判断是否复查。</li>
+              <li>医生可能根据情况安排尿蛋白检查。</li>
+            </ul>
+          </div>
+          <div class="part">
+            <h3>生活建议</h3>
+            <ul>
+              <li>按年龄和身体状况保持均衡饮食，不自行长期限蛋白。</li>
+              <li>不要自行使用蛋白粉或补充剂；是否需要补充由医生或营养师决定。</li>
+              <li>定期记录体重；儿童可记录生长曲线，复诊时带给医生。</li>
+              <li>不要因一次结果大幅改变饮食；先和医生确认原因。</li>
+            </ul>
+          </div>
+          <div class="part">
+            <h3>长期跟踪</h3>
+            <ul><li>建议持续记录 ALT、AST、TP、ALB 的变化。</li></ul>
+          </div>
+
+          <div class="source-line">
+            参考：转氨酶升高分级（ACG 2016）等 8 份
+            <button class="textlink" data-sheet="source-a">查看来源说明 ›</button>
+          </div>
+          <div class="card-foot">
+            <button class="quiet-link" data-sheet="feedback-a">反馈这段内容</button>
+            <span class="small muted">不是诊断</span>
+          </div>
+        </div>
+
+        <div class="section-head"><h2>指标分级</h2><span class="aside">按公开标准，不是诊断</span></div>
+        <div class="card">
+          <div class="grade-row">
+            <div class="grade-main">
+              <div class="grade-title"><span>转氨酶升高程度</span><span class="grade-value">轻度</span></div>
+              <div class="grade-note">本次 ALT 是正常上限的 2.09 倍；2–5 倍为轻度。</div>
+              <div class="grade-source">参考：ACG 2016 转氨酶升高分级</div>
+            </div>
+          </div>
+          <div class="grade-row">
+            <div class="grade-main">
+              <div class="grade-title"><span>AST/ALT 比值</span><span class="grade-value">0.54</span></div>
+              <div class="grade-note">AST 与 ALT 直接相除；比值需要结合病史和其他指标理解。</div>
+              <div class="grade-source">参考：AASLD 转氨酶升高指南</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-head"><h2>异常 4 项</h2><span class="aside">按每项最近一次结果</span></div>
+        <div class="card">
+          <div class="result-row">
+            <div class="result-main"><div class="result-name">丙氨酸氨基转移酶（ALT）</div><div class="result-meta">2026-11-04 · 参考 7–40</div></div>
+            <div class="result-value flag-high">83.5 <span class="small">U/L</span></div>
+            <span class="pill ok">已解释</span>
+          </div>
+          <div class="result-row">
+            <div class="result-main"><div class="result-name">天门冬氨酸氨基转移酶（AST）</div><div class="result-meta">2026-11-04 · 参考 13–35</div></div>
+            <div class="result-value flag-high">45 <span class="small">U/L</span></div>
+            <span class="pill ok">已解释</span>
+          </div>
+          <div class="result-row">
+            <div class="result-main"><div class="result-name">总蛋白（TP）</div><div class="result-meta">2026-09-04 · 参考 65–85</div></div>
+            <div class="result-value flag-low">60.70 <span class="small">g/L</span></div>
+            <span class="pill warn">已解释</span>
+          </div>
+          <div class="result-row">
+            <div class="result-main"><div class="result-name">白蛋白（ALB）</div><div class="result-meta">2026-09-04 · 参考 40–55</div></div>
+            <div class="result-value flag-low">35.50 <span class="small">g/L</span></div>
+            <span class="pill warn">已解释</span>
+          </div>
+          <div class="cov-note">“已解释”表示这两项在日期范围内，只是还没有经过审核的解释条目；请结合医生意见，不要只凭数值判断。</div>
+        </div>
+
+        <div class="section-head"><h2>医生记录</h2><span class="aside">2026-02-14 · 病历</span></div>
+        <div class="card">
+          <div class="note-block">
+            <div class="note-label">医生当时诊断（原文）</div>
+            <div class="note-text">肝功能不全</div>
+          </div>
+          <div class="note-block">
+            <div class="note-label">医生当时处理（原文，不是建议）</div>
+            <div class="note-text">服药治疗不适随诊；甘草酸二铵（天晴甘平）150mg，口服，日三次。</div>
+          </div>
+          <div class="warning">这是当时病历原文，不是本次分析的建议；请勿按旧处方自行用药。</div>
+        </div>
+
+        <div class="section-head" id="a-data"><h2>数据说明</h2></div>
+        <div class="card data-card">
+          <p>本次判断使用 <span class="scope-em">2025-11-05 之后</span>的 3 份报告、1 份病历。</p>
+          <p>2025-09-28 的旧点只用于历史趋势，<span class="scope-em">不参与本次异常判断</span>。历史趋势在「肝功」项目页查看；体格发育（BMI 等）在成员页查看。</p>
+          <button class="textlink">查看肝功全部指标与趋势 ›</button>
+        </div>
+
+        <div class="actions">
+          <button class="btn secondary">重新分析</button>
+          <button class="btn quiet" data-sheet="feedback-a">反馈问题</button>
+        </div>
+        <div class="statement">内容来自你上传的检查报告、病历和公开检验标准，不是诊断。</div>
+      </div>
+
+      <div class="sheet-backdrop" data-sheet-panel="source-a">
+        <div class="sheet">
+          <div class="sheet-handle"></div>
+          <h3>这个分级来自哪里？</h3>
+          <p class="small muted" style="margin:0">把专业指南翻译成家长能看懂的话；指南不能替代医生。</p>
+          <div class="sources">
+            <div class="source-item">
+              <div class="source-title">转氨酶升高分级</div>
+              <div class="source-org">ACG 2016 · 美国胃肠病学会临床指南</div>
+              <div class="source-desc">按转氨酶超过正常上限的倍数分级：不到 2 倍为临界，2–5 倍为轻度，5–15 倍为中度，超过 15 倍为重度。本次 ALT 为 2.09 倍，属于轻度。</div>
+              <div class="source-actions"><button class="btn secondary">打开指南原文</button></div>
+            </div>
+            <div class="source-item">
+              <div class="source-title">AST/ALT 比值</div>
+              <div class="source-org">AASLD · 美国肝病学会转氨酶升高指南</div>
+              <div class="source-desc">AST 与 ALT 直接相除得到的比值，需要结合病史和其他指标一起看，不能单独用来诊断。</div>
+              <div class="source-actions"><button class="btn secondary">打开指南原文</button></div>
+            </div>
+          </div>
+          <button class="btn secondary" style="width:100%;margin-top:14px" data-close-sheet>关闭</button>
+        </div>
+      </div>
+
+      <div class="sheet-backdrop" data-sheet-panel="feedback-a">
+        <div class="sheet">
+          <div class="sheet-handle"></div>
+          <h3>这段内容哪里需要改进？</h3>
+          <p class="small muted" style="margin:0">选择问题类型；只记录分类，不发送报告原文。</p>
+          <div class="feedback-options">
+            <button class="feedback-option">数值不对</button>
+            <button class="feedback-option active">解释不对</button>
+            <button class="feedback-option">病历冲突</button>
+            <button class="feedback-option">看不懂</button>
+            <button class="feedback-option">其他</button>
+          </div>
+          <div class="feedback-hint">“解释不对”只针对这一段解读，不会影响整份分析。</div>
+          <button class="btn primary" style="width:100%;margin-top:14px">提交反馈</button>
+          <button class="btn secondary" style="width:100%;margin-top:8px" data-close-sheet>取消</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== B ===================== -->
+  <section class="phone-wrap" data-variant="b">
+    <div class="caption">
+      <b>方案 B · 单页分层，保留全部证据</b>
+      结论、指标分级、异常、历史趋势、数据范围都在同一页；历史与窗口前参考默认折叠，逐指标说明“为什么用/不用旧点”。适合必须在一页内自证的情况。
+    </div>
+    <div class="device" id="device-b">
+      <div class="statusbar"><span>9:41</span><span>5G &nbsp; 74%</span></div>
+      <div class="appbar"><span class="back">‹</span><span class="title">肝功分析</span><span class="right">•••</span></div>
+      <div class="scroll" id="b-scroll">
+        <div class="meta">小明 · 8 岁 · 肝功</div>
+        <div class="window">2025-11-05 — 2026-11-05 · 近 12 个月</div>
+        <div class="window">生成于 2026-11-05 14:35</div>
+
+        <div class="card" style="margin-top:12px">
+          <div class="eyebrow">本次解读</div>
+          <div class="headline">转氨酶轻度升高；总蛋白、白蛋白偏低需要医生判断</div>
+          <div class="coverage">
+            <div class="coverage-line"><span>4 项异常里，本次解读解释了 4 项</span></div>
+            <div class="bar"><i></i></div>
+            <div class="coverage-sub">本次 4 项异常都有对应解读；仍需结合医生意见。</div>
+          </div>
+          <div class="disclaimer">这是解读，不是诊断。</div>
+          <div class="part"><h3>可能原因</h3><ul><li>转氨酶升高而碱性磷酸酶和胆红素正常，通常提示肝细胞受累，而不是胆道淤积。</li></ul></div>
+          <div class="part"><h3>下一步</h3><ul><li>复查肝功能，观察是否持续升高。</li></ul></div>
+          <div class="part"><h3>长期跟踪</h3><ul><li>持续记录 ALT、AST 的变化。</li></ul></div>
+          <div class="source-line">参考：转氨酶升高分级（ACG 2016）<button class="textlink" data-sheet="source-b">查看来源说明 ›</button></div>
+          <div class="card-foot"><button class="quiet-link" data-sheet="feedback-b">反馈这段内容</button><span class="small muted">不是诊断</span></div>
+        </div>
+
+        <div class="section-head"><h2>指标分级</h2><span class="aside">按公开标准，不是诊断</span></div>
+        <div class="card">
+          <div class="grade-row"><div class="grade-main"><div class="grade-title"><span>转氨酶升高程度</span><span class="grade-value">轻度</span></div><div class="grade-note">本次 ALT 是正常上限的 2.09 倍；2–5 倍为轻度。</div><div class="grade-source">参考：ACG 2016 转氨酶升高分级</div></div></div>
+          <div class="grade-row"><div class="grade-main"><div class="grade-title"><span>AST/ALT 比值</span><span class="grade-value">0.54</span></div><div class="grade-note">AST 与 ALT 直接相除；比值需要结合病史和其他指标理解。</div><div class="grade-source">参考：AASLD 转氨酶升高指南</div></div></div>
+        </div>
+
+        <div class="section-head"><h2>异常 4 项</h2><span class="aside">按每项最近一次结果</span></div>
+        <div class="card">
+          <div class="result-row"><div class="result-main"><div class="result-name">丙氨酸氨基转移酶（ALT）</div><div class="result-meta">2026-11-04 · 参考 7–40</div></div><div class="result-value flag-high">83.5 <span class="small">U/L</span></div><span class="pill ok">已解释</span></div>
+          <div class="result-row"><div class="result-main"><div class="result-name">天门冬氨酸氨基转移酶（AST）</div><div class="result-meta">2026-11-04 · 参考 13–35</div></div><div class="result-value flag-high">45 <span class="small">U/L</span></div><span class="pill ok">已解释</span></div>
+          <div class="result-row"><div class="result-main"><div class="result-name">总蛋白（TP）</div><div class="result-meta">2026-09-04 · 参考 65–85</div></div><div class="result-value flag-low">60.70 <span class="small">g/L</span></div><span class="pill warn">已解释</span></div>
+          <div class="result-row"><div class="result-main"><div class="result-name">白蛋白（ALB）</div><div class="result-meta">2026-09-04 · 参考 40–55</div></div><div class="result-value flag-low">35.50 <span class="small">g/L</span></div><span class="pill warn">已解释</span></div>
+          <div class="cov-note">“已解释”表示这两项在日期范围内，只是还没有经过审核的解释条目；请结合医生意见，不要只凭数值判断。</div>
+        </div>
+
+        <div class="section-head" id="b-history"><h2>历史趋势</h2><span class="aside">14 项有历史数据</span></div>
+        <div class="card">
+          <div class="history-summary">
+            <span class="pill muted">有变化 11</span>
+            <span class="pill muted">仅 1 个点 3</span>
+            <button class="textlink history-toggle" data-history-toggle>展开 ›</button>
+          </div>
+          <div class="history-body" id="b-history-body" style="display:none">
+            <div class="history-group">有变化 11 项</div>
+            <div class="history-row"><div><div class="history-name">丙氨酸氨基转移酶（ALT）</div><div class="history-sub">3 个点 · 最近 2026-11-04</div></div><span class="history-points">共 3 个点</span><span class="history-state flag-high">本次偏高</span></div>
+            <div class="history-row"><div><div class="history-name">总蛋白（TP）</div><div class="history-sub">2 个点 · 含 1 个窗口前点（2025-09-28）</div></div><span class="history-points">共 2 个点</span><span class="history-state flag-low">本次偏低</span></div>
+            <div class="history-row"><div><div class="history-name">γ-谷氨酰基转移酶（GGT）</div><div class="history-sub">2 个点 · 含 1 个窗口前点（2025-09-28）</div></div><span class="history-points">共 2 个点</span><span class="history-state flag-normal">在参考范围内</span></div>
+            <div class="history-group">仅 1 个点 3 项</div>
+            <div class="history-row"><div class="history-name">胆汁酸</div><span class="history-points">共 1 个点</span><span class="history-state muted">暂无法比较</span></div>
+            <div class="history-foot">“窗口前点”只用于看清变化，不参与本次异常判断；本次异常只看 2025-11-05 之后的结果。</div>
+          </div>
+        </div>
+
+        <div class="section-head"><h2>数据范围</h2></div>
+        <div class="card data-card">
+          <p><span class="scope-em">本次判断</span>：2025-11-05 — 2026-11-05 的 3 份报告、1 份病历。</p>
+          <p><span class="scope-em">历史趋势额外参考</span>：总蛋白、白蛋白、GGT、球蛋白各向前取 1 个旧点（2025-09-28）。</p>
+          <p><span class="scope-em">未参与判断</span>：总胆红素、直接胆红素、间接胆红素、ALT、AST、ALP 的 2025-09-28 旧点；这些指标在窗口内已有足够数据。</p>
+          <div class="scope-note">项目范围只决定看哪些指标；时间窗口决定看哪些日期；两者独立。</div>
+          <button class="textlink">查看肝功全部指标与趋势 ›</button>
+        </div>
+
+        <div class="section-head"><h2>医生记录</h2><span class="aside">2026-02-14 · 病历</span></div>
+        <div class="card">
+          <div class="note-block"><div class="note-label">医生当时诊断（原文）</div><div class="note-text">肝功能不全</div></div>
+          <div class="note-block"><div class="note-label">医生当时处理（原文，不是建议）</div><div class="note-text">服药治疗不适随诊；甘草酸二铵（天晴甘平）150mg，口服，日三次。</div></div>
+          <div class="warning">这是当时病历原文，不是本次分析的建议；请勿按旧处方自行用药。</div>
+        </div>
+
+        <div class="actions"><button class="btn secondary">重新分析</button><button class="btn quiet" data-sheet="feedback-b">反馈问题</button></div>
+        <div class="statement">内容来自你上传的检查报告、病历和公开检验标准，不是诊断。</div>
+      </div>
+
+      <div class="sheet-backdrop" data-sheet-panel="source-b">
+        <div class="sheet">
+          <div class="sheet-handle"></div>
+          <h3>这个分级来自哪里？</h3>
+          <p class="small muted" style="margin:0">把专业指南翻译成家长能看懂的话；指南不能替代医生。</p>
+          <div class="sources">
+            <div class="source-item"><div class="source-title">转氨酶升高分级</div><div class="source-org">ACG 2016 · 美国胃肠病学会临床指南</div><div class="source-desc">按转氨酶超过正常上限的倍数分级：不到 2 倍为临界，2–5 倍为轻度，5–15 倍为中度，超过 15 倍为重度。本次 ALT 为 2.09 倍，属于轻度。</div><div class="source-actions"><button class="btn secondary">打开指南原文</button></div></div>
+            <div class="source-item"><div class="source-title">AST/ALT 比值</div><div class="source-org">AASLD · 美国肝病学会转氨酶升高指南</div><div class="source-desc">AST 与 ALT 直接相除得到的比值，需要结合病史和其他指标一起看，不能单独用来诊断。</div><div class="source-actions"><button class="btn secondary">打开指南原文</button></div></div>
+          </div>
+          <button class="btn secondary" style="width:100%;margin-top:14px" data-close-sheet>关闭</button>
+        </div>
+      </div>
+
+      <div class="sheet-backdrop" data-sheet-panel="feedback-b">
+        <div class="sheet">
+          <div class="sheet-handle"></div>
+          <h3>这段内容哪里需要改进？</h3>
+          <p class="small muted" style="margin:0">选择问题类型；只记录分类，不发送报告原文。</p>
+          <div class="feedback-options"><button class="feedback-option">数值不对</button><button class="feedback-option active">解释不对</button><button class="feedback-option">病历冲突</button><button class="feedback-option">看不懂</button><button class="feedback-option">其他</button></div>
+          <div class="feedback-hint">“解释不对”只针对这一段解读，不会影响整份分析。</div>
+          <button class="btn primary" style="width:100%;margin-top:14px">提交反馈</button>
+          <button class="btn secondary" style="width:100%;margin-top:8px" data-close-sheet>取消</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== C ===================== -->
+  <section class="phone-wrap" data-variant="c">
+    <div class="caption">
+      <b>方案 C · 结论页 + 独立的“来源与数据”页</b>
+      结论页只保留一句话结论、异常清单和医生记录；点“查看来源与数据”进入第二页，集中放“为什么这样解读”、来源说明与数据范围。<em>改动最大</em>
+    </div>
+    <div class="device" id="device-c">
+      <div class="result-view">
+        <div class="statusbar"><span>9:41</span><span>5G &nbsp; 74%</span></div>
+        <div class="appbar"><span class="back">‹</span><span class="title">肝功分析</span><span class="right">•••</span></div>
+        <div class="scroll">
+          <div class="meta">小明 · 8 岁 · 肝功</div>
+          <div class="window">2025-11-05 — 2026-11-05 · 近 12 个月</div>
+        <div class="window">生成于 2026-11-05 14:35</div>
+
+          <div class="card" style="margin-top:12px">
+            <div class="eyebrow">本次解读</div>
+            <div class="headline">转氨酶轻度升高；总蛋白、白蛋白偏低需要医生判断</div>
+            <div class="coverage">
+              <div class="coverage-line"><span>4 项异常里，本次解读解释了 4 项</span></div>
+              <div class="bar"><i></i></div>
+              <div class="coverage-sub">本次 4 项异常都有对应解读；仍需结合医生意见。</div>
+            </div>
+            <div class="disclaimer">这是解读，不是诊断。</div>
+            <button class="btn primary" style="width:100%;margin-top:16px" data-c-evidence>查看来源与数据</button>
+          </div>
+
+          <div class="section-head"><h2>异常 4 项</h2><span class="aside">按每项最近一次结果</span></div>
+          <div class="card">
+            <div class="result-row"><div class="result-main"><div class="result-name">丙氨酸氨基转移酶（ALT）</div><div class="result-meta">2026-11-04 · 参考 7–40</div></div><div class="result-value flag-high">83.5 <span class="small">U/L</span></div><span class="pill ok">已解释</span></div>
+            <div class="result-row"><div class="result-main"><div class="result-name">天门冬氨酸氨基转移酶（AST）</div><div class="result-meta">2026-11-04 · 参考 13–35</div></div><div class="result-value flag-high">45 <span class="small">U/L</span></div><span class="pill ok">已解释</span></div>
+            <div class="result-row"><div class="result-main"><div class="result-name">总蛋白（TP）</div><div class="result-meta">2026-09-04 · 参考 65–85</div></div><div class="result-value flag-low">60.70 <span class="small">g/L</span></div><span class="pill warn">已解释</span></div>
+            <div class="result-row"><div class="result-main"><div class="result-name">白蛋白（ALB）</div><div class="result-meta">2026-09-04 · 参考 40–55</div></div><div class="result-value flag-low">35.50 <span class="small">g/L</span></div><span class="pill warn">已解释</span></div>
+          </div>
+
+          <div class="section-head"><h2>医生记录</h2><span class="aside">2026-02-14 · 病历</span></div>
+          <div class="card">
+            <div class="note-block"><div class="note-label">医生当时诊断（原文）</div><div class="note-text">肝功能不全</div></div>
+            <div class="note-block"><div class="note-label">医生当时处理（原文，不是建议）</div><div class="note-text">服药治疗不适随诊；甘草酸二铵（天晴甘平）150mg，口服，日三次。</div></div>
+            <div class="warning">这是当时病历原文，不是本次分析的建议；请勿按旧处方自行用药。</div>
+          </div>
+
+          <div class="actions"><button class="btn secondary">重新分析</button><button class="btn quiet" data-sheet="feedback-c">反馈问题</button></div>
+          <div class="statement">内容来自你上传的检查报告、病历和公开检验标准，不是诊断。</div>
+        </div>
+
+        <div class="sheet-backdrop" data-sheet-panel="feedback-c">
+          <div class="sheet">
+            <div class="sheet-handle"></div>
+            <h3>这段内容哪里需要改进？</h3>
+            <p class="small muted" style="margin:0">选择问题类型；只记录分类，不发送报告原文。</p>
+            <div class="feedback-options"><button class="feedback-option">数值不对</button><button class="feedback-option active">解释不对</button><button class="feedback-option">病历冲突</button><button class="feedback-option">看不懂</button><button class="feedback-option">其他</button></div>
+            <div class="feedback-hint">“解释不对”只针对这一段解读，不会影响整份分析。</div>
+            <button class="btn primary" style="width:100%;margin-top:14px">提交反馈</button>
+            <button class="btn secondary" style="width:100%;margin-top:8px" data-close-sheet>取消</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="evidence-view">
+        <div class="statusbar"><span>9:41</span><span>5G &nbsp; 74%</span></div>
+        <div class="appbar"><span class="back">‹</span><span class="title">来源与数据</span><span class="right">•••</span></div>
+        <div class="scroll">
+          <div class="evidence-head">
+            <h2>为什么这样解读？</h2>
+            <p>先看数据，再看来源；这里只解释本次结论，不作为诊断。</p>
+          </div>
+          <div class="card">
+            <div class="evidence-row main"><span class="dot"></span><div class="evidence-row-main"><div class="evidence-row-title">最近一次报告（2026-11-04）</div><div class="evidence-row-text">ALT 83.5 U/L、AST 45 U/L，两项高于参考范围；碱性磷酸酶 80 U/L、总胆红素 15 μmol/L 在参考范围内。</div></div></div>
+            <div class="evidence-row main"><span class="dot"></span><div class="evidence-row-main"><div class="evidence-row-title">本次解读的方向</div><div class="evidence-row-text">转氨酶升高而碱性磷酸酶和胆红素正常，通常提示肝细胞受累，而不是胆道淤积。</div></div></div>
+            <div class="evidence-row warn"><span class="dot"></span><div class="evidence-row-main"><div class="evidence-row-title">本次没有解释的 2 项</div><div class="evidence-row-text">总蛋白 60.70 g/L、白蛋白 35.50 g/L 偏低；这两项没有对应审核条目，请结合医生意见。</div></div></div>
+            <button class="quiet-link" style="margin-top:10px" data-sheet="feedback-c">反馈这段内容</button>
+          </div>
+
+          <div class="section-head"><h2>参考来源</h2><span class="aside">点击查看原文</span></div>
+          <div class="card">
+            <div class="source-item" style="border:0;padding:0">
+              <div class="source-title">转氨酶升高分级</div>
+              <div class="source-org">ACG 2016 · 美国胃肠病学会临床指南</div>
+              <div class="source-desc">按转氨酶超过正常上限的倍数分级；本次 ALT 2.09 倍属于轻度。</div>
+              <div class="source-actions"><button class="btn secondary">打开指南原文</button></div>
+            </div>
+            <div class="source-item" style="border:0;padding:14px 0 0;margin-top:14px;border-top:1px solid var(--line)">
+              <div class="source-title">AST/ALT 比值</div>
+              <div class="source-org">AASLD · 美国肝病学会转氨酶升高指南</div>
+              <div class="source-desc">比值需要结合病史和其他指标一起看，不能单独用来诊断。</div>
+              <div class="source-actions"><button class="btn secondary">打开指南原文</button></div>
+            </div>
+          </div>
+
+          <div class="section-head"><h2>数据范围</h2></div>
+          <div class="card data-card">
+            <p><span class="scope-em">本次判断</span>：2025-11-05 — 2026-11-05 的 3 份报告、1 份病历。</p>
+            <p><span class="scope-em">历史趋势额外参考</span>：总蛋白、白蛋白、GGT、球蛋白各向前取 1 个旧点（2025-09-28）。</p>
+            <p><span class="scope-em">未参与判断</span>：总胆红素、直接胆红素、间接胆红素、ALT、AST、ALP 的 2025-09-28 旧点；这些指标在窗口内已有足够数据。</p>
+            <div class="scope-note">项目范围只决定看哪些指标；时间窗口决定看哪些日期；两者独立。</div>
+            <button class="textlink">查看肝功全部指标与趋势 ›</button>
+          </div>
+
+          <div class="actions"><button class="btn secondary" data-c-back>返回结论</button></div>
+          <div class="statement">内容来自你上传的检查报告、病历和公开检验标准，不是诊断。</div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+  const params = new URLSearchParams(location.search);
+  const variant = params.get('variant') || 'all';
+  const single = variant !== 'all';
+  document.body.classList.toggle('single', single);
+  document.querySelectorAll('[data-variant]').forEach((el) => {
+    el.style.display = variant === 'all' || el.dataset.variant === variant ? '' : 'none';
+  });
+  if (single) {
+    const stage = document.getElementById('stage');
+    stage.style.padding = '0';
+    stage.style.gap = '0';
+    document.querySelector(`[data-variant="${variant}"] .caption`).style.display = 'none';
+    const wrap = document.querySelector(`[data-variant="${variant}"]`);
+    wrap.style.width = '393px';
+    wrap.style.flexBasis = '393px';
+    document.querySelector(`[data-variant="${variant}"] .device`).style.borderRadius = '0';
+    document.querySelector(`[data-variant="${variant}"] .device`).style.border = '0';
+    document.querySelector(`[data-variant="${variant}"] .device`).style.boxShadow = 'none';
+  }
+
+  function openSheet(name) {
+    document.querySelectorAll('.sheet-backdrop').forEach((el) => {
+      el.classList.toggle('open', el.dataset.sheetPanel === name);
+    });
+  }
+  document.querySelectorAll('[data-sheet]').forEach((el) => {
+    el.addEventListener('click', () => openSheet(el.dataset.sheet));
+  });
+  document.querySelectorAll('[data-close-sheet]').forEach((el) => {
+    el.addEventListener('click', () => {
+      document.querySelectorAll('.sheet-backdrop').forEach((el) => el.classList.remove('open'));
+    });
+  });
+  document.querySelectorAll('[data-history-toggle]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const body = document.getElementById('b-history-body');
+      const open = body.style.display !== 'none';
+      body.style.display = open ? 'none' : 'block';
+      el.textContent = open ? '展开 ›' : '收起 ⌃';
+    });
+  });
+  document.querySelectorAll('[data-c-evidence]').forEach((el) => {
+    el.addEventListener('click', () => {
+      document.getElementById('device-c').classList.add('c-evidence');
+      document.getElementById('device-c').querySelector('.evidence-view .scroll').scrollTop = 0;
+    });
+  });
+  document.querySelectorAll('[data-c-back]').forEach((el) => {
+    el.addEventListener('click', () => {
+      document.getElementById('device-c').classList.remove('c-evidence');
+    });
+  });
+  if (params.get('sheet')) openSheet(params.get('sheet') + '-' + variant);
+  if (params.get('screen') === 'evidence') {
+    document.getElementById('device-c').classList.add('c-evidence');
+  }
+  if (params.get('expanded') === '1') {
+    document.getElementById('b-history-body').style.display = 'block';
+    document.querySelector('[data-history-toggle]').textContent = '收起 ⌃';
+  }
+  const scrollTo = params.get('scroll');
+  if (scrollTo) {
+    const target = document.getElementById(scrollTo);
+    if (target) {
+      const scroller = target.closest('.scroll');
+      if (scroller) {
+        const targetRect = target.getBoundingClientRect();
+        const scrollerRect = scroller.getBoundingClientRect();
+        scroller.scrollTop += targetRect.top - scrollerRect.top - 12;
+      }
+    }
+  }
+</script>
+</body>
+</html>

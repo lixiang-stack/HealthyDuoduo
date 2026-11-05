@@ -9,4 +9,4 @@ import _ "embed"
 var explanationSystemPrompt string
 
 // explanationPromptVersion 随快照记录,便于区分「规则变了」和「prompt 变了」。
-const explanationPromptVersion = "v1"
+const explanationPromptVersion = "v3"
