@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>RAG 解读结果页 · 方案对照</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: #eef0f3;
+    color: #111827;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { width: 1290px; margin: 0 auto; padding: 28px 30px 32px; }
+  .eyebrow { font-size: 11px; letter-spacing: 1.4px; text-transform: uppercase; color: #6b7280; font-weight: 600; }
+  h1 { margin: 6px 0 4px; font-size: 24px; letter-spacing: -.3px; }
+  .sub { font-size: 13px; line-height: 20px; color: #4b5563; }
+  .sub b { color: #111827; }
+  .grid { display: grid; grid-template-columns: repeat(3, 390px); gap: 30px; margin-top: 24px; align-items: start; }
+  .col { display: flex; flex-direction: column; gap: 10px; }
+  .col-head { display: flex; align-items: baseline; gap: 8px; }
+  .tag {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px; border-radius: 8px; background: #111827; color: #fff;
+    font-size: 13px; font-weight: 700;
+  }
+  .tag.a { background: #2563eb; }
+  .tag.b { background: #0f766e; }
+  .tag.c { background: #6b7280; }
+  .col-title { font-size: 15px; font-weight: 700; }
+  .col-note { font-size: 12px; line-height: 18px; color: #4b5563; min-height: 54px; }
+  .shot { width: 390px; border: 1px solid #d1d5db; border-radius: 12px; background: #fff; overflow: hidden; box-shadow: 0 8px 28px rgba(17,24,39,.08); }
+  .shot img { display: block; width: 100%; height: auto; }
+  .verdict { margin-top: 26px; padding: 14px 16px; border-radius: 10px; background: #fff; border: 1px solid #d1d5db; font-size: 13px; line-height: 20px; color: #374151; }
+  .verdict b { color: #111827; }
+  .verdict .pick { color: #2563eb; font-weight: 700; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="eyebrow">HealthyDuoduo · Prototype</div>
+    <h1>RAG 解读结果页 · 三种 claim / 引文展示</h1>
+    <div class="sub"><b>样例：</b>爸爸（42 岁）肝功轻度异常，ALT 186、AST 96、GGT 78；框架层判为肝细胞型、轻度。引文为演示用，最终以审核语料为准。</div>
+
+    <div class="grid">
+      <div class="col">
+        <div class="col-head"><span class="tag a">A</span><span class="col-title">逐条原文</span></div>
+        <div class="col-note">每条结论下方一个「原文」，展开显示逐字引文 + 来源 + 年份/权威等级。首屏更长，但每条都能当场核对。</div>
+        <div class="shot"><img src="shots/01-a-claim-quote.png" alt="方案 A" /></div>
+      </div>
+      <div class="col">
+        <div class="col-head"><span class="tag b">B</span><span class="col-title">内联编号</span></div>
+        <div class="col-note">结论后用 [1][2] 标注，底部统一列来源与引文。更紧凑，但家长要先理解编号再回看。</div>
+        <div class="shot"><img src="shots/02-b-inline-citation.png" alt="方案 B" /></div>
+      </div>
+      <div class="col">
+        <div class="col-head"><span class="tag c">C</span><span class="col-title">现状聚合</span></div>
+        <div class="col-note">保留现有四段式聚合，只在底部给「查看来源说明」。改动最小，但无法逐条溯源。</div>
+        <div class="shot"><img src="shots/03-c-aggregate.png" alt="方案 C" /></div>
+      </div>
+    </div>
+
+    <div class="verdict">
+      <b>要判断什么：</b>家长能否在结果页直接核对「这句话从哪来」。<span class="pick">推荐 A</span>：它把 Q10 的 claim + quote 结构直接呈现为可展开的原文，最符合「可溯源」；B 更紧凑但阅读门槛高，C 最省事但溯源最弱。
+    </div>
+  </div>
+</body>
+</html>

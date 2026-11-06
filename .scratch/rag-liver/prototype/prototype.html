@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HealthyDuoduo · RAG 解读结果页原型</title>
+<style>
+  :root {
+    --text: #111827;
+    --muted: #6b7280;
+    --accent: #2563eb;
+    --ok: #15803d;
+    --fail: #b91c1c;
+    --low: #1d4ed8;
+    --border: #d1d5db;
+    --soft: #f8fafc;
+    --chip: #f3f4f6;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: #e5e7eb;
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .stage { display: flex; flex-direction: column; align-items: center; padding: 22px 0 150px; }
+  .caption {
+    width: 390px; margin-bottom: 14px; font-size: 13px; line-height: 20px; color: #374151;
+  }
+  .caption b { color: #111827; }
+  .device {
+    width: 390px; height: 844px; position: relative; overflow: hidden;
+    background: #fff; border: 10px solid #111827; border-radius: 46px;
+    box-shadow: 0 24px 60px rgba(0,0,0,.28);
+  }
+  .notch {
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+    width: 118px; height: 25px; border-radius: 16px; background: #111827; z-index: 20;
+  }
+  .screen { position: absolute; inset: 0; display: flex; flex-direction: column; background: #fff; }
+  .statusbar {
+    flex: 0 0 44px; height: 44px; padding: 0 22px 6px;
+    display: flex; align-items: flex-end; justify-content: space-between;
+    font-size: 12px; font-weight: 650; color: var(--text);
+  }
+  .appbar {
+    flex: 0 0 52px; height: 52px; padding: 0 16px; display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid #f1f5f9; background: #fff;
+  }
+  .appbar .back { width: 22px; font-size: 30px; line-height: 1; color: var(--text); }
+  .appbar .title { flex: 1; font-size: 17px; font-weight: 650; letter-spacing: .1px; }
+  .content {
+    flex: 1; overflow-y: auto; padding: 20px 24px 32px; scrollbar-width: none;
+  }
+  .content::-webkit-scrollbar { display: none; }
+  .stack { display: flex; flex-direction: column; gap: 14px; }
+
+  .meta { font-size: 13px; line-height: 20px; color: var(--muted); }
+  .created { font-size: 12px; line-height: 18px; color: var(--muted); }
+  .section-title { font-size: 15px; font-weight: 650; color: var(--text); margin: 2px 0 0; }
+  .section-sub { font-size: 12px; line-height: 18px; color: var(--muted); }
+  .card { border: 1px solid var(--border); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+  .disclaimer { font-size: 12px; line-height: 18px; color: var(--muted); }
+  .sample {
+    display: inline-flex; align-items: center; border: 1px solid #e5e7eb; background: #f9fafb;
+    color: #6b7280; border-radius: 8px; padding: 1px 6px; font-size: 10px; line-height: 16px; margin-left: 6px;
+    vertical-align: 1px; font-weight: 500;
+  }
+  .coverage {
+    border: 1px solid #bfdbfe; background: #f8fbff; border-radius: 10px; padding: 10px 12px;
+  }
+  .coverage-title { font-size: 13px; font-weight: 650; line-height: 19px; }
+  .coverage-sub { margin-top: 2px; font-size: 12px; line-height: 18px; color: var(--muted); }
+
+  .part-title { font-size: 14px; font-weight: 650; color: var(--text); margin-top: 6px; }
+  .bullets { display: flex; flex-direction: column; gap: 6px; }
+  .bullet { font-size: 14px; line-height: 22px; color: var(--text); }
+  .bullet::before { content: "·"; color: var(--muted); margin-right: 7px; }
+
+  .claim { display: flex; flex-direction: column; gap: 4px; }
+  .claim-text { font-size: 14px; line-height: 22px; color: var(--text); }
+  .claim-text::before { content: "·"; color: var(--muted); margin-right: 7px; }
+  .claim-action {
+    align-self: flex-start; border: 0; background: transparent; padding: 0;
+    min-height: 28px; font-size: 12px; color: var(--accent); font-family: inherit; cursor: pointer;
+  }
+  .claim-action::before { content: "⌄ "; font-size: 11px; }
+  .claim-action.open::before { content: "⌃ "; }
+  .quote {
+    display: none; margin: 0 0 2px 14px; padding: 9px 11px; border-left: 2px solid #cbd5e1;
+    background: #f8fafc; border-radius: 0 8px 8px 0;
+  }
+  .quote.open { display: block; }
+  .quote-text { font-size: 12px; line-height: 19px; color: #374151; font-style: italic; }
+  .quote-source { margin-top: 4px; font-size: 11px; line-height: 17px; color: var(--muted); }
+  .quote-source b { color: #4b5563; font-weight: 600; }
+
+  .cite {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 16px; height: 16px; padding: 0 3px; margin-left: 2px;
+    border-radius: 8px; background: #eff6ff; color: var(--accent);
+    font-size: 10px; line-height: 1; vertical-align: 1px; cursor: pointer; border: 0;
+    font-family: inherit;
+  }
+  .cite.active { background: var(--accent); color: #fff; }
+
+  .standard {
+    border: 1px solid #e5e7eb; background: #fcfcfd; border-radius: 10px; padding: 11px 12px;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .standard-head { display: flex; align-items: center; gap: 6px; }
+  .standard-chip {
+    font-size: 10px; line-height: 16px; color: #4b5563; background: #f3f4f6;
+    border: 1px solid #e5e7eb; border-radius: 6px; padding: 0 5px;
+  }
+  .standard-title { font-size: 13px; font-weight: 600; color: #374151; }
+  .standard-text { font-size: 13px; line-height: 20px; color: #374151; }
+  .standard-missing { font-size: 12px; line-height: 18px; color: #92400e; }
+
+  .source-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin-top: 2px; }
+  .source-line .label { font-size: 12px; color: var(--muted); }
+  .source-line .name { font-size: 12px; color: var(--muted); }
+  .source-line button {
+    border: 0; background: transparent; padding: 0; min-height: 28px; font-size: 12px;
+    color: var(--accent); font-family: inherit; cursor: pointer;
+  }
+
+  .source-list { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+  .source-item {
+    display: flex; gap: 8px; border: 1px solid #e5e7eb; border-radius: 9px; padding: 9px 10px;
+    background: #fff;
+  }
+  .source-item.active { border-color: #93c5fd; background: #f8fbff; }
+  .source-num {
+    flex: 0 0 18px; width: 18px; height: 18px; border-radius: 9px; background: #eff6ff;
+    color: var(--accent); font-size: 10px; display: flex; align-items: center; justify-content: center;
+  }
+  .source-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .source-title { font-size: 12px; font-weight: 650; line-height: 18px; color: var(--text); }
+  .source-meta { font-size: 11px; line-height: 16px; color: var(--muted); }
+  .source-quote { font-size: 11px; line-height: 17px; color: #4b5563; font-style: italic; margin-top: 2px; }
+  .source-open { font-size: 11px; color: var(--accent); margin-top: 2px; }
+  .auth {
+    display: inline-flex; align-items: center; border-radius: 5px; padding: 0 4px;
+    font-size: 10px; line-height: 16px; border: 1px solid #bbf7d0; background: #f0fdf4; color: var(--ok);
+    margin-left: 4px;
+  }
+
+  .label-row { border-top: 1px solid #f1f5f9; padding-top: 8px; display: flex; flex-direction: column; gap: 3px; }
+  .label-row:first-of-type { border-top: 0; padding-top: 2px; }
+  .label-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .label-name { font-size: 14px; font-weight: 650; }
+  .label-value { font-size: 12px; color: var(--text); font-variant-numeric: tabular-nums; }
+  .label-body { font-size: 13px; line-height: 20px; color: var(--text); }
+  .label-source { font-size: 11px; line-height: 17px; color: var(--muted); }
+
+  .dev-row { border-top: 1px solid #f1f5f9; padding-top: 9px; display: flex; flex-direction: column; gap: 2px; }
+  .dev-row:first-of-type { border-top: 0; padding-top: 2px; }
+  .dev-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .dev-name { font-size: 14px; color: var(--text); }
+  .dev-flag { font-size: 12px; color: var(--fail); }
+  .dev-body { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .dev-value { font-size: 20px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .dev-value .unit { font-size: 11px; font-weight: 400; color: var(--muted); }
+  .dev-ref { font-size: 12px; color: var(--muted); }
+  .dev-tag { font-size: 11px; color: var(--ok); }
+  .dev-link { font-size: 12px; color: var(--accent); }
+
+  .data-note { border: 1px solid var(--border); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 4px; }
+  .data-note .muted { font-size: 12px; line-height: 18px; color: var(--muted); }
+  .data-note .link { font-size: 12px; color: var(--accent); }
+
+  .modal {
+    position: absolute; inset: 0; z-index: 30; display: none; align-items: flex-end;
+    background: rgba(17,24,39,.45);
+  }
+  .modal.open { display: flex; }
+  .sheet {
+    width: 100%; max-height: 78%; background: #fff; border-radius: 16px 16px 0 0;
+    padding: 18px 18px 16px; display: flex; flex-direction: column; gap: 10px;
+  }
+  .sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .sheet-title { font-size: 16px; font-weight: 650; }
+  .sheet-close { border: 0; background: transparent; font-size: 20px; color: var(--muted); cursor: pointer; }
+  .sheet-body { overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+  .sheet-note { font-size: 12px; line-height: 18px; color: var(--muted); }
+
+  .switcher {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 100;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    padding: 10px 16px; background: #111827; color: #fff; font-size: 12px;
+  }
+  .switcher .group { display: flex; align-items: center; gap: 6px; margin-right: 8px; }
+  .switcher .label { color: #9ca3af; font-size: 11px; }
+  .switcher button {
+    border: 0; border-radius: 6px; padding: 6px 10px; background: #374151; color: #fff;
+    font-size: 12px; cursor: pointer; font-family: inherit;
+  }
+  .switcher button.active { background: var(--accent); }
+
+  body.shot { background: #fff; }
+  body.shot .switcher, body.shot .caption { display: none; }
+  body.shot .stage { padding: 0; display: block; }
+  body.shot .device { width: 390px; height: auto; border: 0; border-radius: 0; box-shadow: none; }
+  body.shot .notch, body.shot .statusbar, body.shot .appbar { display: none; }
+  body.shot .screen { position: static; display: block; }
+  body.shot .content { overflow: visible; padding: 20px 24px 32px; }
+  body.shot .modal { position: fixed; }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <div class="caption">
+      <b>任务：</b>爸爸（42 岁）肝功轻度异常。RAG 生成四段式解读，每条结论带逐字引文。<br />
+      对比三种展示：A 逐条展开原文、B 内联编号 + 来源列表、C 现状聚合 + 来源弹层。<br />
+      样例数据；引文为演示用，最终以审核语料为准。
+    </div>
+    <div class="device">
+      <div class="notch"></div>
+      <div class="screen">
+        <div class="statusbar"><span>9:41</span><span>●●●</span></div>
+        <div class="appbar"><span class="back">‹</span><span class="title">解读</span></div>
+        <div class="content" id="content"></div>
+      </div>
+      <div class="modal" id="modal">
+        <div class="sheet">
+          <div class="sheet-head">
+            <span class="sheet-title">这些参考来源是什么？</span>
+            <button class="sheet-close" data-close="1">×</button>
+          </div>
+          <div class="sheet-note">把专业指南翻译成家长能看懂的话；指南不能替代医生。</div>
+          <div class="sheet-body" id="sheet-body"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="switcher">
+    <div class="group"><span class="label">方案</span>
+      <button data-variant="A">A 逐条原文</button>
+      <button data-variant="B">B 内联编号</button>
+      <button data-variant="C">C 现状聚合</button>
+    </div>
+    <div class="group"><span class="label">状态</span>
+      <button data-state="default">默认</button>
+      <button data-state="open">展开一条原文</button>
+      <button data-state="sheet">来源弹层</button>
+    </div>
+  </div>
+
+<script>
+  const sources = [
+    {
+      id: 'aasld',
+      num: 1,
+      title: 'AASLD：How to approach elevated liver enzymes',
+      org: 'American Association for the Study of Liver Diseases',
+      year: '2024',
+      authority: '高权威',
+      url: 'https://www.aasld.org/liver-fellow-network/core-series/back-basics/how-approach-elevated-liver-enzymes',
+    },
+    {
+      id: 'acg2016',
+      num: 2,
+      title: 'ACG 2016：Evaluation of Abnormal Liver Chemistries',
+      org: 'American College of Gastroenterology',
+      year: '2016',
+      authority: '高权威',
+      url: 'https://doi.org/10.1038/ajg.2016.517',
+    },
+  ];
+
+  const claims = [
+    {
+      section: 'causes',
+      text: '指南中，ALT/AST 升高而 ALP 不明显升高时，通常先归为肝细胞型损伤。',
+      quote: 'ALT and AST elevation with normal or mildly elevated ALP suggests a hepatocellular pattern.',
+      source: 'aasld',
+    },
+    {
+      section: 'causes',
+      text: '常见原因包括代谢相关脂肪性肝病、病毒性肝炎和药物性肝损伤。',
+      quote: 'Common causes include metabolic dysfunction-associated steatotic liver disease, viral hepatitis, and drug-induced liver injury.',
+      source: 'acg2016',
+    },
+    {
+      section: 'causes',
+      text: '本次 ALT 约为正常上限的 3.7 倍，按指南属于轻度升高；单次结果不能确定原因。',
+      quote: 'Mild elevations are defined as 2–5 times the upper limit of normal.',
+      source: 'acg2016',
+    },
+    {
+      section: 'checks',
+      text: '指南建议结合病史、用药史和病毒性肝炎筛查来评估持续升高的转氨酶。',
+      quote: 'History, medication review, and viral hepatitis serologies are part of the evaluation.',
+      source: 'aasld',
+    },
+    {
+      section: 'checks',
+      text: '如果影像学提示脂肪肝，可进一步评估代谢风险。',
+      quote: 'Imaging may identify hepatic steatosis and help assess metabolic risk.',
+      source: 'aasld',
+    },
+    {
+      section: 'advice',
+      text: '指南中，减重和规律运动是代谢相关脂肪性肝病的基础管理。',
+      quote: 'Weight loss and physical activity are recommended for patients with MASLD.',
+      source: 'acg2016',
+    },
+    {
+      section: 'advice',
+      text: '避免饮酒，避免自行使用保肝药或补充剂。',
+      quote: 'Alcohol avoidance is advised; patients should avoid unsupervised use of supplements.',
+      source: 'aasld',
+    },
+    {
+      section: 'tracking',
+      text: '指南建议复查肝功，观察转氨酶是否持续升高。',
+      quote: 'Follow-up liver chemistry may be considered to confirm persistence.',
+      source: 'acg2016',
+    },
+  ];
+
+  const sections = [
+    { key: 'causes', title: '可能原因' },
+    { key: 'checks', title: '进一步检查' },
+    { key: 'advice', title: '生活建议' },
+    { key: 'tracking', title: '长期跟踪' },
+  ];
+
+  const framework = [
+    {
+      name: '肝细胞型',
+      value: 'R = 7.75（2026-10-18）',
+      body: '转氨酶升高为主，碱性磷酸酶不明显升高。',
+      source: '参考：AASLD / ACG',
+    },
+    {
+      name: '转氨酶升高：轻度',
+      value: 'ALT 3.72×ULN（2026-10-18）',
+      body: '转氨酶升高 2–5×ULN，按 ACG 2016 为轻度。',
+      source: '参考：ACG 2016',
+    },
+  ];
+
+  const deviations = [
+    { name: '丙氨酸转氨酶 ALT', value: '186', unit: 'U/L', ref: '9–50', flag: '偏高' },
+    { name: '天冬氨酸转氨酶 AST', value: '96', unit: 'U/L', ref: '15–40', flag: '偏高' },
+    { name: 'γ-谷氨酰转移酶 GGT', value: '78', unit: 'U/L', ref: '10–60', flag: '偏高' },
+  ];
+
+  function sourceById(id) {
+    return sources.find((s) => s.id === id);
+  }
+
+  function sourceMeta(source) {
+    return `${source.year} · ${source.authority}`;
+  }
+
+  function claimMarkup(claim, variant, index) {
+    if (variant === 'C') {
+      return `<div class="bullet">${claim.text}</div>`;
+    }
+    if (variant === 'B') {
+      const source = sourceById(claim.source);
+      return `<div class="claim"><div class="claim-text">${claim.text}<button class="cite" data-cite="${source.num}">${source.num}</button></div></div>`;
+    }
+    const source = sourceById(claim.source);
+    const open = index === 0 ? ' open' : '';
+    const actionOpen = index === 0 ? ' open' : '';
+    return `<div class="claim">
+      <div class="claim-text">${claim.text}</div>
+      <button class="claim-action${actionOpen}" data-quote="${index}">${index === 0 ? '收起原文' : '原文'}</button>
+      <div class="quote${open}" data-quote-body="${index}">
+        <div class="quote-text">“${claim.quote}”</div>
+        <div class="quote-source"><b>${source.title}</b> · ${sourceMeta(source)}</div>
+      </div>
+    </div>`;
+  }
+
+  function explanationCard(variant, state) {
+    const claimsBySection = {};
+    for (const claim of claims) {
+      (claimsBySection[claim.section] ||= []).push(claim);
+    }
+    let body = '';
+    let globalIndex = 0;
+    for (const section of sections) {
+      const list = claimsBySection[section.key] || [];
+      if (list.length === 0) continue;
+      body += `<div class="part-title">${section.title}</div>`;
+      if (variant === 'C') {
+        body += `<div class="bullets">${list.map((claim) => claimMarkup(claim, variant)).join('')}</div>`;
+      } else {
+        body += `<div class="bullets">${list.map((claim) => {
+          const index = globalIndex++;
+          return claimMarkup(claim, variant, index);
+        }).join('')}</div>`;
+      }
+    }
+
+    const standard = `<div class="standard">
+      <div class="standard-head"><span class="standard-chip">指南标准</span><span class="standard-title">MASLD 的诊断标准</span></div>
+      <div class="standard-text">指南中，MASLD 的诊断需要影像学脂肪肝证据 + 至少一项代谢异常，并排除其他原因。</div>
+      <div class="standard-missing">本次资料缺少影像学证据，无法判断是否符合；可结合医生意见补充检查。</div>
+    </div>`;
+
+    const sourceLine = variant === 'C'
+      ? `<div class="source-line"><span class="label">参考：</span><span class="name">AASLD / ACG 等 2 份</span><button data-sheet="1">查看来源说明 ›</button></div>`
+      : variant === 'B'
+        ? `<div class="source-line"><span class="label">来源：</span><span class="name">[1] AASLD 2024 · [2] ACG 2016</span><button data-sheet="1">查看引文 ›</button></div>`
+        : `<div class="source-line"><span class="label">参考：</span><span class="name">AASLD 2024、ACG 2016</span><button data-sheet="1">查看全部来源 ›</button></div>`;
+
+    const sourceList = variant === 'B'
+      ? `<div class="source-list">${sources.map((source) => `
+          <div class="source-item" data-source-item="${source.num}">
+            <div class="source-num">${source.num}</div>
+            <div class="source-body">
+              <div class="source-title">${source.title}<span class="auth">${source.authority}</span></div>
+              <div class="source-meta">${source.org} · ${source.year}</div>
+              <div class="source-quote">“${claims.find((claim) => claim.source === source.id)?.quote || ''}”</div>
+              <a class="source-open" href="${source.url}" target="_blank" rel="noreferrer">打开原文 ↗</a>
+            </div>
+          </div>`).join('')}</div>`
+      : '';
+
+    return `<div class="card">
+      <div><span class="section-title">本次解读</span><span class="sample">样例</span></div>
+      <div class="disclaimer">内容来自指南原文，不是诊断。</div>
+      <div class="coverage">
+        <div class="coverage-title">3 项异常里，本次解读解释了 3 项</div>
+        <div class="coverage-sub">引文可展开对照；指南不能替代医生。</div>
+      </div>
+      ${body}
+      ${standard}
+      ${sourceLine}
+      ${sourceList}
+      <div class="source-line"><button data-feedback="1">反馈这段内容</button></div>
+    </div>`;
+  }
+
+  function frameworkCard() {
+    return `<div class="card">
+      <div class="section-title">指标分级</div>
+      <div class="section-sub">按公开标准，不是诊断</div>
+      ${framework.map((label) => `<div class="label-row">
+        <div class="label-head"><span class="label-name">${label.name}</span><span class="label-value">${label.value}</span></div>
+        <div class="label-body">${label.body}</div>
+        <div class="label-source">${label.source}</div>
+      </div>`).join('')}
+    </div>`;
+  }
+
+  function deviationsCard() {
+    return `<div class="card">
+      <div class="section-title">异常 3 项</div>
+      <div class="section-sub">按每项最近一次结果</div>
+      ${deviations.map((item) => `<div class="dev-row">
+        <div class="dev-head"><span class="dev-name">${item.name}</span><span class="dev-flag">${item.flag}</span></div>
+        <div class="dev-body"><span class="dev-value">${item.value} <span class="unit">${item.unit}</span></span><span class="dev-ref">参考 ${item.ref}</span></div>
+        <div class="dev-tag">已解读</div>
+        <div class="dev-link">2026-10-18 · 生化 ›</div>
+      </div>`).join('')}
+    </div>`;
+  }
+
+  function dataNote() {
+    return `<div class="data-note">
+      <div class="section-title">数据说明</div>
+      <div class="muted">本次判断使用 2025-11-06 之后的 2 份报告。</div>
+      <div class="muted">历史趋势在「肝功」项目页查看；体格发育在成员页查看。</div>
+      <div class="link">查看肝功全部指标与趋势 ›</div>
+    </div>`;
+  }
+
+  function render(variant, state) {
+    document.querySelectorAll('.switcher button[data-variant]').forEach((button) => {
+      button.classList.toggle('active', button.dataset.variant === variant);
+    });
+    const content = document.getElementById('content');
+    content.innerHTML = `<div class="stack">
+      <div><div class="meta">爸爸 · 肝功</div><div class="meta">2025-11-06 至 2026-11-06 · 12 个月</div><div class="created">2026-11-06 14:20 创建</div></div>
+      ${explanationCard(variant, state)}
+      ${frameworkCard()}
+      ${deviationsCard()}
+      ${dataNote()}
+    </div>`;
+
+    const modal = document.getElementById('modal');
+    const sheetBody = document.getElementById('sheet-body');
+    sheetBody.innerHTML = sources.map((source) => `<div class="source-item">
+      <div class="source-num">${source.num}</div>
+      <div class="source-body">
+        <div class="source-title">${source.title}<span class="auth">${source.authority}</span></div>
+        <div class="source-meta">${source.org} · ${source.year}</div>
+        <div class="source-quote">“${claims.find((claim) => claim.source === source.id)?.quote || ''}”</div>
+        <a class="source-open" href="${source.url}" target="_blank" rel="noreferrer">打开原文 ↗</a>
+      </div>
+    </div>`).join('');
+    modal.classList.toggle('open', state === 'sheet');
+
+    content.querySelectorAll('[data-quote]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const body = content.querySelector(`[data-quote-body="${button.dataset.quote}"]`);
+        const open = body.classList.toggle('open');
+        button.classList.toggle('open', open);
+        button.textContent = open ? '收起原文' : '原文';
+      });
+    });
+    content.querySelectorAll('[data-cite]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const item = content.querySelector(`[data-source-item="${button.dataset.cite}"]`);
+        if (!item) return;
+        content.querySelectorAll('.source-item').forEach((node) => node.classList.remove('active'));
+        item.classList.add('active');
+        item.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        button.classList.add('active');
+      });
+    });
+    content.querySelectorAll('[data-sheet]').forEach((button) => {
+      button.addEventListener('click', () => modal.classList.add('open'));
+    });
+    content.querySelectorAll('[data-feedback]').forEach((button) => {
+      button.addEventListener('click', () => {
+        button.textContent = '已记录，谢谢反馈。';
+        button.disabled = true;
+      });
+    });
+  }
+
+  document.querySelectorAll('.switcher button[data-variant]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const params = new URLSearchParams(location.search);
+      params.set('variant', button.dataset.variant);
+      params.delete('state');
+      history.replaceState(null, '', `?${params.toString()}`);
+      render(button.dataset.variant, 'default');
+    });
+  });
+  document.querySelectorAll('.switcher button[data-state]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const params = new URLSearchParams(location.search);
+      const variant = params.get('variant') || 'A';
+      params.set('state', button.dataset.state);
+      history.replaceState(null, '', `?${params.toString()}`);
+      render(variant, button.dataset.state);
+    });
+  });
+  document.getElementById('modal').addEventListener('click', (event) => {
+    if (event.target === event.currentTarget || event.target.closest('[data-close]')) {
+      event.currentTarget.classList.remove('open');
+    }
+  });
+
+  const params = new URLSearchParams(location.search);
+  if (params.get('shot') === '1') {
+    document.body.classList.add('shot');
+  }
+  const variant = params.get('variant') || 'A';
+  const state = params.get('state') || 'default';
+  render(variant, state);
+</script>
+</body>
+</html>
