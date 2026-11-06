@@ -1,4 +1,4 @@
-// 分析结果页的数据与交互状态:加载、反馈、重新分析。
+// 解读结果页的数据与交互状态:加载、反馈、重新解读。
 // 页面组件只负责组合，行为与原 AnalysisScreen 内联实现逐字一致。
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useRef, useState } from "react";
@@ -26,7 +26,7 @@ export type AnalysisScreenState =
   | { status: "error"; detail: string }
   | { status: "ready"; result: AnalysisResult };
 
-export const CLINICAL_NOTE_RERUN_TEXT = "病历分析请回到原病历详情页重新发起。";
+export const CLINICAL_NOTE_RERUN_TEXT = "病历解读请回到原病历详情页重新发起。";
 
 /** 加载分析结果;从报告详情返回时静默刷新,保留展开状态与滚动位置。 */
 export function useAnalysisScreen(analysisId: number) {
@@ -38,7 +38,7 @@ export function useAnalysisScreen(analysisId: number) {
   const load = useCallback(
     async (silent = false) => {
       if (!Number.isInteger(analysisId) || analysisId <= 0) {
-        setState({ status: "error", detail: "分析编号无效" });
+        setState({ status: "error", detail: "解读编号无效" });
         return;
       }
       if (!silent) {
@@ -227,8 +227,8 @@ export function useAnalysisViewModel(result: AnalysisResult | undefined) {
     ? Math.max(0, result.quota.limit_today - result.quota.used_today)
     : 0;
   const heading = facts
-    ? `${panelLabel(facts.panel as PanelCode)}分析`
-    : "分析结果";
+    ? `${panelLabel(facts.panel as PanelCode)}解读`
+    : "解读结果";
   const nameLabels = facts
     ? indicatorLabels(facts.deviations.map((point) => point.name))
     : new Map<string, string>();

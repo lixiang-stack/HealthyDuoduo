@@ -228,7 +228,7 @@ export function ExplanationCard({
       </View>
       {explanation.truncated ? (
         <Text testID="analysis-explanation-truncated" style={styles.mutedSmall}>
-          解释内容达到长度上限，已截断；只影响解释层，事实与分级仍完整。
+          解读内容达到长度上限，已截断；只影响解读部分，事实与分级仍完整。
         </Text>
       ) : null}
       {sources.length > 0 ? (
@@ -345,7 +345,7 @@ export function NoteCard({ note }: { note: AnalysisNote }) {
           date={noteDate(note.report_date)}
           testID={`analysis-note-link-${note.report_id}`}
         />
-        {note.outside_window ? <Text style={styles.outsideTag}>早于分析窗口</Text> : null}
+        {note.outside_window ? <Text style={styles.outsideTag}>早于解读窗口</Text> : null}
       </View>
       <Text style={styles.noteWarning}>{NOTE_ATTRIBUTION_WARNING}</Text>
       {note.sections.map((section, index) => (

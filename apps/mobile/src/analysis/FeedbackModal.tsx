@@ -6,7 +6,7 @@ import { colors } from '../components/theme';
 
 export const FEEDBACK_REASON_OPTIONS = [
   { value: 'value_wrong', label: '数值不对' },
-  { value: 'explanation_wrong', label: '解释不对' },
+  { value: 'explanation_wrong', label: '解读不对' },
   { value: 'note_conflict', label: '病历冲突' },
   { value: 'unclear', label: '看不懂' },
   { value: 'other', label: '其他' },
@@ -40,7 +40,7 @@ export function AnalysisFeedbackModal({
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         <View testID="analysis-feedback-modal" style={styles.sheet}>
           <Text style={styles.title}>
-            {entryId ? '这段内容哪里需要改进？' : '分析结果哪里需要改进？'}
+            {entryId ? '这段内容哪里需要改进？' : '解读结果哪里需要改进？'}
           </Text>
           <Text style={styles.hint}>
             {entryId

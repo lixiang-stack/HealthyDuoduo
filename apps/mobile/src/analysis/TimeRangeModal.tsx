@@ -1,4 +1,4 @@
-// 分析时间范围选择(llm-analysis 票 04 产品体验修订):先点「分析这个项目 / 指标 / 病历」,
+// 解读时间范围选择(llm-analysis 票 04 产品体验修订):先点「解读这个项目 / 指标 / 病历」,
 // 再选择 6 / 12 / 24 个月;默认 12 个月。时间范围不再常驻项目详情页。
 import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -34,7 +34,7 @@ export function TimeRangeModal({
       <View style={styles.backdrop}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onCancel} />
         <View testID="analysis-range" style={styles.sheet}>
-          <Text style={styles.title}>选择分析时间范围</Text>
+          <Text style={styles.title}>选择解读时间范围</Text>
           <Text style={styles.hint}>
             当前为 {initialMonths} 个月；可改为 6 / 12 / 24 个月。
           </Text>
@@ -73,7 +73,7 @@ export function TimeRangeModal({
               onPress={() => onConfirm(selected)}
               disabled={busy}
             >
-              <Text style={styles.primaryText}>开始分析</Text>
+              <Text style={styles.primaryText}>开始解读</Text>
             </Pressable>
           </View>
         </View>

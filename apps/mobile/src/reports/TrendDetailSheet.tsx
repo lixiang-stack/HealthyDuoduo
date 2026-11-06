@@ -176,7 +176,7 @@ export function TrendDetailSheet({
                 onPress={onAnalyze}
                 style={styles.analyzeButton}
               >
-                <Text style={styles.analyzeButtonText}>分析这个指标 ›</Text>
+                <Text style={styles.analyzeButtonText}>解读这个指标 ›</Text>
               </Pressable>
             ) : null}
           </ScrollView>

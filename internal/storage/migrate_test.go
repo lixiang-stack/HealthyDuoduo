@@ -29,18 +29,19 @@ func TestMigrationSchema(t *testing.T) {
 		t.Fatalf("migrate: %v", err)
 	}
 
-	// 基线固定在 version 19:已跑过旧 0018/0019 的本地库跳过,新库也从这里开始。
+	// 基线固定在 version 20:0019 是当前完整 schema,0020 追加解释层缓存表。
 	var latest int
 	if err := pool.QueryRow(ctx, `SELECT max(version_id) FROM goose_db_version`).Scan(&latest); err != nil {
 		t.Fatalf("read goose version: %v", err)
 	}
-	if latest != 19 {
-		t.Fatalf("goose version = %d, want 19", latest)
+	if latest != 20 {
+		t.Fatalf("goose version = %d, want 20", latest)
 	}
 
 	t.Run("tables", func(t *testing.T) {
 		want := []string{
-			"analyses", "analysis_events", "analysis_feedback", "analysis_llm_calls",
+			"analyses", "analysis_events", "analysis_explanation_cache",
+			"analysis_feedback", "analysis_llm_calls",
 			"correction_pairs", "growth_records", "images", "members", "ocr_results",
 			"report_items", "reports",
 		}
@@ -325,24 +326,30 @@ func TestMigrationSchema(t *testing.T) {
 		if _, err := pool.Exec(ctx, `INSERT INTO analysis_llm_calls (analysis_id) VALUES ($1)`, analysisID); err != nil {
 			t.Fatalf("seed llm call: %v", err)
 		}
+		if _, err := pool.Exec(ctx, `INSERT INTO analysis_explanation_cache
+			(member_id, cache_key, explanation) VALUES (1, 'key', '{}')`); err != nil {
+			t.Fatalf("seed explanation cache: %v", err)
+		}
 	})
 
 	t.Run("member delete cascades owned data", func(t *testing.T) {
 		if _, err := pool.Exec(ctx, `DELETE FROM members WHERE id = 1`); err != nil {
 			t.Fatalf("delete member: %v", err)
 		}
-		var growth, analyses, feedback, events, calls, ownedReports int
+		var growth, analyses, feedback, events, calls, cached, ownedReports int
 		if err := pool.QueryRow(ctx, `SELECT
 			(SELECT count(*) FROM growth_records), (SELECT count(*) FROM analyses),
 			(SELECT count(*) FROM analysis_feedback), (SELECT count(*) FROM analysis_events),
 			(SELECT count(*) FROM analysis_llm_calls),
+			(SELECT count(*) FROM analysis_explanation_cache),
 			(SELECT count(*) FROM reports WHERE member_id = 1)`).
-			Scan(&growth, &analyses, &feedback, &events, &calls, &ownedReports); err != nil {
+			Scan(&growth, &analyses, &feedback, &events, &calls, &cached, &ownedReports); err != nil {
 			t.Fatal(err)
 		}
-		if growth != 0 || analyses != 0 || feedback != 0 || events != 0 || calls != 0 || ownedReports != 0 {
-			t.Fatalf("after member delete: growth=%d analyses=%d feedback=%d events=%d calls=%d reports=%d, want all 0",
-				growth, analyses, feedback, events, calls, ownedReports)
+		if growth != 0 || analyses != 0 || feedback != 0 || events != 0 || calls != 0 ||
+			cached != 0 || ownedReports != 0 {
+			t.Fatalf("after member delete: growth=%d analyses=%d feedback=%d events=%d calls=%d cached=%d reports=%d, want all 0",
+				growth, analyses, feedback, events, calls, cached, ownedReports)
 		}
 		// 无主存量报告不受成员删除影响。
 		var unowned int

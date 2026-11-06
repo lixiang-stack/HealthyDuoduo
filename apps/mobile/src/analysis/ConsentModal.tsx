@@ -21,7 +21,7 @@ export function AnalysisConsentModal({
       <View style={styles.backdrop}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onCancel} />
         <View testID="analysis-consent" style={styles.sheet}>
-          <Text style={styles.title}>分析前请确认</Text>
+          <Text style={styles.title}>解读前请确认</Text>
           <Text style={styles.body}>{ANALYSIS_CONSENT_TEXT}</Text>
           <View style={styles.actions}>
             <Pressable
@@ -38,7 +38,7 @@ export function AnalysisConsentModal({
               onPress={onConfirm}
               disabled={busy}
             >
-              <Text style={styles.primaryText}>我知道了，开始分析</Text>
+              <Text style={styles.primaryText}>我知道了，开始解读</Text>
             </Pressable>
           </View>
         </View>

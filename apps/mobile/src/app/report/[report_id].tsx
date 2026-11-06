@@ -206,7 +206,7 @@ function ReportReadyView({
             disabled={analysis.starting}
           >
             <Text style={styles.buttonText}>
-              {analysis.starting ? "正在分析…" : "分析这份病历"}
+              {analysis.starting ? "正在解读…" : "解读这份病历"}
             </Text>
           </Pressable>
           {analysis.error ? (

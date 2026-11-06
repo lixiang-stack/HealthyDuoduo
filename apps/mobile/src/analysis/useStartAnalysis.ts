@@ -1,12 +1,13 @@
-// 分析入口(llm-analysis 票 04):点击分析后先选时间范围(默认 12 个月),
-// 首次再展示数据去向确认,之后直接创建分析并跳转。
+// 解读入口(llm-analysis 票 04):点击解读后先选时间范围(默认 12 个月),
+// 首次再展示数据去向确认,之后直接创建解读并跳转。
 // 创建后由结果页 GET /analyses/{id} 读取已保存快照;这里只负责入口、范围与确认。
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 
 import {
   ANALYSIS_DEFAULT_WINDOW_MONTHS,
   createAnalysis,
+  getAnalysisQuota,
   type AnalysisEntry,
   type AnalysisWindowMonths,
 } from '../api/analyses';
@@ -30,11 +31,38 @@ export function useStartAnalysis(
   const [pendingConsent, setPendingConsent] = useState(false);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string>();
+  const [remainingQuota, setRemainingQuota] = useState<number>();
+
+  // 额度提示是入口的补充信息;读取失败不阻塞分析,也不覆盖创建错误。
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      void (async () => {
+        try {
+          const resolved = await resolveApiClient();
+          if (!resolved) {
+            return;
+          }
+          const quota = await getAnalysisQuota(resolved.client);
+          if (active) {
+            setRemainingQuota(Math.max(0, quota.limit_today - quota.used_today));
+          }
+        } catch {
+          if (active) {
+            setRemainingQuota(undefined);
+          }
+        }
+      })();
+      return () => {
+        active = false;
+      };
+    }, []),
+  );
 
   const create = useCallback(
     async (next: Pending) => {
       if (memberId === undefined || !panel) {
-        setError('请选择成员与项目后再分析');
+        setError('请选择成员与项目后再解读');
         return;
       }
       setStarting(true);
@@ -66,7 +94,7 @@ export function useStartAnalysis(
     [memberId, panel],
   );
 
-  /** 点击分析入口:先打开时间范围选择,不立即请求。 */
+  /** 点击解读入口:先打开时间范围选择,不立即请求。 */
   const start = useCallback(
     (entry: AnalysisEntry, indicatorName?: string, reportSHA?: string) => {
       setError(undefined);
@@ -81,7 +109,7 @@ export function useStartAnalysis(
     [],
   );
 
-  /** 选定时间范围后:已有确认直接分析;首次先弹数据去向确认。 */
+  /** 选定时间范围后:已有确认直接解读;首次先弹数据去向确认。 */
   const confirmRange = useCallback(
     async (windowMonths: AnalysisWindowMonths) => {
       if (!pending) {
@@ -128,5 +156,6 @@ export function useStartAnalysis(
     cancelConsent,
     starting,
     error,
+    remainingQuota,
   };
 }

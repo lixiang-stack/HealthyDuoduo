@@ -92,7 +92,8 @@ func (c *Client) Complete(ctx context.Context, req analysis.LLMRequest) (analysi
 		},
 		ResponseFormat: &responseFormat{Type: "json_object"},
 		MaxTokens:      maxTokens,
-		Temperature:    0,
+		// temperature=0 只降低随机性,不保证跨请求完全一致;相同输入的复用由解释层缓存负责。
+		Temperature: 0,
 	}
 	raw, err := json.Marshal(payload)
 	if err != nil {

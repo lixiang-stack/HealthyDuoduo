@@ -63,6 +63,13 @@ const sqlAnalysisUpdateExplanation = `UPDATE analyses
 
 const sqlInsertLLMCall = `INSERT INTO analysis_llm_calls (analysis_id) VALUES ($1)`
 
+const sqlFindExplanationCache = `SELECT explanation
+	   FROM analysis_explanation_cache WHERE member_id = $1 AND cache_key = $2`
+
+const sqlSaveExplanationCache = `INSERT INTO analysis_explanation_cache (member_id, cache_key, explanation)
+	   VALUES ($1, $2, $3::jsonb)
+	   ON CONFLICT (member_id, cache_key) DO NOTHING`
+
 const sqlLLMUsedToday = `SELECT count(*)::int
 	   FROM analysis_llm_calls
 	   WHERE created_at >= date_trunc('day', now())`
@@ -295,6 +302,33 @@ func (s *Store) LLMUsedToday(ctx context.Context) (int, error) {
 		return 0, err
 	}
 	return used, nil
+}
+
+// FindExplanation 按成员 + 输入指纹读取已缓存解释;未命中返回 nil, nil。
+func (s *Store) FindExplanation(ctx context.Context, memberID int64, key string) (*analysis.Explanation, error) {
+	var raw []byte
+	err := s.pool.QueryRow(ctx, sqlFindExplanationCache, memberID, key).Scan(&raw)
+	if err == pgx.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var explanation analysis.Explanation
+	if err := json.Unmarshal(raw, &explanation); err != nil {
+		return nil, fmt.Errorf("parse cached explanation: %w", err)
+	}
+	return &explanation, nil
+}
+
+// SaveExplanation 保存成功生成的解释;相同成员 + 指纹保留首次结果。
+func (s *Store) SaveExplanation(ctx context.Context, memberID int64, key string, explanation *analysis.Explanation) error {
+	raw, err := json.Marshal(explanation)
+	if err != nil {
+		return fmt.Errorf("marshal cached explanation: %w", err)
+	}
+	_, err = s.pool.Exec(ctx, sqlSaveExplanationCache, memberID, key, string(raw))
+	return err
 }
 
 // RecordAnalysisEvent 记录降级事件;事件写入失败不影响分析结果。

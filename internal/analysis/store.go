@@ -75,6 +75,15 @@ type Store interface {
 	DataVersion(ctx context.Context, memberID int64) (string, error)
 }
 
+// ExplanationCache 解释层输入指纹 → 已生成解释;命中时复用,不调用 LLM、不消耗配额。
+// 缓存按成员隔离并随成员删除级联;读写失败只影响复用机会,不改变分析结果。
+type ExplanationCache interface {
+	// FindExplanation 按成员 + 输入指纹读取已保存解释;未命中返回 nil, nil。
+	FindExplanation(ctx context.Context, memberID int64, key string) (*Explanation, error)
+	// SaveExplanation 保存成功生成的解释;相同 key 已存在时保留首次结果。
+	SaveExplanation(ctx context.Context, memberID int64, key string, explanation *Explanation) error
+}
+
 // QuotaStore 解释层每日配额(前两层不调 LLM、不消耗配额)。
 type QuotaStore interface {
 	// ConsumeLLMQuota 原子占用一次解释层调用;allowed=false 时 used 为当前已用次数。

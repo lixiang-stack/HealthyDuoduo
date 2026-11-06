@@ -316,6 +316,7 @@ func handleGetAnalysis(d *deps) http.HandlerFunc {
 }
 
 // analysisQuota 当前配额快照;已保存解释层仍可查看,不因当日额度用完而隐藏。
+// record 为 nil 时只返回今日额度,用于分析入口提示。
 func (d *deps) analysisQuota(r *http.Request, record *analysis.Record) (httpapi.AnalysisQuota, error) {
 	limit := d.analysisDailyLimit()
 	used := 0
@@ -326,17 +327,30 @@ func (d *deps) analysisQuota(r *http.Request, record *analysis.Record) (httpapi.
 		}
 		used = value
 	}
-	available := used < limit || record.Explanation != nil
+	available := used < limit || (record != nil && record.Explanation != nil)
 	quota := httpapi.AnalysisQuota{
 		UsedToday:            used,
 		LimitToday:           limit,
 		ExplanationAvailable: available,
 	}
-	if record.Explanation == nil && record.ExplanationReason != "" {
+	if record != nil && record.Explanation == nil && record.ExplanationReason != "" {
 		reason := record.ExplanationReason
 		quota.ExplanationReason = &reason
 	}
 	return quota, nil
+}
+
+// handleGetAnalysisQuota GET /api/v1/analyses/quota:只读今日额度,不消耗配额。
+func handleGetAnalysisQuota(d *deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		quota, err := d.analysisQuota(r, nil)
+		if err != nil {
+			log.Printf("analysis quota read failed: %v", err)
+			writeErrorJSON(w, http.StatusInternalServerError, "read analysis quota failed")
+			return
+		}
+		writeJSON(w, http.StatusOK, quota)
+	}
 }
 
 // toAPIAnalysisResult 已保存分析 → 契约信封;事实层数组保证非 null。

@@ -3,8 +3,8 @@
 import type { AnalysisFramework, AnalysisFrameworkLabel } from '../api/analyses';
 
 export const QUOTA_EXHAUSTED_TEXT = '今日额度已用完，事实与分级仍可用。';
-export const QUOTA_EXHAUSTED_HISTORY_TEXT = '本次分析生成时额度已用完，事实与分级仍可用。';
-export const EXPLANATION_UNAVAILABLE_TEXT = '本次解释暂不可用，事实与分级仍可用。';
+export const QUOTA_EXHAUSTED_HISTORY_TEXT = '本次解读生成时额度已用完，事实与分级仍可用。';
+export const EXPLANATION_UNAVAILABLE_TEXT = '本次解读暂不可用，事实与分级仍可用。';
 export const QUOTA_UNAVAILABLE_TEXT = '额度状态暂不可用，事实与分级仍可用。';
 export const NO_ENTRIES_GUIDANCE_TEXT = '本次没有可引用的解读条目，可以带着上面的数值问医生。';
 
@@ -45,7 +45,7 @@ export function explanationUnavailableText(
   return available ? undefined : QUOTA_EXHAUSTED_TEXT;
 }
 
-/** 解释层不可用时给下一步;云端重试端点尚未落地,先给「稍后重新分析」。 */
+/** 解释层不可用时给下一步;云端重试端点尚未落地,先给「稍后重新解读」。 */
 export function explanationUnavailableNextStep(
   reason: string | undefined,
   available: boolean,
@@ -63,7 +63,7 @@ export function explanationUnavailableNextStep(
     case 'bridge_text_rejected':
     case 'input_too_large':
     case 'not_configured':
-      return '可稍后重新分析；事实与分级仍可用。';
+      return '可稍后重新解读；事实与分级仍可用。';
     default:
       return available ? '' : '明天再试；事实与分级仍可用。';
   }

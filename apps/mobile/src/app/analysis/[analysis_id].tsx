@@ -96,7 +96,7 @@ export default function AnalysisScreen() {
         {state.status === "loading" ? (
           <View style={sharedStyles.horizontal}>
             <ActivityIndicator />
-            <Text style={sharedStyles.muted}>正在加载分析…</Text>
+            <Text style={sharedStyles.muted}>正在加载解读…</Text>
           </View>
         ) : null}
 
@@ -319,7 +319,7 @@ function AnalysisHeader({
               style={styles.secondaryButton}
             >
               <Text style={styles.secondaryButtonText}>
-                {creating ? "正在创建新分析…" : "基于最新数据重新分析"}
+                {creating ? "正在创建新解读…" : "基于最新数据重新解读"}
               </Text>
             </Pressable>
           )}
@@ -389,7 +389,7 @@ function DeviationsSection({
                       testID={`analysis-deviation-coverage-${point.evidence_id}`}
                       style={covered ? styles.coveredTag : styles.uncoveredTag}
                     >
-                      {covered ? "已解释" : "暂无对应解读"}
+                      {covered ? "已解读" : "暂无对应解读"}
                     </Text>
                   ) : null}
                   <View style={styles.rowBody}>
