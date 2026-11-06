@@ -5,6 +5,8 @@ package analysis
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -70,6 +72,8 @@ type Explainer struct {
 	Matcher          EntryMatcher
 	Quota            QuotaStore
 	Events           ObservabilityStore
+	Cache            ExplanationCache
+	Model            string
 	DailyLimit       int
 	InputTokenLimit  int
 	OutputTokenLimit int
@@ -104,6 +108,10 @@ func (e *Explainer) Explain(ctx context.Context, analysisID int64, req Request, 
 		return nil, ExplanationReasonInputTooLarge
 	}
 	mapping = filterEvidenceMapping(pack, mapping)
+	cacheKey := explanationCacheKey(pack, mapping, entries, e)
+	if cached := e.cachedExplanation(ctx, req.MemberID, cacheKey); cached != nil {
+		return cached, ""
+	}
 	if reason := e.consumeQuota(ctx, analysisID); reason != "" {
 		return nil, reason
 	}
@@ -112,7 +120,61 @@ func (e *Explainer) Explain(ctx context.Context, analysisID int64, req Request, 
 		e.record(ctx, analysisID, EventLLMError, "marshal evidence: "+err.Error())
 		return nil, ExplanationReasonError
 	}
-	return e.complete(ctx, analysisID, user, entries, mapping)
+	explanation, reason := e.complete(ctx, analysisID, user, entries, mapping)
+	if explanation != nil {
+		e.saveExplanation(ctx, req.MemberID, cacheKey, explanation)
+	}
+	return explanation, reason
+}
+
+// explanationCacheKey 解释层输入指纹:模型实际看到的证据包 + 真实证据点身份 +
+// prompt / 规则 / 条目版本 + 模型与输出上限。模型输出不保证确定性,但相同输入可复用。
+// 真实证据点身份必须入 key:缓存解释里的 evidence_ids 是第一次分析的 id,不能跨分析复用。
+func explanationCacheKey(pack EvidencePack, mapping EvidenceMapping, entries []KnowledgeEntry, e *Explainer) string {
+	raw, err := json.Marshal(struct {
+		Pack             EvidencePack      `json:"pack"`
+		Mapping          EvidenceMapping   `json:"mapping"`
+		Prompt           string            `json:"prompt"`
+		PromptVersion    string            `json:"prompt_version"`
+		RuleVersion      string            `json:"rule_version"`
+		EntryVersions    map[string]string `json:"entry_versions"`
+		Model            string            `json:"model"`
+		OutputTokenLimit int               `json:"output_token_limit"`
+	}{
+		Pack:             pack,
+		Mapping:          mapping,
+		Prompt:           explanationSystemPrompt,
+		PromptVersion:    explanationPromptVersion,
+		RuleVersion:      RuleVersion,
+		EntryVersions:    EntryVersions(entries),
+		Model:            e.Model,
+		OutputTokenLimit: e.OutputTokenLimit,
+	})
+	if err != nil {
+		return ""
+	}
+	sum := sha256.Sum256(raw)
+	return hex.EncodeToString(sum[:])
+}
+
+// cachedExplanation 命中缓存时直接返回;未配置 / 读取失败 / 空结果都退回调用模型。
+func (e *Explainer) cachedExplanation(ctx context.Context, memberID int64, key string) *Explanation {
+	if e.Cache == nil || key == "" {
+		return nil
+	}
+	explanation, err := e.Cache.FindExplanation(ctx, memberID, key)
+	if err != nil || explanation == nil || len(explanation.Sections) == 0 {
+		return nil
+	}
+	return explanation
+}
+
+// saveExplanation 缓存写失败不影响本次分析;下次仍会重新调用模型。
+func (e *Explainer) saveExplanation(ctx context.Context, memberID int64, key string, explanation *Explanation) {
+	if e.Cache == nil || key == "" {
+		return
+	}
+	_ = e.Cache.SaveExplanation(ctx, memberID, key, explanation)
 }
 
 // consumeQuota 解释层配额;空字符串表示放行。

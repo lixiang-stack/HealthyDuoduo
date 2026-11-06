@@ -15,9 +15,9 @@ export const INSUFFICIENT_EVIDENCE_TEXT = '证据不足，请先核对';
 export const NO_DEVIATION_TEXT = '本次没有偏离参考范围的指标。';
 export const NO_NOTES_TEXT = '本次窗口内没有可引用的病历诊断或处理。';
 export const UNCOVERED_DEVIATION_TEXT =
-  '「暂无对应解读」表示数据在日期范围内，只是还没有经过审核的解释条目；请结合医生意见。';
+  '「暂无对应解读」表示数据在日期范围内，只是还没有经过审核的解读条目；请结合医生意见。';
 export const NOTE_ATTRIBUTION_WARNING =
-  '以下是当时病历原文，不是本次分析的建议；请勿按旧处方自行用药。';
+  '以下是当时病历原文，不是本次解读的建议；请勿按旧处方自行用药。';
 export const NOT_DIAGNOSIS_TEXT = '这是解读，不是诊断。';
 
 export function windowText(facts: AnalysisFacts): string {
@@ -259,7 +259,7 @@ export function sourceDisplay(source: AnalysisSource): SourceDisplay {
     SOURCE_COPY[source.standard] ?? {
       title: source.note || source.standard,
       org: source.standard,
-      description: source.note || '这条来源用于解释本次指标分级。',
+      description: source.note || '这条来源用于解读本次指标分级。',
     }
   );
 }

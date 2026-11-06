@@ -112,6 +112,14 @@ func (f *fakeAnalysisStore) LLMUsedToday(ctx context.Context) (int, error) {
 	return f.usedToday, nil
 }
 
+func (f *fakeAnalysisStore) FindExplanation(ctx context.Context, memberID int64, key string) (*analysis.Explanation, error) {
+	return nil, nil
+}
+
+func (f *fakeAnalysisStore) SaveExplanation(ctx context.Context, memberID int64, key string, explanation *analysis.Explanation) error {
+	return nil
+}
+
 func (f *fakeAnalysisStore) RecordAnalysisEvent(ctx context.Context, analysisID int64, kind, detail string) error {
 	f.events = append(f.events, kind)
 	return nil
@@ -492,6 +500,35 @@ func TestServeAnalysisQuotaExhaustedStillReturnsFacts(t *testing.T) {
 	if result.Quota.UsedToday != 20 || result.Quota.LimitToday != 20 ||
 		result.Quota.ExplanationAvailable {
 		t.Fatalf("quota = %+v, want exhausted", result.Quota)
+	}
+}
+
+func TestServeAnalysisQuotaStatus(t *testing.T) {
+	store := &fakeAnalysisStore{usedToday: 3, dailyLimit: 20}
+	srv, _ := newAnalysisTestServer(t, store)
+
+	status, raw := doJSON(t, srv, http.MethodGet, "/api/v1/analyses/quota", "")
+	if status != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%s", status, raw)
+	}
+	var quota httpapi.AnalysisQuota
+	if err := json.Unmarshal(raw, &quota); err != nil {
+		t.Fatal(err)
+	}
+	if quota.UsedToday != 3 || quota.LimitToday != 20 || !quota.ExplanationAvailable {
+		t.Fatalf("quota = %+v", quota)
+	}
+
+	store.usedToday = 20
+	status, raw = doJSON(t, srv, http.MethodGet, "/api/v1/analyses/quota", "")
+	if status != http.StatusOK {
+		t.Fatalf("exhausted status = %d, want 200; body=%s", status, raw)
+	}
+	if err := json.Unmarshal(raw, &quota); err != nil {
+		t.Fatal(err)
+	}
+	if quota.UsedToday != 20 || quota.ExplanationAvailable {
+		t.Fatalf("exhausted quota = %+v", quota)
 	}
 }
 

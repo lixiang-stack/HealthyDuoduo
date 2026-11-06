@@ -30,7 +30,7 @@ export default function RootLayout() {
             <Stack.Screen name="report/[report_id]" options={{ title: '报告详情' }} />
             <Stack.Screen name="image/[report_id]" options={{ title: '原始图像' }} />
             <Stack.Screen name="panel/[panel]" options={{ title: '项目详情' }} />
-            <Stack.Screen name="analysis/[analysis_id]" options={{ title: '分析结果' }} />
+            <Stack.Screen name="analysis/[analysis_id]" options={{ title: '解读结果' }} />
             <Stack.Screen name="review/[report_id]" options={{ title: '核对报告' }} />
             <Stack.Screen name="upload" options={{ title: '上传检查单' }} />
           </Stack>

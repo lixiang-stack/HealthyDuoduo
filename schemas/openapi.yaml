@@ -428,6 +428,19 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "404":
           $ref: "#/components/responses/NotFound"
+  /analyses/quota:
+    get:
+      operationId: getAnalysisQuota
+      summary: 今日解读额度
+      description: |
+        返回今日已用与上限,用于分析入口提示剩余解读次数。只读,不消耗配额。
+      responses:
+        "200":
+          description: 今日额度
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisQuota"
   /analyses/metrics:
     get:
       operationId: getAnalysisMetrics

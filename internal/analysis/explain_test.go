@@ -57,6 +57,42 @@ func (f *fakeQuota) LLMUsedToday(ctx context.Context) (int, error) {
 	return f.used, nil
 }
 
+type fakeCacheKey struct {
+	memberID int64
+	key      string
+}
+
+type fakeCache struct {
+	entries map[fakeCacheKey]*Explanation
+	findErr error
+	saveErr error
+	finds   int
+	saves   int
+}
+
+func (f *fakeCache) FindExplanation(ctx context.Context, memberID int64, key string) (*Explanation, error) {
+	f.finds++
+	if f.findErr != nil {
+		return nil, f.findErr
+	}
+	return f.entries[fakeCacheKey{memberID, key}], nil
+}
+
+func (f *fakeCache) SaveExplanation(ctx context.Context, memberID int64, key string, explanation *Explanation) error {
+	f.saves++
+	if f.saveErr != nil {
+		return f.saveErr
+	}
+	if f.entries == nil {
+		f.entries = map[fakeCacheKey]*Explanation{}
+	}
+	entryKey := fakeCacheKey{memberID, key}
+	if _, ok := f.entries[entryKey]; !ok {
+		f.entries[entryKey] = explanation
+	}
+	return nil
+}
+
 type fakeEvents struct {
 	kinds []string
 }
@@ -122,6 +158,74 @@ func TestExplainSuccessMapsEphemeralEvidenceIDs(t *testing.T) {
 	}
 	if len(client.calls) != 1 || client.calls[0].MaxTokens != 1500 {
 		t.Fatalf("llm calls = %+v", client.calls)
+	}
+}
+
+func TestExplainReusesCachedExplanation(t *testing.T) {
+	client := &fakeLLM{responses: []LLMResponse{{Content: validExplanationJSON}}}
+	explainer, quota, _ := explanationTestExplainer(client, fakeMatcher{entries: []KnowledgeEntry{acceptedEntry("liver-hepatocellular-mild")}})
+	cache := &fakeCache{}
+	explainer.Cache = cache
+
+	first, reason := explainer.Explain(context.Background(), 7, testRequest(EntryPanel, "liver", 12), explanationTestFacts())
+	if reason != "" || first == nil {
+		t.Fatalf("first explanation = %+v, reason = %q", first, reason)
+	}
+	quota.used = 20
+	second, reason := explainer.Explain(context.Background(), 8, testRequest(EntryPanel, "liver", 12), explanationTestFacts())
+	if reason != "" || second == nil || second.Sections[0].BridgeText != first.Sections[0].BridgeText {
+		t.Fatalf("second explanation = %+v, reason = %q", second, reason)
+	}
+	if len(client.calls) != 1 || quota.calls != 1 || cache.saves != 1 || cache.finds != 2 {
+		t.Fatalf("calls/quota/cache = %d/%d/%+v", len(client.calls), quota.calls, cache)
+	}
+}
+
+func TestExplainCacheMissCallsLLMAgain(t *testing.T) {
+	client := &fakeLLM{responses: []LLMResponse{{Content: validExplanationJSON}, {Content: validExplanationJSON}}}
+	explainer, quota, _ := explanationTestExplainer(client, fakeMatcher{entries: []KnowledgeEntry{acceptedEntry("liver-hepatocellular-mild")}})
+	explainer.Cache = &fakeCache{}
+
+	_, _ = explainer.Explain(context.Background(), 7, testRequest(EntryPanel, "liver", 12), explanationTestFacts())
+	facts := explanationTestFacts()
+	facts.Panel = "cbc"
+	_, _ = explainer.Explain(context.Background(), 8, testRequest(EntryPanel, "cbc", 12), facts)
+	if len(client.calls) != 2 || quota.calls != 2 {
+		t.Fatalf("calls/quota = %d/%d, want 2/2", len(client.calls), quota.calls)
+	}
+}
+
+func TestExplainCacheKeyIncludesEvidenceIdentity(t *testing.T) {
+	client := &fakeLLM{responses: []LLMResponse{{Content: validExplanationJSON}, {Content: validExplanationJSON}}}
+	explainer, quota, _ := explanationTestExplainer(client, fakeMatcher{entries: []KnowledgeEntry{acceptedEntry("liver-hepatocellular-mild")}})
+	explainer.Cache = &fakeCache{}
+
+	first := explanationTestFacts()
+	_, _ = explainer.Explain(context.Background(), 7, testRequest(EntryPanel, "liver", 12), first)
+
+	secondPoint := first.History[0].Latest
+	secondPoint.ReportID = "r2"
+	secondPoint.EvidenceID = "ev-r2-1"
+	second := first
+	second.History = []History{{Points: []EvidencePoint{secondPoint}, Latest: secondPoint}}
+	_, _ = explainer.Explain(context.Background(), 8, testRequest(EntryPanel, "liver", 12), second)
+
+	if len(client.calls) != 2 || quota.calls != 2 {
+		t.Fatalf("calls/quota = %d/%d, want 2/2", len(client.calls), quota.calls)
+	}
+}
+
+func TestExplainCacheFailureFallsBackToLLM(t *testing.T) {
+	client := &fakeLLM{responses: []LLMResponse{{Content: validExplanationJSON}}}
+	explainer, quota, _ := explanationTestExplainer(client, fakeMatcher{entries: []KnowledgeEntry{acceptedEntry("liver-hepatocellular-mild")}})
+	explainer.Cache = &fakeCache{findErr: errors.New("db down"), saveErr: errors.New("db down")}
+
+	explanation, reason := explainer.Explain(context.Background(), 7, testRequest(EntryPanel, "liver", 12), explanationTestFacts())
+	if reason != "" || explanation == nil {
+		t.Fatalf("explanation = %+v, reason = %q", explanation, reason)
+	}
+	if len(client.calls) != 1 || quota.calls != 1 {
+		t.Fatalf("calls/quota = %d/%d, want 1/1", len(client.calls), quota.calls)
 	}
 }
 

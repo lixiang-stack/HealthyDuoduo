@@ -1,4 +1,5 @@
-// 分析 API 封装(POST /analyses、GET /analyses/{analysis_id}、反馈;契约 schemas/openapi.yaml)。
+// 分析 API 封装(POST /analyses、GET /analyses/{analysis_id}、GET /analyses/quota、反馈;
+// 契约 schemas/openapi.yaml)。
 // 事实层永远返回;框架层按规则出现;解释层受条目与配额约束。创建时永久保存快照。
 import type { ApiClient } from './client';
 import { unwrap } from './client';
@@ -19,6 +20,7 @@ export type AnalysisFrameworkLabel = components['schemas']['AnalysisFrameworkLab
 export type AnalysisExplanation = components['schemas']['AnalysisExplanation'];
 export type AnalysisFeedbackRequest = components['schemas']['AnalysisFeedbackRequest'];
 export type AnalysisFeedbackResult = components['schemas']['AnalysisFeedbackResult'];
+export type AnalysisQuota = components['schemas']['AnalysisQuota'];
 
 /** 默认回溯窗口(月);用户可在入口切换 6 / 12 / 24。 */
 export const ANALYSIS_DEFAULT_WINDOW_MONTHS: AnalysisWindowMonths = 12;
@@ -28,6 +30,13 @@ export async function createAnalysis(
   body: AnalysisRequest,
 ): Promise<AnalysisResult> {
   return unwrap(await client.POST('/analyses', { body }));
+}
+
+/** 今日解读额度;只读,不消耗配额。 */
+export async function getAnalysisQuota(
+  client: ApiClient,
+): Promise<AnalysisQuota> {
+  return unwrap(await client.GET('/analyses/quota'));
 }
 
 export async function getAnalysis(

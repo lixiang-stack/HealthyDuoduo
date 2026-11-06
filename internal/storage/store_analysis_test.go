@@ -184,6 +184,27 @@ func TestAnalysisStoreSmoke(t *testing.T) {
 		t.Fatalf("loaded explanation = %+v, %v", loaded, err)
 	}
 
+	cacheKey := "fingerprint-1"
+	if err := st.SaveExplanation(ctx, member.MemberID, cacheKey, explanation); err != nil {
+		t.Fatalf("save explanation cache: %v", err)
+	}
+	cached, err := st.FindExplanation(ctx, member.MemberID, cacheKey)
+	if err != nil || cached == nil || cached.Sections[0].BridgeText != explanation.Sections[0].BridgeText {
+		t.Fatalf("cached explanation = %+v, %v", cached, err)
+	}
+	if missing, err := st.FindExplanation(ctx, member.MemberID, "missing"); err != nil || missing != nil {
+		t.Fatalf("missing cache = %+v, %v", missing, err)
+	}
+	other, err := st.CreateMember(ctx, pipeline.MemberProfile{
+		Name: "小满", Sex: pipeline.SexFemale, BirthDate: "2021-03-01",
+	})
+	if err != nil {
+		t.Fatalf("create other member: %v", err)
+	}
+	if otherCached, err := st.FindExplanation(ctx, other.MemberID, cacheKey); err != nil || otherCached != nil {
+		t.Fatalf("cache leaked across members = %+v, %v", otherCached, err)
+	}
+
 	used, allowed, err := st.ConsumeLLMQuota(ctx, saved.AnalysisID, 1)
 	if err != nil || !allowed || used != 1 {
 		t.Fatalf("first quota = (%d, %v, %v)", used, allowed, err)
@@ -266,6 +287,7 @@ func TestAnalysisStoreSmoke(t *testing.T) {
 	}
 	for table, want := range map[string]int{
 		"analysis_feedback": 0, "analysis_events": 0, "analysis_llm_calls": 0,
+		"analysis_explanation_cache": 0,
 	} {
 		var count int
 		if err := pool.QueryRow(ctx, `SELECT count(*) FROM `+table).Scan(&count); err != nil {

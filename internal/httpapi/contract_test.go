@@ -43,7 +43,7 @@ func loadFixture(t *testing.T, name string) []byte {
 	return data
 }
 
-// TestOpenAPIFrozenPathSet 19 端点集合冻结:实现票不得多加、少删或改路径/方法
+// TestOpenAPIFrozenPathSet 端点集合冻结:实现票不得多加、少删或改路径/方法
 // (契约变更须先改本文件与 OpenAPI 再随 PR 提走)。
 func TestOpenAPIFrozenPathSet(t *testing.T) {
 	doc := getOpenAPI(t)
@@ -61,6 +61,7 @@ func TestOpenAPIFrozenPathSet(t *testing.T) {
 		"GET /members/{member_id}/panels":            true,
 		"GET /members/{member_id}/panels/{panel}":    true,
 		"POST /analyses":                             true,
+		"GET /analyses/quota":                        true,
 		"GET /analyses/metrics":                      true,
 		"GET /analyses/{analysis_id}":                true,
 		"POST /analyses/{analysis_id}/feedback":      true,
@@ -311,6 +312,7 @@ var reconcileCases = []fixtureCase{
 	{"panel.detail.json", "PanelDetail", unmarshal[PanelDetail]},
 	{"analysis.request.json", "AnalysisRequest", unmarshal[AnalysisRequest]},
 	{"analysis.result.json", "AnalysisResult", unmarshal[AnalysisResult]},
+	{"analysis.quota.json", "AnalysisQuota", unmarshal[AnalysisQuota]},
 	{"analysis.feedback.request.json", "AnalysisFeedbackRequest", unmarshal[AnalysisFeedbackRequest]},
 	{"analysis.feedback.result.json", "AnalysisFeedbackResult", unmarshal[AnalysisFeedbackResult]},
 	{"analysis.metrics.json", "AnalysisMetrics", unmarshal[AnalysisMetrics]},

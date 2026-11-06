@@ -103,7 +103,7 @@ func resolveLLMAPIKey(c config) (string, error) {
 
 // newExplainer 只有配置了 API key 才创建解释层编排器;未配置时保持 nil,
 // 分析只输出事实层与框架层,不发起任何云端请求。
-func newExplainer(c config, quota analysis.QuotaStore, events analysis.ObservabilityStore) (*analysis.Explainer, error) {
+func newExplainer(c config, quota analysis.QuotaStore, events analysis.ObservabilityStore, cache analysis.ExplanationCache) (*analysis.Explainer, error) {
 	apiKey, err := resolveLLMAPIKey(c)
 	if err != nil {
 		return nil, err
@@ -121,6 +121,8 @@ func newExplainer(c config, quota analysis.QuotaStore, events analysis.Observabi
 		Matcher:          matcher,
 		Quota:            quota,
 		Events:           events,
+		Cache:            cache,
+		Model:            c.llmModel,
 		DailyLimit:       c.analysisLimit,
 		InputTokenLimit:  c.llmInputTokens,
 		OutputTokenLimit: c.llmOutputTokens,
@@ -166,7 +168,7 @@ func openDeps(c config) (*deps, func(), error) {
 		rec:           rec,
 		obj:           obj,
 	}
-	explainer, err := newExplainer(c, st, st)
+	explainer, err := newExplainer(c, st, st, st)
 	if err != nil {
 		pool.Close()
 		return nil, nil, err

@@ -49,7 +49,7 @@ func TestEnvConfigLLMDefaults(t *testing.T) {
 	if c.analysisLimit != analysisDailyLimitDefault {
 		t.Errorf("analysisLimit = %d, want %d", c.analysisLimit, analysisDailyLimitDefault)
 	}
-	if explainer, err := newExplainer(c, nil, nil); err != nil || explainer != nil {
+	if explainer, err := newExplainer(c, nil, nil, nil); err != nil || explainer != nil {
 		t.Fatalf("explainer = %+v, err = %v; want nil, nil without API key", explainer, err)
 	}
 }
@@ -72,7 +72,7 @@ func TestEnvConfigLLMOverrides(t *testing.T) {
 		c.llmOutputTokens != 2000 || c.analysisLimit != 7 {
 		t.Fatalf("llm limits = %+v", c)
 	}
-	if explainer, err := newExplainer(c, nil, nil); err != nil || explainer == nil {
+	if explainer, err := newExplainer(c, nil, nil, nil); err != nil || explainer == nil {
 		t.Fatalf("explainer = %+v, err = %v; want explainer with API key", explainer, err)
 	}
 }
@@ -129,14 +129,14 @@ func TestNewExplainerReadsKeyFile(t *testing.T) {
 	if err := os.WriteFile(path, []byte("sk-file\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	explainer, err := newExplainer(config{llmAPIKeyFile: path}, nil, nil)
+	explainer, err := newExplainer(config{llmAPIKeyFile: path}, nil, nil, nil)
 	if err != nil || explainer == nil {
 		t.Fatalf("explainer = %+v, err = %v; want explainer from key file", explainer, err)
 	}
 }
 
 func TestNewExplainerMissingKeyFileDisables(t *testing.T) {
-	explainer, err := newExplainer(config{llmAPIKeyFile: filepath.Join(t.TempDir(), "missing")}, nil, nil)
+	explainer, err := newExplainer(config{llmAPIKeyFile: filepath.Join(t.TempDir(), "missing")}, nil, nil, nil)
 	if err != nil || explainer != nil {
 		t.Fatalf("explainer = %+v, err = %v; want disabled without key file", explainer, err)
 	}
@@ -191,7 +191,7 @@ func TestNewExplainerWiresConfigAndStores(t *testing.T) {
 		llmOutputTokens: 2000,
 		analysisLimit:   7,
 	}
-	explainer, err := newExplainer(c, store, store)
+	explainer, err := newExplainer(c, store, store, store)
 	if err != nil || explainer == nil {
 		t.Fatalf("explainer = %+v, err = %v", explainer, err)
 	}
@@ -201,8 +201,11 @@ func TestNewExplainerWiresConfigAndStores(t *testing.T) {
 	if _, ok := explainer.Matcher.(*analysis.KnowledgeMatcher); !ok {
 		t.Fatalf("matcher type = %T, want *analysis.KnowledgeMatcher", explainer.Matcher)
 	}
-	if explainer.Quota != store || explainer.Events != store {
-		t.Fatal("quota/events store not wired")
+	if explainer.Quota != store || explainer.Events != store || explainer.Cache != store {
+		t.Fatal("quota/events/cache store not wired")
+	}
+	if explainer.Model != "deepseek-chat" {
+		t.Fatalf("model = %q, want deepseek-chat", explainer.Model)
 	}
 	if explainer.DailyLimit != 7 || explainer.InputTokenLimit != 9000 ||
 		explainer.OutputTokenLimit != 2000 {

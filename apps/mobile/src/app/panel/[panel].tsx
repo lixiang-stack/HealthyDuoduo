@@ -270,20 +270,27 @@ function PanelDetailReadyView({
           {panelSourceLabel(detail.panel, detail.report_types)}
         </Text>
       ) : null}
-      <Pressable
-        testID="panel-analyze"
-        accessibilityRole="button"
-        style={[
-          styles.analyzeButton,
-          analysis.starting && styles.analyzeButtonDisabled,
-        ]}
-        onPress={() => void analysis.start("panel")}
-        disabled={analysis.starting}
-      >
-        <Text style={styles.analyzeButtonText}>
-          {analysis.starting ? "正在分析…" : "分析这个项目"}
-        </Text>
-      </Pressable>
+      <View style={styles.analyzeRow}>
+        <Pressable
+          testID="panel-analyze"
+          accessibilityRole="button"
+          style={[
+            styles.analyzeButton,
+            analysis.starting && styles.analyzeButtonDisabled,
+          ]}
+          onPress={() => void analysis.start("panel")}
+          disabled={analysis.starting}
+        >
+          <Text style={styles.analyzeButtonText}>
+            {analysis.starting ? "正在解读…" : "解读这个项目"}
+          </Text>
+        </Pressable>
+        {analysis.remainingQuota !== undefined ? (
+          <Text testID="panel-quota-remaining" style={styles.quotaText}>
+            今日剩余解读次数 {analysis.remainingQuota} 次
+          </Text>
+        ) : null}
+      </View>
       {analysis.error ? (
         <Text style={styles.fail}>{analysis.error}</Text>
       ) : null}
@@ -475,7 +482,7 @@ function AbnormalItemCard({
         accessibilityRole="button"
         onPress={() => onAnalyze(item.name)}
       >
-        <Text style={styles.detailLink}>分析这个指标 ›</Text>
+        <Text style={styles.detailLink}>解读这个指标 ›</Text>
       </Pressable>
     </View>
   );
@@ -517,7 +524,7 @@ function CompactItemRow({
         accessibilityRole="button"
         onPress={() => onAnalyze(item.name)}
       >
-        <Text style={styles.detailLink}>分析这个指标 ›</Text>
+        <Text style={styles.detailLink}>解读这个指标 ›</Text>
       </Pressable>
     </View>
   );
@@ -637,6 +644,13 @@ const styles = StyleSheet.create({
   emptyChart: { fontSize: 12, color: colors.muted },
   meta: { fontSize: 12, color: colors.muted, lineHeight: 18 },
   detailLink: { alignSelf: "flex-end", fontSize: 13, color: colors.accent },
+  analyzeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  quotaText: { fontSize: 12, color: colors.muted },
   analyzeButton: {
     alignSelf: "flex-start",
     paddingVertical: 10,

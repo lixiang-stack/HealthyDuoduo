@@ -257,8 +257,8 @@ describe('AnalysisScreen', () => {
     expect(coverage).toHaveTextContent(
       /另外 2 项（总蛋白、白蛋白）在日期范围内，但暂无对应的审核解读条目/,
     );
-    expect(screen.getByTestId('analysis-deviation-coverage-ev-1')).toHaveTextContent('已解释');
-    expect(screen.getByTestId('analysis-deviation-coverage-ev-2')).toHaveTextContent('已解释');
+    expect(screen.getByTestId('analysis-deviation-coverage-ev-1')).toHaveTextContent('已解读');
+    expect(screen.getByTestId('analysis-deviation-coverage-ev-2')).toHaveTextContent('已解读');
     expect(screen.getByTestId('analysis-deviation-coverage-ev-3')).toHaveTextContent(
       '暂无对应解读',
     );
@@ -266,7 +266,7 @@ describe('AnalysisScreen', () => {
       '暂无对应解读',
     );
     expect(screen.getByTestId('analysis-deviations-uncovered')).toHaveTextContent(
-      /数据在日期范围内.*没有经过审核的解释条目/,
+      /数据在日期范围内.*没有经过审核的解读条目/,
     );
     expect(screen.getByTestId('analysis-explanation')).toHaveTextContent(/这是解读，不是诊断/);
   });
@@ -328,8 +328,8 @@ describe('AnalysisScreen', () => {
     const coverage = await screen.findByTestId('analysis-explanation-coverage');
     expect(coverage).toHaveTextContent(/4 项异常里，本次解读解释了 4 项/);
     expect(coverage).not.toHaveTextContent(/另外/);
-    expect(screen.getByTestId('analysis-deviation-coverage-ev-3')).toHaveTextContent('已解释');
-    expect(screen.getByTestId('analysis-deviation-coverage-ev-4')).toHaveTextContent('已解释');
+    expect(screen.getByTestId('analysis-deviation-coverage-ev-3')).toHaveTextContent('已解读');
+    expect(screen.getByTestId('analysis-deviation-coverage-ev-4')).toHaveTextContent('已解读');
     expect(screen.queryByText('暂无对应解读')).toBeNull();
     expect(screen.queryByTestId('analysis-deviations-uncovered')).toBeNull();
 
@@ -400,7 +400,7 @@ describe('AnalysisScreen', () => {
     expect(section).toHaveTextContent(/天门冬氨酸氨基转移酶（AST）/);
     expect(section).toHaveTextContent(/反馈这段内容/);
     expect(screen.getByTestId('analysis-explanation-truncated')).toHaveTextContent(
-      /只影响解释层/,
+      /只影响解读部分/,
     );
     expect(screen.getByTestId('analysis-explanation')).toHaveTextContent(
       /参考：转氨酶升高分级（ACG 2016）等 2 份/,
@@ -462,10 +462,10 @@ describe('AnalysisScreen', () => {
     await renderScreen(<AnalysisScreen />);
 
     expect(await screen.findByTestId('analysis-explanation-unavailable')).toHaveTextContent(
-      /本次解释暂不可用/,
+      /本次解读暂不可用/,
     );
     expect(screen.getByTestId('analysis-explanation-unavailable')).toHaveTextContent(
-      /可稍后重新分析/,
+      /可稍后重新解读/,
     );
     expect(screen.queryByTestId('analysis-rerun')).toBeNull();
   });
@@ -526,7 +526,7 @@ describe('AnalysisScreen', () => {
     await renderScreen(<AnalysisScreen />);
     expect(await screen.findByTestId('analysis-feedback-open')).toHaveTextContent('反馈问题');
     fireEvent.press(screen.getByTestId('analysis-feedback-open'));
-    expect(await screen.findByText('分析结果哪里需要改进？')).toBeTruthy();
+    expect(await screen.findByText('解读结果哪里需要改进？')).toBeTruthy();
     await act(async () => {
       fireEvent.press(screen.getByTestId('analysis-feedback-reason-explanation_wrong'));
     });
@@ -564,7 +564,7 @@ describe('AnalysisScreen', () => {
       '反馈这段内容',
     );
     fireEvent.press(screen.getByTestId('analysis-explanation-feedback'));
-    expect(await screen.findByText('分析结果哪里需要改进？')).toBeTruthy();
+    expect(await screen.findByText('解读结果哪里需要改进？')).toBeTruthy();
     await act(async () => {
       fireEvent.press(screen.getByTestId('analysis-feedback-reason-explanation_wrong'));
     });
@@ -750,6 +750,11 @@ describe('Panel analysis entry', () => {
         '/members/{member_id}/panels/{panel}': () => makePanelDetail(),
         '/members': () => ({ members: [makeMember()] }),
         '/reports': () => ({ reports: [] }),
+        '/analyses/quota': () => ({
+          used_today: 18,
+          limit_today: 20,
+          explanation_available: true,
+        }),
       },
       POST: { '/analyses': postHandler },
     });
@@ -766,10 +771,14 @@ describe('Panel analysis entry', () => {
 
     await renderScreen(<PanelDetailScreen />);
     expect(await screen.findByTestId('panel-detail-heading')).toBeTruthy();
+    expect(screen.getByTestId('panel-analyze')).toHaveTextContent('解读这个项目');
+    expect(await screen.findByTestId('panel-quota-remaining')).toHaveTextContent(
+      '今日剩余解读次数 2 次',
+    );
 
     fireEvent.press(screen.getByTestId('panel-analyze'));
     await chooseRange(12);
-    expect(await screen.findByTestId('analysis-consent')).toHaveTextContent(/分析会把本次涉及的检验数值/);
+    expect(await screen.findByTestId('analysis-consent')).toHaveTextContent(/解读会把本次涉及的检验数值/);
     expect(postHandler).not.toHaveBeenCalled();
 
     fireEvent.press(screen.getByTestId('analysis-consent-confirm'));
