@@ -330,6 +330,23 @@ func TestExplainStripsCodeFence(t *testing.T) {
 	}
 }
 
+func TestValidateSectionIgnoresRelativeTimeLabels(t *testing.T) {
+	entry := acceptedEntry("liver-hepatocellular-mild")
+	mapping := EvidenceMapping{"e1": {EvidenceID: "ev-1", Value: strPtr("70"), RefRange: strPtr("7-40")}}
+	for _, text := range []string{
+		"T-13m 丙氨酸氨基转移酶 70 U/L 高于参考范围。",
+		"T-2m 丙氨酸氨基转移酶 70 U/L 高于参考范围。",
+		"13 个月前 丙氨酸氨基转移酶 70 U/L 高于参考范围。",
+	} {
+		t.Run(text, func(t *testing.T) {
+			section := llmSection{EntryID: entry.ID, EvidenceIDs: []string{"e1"}, BridgeText: text}
+			if _, ok := validateSection(section, map[string]KnowledgeEntry{entry.ID: entry}, mapping); !ok {
+				t.Fatalf("relative time label rejected: %s", text)
+			}
+		})
+	}
+}
+
 func TestValidateSectionRejectsUnreviewedEntry(t *testing.T) {
 	section := llmSection{EntryID: "x", EvidenceIDs: []string{"e1"}, BridgeText: "本次结果已整理。"}
 	mapping := EvidenceMapping{"e1": {EvidenceID: "ev-1"}}
@@ -346,7 +363,10 @@ func TestExplanationPromptEmbeddedAndVersioned(t *testing.T) {
 	if strings.TrimSpace(explanationSystemPrompt) == "" {
 		t.Fatal("embedded explanation prompt is empty")
 	}
-	for _, want := range []string{`"sections"`, `"evidence_ids"`, `"bridge_text"`} {
+	for _, want := range []string{
+		`"sections"`, `"evidence_ids"`, `"bridge_text"`,
+		"relative_time", "不超过 120 字",
+	} {
 		if !strings.Contains(explanationSystemPrompt, want) {
 			t.Fatalf("prompt missing %s", want)
 		}

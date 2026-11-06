@@ -354,9 +354,15 @@ func containsBannedInference(text string) bool {
 	return false
 }
 
-var numberPattern = regexp.MustCompile(`\d+(?:\.\d+)?`)
+var (
+	numberPattern = regexp.MustCompile(`\d+(?:\.\d+)?`)
+	// 相对时间标签(T-13m / 13 个月前)不是检验数值;多点证据时模型会用它区分时间,
+	// 校验前先剔除,避免把 13、2 误判成编造数值。
+	relativeTimeLabelPattern = regexp.MustCompile(`T-\d+m?|\d+\s*(?:个月|年|周|天)(?:前|以前)?`)
+)
 
 func numbersBelongToEvidence(text string, points []EvidencePoint) bool {
+	text = relativeTimeLabelPattern.ReplaceAllString(text, "")
 	numbers := numberPattern.FindAllString(text, -1)
 	if len(numbers) == 0 {
 		return true
