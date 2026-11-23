@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HealthyDuoduo · 一级导航呈现对比</title>
+<style>
+  :root {
+    --text: #111827; --muted: #6b7280; --accent: #2563eb; --accent-soft: #eff6ff;
+    --border: #d1d5db; --line: #e5e7eb; --soft: #f8fafc; --chip: #f3f4f6;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: #e5e7eb; color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  body.clean { background: #fff; min-height: 844px; }
+  body.clean .page-head, body.clean .page-foot, body.clean .variant-bar { display: none; }
+  body.clean .page { max-width: none; padding: 0; }
+  body.clean .stage { padding: 0; }
+  body.clean .device { width: 390px; height: 844px; border: 0; border-radius: 0; box-shadow: none; }
+  body.clean .notch { display: none; }
+
+  .page { max-width: 1180px; margin: 0 auto; padding: 28px 24px 100px; }
+  .page-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; margin-bottom: 16px; }
+  .kicker { font-size: 11px; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
+  .page-head h1 { margin: 6px 0 6px; font-size: 24px; letter-spacing: -.3px; }
+  .page-head p { margin: 0; max-width: 720px; color: var(--muted); font-size: 13px; line-height: 20px; }
+  .page-head p b { color: var(--text); }
+  .variant-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
+  .variant-btn {
+    border: 1px solid var(--border); background: #fff; color: var(--muted);
+    border-radius: 999px; padding: 8px 13px; font-size: 12px; cursor: pointer; font-family: inherit;
+  }
+  .variant-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); font-weight: 650; }
+
+  .stage { display: flex; justify-content: center; }
+  .device {
+    width: 390px; height: 844px; position: relative; overflow: hidden;
+    background: #fff; border: 10px solid #111827; border-radius: 46px;
+    box-shadow: 0 24px 70px rgba(0,0,0,.28);
+  }
+  .notch { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); width: 118px; height: 25px; border-radius: 16px; background: #111827; z-index: 50; }
+  .screen { position: absolute; inset: 0; display: flex; flex-direction: column; background: #fff; }
+
+  .statusbar { flex: 0 0 44px; height: 44px; padding: 0 22px 6px; display: flex; align-items: flex-end; justify-content: space-between; font-size: 12px; font-weight: 650; }
+  .status-right { display: flex; align-items: center; gap: 5px; font-size: 10px; letter-spacing: -.5px; }
+  .signal { letter-spacing: -1px; }
+  .battery { width: 20px; height: 10px; border: 1px solid var(--text); border-radius: 2px; position: relative; }
+  .battery::after { content: ""; position: absolute; right: -3px; top: 3px; width: 2px; height: 4px; background: var(--text); border-radius: 0 1px 1px 0; }
+  .battery i { display: block; height: 6px; margin: 1px; width: 72%; background: var(--text); border-radius: 1px; }
+
+  .appbar { flex: 0 0 52px; height: 52px; padding: 0 16px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #f1f5f9; background: #fff; }
+  .appbar .title { flex: 1; font-size: 17px; font-weight: 650; }
+  .appbar .right { color: var(--accent); font-size: 13px; white-space: nowrap; }
+  .appbar .muted-right { color: var(--muted); font-size: 12px; }
+  .domain-appbar { align-items: flex-end; padding-bottom: 0; }
+  .domain-tabs { display: flex; gap: 18px; align-items: flex-end; flex: 1; }
+  .domain-tab { padding: 0 1px 12px; font-size: 15px; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; }
+  .domain-tab.active { color: var(--text); font-weight: 650; border-bottom-color: var(--accent); }
+  .domain-tab .dot { display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); margin-left: 4px; vertical-align: 2px; }
+  .appbar .member { color: var(--accent); font-size: 12px; padding-bottom: 13px; white-space: nowrap; }
+  .dropdown-title { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+  .dropdown-title .chev { font-size: 10px; color: var(--muted); }
+
+  .domainbar { flex: 0 0 46px; height: 46px; display: flex; align-items: center; gap: 6px; padding: 0 16px; border-bottom: 1px solid #f1f5f9; background: #fff; }
+  .domain { font-size: 12px; color: var(--muted); padding: 6px 12px; border-radius: 999px; cursor: pointer; border: 1px solid transparent; white-space: nowrap; }
+  .domain.active { background: var(--text); color: #fff; font-weight: 650; }
+  .domain .dot { display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); margin-left: 5px; vertical-align: 2px; }
+  .domain.active .dot { background: #fff; }
+
+  .content { flex: 1; overflow-y: auto; padding: 14px 16px 30px; scrollbar-width: none; }
+  .content::-webkit-scrollbar { display: none; }
+  .content.has-tab { padding-bottom: 84px; }
+
+  .tabbar { position: absolute; left: 0; right: 0; bottom: 0; height: 64px; display: flex; border-top: 1px solid var(--line); background: #fff; z-index: 10; }
+  .tab { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 10px; color: var(--muted); }
+  .tab.active { color: var(--accent); }
+  .tab svg { width: 21px; height: 21px; }
+
+  .hero { background: linear-gradient(135deg, #eff6ff 0%, #fff 78%); border: 1px solid #bfdbfe; border-radius: 16px; padding: 15px 16px 13px; margin-bottom: 10px; }
+  .hero-eyebrow { font-size: 12px; color: var(--accent); font-weight: 650; }
+  .hero-num { font-size: 30px; line-height: 1.15; font-weight: 750; letter-spacing: -.6px; margin-top: 4px; }
+  .hero-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .hero-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; padding-top: 8px; border-top: 1px solid #dbeafe; font-size: 11px; color: var(--muted); }
+  .tag { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 1px 6px; font-size: 10px; color: var(--muted); background: #fff; }
+
+  .quick-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px; }
+  .quick { border: 1px solid var(--line); background: #fff; border-radius: 12px; padding: 8px 3px; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; color: var(--text); }
+  .qicon { width: 32px; height: 32px; border-radius: 50%; background: var(--soft); display: flex; align-items: center; justify-content: center; color: var(--accent); }
+
+  .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; margin-bottom: 10px; }
+  .summary-cell { background: #fff; padding: 9px 6px; text-align: center; }
+  .summary-val { font-size: 16px; font-weight: 700; }
+  .summary-label { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+  .reminder { display: flex; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; background: #fff; }
+  .reminder-icon { width: 34px; height: 34px; border-radius: 10px; background: #fff7ed; color: #b45309; display: flex; align-items: center; justify-content: center; flex: 0 0 34px; }
+  .reminder-title { font-size: 13px; font-weight: 650; }
+  .reminder-meta { margin-top: 2px; font-size: 11px; color: var(--muted); }
+
+  .section-title { display: flex; align-items: center; justify-content: space-between; margin: 14px 2px 6px; font-size: 12px; color: var(--muted); }
+  .section-title b { color: var(--text); font-size: 12px; font-weight: 650; }
+  .event { display: flex; gap: 10px; padding: 9px 0; border-bottom: 1px solid #f1f5f9; }
+  .event:last-child { border-bottom: 0; }
+  .event-time { width: 44px; flex: 0 0 44px; padding-top: 2px; font-size: 12px; color: var(--muted); }
+  .event-icon { width: 30px; height: 30px; flex: 0 0 30px; border-radius: 9px; background: var(--soft); color: var(--accent); display: flex; align-items: center; justify-content: center; }
+  .event-title { font-size: 14px; font-weight: 550; }
+  .event-meta { margin-top: 2px; font-size: 11px; color: var(--muted); }
+  .event-meta .tag { margin-left: 5px; }
+  .chev { color: #9ca3af; font-size: 18px; line-height: 1; }
+
+  .dropdown {
+    position: absolute; top: 96px; left: 12px; right: 12px; background: #fff; border: 1px solid var(--line);
+    border-radius: 14px; box-shadow: 0 14px 34px rgba(17,24,39,.16); z-index: 22; padding: 5px; animation: pop .14s ease-out;
+  }
+  @keyframes pop { from { transform: translateY(-4px); opacity: .7; } to { transform: translateY(0); opacity: 1; } }
+  .dropdown-mask { position: absolute; top: 96px; left: 0; right: 0; bottom: 64px; background: rgba(17,24,39,.12); z-index: 20; }
+  .dropdown-item { display: flex; align-items: center; justify-content: space-between; padding: 11px 10px; border-radius: 10px; font-size: 14px; }
+  .dropdown-item.active { background: var(--accent-soft); color: var(--accent); font-weight: 650; }
+  .dropdown-item .check { font-size: 12px; }
+  .dropdown-item .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); display: inline-block; }
+
+  .hub { padding: 10px 4px 0; }
+  .hub h2 { margin: 0 0 6px; font-size: 22px; letter-spacing: -.3px; }
+  .hub p { margin: 0 0 18px; color: var(--muted); font-size: 13px; line-height: 20px; }
+  .hub-card { display: flex; align-items: center; gap: 13px; border: 1px solid var(--line); border-radius: 16px; padding: 16px; margin-bottom: 12px; background: #fff; }
+  .hub-icon { width: 48px; height: 48px; border-radius: 16px; background: var(--accent-soft); color: var(--accent); display: flex; align-items: center; justify-content: center; flex: 0 0 48px; }
+  .hub-title { font-size: 16px; font-weight: 650; }
+  .hub-meta { margin-top: 3px; font-size: 12px; color: var(--muted); line-height: 18px; }
+  .hub-note { margin-top: 12px; border-radius: 12px; background: var(--soft); padding: 11px 12px; font-size: 11px; line-height: 17px; color: var(--muted); }
+
+  .page-foot { margin-top: 16px; text-align: center; color: var(--muted); font-size: 11px; }
+  .page-foot .dot { display: inline-block; width: 4px; height: 4px; border-radius: 50%; background: #9ca3af; margin: 0 5px 2px; }
+</style>
+</head>
+<body>
+  <div class="page">
+    <header class="page-head">
+      <div>
+        <div class="kicker">HealthyDuoduo · Navigation prototype</div>
+        <h1>一级导航还可以怎么放？</h1>
+        <p>同一套「今天」内容，只换 <b>日常 / 健康档案</b> 这一层一级导航的呈现方式。重点看：省不省空间、另个域是否一眼可见、切换是否顺手。</p>
+      </div>
+    </header>
+
+    <div class="variant-bar" id="variant-bar">
+      <button class="variant-btn active" data-variant="top">A · 顶部独立 segmented</button>
+      <button class="variant-btn" data-variant="appbar">B · 嵌进 appbar 的域 tab</button>
+      <button class="variant-btn" data-variant="dropdown">C · 标题下拉切换</button>
+      <button class="variant-btn" data-variant="hub">D · 首页双卡入口</button>
+    </div>
+
+    <div class="stage">
+      <div class="device" id="device">
+        <div class="notch"></div>
+        <div class="screen" id="screen"></div>
+      </div>
+    </div>
+
+    <footer class="page-foot">
+      390 × 844 CSS px <span class="dot"></span> 只比较一级导航呈现，内容与二级 tab 保持不变
+    </footer>
+  </div>
+
+<script>
+  const ICONS = {
+    home: '<path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-9.5Z"/>',
+    stats: '<path d="M5 20V10M12 20V4M19 20v-7"/>',
+    bottle: '<path d="M9 3h6v3l2 2v13H7V8l2-2V3Z"/><path d="M9 11h6"/>',
+    droplet: '<path d="M12 3s6 6.5 6 10a6 6 0 1 1-12 0c0-3.5 6-10 6-10Z"/>',
+    moon: '<path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5Z"/>',
+    bowl: '<path d="M4 11h16a8 8 0 0 1-16 0Z"/><path d="M8 3v4M12 2v5M16 3v4"/>',
+    bell: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/>',
+    archive: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+    report: '<path d="M6 3h9l3 3v15H6V3Z"/><path d="M15 3v3h3M9 11h6M9 15h6"/>',
+    settings: '<circle cx="12" cy="12" r="3"/><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>'
+  };
+
+  function icon(name, size = 20) {
+    return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${ICONS[name] || ''}</svg>`;
+  }
+
+  const state = { variant: 'top', open: false, clean: false };
+  const screenEl = document.getElementById('screen');
+  const deviceEl = document.getElementById('device');
+
+  function statusbar() {
+    return `<div class="statusbar"><span>9:41</span><span class="status-right"><span class="signal">▂▄▆</span><span>5G</span><span class="battery"><i></i></span></span></div>`;
+  }
+
+  function appbar(title, right = '豆豆 ▾') {
+    return `<div class="appbar"><div class="title">${title}</div><div class="right">${right}</div></div>`;
+  }
+
+  function appbarTabs() {
+    return `<div class="appbar domain-appbar">
+      <div class="domain-tabs">
+        <span class="domain-tab active">日常</span>
+        <span class="domain-tab">健康档案<span class="dot"></span></span>
+      </div>
+      <span class="member">豆豆 ▾</span>
+    </div>`;
+  }
+
+  function appbarDropdown() {
+    return `<div class="appbar">
+      <div class="title dropdown-title">日常 <span class="chev">▾</span></div>
+      <span class="right">豆豆 ▾</span>
+    </div>`;
+  }
+
+  function dropdown(open) {
+    return `${open ? `<div class="dropdown-mask"></div><div class="dropdown">
+      <div class="dropdown-item active">日常 <span class="check">✓</span></div>
+      <div class="dropdown-item">健康档案 <span class="dot"></span></div>
+    </div>` : ''}`;
+  }
+
+  function domainbar() {
+    return `<div class="domainbar">
+      <span class="domain active">日常</span>
+      <span class="domain">健康档案<span class="dot"></span></span>
+    </div>`;
+  }
+
+  function hero() {
+    return `<div class="hero">
+      <div class="hero-eyebrow">豆豆 · 距上次喂养</div>
+      <div class="hero-num">2 小时 15 分</div>
+      <div class="hero-sub">上次 14:05 · 奶粉 · 120 ml</div>
+      <div class="hero-foot"><span>以家长记录为准</span><span class="tag">家长记录</span></div>
+    </div>`;
+  }
+
+  function quickGrid() {
+    const actions = [
+      ['bottle', '喂奶'], ['droplet', '尿布'], ['moon', '睡觉'], ['bowl', '辅食']
+    ];
+    return `<div class="quick-grid">${actions.map(([ic, label]) => `<div class="quick"><span class="qicon">${icon(ic, 17)}</span>${label}</div>`).join('')}</div>`;
+  }
+
+  function summary() {
+    const cells = [['3', '喂养'], ['240', '奶量 ml'], ['45', '睡眠 min'], ['3', '尿布']];
+    return `<div class="summary">${cells.map(([v, l]) => `<div class="summary-cell"><div class="summary-val">${v}</div><div class="summary-label">${l}</div></div>`).join('')}</div>`;
+  }
+
+  function reminder() {
+    return `<div class="reminder"><span class="reminder-icon">${icon('bell', 18)}</span><div><div class="reminder-title">喂奶间隔提醒</div><div class="reminder-meta">未开启</div></div><span class="chev" style="margin-left:auto">›</span></div>`;
+  }
+
+  function timeline() {
+    const events = [
+      ['16:00', 'droplet', '尿尿', '换尿布'],
+      ['15:20', 'moon', '午睡 · 45 分钟', '睡觉'],
+      ['14:05', 'bottle', '奶粉 · 120 ml', '喂奶']
+    ];
+    return `<div class="section-title"><b>今日时间线</b><span>全部记录</span></div>
+      ${events.map(([time, ic, title, meta]) => `<div class="event"><div class="event-time">${time}</div><div class="event-icon">${icon(ic, 15)}</div><div><div class="event-title">${title}</div><div class="event-meta">${meta}<span class="tag">家长记录</span></div></div><span class="chev" style="margin-left:auto">›</span></div>`).join('')}`;
+  }
+
+  function todayContent() {
+    return `${hero()}${quickGrid()}${summary()}${reminder()}${timeline()}`;
+  }
+
+  function tabbar() {
+    return `<div class="tabbar">
+      <div class="tab active">${icon('home', 21)}<span>今天</span></div>
+      <div class="tab">${icon('stats', 21)}<span>统计</span></div>
+    </div>`;
+  }
+
+  function hubContent() {
+    return `<div class="hub">
+      <h2>今天从哪里开始？</h2>
+      <p>健康档案和日常是并列的两个域；首页只负责选择，不替你做主。</p>
+      <div class="hub-card">
+        <div class="hub-icon">${icon('bottle', 24)}</div>
+        <div><div class="hub-title">日常</div><div class="hub-meta">记录给 豆豆 · 距上次喂养 2 小时 15 分<br>今天 8 条记录</div></div>
+        <span class="chev" style="margin-left:auto">›</span>
+      </div>
+      <div class="hub-card">
+        <div class="hub-icon">${icon('archive', 24)}</div>
+        <div><div class="hub-title">健康档案</div><div class="hub-meta">3 份报告 · 1 份待核对<br>血常规 · 2026-11-02</div></div>
+        <span class="chev" style="margin-left:auto">›</span>
+      </div>
+      <div class="hub-note">代价：每天第一次记录要多一次点击。适合把两个域当作两种「模式」、不追求一打开就记录的家庭。</div>
+    </div>`;
+  }
+
+  function render() {
+    let html = `${statusbar()}`;
+    if (state.variant === 'top') {
+      html += appbar('今天') + domainbar() + `<div class="content has-tab">${todayContent()}</div>` + tabbar();
+    } else if (state.variant === 'appbar') {
+      html += appbarTabs() + `<div class="content has-tab">${todayContent()}</div>` + tabbar();
+    } else if (state.variant === 'dropdown') {
+      html += appbarDropdown() + dropdown(state.open) + `<div class="content has-tab">${todayContent()}</div>` + tabbar();
+    } else {
+      html += appbar('家庭') + `<div class="content">${hubContent()}</div>`;
+    }
+    screenEl.innerHTML = html;
+  }
+
+  function setVariant(variant) {
+    state.variant = variant;
+    state.open = false;
+    document.querySelectorAll('.variant-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.variant === variant));
+    render();
+  }
+
+  document.getElementById('variant-bar').addEventListener('click', (event) => {
+    const btn = event.target.closest('[data-variant]');
+    if (btn) setVariant(btn.dataset.variant);
+  });
+
+  screenEl.addEventListener('click', (event) => {
+    if (event.target.closest('.dropdown-title')) {
+      state.open = !state.open;
+      render();
+      return;
+    }
+    if (event.target.closest('.dropdown-mask')) {
+      state.open = false;
+      render();
+      return;
+    }
+    if (event.target.closest('.dropdown-item')) {
+      state.open = false;
+      render();
+    }
+  });
+
+  function init() {
+    const params = new URLSearchParams(window.location.search);
+    if (['top', 'appbar', 'dropdown', 'hub'].includes(params.get('variant'))) state.variant = params.get('variant');
+    state.open = params.get('open') === '1';
+    state.clean = params.get('clean') === '1';
+    if (state.clean) {
+      document.body.classList.add('clean');
+      deviceEl.classList.add('clean');
+    }
+    document.querySelectorAll('.variant-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.variant === state.variant));
+    render();
+  }
+
+  init();
+</script>
+</body>
+</html>

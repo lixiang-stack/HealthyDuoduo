@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=1282, initial-scale=1" />
+<title>HealthyDuoduo · 一级导航呈现对比</title>
+<style>
+  :root { --text:#111827; --muted:#6b7280; --accent:#2563eb; --line:#d1d5db; --soft:#f3f4f6; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--soft); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .sheet { width: 1282px; margin: 0 auto; padding: 34px 32px 46px; }
+  .kicker { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  h1 { margin: 7px 0 8px; font-size: 30px; line-height: 1.2; letter-spacing: -.5px; }
+  .intro { max-width: 980px; margin: 0; color: var(--muted); font-size: 13px; line-height: 21px; }
+  .intro b { color: var(--text); }
+  .grid { margin-top: 24px; display: grid; grid-template-columns: repeat(2, 560px); gap: 28px 30px; justify-content: center; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: flex; gap: 14px; }
+  .card img { width: 300px; display: block; border-radius: 8px; border: 1px solid #e5e7eb; flex: 0 0 300px; }
+  .caption { padding: 4px 2px; }
+  .caption .tag { display: inline-block; font-size: 10px; border-radius: 999px; padding: 1px 7px; border: 1px solid #bfdbfe; color: var(--accent); background: #eff6ff; }
+  .caption .scene { margin-top: 7px; font-size: 17px; font-weight: 700; }
+  .caption p { margin: 6px 0 0; font-size: 11px; line-height: 18px; color: var(--muted); }
+  .caption .tradeoff { margin-top: 9px; font-size: 11px; line-height: 18px; color: var(--text); }
+  .caption .tradeoff b { color: var(--accent); }
+  .decision { margin-top: 30px; background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; }
+  .decision h2 { margin: 0 0 12px; font-size: 15px; }
+  table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; background: #fafafa; }
+  td b { color: var(--text); }
+  .note { margin-top: 14px; padding: 11px 12px; background: #f8fafc; border-radius: 10px; font-size: 11px; line-height: 18px; color: var(--muted); }
+  .note b { color: var(--text); }
+  .footer { margin-top: 16px; color: var(--muted); font-size: 11px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .footer .dot { width: 4px; height: 4px; background: #9ca3af; border-radius: 50%; display: inline-block; }
+</style>
+</head>
+<body>
+  <main class="sheet">
+    <div class="kicker">HealthyDuoduo · Navigation prototype · 2026-11-23</div>
+    <h1>一级导航还可以怎么放？</h1>
+    <p class="intro">
+      同一套「今天」内容，只换 <b>日常 / 健康档案</b> 这一层的呈现。
+      四个选项的差别不在视觉，而在：<b>占不占一行、另个域是否一眼可见、切换要几次点击</b>。
+    </p>
+
+    <section class="grid">
+      <article class="card">
+        <img src="shots/44-nav-top.png" alt="A 顶部独立 segmented" />
+        <div class="caption">
+          <span class="tag">A · 当前 B3</span>
+          <div class="scene">顶部独立 segmented</div>
+          <p>appbar 下面单独一行「日常 / 健康档案」，两个域一眼可见。</p>
+          <div class="tradeoff"><b>多占 46px</b>；内容页少一点高度，但最稳、最不容易误解。</div>
+        </div>
+      </article>
+
+      <article class="card">
+        <img src="shots/45-nav-appbar.png" alt="B 嵌进 appbar 的域 tab" />
+        <div class="caption">
+          <span class="tag">B · 推荐</span>
+          <div class="scene">嵌进 appbar 的域 tab</div>
+          <p>把「日常 / 健康档案」直接放进 appbar，右边留成员切换。</p>
+          <div class="tradeoff"><b>省下 46px</b>，两个域仍然始终可见；appbar 会更满一点。</div>
+        </div>
+      </article>
+
+      <article class="card">
+        <img src="shots/46-nav-dropdown.png" alt="C 标题下拉切换" />
+        <div class="caption">
+          <span class="tag">C · 省空间版</span>
+          <div class="scene">标题下拉切换</div>
+          <p>标题「日常 ▾」点开下拉，切到健康档案；另个域藏在一次点击后。</p>
+          <div class="tradeoff"><b>省 46px</b>；可发现性中等，适合域切换低频、appbar 放不下时。</div>
+        </div>
+      </article>
+
+      <article class="card">
+        <img src="shots/47-nav-hub.png" alt="D 首页双卡入口" />
+        <div class="caption">
+          <span class="tag">D · 最并列</span>
+          <div class="scene">首页双卡入口</div>
+          <p>打开先看到「日常 / 健康档案」两张卡；点进去才是各自的视图。</p>
+          <div class="tradeoff"><b>每天多一次点击</b>；适合把两个域当两种模式、不追求一打开就记录。</div>
+        </div>
+      </article>
+    </section>
+
+    <section class="decision">
+      <h2>怎么选</h2>
+      <table>
+        <thead><tr><th>方式</th><th>空间</th><th>另个域可见</th><th>切换成本</th><th>适合</th></tr></thead>
+        <tbody>
+          <tr><td><b>A 顶部独立</b></td><td>多 46px</td><td>一眼可见</td><td>1 次点击</td><td>最稳；内容页不紧、想让两个域最显眼</td></tr>
+          <tr><td><b>B appbar tabs</b></td><td>省 46px</td><td>一眼可见</td><td>1 次点击</td><td>日常为主、两个域都常用；390px 宽度下最平衡</td></tr>
+          <tr><td><b>C 标题下拉</b></td><td>省 46px</td><td>藏在点击后</td><td>2 次点击</td><td>域切换低频、appbar 已经很满</td></tr>
+          <tr><td><b>D 首页双卡</b></td><td>无额外行</td><td>一眼可见</td><td>2 次点击</td><td>两个域是两种模式，接受每次多一步</td></tr>
+        </tbody>
+      </table>
+      <div class="note">
+        <b>建议：</b>优先试 B（appbar tabs）——它保住了「两个域始终可见」和「一次点击切换」，又不占额外一行；
+        A 作为保守 fallback；C 只在 appbar 放不下时用；D 只在你想做「家庭首页」时用。
+        B2 的底部全局 tab 也稳定，但会把高频的今天 / 统计放回顶部，不如 B3 顺手。
+      </div>
+    </section>
+
+    <div class="footer">
+      <span>所有截图来自 nav.html 实际渲染</span><span class="dot"></span>
+      <span>390 × 844 CSS px / 2× 截图</span><span class="dot"></span>
+      <span>可点击版本：nav.html</span>
+    </div>
+  </main>
+</body>
+</html>
