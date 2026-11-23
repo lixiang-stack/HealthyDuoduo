@@ -3,7 +3,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react-native';
 
 import { resolveApiClient } from '../../api/resolveClient';
 import MembersScreen from '../../app/members';
-import { CURRENT_MEMBER_STORAGE_KEY } from '../../members/currentMemberStore';
+import { CURRENT_CHILD_STORAGE_KEY, CURRENT_MEMBER_STORAGE_KEY } from '../../members/currentMemberStore';
 import { createFakeApiClient, TEST_BASE_URL, type FakeApiOptions } from '../fakeApi';
 import { makeGrowthRecord, makeMember, makeReportSummary } from '../fixtures';
 import { renderScreen } from '../renderScreen';
@@ -50,6 +50,7 @@ describe('MembersScreen', () => {
       DELETE: { '/members/{member_id}': deleteHandler },
     });
     await AsyncStorage.setItem(CURRENT_MEMBER_STORAGE_KEY, '1');
+    await AsyncStorage.setItem(CURRENT_CHILD_STORAGE_KEY, '1');
 
     await renderScreen(<MembersScreen />);
     expect(await screen.findByText('小明')).toBeTruthy();
@@ -66,6 +67,9 @@ describe('MembersScreen', () => {
     expect(deleteHandler).toHaveBeenCalledTimes(1);
     await waitFor(() =>
       expect(AsyncStorage.removeItem).toHaveBeenCalledWith(CURRENT_MEMBER_STORAGE_KEY),
+    );
+    await waitFor(() =>
+      expect(AsyncStorage.removeItem).toHaveBeenCalledWith(CURRENT_CHILD_STORAGE_KEY),
     );
   });
 

@@ -9,14 +9,14 @@ type DomainTabsProps = {
   onSelect: (domain: Domain) => void;
 };
 
-// Appbar domain tabs (B3): 日常 / 健康档案, active text bold with a 2px accent
+// Appbar domain tabs (B3): 育儿 / 健康档案, active text bold with a 2px accent
 // underline; health carries a pending dot when actionable report review exists.
 // Pure presentation so screen tests can exercise activation without a navigator.
 export function DomainTabs({ activeDomain, hasPending, onSelect }: DomainTabsProps) {
   return (
     <View testID="domain-tabs" style={styles.tabs}>
       <DomainTab
-        label="日常"
+        label="育儿"
         active={activeDomain === 'daily'}
         testID="domain-tab-daily"
         onPress={() => onSelect('daily')}

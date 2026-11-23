@@ -1,7 +1,14 @@
-// 当前成员选择的持久化单测:保存/读回往返 + 未存与损坏值一律回落 undefined。
+// 当前成员 / 当前孩子选择的持久化单测:保存/读回往返 + 未存与损坏值一律回落 undefined。
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { CURRENT_MEMBER_STORAGE_KEY, loadCurrentMemberId, saveCurrentMemberId } from './currentMemberStore';
+import {
+  CURRENT_CHILD_STORAGE_KEY,
+  CURRENT_MEMBER_STORAGE_KEY,
+  loadCurrentChildId,
+  loadCurrentMemberId,
+  saveCurrentChildId,
+  saveCurrentMemberId,
+} from './currentMemberStore';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
   // Jest 的 mock factory 被提升到 import 之前，只能 require 取 mock 模块。
@@ -27,6 +34,22 @@ describe('currentMemberStore', () => {
     for (const bad of ['abc', '0', '-3', '1.5']) {
       await AsyncStorage.setItem(CURRENT_MEMBER_STORAGE_KEY, bad);
       expect(await loadCurrentMemberId()).toBeUndefined();
+    }
+  });
+
+  it('当前孩子与当前成员使用独立存储位,互不覆盖', async () => {
+    await saveCurrentMemberId(42);
+    await saveCurrentChildId(7);
+
+    expect(await loadCurrentMemberId()).toBe(42);
+    expect(await loadCurrentChildId()).toBe(7);
+    expect(CURRENT_CHILD_STORAGE_KEY).not.toBe(CURRENT_MEMBER_STORAGE_KEY);
+  });
+
+  it('当前孩子存储值损坏/非法时为 undefined', async () => {
+    for (const bad of ['abc', '0', '-3', '1.5']) {
+      await AsyncStorage.setItem(CURRENT_CHILD_STORAGE_KEY, bad);
+      expect(await loadCurrentChildId()).toBeUndefined();
     }
   });
 });

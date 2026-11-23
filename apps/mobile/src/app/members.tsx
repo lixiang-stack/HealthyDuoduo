@@ -50,7 +50,8 @@ type DeleteState = {
 };
 
 export default function MembersScreen() {
-  const { currentMemberId, selectMember, clearMember } = useCurrentMember();
+  const { currentMemberId, selectMember, clearMember, currentChildId, clearChild } =
+    useCurrentMember();
   const [state, setState] = useState<ScreenState>({ status: 'loading' });
   const [name, setName] = useState('');
   const [sex, setSex] = useState<MemberSex>();
@@ -222,10 +223,21 @@ export default function MembersScreen() {
       if (currentMemberId === target.member_id) {
         clearMember();
       }
+      if (currentChildId === target.member_id) {
+        clearChild();
+      }
       setDeleting(undefined);
       await reload();
     });
-  }, [deleting, runAction, currentMemberId, clearMember, reload]);
+  }, [
+    deleting,
+    runAction,
+    currentMemberId,
+    clearMember,
+    currentChildId,
+    clearChild,
+    reload,
+  ]);
 
   const onCancelDelete = useCallback(() => {
     deleteRequestId.current++;
