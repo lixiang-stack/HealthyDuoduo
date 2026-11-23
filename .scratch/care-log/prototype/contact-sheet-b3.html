@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=1282, initial-scale=1" />
+<title>HealthyDuoduo · B3 域在上、视图在下 contact sheet</title>
+<style>
+  :root {
+    --text: #111827; --muted: #6b7280; --accent: #2563eb; --line: #d1d5db;
+    --soft: #f3f4f6;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--soft); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .sheet { width: 1282px; margin: 0 auto; padding: 34px 32px 46px; }
+  .kicker { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  h1 { margin: 7px 0 8px; font-size: 30px; line-height: 1.2; letter-spacing: -.5px; }
+  .intro { max-width: 980px; margin: 0; color: var(--muted); font-size: 13px; line-height: 21px; }
+  .intro b { color: var(--text); }
+  .legend { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .pill { border-radius: 999px; padding: 5px 12px; font-size: 12px; font-weight: 650; background: #eff6ff; color: var(--accent); border: 1px solid #bfdbfe; }
+  .pill.gray { background: #fff; color: var(--muted); border-color: var(--line); font-weight: 500; }
+  .grid {
+    margin-top: 24px; display: grid; grid-template-columns: repeat(3, 380px);
+    gap: 26px 24px; justify-content: center;
+  }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 10px; }
+  .card img { width: 360px; display: block; border-radius: 8px; border: 1px solid #e5e7eb; }
+  .caption { padding: 10px 2px 2px; }
+  .caption .scene { font-size: 14px; font-weight: 700; }
+  .caption p { margin: 5px 0 0; font-size: 11px; line-height: 17px; color: var(--muted); }
+  .decision { margin-top: 30px; background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; }
+  .decision h2 { margin: 0 0 12px; font-size: 15px; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; }
+  .col h3 { margin: 0 0 5px; font-size: 13px; }
+  .col p { margin: 0; font-size: 11px; line-height: 18px; color: var(--muted); }
+  .footer { margin-top: 16px; color: var(--muted); font-size: 11px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .footer .dot { width: 4px; height: 4px; background: #9ca3af; border-radius: 50%; display: inline-block; }
+</style>
+</head>
+<body>
+  <main class="sheet">
+    <div class="kicker">HealthyDuoduo · B3 navigation prototype · 2026-11-23</div>
+    <h1>B3 · 域在 appbar、视图在底部</h1>
+    <p class="intro">
+      一级域嵌在 appbar：<b>日常 / 健康档案</b>；底部只显示当前域的视图。进入日常后，底部是 <b>今天 / 统计</b>，
+      健康档案不再出现在底部导航里，但 appbar 入口始终保留，并带待核对小圆点。默认进 <b>日常 &gt; 今天</b>。
+    </p>
+    <div class="legend">
+      <span class="pill">默认：日常 &gt; 今天</span>
+      <span class="pill gray">appbar：一级域切换</span>
+      <span class="pill gray">底部：当前域视图</span>
+      <span class="pill gray">高频动作在底部</span>
+    </div>
+
+    <section class="grid">
+      <article class="card">
+        <img src="shots/24-d-welcome.png" alt="B3 首次启动" />
+        <div class="caption"><div class="scene">首次启动 · 选默认入口</div><p>首次打开选「记录今天 / 查看健康档案」；之后记住上次所在的域。</p></div>
+      </article>
+      <article class="card">
+        <img src="shots/25-d-today.png" alt="B3 今天" />
+        <div class="caption"><div class="scene">今天（日常的下方视图）</div><p>appbar 里「日常」激活；底部只有今天 / 统计。健康档案不在底部，但 appbar 入口带角标。</p></div>
+      </article>
+      <article class="card">
+        <img src="shots/26-d-stats.png" alt="B3 统计" />
+        <div class="caption"><div class="scene">统计（日常的下方视图）</div><p>今天 / 统计放在最顺手的位置；指标（喂养/奶量/睡眠/尿布）× 图表类型（柱状/堆叠/折线）都在这一页切换。</p></div>
+      </article>
+
+      <article class="card">
+        <img src="shots/27-d-archive.png" alt="B3 健康档案报告" />
+        <div class="caption"><div class="scene">健康档案 · 报告</div><p>切到健康档案后，底部变成报告 / 趋势；日常不再出现在底部。</p></div>
+      </article>
+      <article class="card">
+        <img src="shots/28-d-trends.png" alt="B3 健康档案趋势" />
+        <div class="caption"><div class="scene">健康档案 · 趋势</div><p>健康域有自己的二级视图；报告与趋势并列，不与日常的统计混在一起。</p></div>
+      </article>
+      <article class="card">
+        <img src="shots/29-d-report.png" alt="B3 报告详情" />
+        <div class="caption"><div class="scene">报告详情</div><p>从报告列表进入详情；返回时回到健康档案，不回到日常。</p></div>
+      </article>
+    </section>
+
+    <section class="decision">
+      <h2>B2 还是 B3？</h2>
+      <div class="cols">
+        <div class="col">
+          <h3>B2 · 域在底部</h3>
+          <p>底部固定「日常 / 健康档案」，顶部再分今天 / 统计。域切换最快，但高频的今天 / 统计在顶部，拇指要多抬一次。</p>
+        </div>
+        <div class="col">
+          <h3>B3 · 视图在底部</h3>
+          <p>底部放高频的今天 / 统计，appbar 放低频的日常 / 健康档案。进入日常更专注，但每次切域要抬头看 appbar。</p>
+        </div>
+        <div class="col">
+          <h3>建议</h3>
+          <p>如果真实使用是每天多次记录，B3 更顺；如果经常在记录中顺手看报告，B2 的域切换更直接。两者都不要超过两层。</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="footer">
+      <span>所有截图来自 prototype.html 实际渲染</span><span class="dot"></span>
+      <span>390 × 844 CSS px / 2× 截图</span><span class="dot"></span>
+      <span>可点击版本：prototype.html → 顶部选 B3</span>
+    </div>
+  </main>
+</body>
+</html>

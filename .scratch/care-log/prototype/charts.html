@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HealthyDuoduo · 统计图表选型原型</title>
+<style>
+  :root {
+    --text: #111827;
+    --muted: #6b7280;
+    --accent: #2563eb;
+    --accent-soft: #eff6ff;
+    --ok: #15803d;
+    --fail: #b91c1c;
+    --border: #d1d5db;
+    --line: #e5e7eb;
+    --soft: #f8fafc;
+    --chip: #f3f4f6;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: #e5e7eb;
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  body.clean { background: #fff; min-height: 844px; }
+  body.clean .page-head, body.clean .page-foot { display: none; }
+  body.clean .page { max-width: none; padding: 0; }
+  body.clean .stage { padding: 0; }
+  body.clean .device { width: 390px; height: 844px; border: 0; border-radius: 0; box-shadow: none; }
+  body.clean .notch { display: none; }
+
+  .page { max-width: 1180px; margin: 0 auto; padding: 28px 24px 100px; }
+  .page-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; margin-bottom: 18px; }
+  .kicker { font-size: 11px; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
+  .page-head h1 { margin: 6px 0 6px; font-size: 24px; letter-spacing: -.3px; }
+  .page-head p { margin: 0; max-width: 720px; color: var(--muted); font-size: 13px; line-height: 20px; }
+  .page-head p b { color: var(--text); }
+  .legend { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .pill { border: 1px solid var(--line); background: #fff; color: var(--muted); border-radius: 999px; padding: 6px 11px; font-size: 11px; }
+  .pill.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-weight: 650; }
+
+  .stage { display: flex; justify-content: center; }
+  .device {
+    width: 390px; height: 844px; position: relative; overflow: hidden;
+    background: #fff; border: 10px solid #111827; border-radius: 46px;
+    box-shadow: 0 24px 70px rgba(0,0,0,.28);
+  }
+  .notch {
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+    width: 118px; height: 25px; border-radius: 16px; background: #111827; z-index: 50;
+  }
+  .screen { position: absolute; inset: 0; display: flex; flex-direction: column; background: #fff; }
+
+  .statusbar {
+    flex: 0 0 44px; height: 44px; padding: 0 22px 6px;
+    display: flex; align-items: flex-end; justify-content: space-between;
+    font-size: 12px; font-weight: 650;
+  }
+  .status-right { display: flex; align-items: center; gap: 5px; font-size: 10px; letter-spacing: -.5px; }
+  .signal { letter-spacing: -1px; }
+  .battery { width: 20px; height: 10px; border: 1px solid var(--text); border-radius: 2px; position: relative; }
+  .battery::after { content: ""; position: absolute; right: -3px; top: 3px; width: 2px; height: 4px; background: var(--text); border-radius: 0 1px 1px 0; }
+  .battery i { display: block; height: 6px; margin: 1px; width: 72%; background: var(--text); border-radius: 1px; }
+
+  .appbar {
+    flex: 0 0 52px; height: 52px; padding: 0 16px; display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  .appbar .back { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; margin-left: -7px; cursor: pointer; }
+  .appbar .title { flex: 1; font-size: 17px; font-weight: 650; }
+  .appbar .right { color: var(--muted); font-size: 12px; }
+
+  .content { flex: 1; overflow-y: auto; padding: 14px 16px 28px; scrollbar-width: none; }
+  .content::-webkit-scrollbar { display: none; }
+
+  .metric-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; background: var(--chip); border-radius: 10px; padding: 3px; margin-bottom: 8px; }
+  .metric {
+    border: 0; background: transparent; border-radius: 8px; padding: 7px 0;
+    font-size: 11px; color: var(--muted); cursor: pointer; font-family: inherit; white-space: nowrap;
+  }
+  .metric.active { background: #fff; color: var(--text); font-weight: 650; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+
+  .chart-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; background: var(--chip); border-radius: 10px; padding: 3px; margin-bottom: 8px; }
+  .chart-tab {
+    border: 0; background: transparent; border-radius: 8px; padding: 7px 0;
+    font-size: 12px; color: var(--muted); cursor: pointer; font-family: inherit;
+  }
+  .chart-tab.active { background: #fff; color: var(--text); font-weight: 650; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+
+  .question {
+    margin: 2px 2px 10px; font-size: 11px; color: var(--muted);
+  }
+  .question b { color: var(--text); font-weight: 650; }
+
+  .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin-bottom: 10px; }
+  .kpi { border: 1px solid var(--line); border-radius: 10px; padding: 9px 9px; background: #fff; }
+  .kpi-label { font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .kpi-value { margin-top: 3px; font-size: 18px; font-weight: 720; letter-spacing: -.3px; white-space: nowrap; }
+  .kpi-unit { margin-left: 1px; font-size: 9px; font-weight: 400; color: var(--muted); }
+
+  .chart-card { border: 1px solid var(--line); border-radius: 12px; padding: 10px 10px 8px; background: #fff; margin-bottom: 10px; }
+  .chart-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
+  .chart-title { font-size: 12px; font-weight: 650; }
+  .chart-sub { font-size: 9px; color: var(--muted); }
+  .chart-body { height: 222px; position: relative; }
+
+  .bars { display: flex; align-items: flex-end; gap: 7px; height: 100%; padding-top: 18px; }
+  .bar-col { flex: 1; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; min-width: 0; }
+  .bar-val { font-size: 9px; color: var(--muted); white-space: nowrap; }
+  .bar-wrap { flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center; position: relative; }
+  .bar { width: 100%; max-width: 24px; border-radius: 5px 5px 2px 2px; background: #bfdbfe; }
+  .bar.today { background: var(--accent); }
+  .bar-label { font-size: 9px; color: var(--muted); white-space: nowrap; }
+  .baseline { position: absolute; left: 0; right: 0; bottom: 0; border-top: 1px solid #e5e7eb; }
+
+  .stack-wrap { flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center; }
+  .stack { width: 100%; max-width: 24px; display: flex; flex-direction: column-reverse; border-radius: 5px 5px 2px 2px; overflow: hidden; }
+  .stack-seg { width: 100%; min-height: 1px; }
+  .stack-legend { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 4px; padding: 0 2px; }
+  .legend-item { display: flex; align-items: center; gap: 4px; font-size: 9px; color: var(--muted); }
+  .legend-dot { width: 7px; height: 7px; border-radius: 2px; display: inline-block; }
+
+  .line-svg { width: 100%; height: 100%; display: block; overflow: visible; }
+  .line-svg text { font-family: inherit; }
+
+  .caption { border: 1px solid var(--line); border-radius: 10px; padding: 10px 11px; background: var(--soft); margin-bottom: 8px; }
+  .caption-title { font-size: 12px; font-weight: 650; }
+  .caption-body { margin-top: 3px; font-size: 10px; line-height: 16px; color: var(--muted); }
+  .caption-row { display: flex; gap: 6px; margin-top: 7px; flex-wrap: wrap; }
+  .fit { font-size: 9px; border-radius: 999px; padding: 2px 7px; border: 1px solid #bbf7d0; color: var(--ok); background: #f0fdf4; }
+  .not-fit { font-size: 9px; border-radius: 999px; padding: 2px 7px; border: 1px solid #fecaca; color: var(--fail); background: #fef2f2; }
+
+  .recommend { border-left: 3px solid var(--accent); padding: 2px 0 2px 9px; font-size: 10px; line-height: 16px; color: var(--muted); }
+  .recommend b { color: var(--text); }
+
+  .page-foot { margin-top: 16px; text-align: center; color: var(--muted); font-size: 11px; }
+  .page-foot .dot { display: inline-block; width: 4px; height: 4px; border-radius: 50%; background: #9ca3af; margin: 0 5px 2px; }
+</style>
+</head>
+<body>
+  <div class="page">
+    <header class="page-head">
+      <div>
+        <div class="kicker">HealthyDuoduo · Chart prototype</div>
+        <h1>同一组数据，三种图回答三个问题</h1>
+        <p>柱状看<b>每天多少</b>，堆叠看<b>由什么组成</b>，折线看<b>往哪走</b>。切换指标和图表类型，看信息怎么变；数据为合成样例。</p>
+      </div>
+      <div class="legend">
+        <span class="pill">柱状 · 比较</span>
+        <span class="pill">堆叠 · 构成</span>
+        <span class="pill">折线 · 趋势</span>
+      </div>
+    </header>
+
+    <div class="stage">
+      <div class="device" id="device">
+        <div class="notch"></div>
+        <div class="screen" id="screen"></div>
+      </div>
+    </div>
+
+    <footer class="page-foot">
+      390 × 844 CSS px <span class="dot"></span> 直接切换指标 / 图表类型 <span class="dot"></span> 截图：?clean=1&metric=amount&chart=bar
+    </footer>
+  </div>
+
+<script>
+  const METRICS = {
+    feeding: {
+      label: '喂养',
+      unit: '次',
+      title: '每日喂养次数',
+      max: 10,
+      days: ['11/17', '11/18', '11/19', '11/20', '11/21', '11/22', '今天'],
+      total: [8, 7, 8, 6, 9, 8, 7],
+      kpis: [
+        { label: '7 天喂养', value: '53', unit: '次' },
+        { label: '日均', value: '7.6', unit: '次' },
+        { label: '平均间隔', value: '2h48', unit: '' }
+      ],
+      segments: [
+        { label: '母乳', color: '#2563eb', values: [3, 3, 4, 2, 4, 3, 3] },
+        { label: '奶粉', color: '#93c5fd', values: [5, 4, 4, 4, 5, 5, 4] }
+      ]
+    },
+    amount: {
+      label: '奶量',
+      unit: 'ml',
+      title: '每日奶量',
+      max: 800,
+      days: ['11/17', '11/18', '11/19', '11/20', '11/21', '11/22', '今天'],
+      total: [640, 560, 680, 480, 720, 660, 580],
+      kpis: [
+        { label: '7 天奶量', value: '4,320', unit: 'ml' },
+        { label: '日均', value: '617', unit: 'ml' },
+        { label: '单次平均', value: '82', unit: 'ml' }
+      ],
+      segments: [
+        { label: '母乳', color: '#2563eb', values: [180, 160, 200, 140, 220, 180, 160] },
+        { label: '奶粉', color: '#93c5fd', values: [460, 400, 480, 340, 500, 480, 420] }
+      ]
+    },
+    sleep: {
+      label: '睡眠',
+      unit: '小时',
+      title: '每日睡眠',
+      max: 14,
+      days: ['11/17', '11/18', '11/19', '11/20', '11/21', '11/22', '今天'],
+      total: [12.4, 13.1, 12.8, 11.9, 13.4, 12.6, 12.2],
+      kpis: [
+        { label: '日均睡眠', value: '12.6', unit: '小时' },
+        { label: '夜间', value: '9.2', unit: '小时' },
+        { label: '白天', value: '3.4', unit: '小时' }
+      ],
+      segments: [
+        { label: '夜间', color: '#1e3a8a', values: [9.0, 9.6, 9.4, 8.7, 9.8, 9.2, 8.9] },
+        { label: '白天', color: '#bfdbfe', values: [3.4, 3.5, 3.4, 3.2, 3.6, 3.4, 3.3] }
+      ]
+    },
+    diaper: {
+      label: '尿布',
+      unit: '次',
+      title: '每日尿布',
+      max: 10,
+      days: ['11/17', '11/18', '11/19', '11/20', '11/21', '11/22', '今天'],
+      total: [8, 7, 9, 6, 8, 7, 8],
+      kpis: [
+        { label: '7 天尿布', value: '53', unit: '次' },
+        { label: '尿', value: '33', unit: '次' },
+        { label: '便 / 混合', value: '20', unit: '次' }
+      ],
+      segments: [
+        { label: '尿', color: '#2563eb', values: [5, 4, 6, 4, 5, 4, 5] },
+        { label: '便', color: '#f59e0b', values: [2, 2, 2, 1, 2, 2, 2] },
+        { label: '尿+便', color: '#d1d5db', values: [1, 1, 1, 1, 1, 1, 1] }
+      ]
+    }
+  };
+
+  const CHART_COPY = {
+    bar: {
+      question: '每天多少？',
+      title: '柱状图：比较每天总量',
+      body: '适合看哪一天多、哪一天少；看不出一天由什么组成，也不擅长表达连续趋势。',
+      fit: '适合：每日总量对比',
+      not: '不适合：构成 / 趋势 / 分布'
+    },
+    stacked: {
+      question: '每天由什么组成？',
+      title: '堆叠柱：总量 + 构成',
+      body: '柱子的总高度还是每天总量，分段告诉你是由什么组成；段与段比较的是构成，不是趋势。',
+      fit: '适合：睡眠夜间/白天、尿布尿/便、母乳/奶粉',
+      not: '不适合：精确趋势 / 分布'
+    },
+    line: {
+      question: '往哪走？',
+      title: '折线图：看 7 天趋势',
+      body: '适合看整体往上、往下还是持平；单日高低不如柱状直观，也看不到构成。',
+      fit: '适合：30 天趋势 / 连续变化',
+      not: '不适合：单日构成 / 分布'
+    }
+  };
+
+  const state = { metric: 'amount', chart: 'bar', clean: false };
+  const screenEl = document.getElementById('screen');
+  const deviceEl = document.getElementById('device');
+
+  function statusbar() {
+    return `<div class="statusbar">
+      <span>9:41</span>
+      <span class="status-right"><span class="signal">▂▄▆</span><span>5G</span><span class="battery"><i></i></span></span>
+    </div>`;
+  }
+
+  function appbar() {
+    return `<div class="appbar"><div class="title">统计</div><div class="right">7 天</div></div>`;
+  }
+
+  function metricTabs() {
+    return `<div class="metric-tabs">
+      ${Object.entries(METRICS).map(([key, m]) => `<button class="metric ${state.metric === key ? 'active' : ''}" data-metric="${key}">${m.label}</button>`).join('')}
+    </div>`;
+  }
+
+  function chartTabs() {
+    return `<div class="chart-tabs">
+      <button class="chart-tab ${state.chart === 'bar' ? 'active' : ''}" data-chart="bar">柱状</button>
+      <button class="chart-tab ${state.chart === 'stacked' ? 'active' : ''}" data-chart="stacked">堆叠</button>
+      <button class="chart-tab ${state.chart === 'line' ? 'active' : ''}" data-chart="line">折线</button>
+    </div>`;
+  }
+
+  function kpis(metric) {
+    return `<div class="kpis">${metric.kpis.map(k => `
+      <div class="kpi"><div class="kpi-label">${k.label}</div><div class="kpi-value">${k.value}<span class="kpi-unit">${k.unit}</span></div></div>`).join('')}</div>`;
+  }
+
+  function barChart(metric) {
+    const bars = metric.total.map((value, index) => {
+      const height = Math.max(6, Math.round((value / metric.max) * 100));
+      return `<div class="bar-col">
+        <div class="bar-val">${value}</div>
+        <div class="bar-wrap"><div class="bar ${index === metric.total.length - 1 ? 'today' : ''}" style="height:${height}%"></div></div>
+        <div class="bar-label">${index === metric.total.length - 1 ? '今天' : metric.days[index]}</div>
+      </div>`;
+    }).join('');
+    return `<div class="chart-card">
+      <div class="chart-head"><span class="chart-title">${metric.title}</span><span class="chart-sub">单位：${metric.unit}</span></div>
+      <div class="chart-body"><div class="baseline"></div><div class="bars">${bars}</div></div>
+    </div>`;
+  }
+
+  function stackedChart(metric) {
+    const bars = metric.days.map((day, index) => {
+      const total = metric.total[index];
+      const stackHeight = Math.max(6, Math.round((total / metric.max) * 100));
+      const segments = metric.segments.map(seg => {
+        const share = total ? (seg.values[index] / total) * 100 : 0;
+        return `<div class="stack-seg" style="height:${share}%;background:${seg.color}" title="${seg.label} ${seg.values[index]}"></div>`;
+      }).join('');
+      return `<div class="bar-col">
+        <div class="bar-val">${total}</div>
+        <div class="bar-wrap"><div class="stack" style="height:${stackHeight}%">${segments}</div></div>
+        <div class="bar-label">${index === metric.days.length - 1 ? '今天' : day}</div>
+      </div>`;
+    }).join('');
+    const legend = metric.segments.map(seg => {
+      const sum = seg.values.reduce((a, b) => a + b, 0);
+      const display = metric.unit === '小时' ? sum.toFixed(1) : Math.round(sum);
+      return `<span class="legend-item"><i class="legend-dot" style="background:${seg.color}"></i>${seg.label} ${display}${metric.unit === '小时' ? ' h' : metric.unit === 'ml' ? ' ml' : ' 次'}</span>`;
+    }).join('');
+    return `<div class="chart-card">
+      <div class="chart-head"><span class="chart-title">${metric.title}构成</span><span class="chart-sub">单位：${metric.unit}</span></div>
+      <div class="chart-body" style="height:196px"><div class="baseline"></div><div class="bars">${bars}</div></div>
+      <div class="stack-legend">${legend}</div>
+    </div>`;
+  }
+
+  function lineChart(metric) {
+    const W = 320, H = 170, padL = 28, padR = 12, padT = 18, padB = 24;
+    const n = metric.total.length;
+    const x = (i) => padL + (i * (W - padL - padR)) / (n - 1);
+    const y = (v) => padT + (1 - v / metric.max) * (H - padT - padB);
+    const points = metric.total.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+    const area = `${padL},${H - padB} ${points} ${x(n - 1).toFixed(1)},${H - padB}`;
+    const grid = [0, 0.5, 1].map(t => {
+      const gy = padT + t * (H - padT - padB);
+      const label = Math.round(metric.max * (1 - t));
+      return `<line x1="${padL}" y1="${gy}" x2="${W - padR}" y2="${gy}" stroke="#f1f5f9" stroke-width="1" />
+        <text x="${padL - 5}" y="${gy + 3}" text-anchor="end" font-size="8" fill="#9ca3af">${label}</text>`;
+    }).join('');
+    const dots = metric.total.map((v, i) => {
+      const isLast = i === n - 1;
+      return `<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="${isLast ? 4 : 3}" fill="${isLast ? '#2563eb' : '#fff'}" stroke="#2563eb" stroke-width="1.5" />
+        <text x="${x(i).toFixed(1)}" y="${(y(v) - 7).toFixed(1)}" text-anchor="middle" font-size="8" fill="#6b7280">${v}</text>`;
+    }).join('');
+    const xLabels = metric.days.map((day, i) => `<text x="${x(i).toFixed(1)}" y="${H - 7}" text-anchor="middle" font-size="8" fill="#9ca3af">${i === n - 1 ? '今天' : day}</text>`).join('');
+    return `<div class="chart-card">
+      <div class="chart-head"><span class="chart-title">${metric.title}趋势</span><span class="chart-sub">单位：${metric.unit}</span></div>
+      <div class="chart-body">
+        <svg class="line-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+          <defs><linearGradient id="lineFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#2563eb" stop-opacity=".12"/><stop offset="100%" stop-color="#2563eb" stop-opacity="0"/></linearGradient></defs>
+          ${grid}
+          <polygon points="${area}" fill="url(#lineFill)" />
+          <polyline points="${points}" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          ${dots}
+          ${xLabels}
+        </svg>
+      </div>
+    </div>`;
+  }
+
+  function caption(chart) {
+    const c = CHART_COPY[chart];
+    return `<div class="caption">
+      <div class="caption-title">${c.title}</div>
+      <div class="caption-body">${c.body}</div>
+      <div class="caption-row"><span class="fit">${c.fit}</span><span class="not-fit">${c.not}</span></div>
+    </div>`;
+  }
+
+  function render() {
+    const metric = METRICS[state.metric];
+    const chart = state.chart;
+    const body = chart === 'bar' ? barChart(metric) : chart === 'stacked' ? stackedChart(metric) : lineChart(metric);
+    screenEl.innerHTML = `${statusbar()}${appbar()}
+      <div class="content">
+        ${metricTabs()}
+        ${chartTabs()}
+        <div class="question">当前问题：<b>${CHART_COPY[chart].question}</b></div>
+        ${kpis(metric)}
+        ${body}
+        ${caption(chart)}
+        <div class="recommend"><b>建议顺序：</b>先保留柱状；需要构成时加堆叠；30 天趋势再用折线；直方图只用于间隔 / 单次奶量分布。</div>
+      </div>`;
+  }
+
+  function init() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('metric') && METRICS[params.get('metric')]) state.metric = params.get('metric');
+    if (['bar', 'stacked', 'line'].includes(params.get('chart'))) state.chart = params.get('chart');
+    state.clean = params.get('clean') === '1';
+    if (state.clean) {
+      document.body.classList.add('clean');
+      deviceEl.classList.add('clean');
+    }
+    render();
+  }
+
+  screenEl.addEventListener('click', (event) => {
+    const metric = event.target.closest('[data-metric]');
+    if (metric) {
+      state.metric = metric.dataset.metric;
+      render();
+      return;
+    }
+    const chart = event.target.closest('[data-chart]');
+    if (chart) {
+      state.chart = chart.dataset.chart;
+      render();
+    }
+  });
+
+  init();
+</script>
+</body>
+</html>

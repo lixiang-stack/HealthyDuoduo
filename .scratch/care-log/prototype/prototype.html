@@ -1,0 +1,1809 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HealthyDuoduo · 护理记录产品重心原型</title>
+<style>
+  :root {
+    --text: #111827;
+    --muted: #6b7280;
+    --accent: #2563eb;
+    --accent-soft: #eff6ff;
+    --ok: #15803d;
+    --fail: #b91c1c;
+    --low: #1d4ed8;
+    --border: #d1d5db;
+    --line: #e5e7eb;
+    --soft: #f8fafc;
+    --chip: #f3f4f6;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: #e5e7eb;
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  body.clean { background: #fff; min-height: 844px; }
+  body.clean .topbar,
+  body.clean .screen-nav,
+  body.clean .floating,
+  body.clean .page-footer { display: none; }
+  body.clean .page { max-width: none; padding: 0; }
+  body.clean .stage { padding: 0; }
+  body.clean .device {
+    width: 390px; height: 844px; border: 0; border-radius: 0; box-shadow: none;
+  }
+  body.clean .notch { display: none; }
+
+  .page { max-width: 1280px; margin: 0 auto; padding: 28px 24px 120px; }
+  .topbar { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; margin-bottom: 14px; }
+  .kicker { font-size: 11px; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
+  .brand h1 { font-size: 24px; line-height: 1.2; margin: 6px 0 6px; letter-spacing: -.3px; }
+  .brand p { margin: 0; max-width: 720px; font-size: 13px; line-height: 20px; color: var(--muted); }
+  .brand p b { color: var(--text); font-weight: 650; }
+  .scenario-toggle { display: flex; flex: 0 0 auto; background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 4px; }
+  .scenario-btn {
+    border: 0; background: transparent; padding: 9px 14px; border-radius: 9px;
+    font-size: 13px; color: var(--muted); cursor: pointer; white-space: nowrap;
+  }
+  .scenario-btn.active { background: var(--text); color: #fff; }
+  .screen-nav { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+  .screen-pill {
+    border: 1px solid var(--border); background: #fff; color: var(--text);
+    border-radius: 999px; padding: 7px 12px; font-size: 12px; cursor: pointer;
+  }
+  .screen-pill.active { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+  .prototype-tools { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+  .tool-btn {
+    border: 1px solid var(--border); background: #fff; color: var(--muted);
+    border-radius: 999px; padding: 6px 10px; font-size: 11px; cursor: pointer;
+  }
+  .tool-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+
+  .stage { display: flex; justify-content: center; }
+  .device {
+    width: 390px; height: 844px; position: relative; overflow: hidden;
+    background: #fff; border: 10px solid #111827; border-radius: 46px;
+    box-shadow: 0 24px 70px rgba(0,0,0,.28);
+  }
+  .notch {
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+    width: 118px; height: 25px; border-radius: 16px; background: #111827; z-index: 50;
+  }
+  .screen { position: absolute; inset: 0; display: flex; flex-direction: column; background: #fff; }
+
+  .statusbar {
+    flex: 0 0 44px; height: 44px; padding: 0 22px 6px;
+    display: flex; align-items: flex-end; justify-content: space-between;
+    font-size: 12px; font-weight: 650; color: var(--text);
+  }
+  .status-right { display: flex; align-items: center; gap: 5px; font-size: 10px; letter-spacing: -.5px; }
+  .signal { letter-spacing: -1px; }
+  .battery {
+    width: 20px; height: 10px; border: 1px solid var(--text); border-radius: 2px;
+    position: relative; display: inline-block;
+  }
+  .battery::after {
+    content: ""; position: absolute; right: -3px; top: 3px; width: 2px; height: 4px;
+    background: var(--text); border-radius: 0 1px 1px 0;
+  }
+  .battery i { display: block; height: 6px; margin: 1px; width: 72%; background: var(--text); border-radius: 1px; }
+
+  .appbar {
+    flex: 0 0 52px; height: 52px; padding: 0 16px; display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid #f1f5f9; background: #fff;
+  }
+  .appbar .back {
+    width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+    margin-left: -7px; color: var(--text); cursor: pointer;
+  }
+  .appbar .title {
+    flex: 1; min-width: 0; font-size: 17px; font-weight: 650; letter-spacing: .1px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .appbar .right { color: var(--accent); font-size: 13px; cursor: pointer; white-space: nowrap; }
+  .appbar .right.muted { color: var(--muted); }
+
+  .content { flex: 1; overflow-y: auto; padding: 16px 16px 30px; scrollbar-width: none; }
+  .content::-webkit-scrollbar { display: none; }
+  .content.has-tab { padding-bottom: 86px; }
+
+  .tabbar {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 64px; display: flex;
+    border-top: 1px solid var(--line); background: #fff; z-index: 10;
+  }
+  .tab {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 3px; font-size: 10px; color: var(--muted); cursor: pointer;
+  }
+  .tab.active { color: var(--accent); }
+  .tab svg { width: 21px; height: 21px; }
+  .tab { position: relative; }
+  .tab-badge {
+    position: absolute; top: 7px; right: calc(50% - 19px);
+    width: 6px; height: 6px; border-radius: 50%; background: var(--accent);
+  }
+  .subtabs {
+    flex: 0 0 44px; height: 44px; display: flex; align-items: flex-end; gap: 22px;
+    padding: 0 16px; border-bottom: 1px solid #f1f5f9; background: #fff;
+  }
+  .subtab {
+    padding: 0 1px 11px; font-size: 14px; color: var(--muted); cursor: pointer;
+    border-bottom: 2px solid transparent;
+  }
+  .subtab.active { color: var(--text); font-weight: 650; border-bottom-color: var(--accent); }
+  .domain-appbar { align-items: flex-end; padding-bottom: 0; }
+  .domain-tabs { display: flex; gap: 18px; align-items: flex-end; flex: 1; }
+  .domain-tab {
+    padding: 0 1px 12px; font-size: 15px; color: var(--muted); cursor: pointer;
+    border-bottom: 2px solid transparent; white-space: nowrap;
+  }
+  .domain-tab.active { color: var(--text); font-weight: 650; border-bottom-color: var(--accent); }
+  .domain-tab .dot {
+    display: inline-block; width: 5px; height: 5px; border-radius: 50%;
+    background: var(--accent); margin-left: 4px; vertical-align: 2px;
+  }
+  .domain-appbar .member { color: var(--accent); font-size: 12px; padding-bottom: 13px; white-space: nowrap; }
+  .welcome { padding: 22px 4px 0; }
+  .welcome-icon {
+    width: 52px; height: 52px; border-radius: 16px; background: var(--accent-soft);
+    color: var(--accent); display: flex; align-items: center; justify-content: center; margin-bottom: 14px;
+  }
+  .welcome h2 { margin: 0 0 6px; font-size: 22px; letter-spacing: -.3px; }
+  .welcome p { margin: 0 0 18px; color: var(--muted); font-size: 13px; line-height: 20px; }
+  .choice {
+    width: 100%; text-align: left; border: 1px solid var(--line); border-radius: 14px;
+    background: #fff; padding: 14px 14px; margin-bottom: 10px; cursor: pointer;
+    font-family: inherit; color: var(--text);
+  }
+  .choice b { display: block; font-size: 15px; }
+  .choice small { display: block; margin-top: 3px; font-size: 11px; color: var(--muted); }
+  .choice:active { background: var(--soft); }
+  .welcome-note {
+    margin-top: 14px; border-radius: 12px; background: var(--soft); padding: 11px 12px;
+    font-size: 11px; line-height: 17px; color: var(--muted);
+  }
+
+  .card {
+    border: 1px solid var(--line); border-radius: 12px; padding: 13px;
+    background: #fff; margin-bottom: 10px;
+  }
+  .card.soft { background: var(--soft); }
+  .card.accent { border-color: #bfdbfe; background: #f8fbff; }
+  .section-title {
+    display: flex; align-items: center; justify-content: space-between;
+    margin: 18px 2px 8px; font-size: 13px; color: var(--muted);
+  }
+  .section-title:first-child { margin-top: 0; }
+  .section-title b { color: var(--text); font-size: 13px; font-weight: 650; }
+  .link { color: var(--accent); text-decoration: none; cursor: pointer; font-size: 12px; }
+  .muted { color: var(--muted); }
+  .small { font-size: 12px; line-height: 18px; }
+  .tag {
+    display: inline-flex; align-items: center; border: 1px solid var(--line);
+    border-radius: 999px; padding: 1px 6px; font-size: 10px; color: var(--muted);
+    background: #fff; white-space: nowrap;
+  }
+  .chips { display: flex; gap: 8px; margin-bottom: 12px; }
+  .chip {
+    border: 1px solid var(--border); border-radius: 999px; padding: 5px 12px;
+    font-size: 12px; color: var(--text); background: #fff; cursor: pointer;
+  }
+  .chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  .member-head { display: flex; align-items: center; gap: 8px; }
+  .member-name { font-size: 17px; font-weight: 650; }
+  .badge-child {
+    font-size: 10px; color: var(--accent); background: var(--accent-soft);
+    border: 1px solid #bfdbfe; border-radius: 999px; padding: 1px 6px;
+  }
+  .member-line { display: flex; justify-content: space-between; gap: 8px; margin-top: 7px; font-size: 13px; }
+  .member-line .pending { color: var(--accent); font-weight: 650; }
+  .care-row {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line);
+    display: flex; align-items: center; gap: 10px; cursor: pointer;
+  }
+  .care-icon {
+    width: 34px; height: 34px; border-radius: 10px; background: var(--accent-soft);
+    color: var(--accent); display: flex; align-items: center; justify-content: center; flex: 0 0 34px;
+  }
+  .care-copy { flex: 1; min-width: 0; }
+  .care-title { font-size: 13px; font-weight: 650; }
+  .care-meta { margin-top: 2px; font-size: 12px; color: var(--muted); }
+  .chev { color: #9ca3af; flex: 0 0 auto; }
+
+  .hero {
+    background: linear-gradient(135deg, #eff6ff 0%, #ffffff 78%);
+    border: 1px solid #bfdbfe; border-radius: 16px; padding: 15px 16px 13px; margin-bottom: 12px;
+  }
+  .hero-eyebrow { font-size: 12px; color: var(--accent); font-weight: 650; letter-spacing: .02em; }
+  .hero-num { font-size: 30px; line-height: 1.15; font-weight: 750; letter-spacing: -.6px; margin-top: 4px; }
+  .hero-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .hero-foot {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-top: 11px; padding-top: 9px; border-top: 1px solid #dbeafe; font-size: 11px; color: var(--muted);
+  }
+
+  .quick-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
+  .quick {
+    border: 1px solid var(--line); background: #fff; border-radius: 12px;
+    padding: 9px 3px 8px; display: flex; flex-direction: column; align-items: center; gap: 5px;
+    font-size: 11px; color: var(--text); cursor: pointer;
+  }
+  .quick:active { background: var(--soft); }
+  .qicon {
+    width: 34px; height: 34px; border-radius: 50%; background: var(--soft);
+    display: flex; align-items: center; justify-content: center; color: var(--accent);
+  }
+
+  .summary-strip {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px;
+    background: var(--line); border: 1px solid var(--line); border-radius: 12px;
+    overflow: hidden; margin-bottom: 12px;
+  }
+  .summary-cell { background: #fff; padding: 10px 6px; text-align: center; }
+  .summary-val { font-size: 16px; font-weight: 700; letter-spacing: -.2px; }
+  .summary-label { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+  .timeline { position: relative; }
+  .event {
+    display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f1f5f9;
+    cursor: pointer;
+  }
+  .event:last-child { border-bottom: 0; }
+  .event-time {
+    width: 44px; flex: 0 0 44px; padding-top: 2px; font-size: 12px; color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .event-icon {
+    width: 30px; height: 30px; flex: 0 0 30px; border-radius: 9px; background: var(--soft);
+    color: var(--accent); display: flex; align-items: center; justify-content: center;
+  }
+  .event-body { flex: 1; min-width: 0; }
+  .event-title { font-size: 14px; font-weight: 550; }
+  .event-meta { margin-top: 2px; font-size: 11px; color: var(--muted); }
+  .event-meta .tag { margin-left: 5px; }
+
+  .empty-state {
+    padding: 30px 18px 34px; text-align: center; border: 1px dashed var(--border);
+    border-radius: 12px; background: var(--soft); margin-top: 8px;
+  }
+  .empty-icon {
+    width: 48px; height: 48px; border-radius: 50%; background: #fff; border: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; color: var(--accent);
+  }
+  .empty-title { font-size: 14px; font-weight: 650; }
+  .empty-text { margin-top: 4px; font-size: 11px; line-height: 17px; color: var(--muted); }
+
+  .reminder-card {
+    display: flex; align-items: center; gap: 10px; border: 1px solid var(--line);
+    border-radius: 12px; padding: 11px 12px; margin-bottom: 12px; background: #fff; cursor: pointer;
+  }
+  .reminder-card .care-icon { background: #fff7ed; color: #b45309; }
+  .reminder-copy { flex: 1; min-width: 0; }
+  .reminder-title { font-size: 13px; font-weight: 650; display: block; }
+  .reminder-meta { margin-top: 2px; font-size: 11px; color: var(--muted); display: block; }
+
+  .kpi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+  .kpi { border: 1px solid var(--line); border-radius: 12px; padding: 11px 12px; background: #fff; }
+  .kpi-label { font-size: 11px; color: var(--muted); }
+  .kpi-value { margin-top: 3px; font-size: 21px; font-weight: 720; letter-spacing: -.3px; }
+  .kpi-unit { margin-left: 2px; font-size: 10px; font-weight: 400; color: var(--muted); }
+
+  .chart-card { border: 1px solid var(--line); border-radius: 12px; padding: 12px 12px 10px; margin-bottom: 10px; background: #fff; }
+  .chart-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
+  .chart-title { font-size: 13px; font-weight: 650; }
+  .chart-sub { font-size: 10px; color: var(--muted); }
+  .bars { display: flex; align-items: flex-end; gap: 7px; height: 112px; padding-top: 4px; }
+  .bar-col { flex: 1; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; }
+  .bar-wrap { flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center; }
+  .bar { width: 100%; max-width: 24px; border-radius: 5px 5px 2px 2px; background: #bfdbfe; position: relative; }
+  .bar.today { background: var(--accent); }
+  .bar-val { font-size: 9px; color: var(--muted); }
+  .bar-label { font-size: 9px; color: var(--muted); white-space: nowrap; }
+
+  .c-metric-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; background: var(--chip); border-radius: 10px; padding: 3px; margin-bottom: 8px; }
+  .c-metric {
+    border: 0; background: transparent; border-radius: 8px; padding: 7px 0;
+    font-size: 11px; color: var(--muted); cursor: pointer; font-family: inherit; white-space: nowrap;
+  }
+  .c-metric.active { background: #fff; color: var(--text); font-weight: 650; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  .c-type-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; background: var(--chip); border-radius: 10px; padding: 3px; margin-bottom: 8px; }
+  .c-type-tab {
+    border: 0; background: transparent; border-radius: 8px; padding: 7px 0;
+    font-size: 12px; color: var(--muted); cursor: pointer; font-family: inherit;
+  }
+  .c-type-tab.active { background: #fff; color: var(--text); font-weight: 650; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  .c-question { margin: 2px 2px 9px; font-size: 11px; color: var(--muted); }
+  .c-question b { color: var(--text); font-weight: 650; }
+  .c-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin-bottom: 10px; }
+  .c-kpi { border: 1px solid var(--line); border-radius: 10px; padding: 8px 9px; background: #fff; }
+  .c-kpi-label { font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .c-kpi-value { margin-top: 3px; font-size: 17px; font-weight: 720; letter-spacing: -.3px; white-space: nowrap; }
+  .c-kpi-unit { margin-left: 1px; font-size: 9px; font-weight: 400; color: var(--muted); }
+  .c-chart-card { border: 1px solid var(--line); border-radius: 12px; padding: 10px 10px 8px; background: #fff; margin-bottom: 9px; }
+  .c-chart-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
+  .c-chart-title { font-size: 12px; font-weight: 650; }
+  .c-chart-sub { font-size: 9px; color: var(--muted); }
+  .c-chart-body { height: 190px; position: relative; }
+  .c-bars { display: flex; align-items: flex-end; gap: 7px; height: 100%; padding-top: 16px; }
+  .c-bar-col { flex: 1; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; min-width: 0; }
+  .c-bar-val { font-size: 9px; color: var(--muted); white-space: nowrap; }
+  .c-bar-wrap { flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center; position: relative; }
+  .c-bar { width: 100%; max-width: 24px; border-radius: 5px 5px 2px 2px; background: #bfdbfe; }
+  .c-bar.today { background: var(--accent); }
+  .c-bar-label { font-size: 9px; color: var(--muted); white-space: nowrap; }
+  .c-baseline { position: absolute; left: 0; right: 0; bottom: 0; border-top: 1px solid #e5e7eb; }
+  .c-stack { width: 100%; max-width: 24px; display: flex; flex-direction: column-reverse; border-radius: 5px 5px 2px 2px; overflow: hidden; }
+  .c-stack-seg { width: 100%; min-height: 1px; }
+  .c-legend { display: flex; flex-wrap: wrap; gap: 5px 11px; margin-top: 3px; padding: 0 2px; }
+  .c-legend-item { display: flex; align-items: center; gap: 4px; font-size: 9px; color: var(--muted); }
+  .c-legend-dot { width: 7px; height: 7px; border-radius: 2px; display: inline-block; }
+  .c-line-svg { width: 100%; height: 100%; display: block; overflow: visible; }
+  .c-line-svg text { font-family: inherit; }
+  .c-caption { border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px; background: var(--soft); margin-bottom: 8px; }
+  .c-caption-title { font-size: 12px; font-weight: 650; }
+  .c-caption-body { margin-top: 3px; font-size: 10px; line-height: 16px; color: var(--muted); }
+  .c-caption-row { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+  .c-fit { font-size: 9px; border-radius: 999px; padding: 2px 7px; border: 1px solid #bbf7d0; color: var(--ok); background: #f0fdf4; }
+  .c-not-fit { font-size: 9px; border-radius: 999px; padding: 2px 7px; border: 1px solid #fecaca; color: var(--fail); background: #fef2f2; }
+  .c-recommend { border-left: 3px solid var(--accent); padding: 2px 0 2px 9px; font-size: 10px; line-height: 16px; color: var(--muted); margin-bottom: 10px; }
+  .c-recommend b { color: var(--text); }
+
+  .switch-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .switch {
+    width: 46px; height: 28px; border-radius: 999px; background: #d1d5db; position: relative;
+    cursor: pointer; flex: 0 0 46px; transition: background .18s;
+  }
+  .switch.on { background: var(--accent); }
+  .switch::after {
+    content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px;
+    border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.2); transition: left .18s;
+  }
+  .switch.on::after { left: 21px; }
+  .interval-row { display: flex; gap: 8px; margin-top: 12px; }
+  .interval {
+    flex: 1; border: 1px solid var(--line); border-radius: 10px; padding: 9px 0;
+    text-align: center; font-size: 13px; color: var(--text); cursor: pointer; background: #fff;
+  }
+  .interval.active { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); font-weight: 650; }
+  .notification {
+    border: 1px solid var(--line); border-radius: 14px; padding: 12px; background: var(--soft);
+    display: flex; gap: 10px; align-items: flex-start;
+  }
+  .app-icon {
+    width: 34px; height: 34px; border-radius: 9px; background: var(--accent); color: #fff;
+    display: flex; align-items: center; justify-content: center; flex: 0 0 34px; font-size: 12px; font-weight: 700;
+  }
+  .notification-title { font-size: 12px; font-weight: 650; }
+  .notification-body { margin-top: 2px; font-size: 11px; color: var(--muted); line-height: 16px; }
+
+  .report-card { cursor: pointer; }
+  .report-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .report-title { font-size: 15px; font-weight: 650; line-height: 21px; }
+  .report-meta { margin-top: 4px; font-size: 11px; color: var(--muted); }
+  .report-foot { margin-top: 8px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .status { font-size: 11px; white-space: nowrap; }
+  .status.pending { color: var(--accent); }
+  .status.ok { color: var(--ok); }
+  .status.fail { color: var(--fail); }
+
+  .item-row {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 10px;
+    padding: 10px 0; border-bottom: 1px solid #f1f5f9;
+  }
+  .item-row:last-child { border-bottom: 0; }
+  .item-name { font-size: 13px; }
+  .item-name small { display: block; margin-top: 2px; font-size: 10px; color: var(--muted); }
+  .item-value { font-size: 13px; font-weight: 650; white-space: nowrap; }
+  .item-ref { display: block; margin-top: 2px; font-size: 10px; font-weight: 400; color: var(--muted); text-align: right; }
+  .flag-high { color: var(--fail); }
+  .flag-low { color: var(--low); }
+
+  .btn-primary {
+    width: 100%; border: 0; border-radius: 12px; background: var(--accent); color: #fff;
+    padding: 13px; font-size: 14px; font-weight: 650; cursor: pointer;
+  }
+  .btn-secondary {
+    width: 100%; border: 1px solid var(--border); border-radius: 12px; background: #fff; color: var(--text);
+    padding: 12px; font-size: 13px; cursor: pointer;
+  }
+  .row-link {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 12px 0; border-bottom: 1px solid #f1f5f9; cursor: pointer;
+  }
+  .row-link:last-child { border-bottom: 0; }
+  .row-link-title { font-size: 13px; }
+  .row-link-meta { margin-top: 2px; font-size: 11px; color: var(--muted); }
+
+  .sheet-backdrop {
+    position: absolute; inset: 0; background: rgba(17,24,39,.45); z-index: 30;
+    display: flex; align-items: flex-end;
+  }
+  .sheet {
+    width: 100%; background: #fff; border-radius: 20px 20px 0 0;
+    padding: 9px 16px 22px; animation: slideUp .18s ease-out;
+  }
+  @keyframes slideUp { from { transform: translateY(18px); opacity: .6; } to { transform: translateY(0); opacity: 1; } }
+  .sheet-handle { width: 36px; height: 4px; border-radius: 2px; background: #d1d5db; margin: 0 auto 12px; }
+  .sheet-title { display: flex; align-items: center; gap: 8px; font-size: 17px; font-weight: 700; }
+  .sheet-child { margin-top: 4px; font-size: 11px; color: var(--muted); }
+  .sheet-child b { color: var(--text); }
+  .sheet-note { margin-top: 9px; font-size: 11px; line-height: 17px; color: var(--muted); }
+  .field { margin-top: 12px; }
+  .field-label { margin-bottom: 6px; font-size: 11px; color: var(--muted); }
+  .input {
+    width: 100%; border: 1px solid var(--border); border-radius: 10px; padding: 11px 12px;
+    font-size: 15px; color: var(--text); background: #fff; outline: none;
+    font-family: inherit;
+  }
+  .input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+  .input-row { display: flex; align-items: center; gap: 8px; }
+  .input-unit { font-size: 13px; color: var(--muted); }
+  .segmented { display: flex; background: var(--chip); border-radius: 10px; padding: 3px; }
+  .seg {
+    flex: 1; border: 0; background: transparent; padding: 8px 0; border-radius: 8px;
+    font-size: 13px; color: var(--muted); cursor: pointer; font-family: inherit;
+  }
+  .seg.active { background: #fff; color: var(--text); font-weight: 650; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  .sheet-actions { margin-top: 16px; }
+  .ghost-danger {
+    width: 100%; border: 0; background: transparent; color: var(--fail);
+    padding: 10px; font-size: 12px; cursor: pointer; margin-top: 2px; font-family: inherit;
+  }
+
+  .toast {
+    position: absolute; left: 50%; bottom: 84px; transform: translateX(-50%);
+    background: rgba(17,24,39,.92); color: #fff; font-size: 12px; border-radius: 999px;
+    padding: 9px 14px; z-index: 60; opacity: 0; pointer-events: none;
+    transition: opacity .2s; white-space: nowrap;
+  }
+  .toast.show { opacity: 1; }
+
+  .floating {
+    position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 8px; z-index: 80;
+    background: #111827; color: #fff; border-radius: 999px; padding: 7px 8px;
+    box-shadow: 0 10px 24px rgba(0,0,0,.28);
+  }
+  .floating button {
+    border: 0; background: transparent; color: #fff; cursor: pointer; font-size: 13px;
+    padding: 6px 9px; border-radius: 999px;
+  }
+  .floating button:hover { background: rgba(255,255,255,.12); }
+  .floating .current { padding: 0 5px; font-size: 11px; color: #d1d5db; min-width: 150px; text-align: center; }
+  .floating .scenario-mini { border: 1px solid rgba(255,255,255,.2); }
+  .floating .scenario-mini.active { background: #fff; color: #111827; }
+
+  .page-footer { margin-top: 18px; display: flex; justify-content: center; gap: 8px; color: var(--muted); font-size: 11px; }
+  .page-footer .dot { width: 4px; height: 4px; border-radius: 50%; background: #9ca3af; display: inline-block; margin: 0 4px 2px; }
+</style>
+</head>
+<body>
+  <div class="page">
+    <header class="topbar">
+      <div class="brand">
+        <div class="kicker">HealthyDuoduo · Product prototype</div>
+        <h1>护理记录放在哪里？</h1>
+        <p id="decision-copy">
+          同一套护理记录能力：A 档案优先，B1 日记优先（平铺 tab），B2 双域导航（域在底部），B3 域在上、视图在下。数据为合成样例；<b>不含账号 / 云同步</b>，记录保存在家庭局域网。
+        </p>
+      </div>
+      <div class="scenario-toggle" aria-label="方案切换">
+        <button class="scenario-btn active" data-scenario="A">A · 档案优先</button>
+        <button class="scenario-btn" data-scenario="B">B1 · 日记优先</button>
+        <button class="scenario-btn" data-scenario="C">B2 · 双域导航</button>
+        <button class="scenario-btn" data-scenario="D">B3 · 视图在下</button>
+      </div>
+    </header>
+
+    <nav class="screen-nav" id="screen-nav">
+      <div class="prototype-tools">
+        <button class="tool-btn" id="empty-toggle">空态</button>
+        <button class="tool-btn" id="reset-btn">重置</button>
+      </div>
+    </nav>
+
+    <div class="stage">
+      <div class="device" id="device">
+        <div class="notch"></div>
+        <div class="screen" id="screen"></div>
+        <div class="toast" id="toast"></div>
+      </div>
+    </div>
+
+    <footer class="page-footer">
+      <span>原型 · 可点击</span><span class="dot"></span>
+      <span>统计 / 提醒已按「先做品类标配」放进两套方案</span><span class="dot"></span>
+      <span>差别只在信息架构与首页重心</span>
+    </footer>
+  </div>
+
+  <div class="floating" id="floating">
+    <button data-action="scenario-A" data-scenario="A">A</button>
+    <button data-action="scenario-B" data-scenario="B">B1</button>
+    <button data-action="scenario-C" data-scenario="C">B2</button>
+    <button data-action="scenario-D" data-scenario="D">B3</button>
+    <span style="width:1px;height:18px;background:rgba(255,255,255,.18)"></span>
+    <button data-action="prev-screen">←</button>
+    <span class="current" id="floating-label">A · 家庭</span>
+    <button data-action="next-screen">→</button>
+  </div>
+
+<script>
+  const NOW = '16:20';
+  const DEFAULT_EVENTS = [
+    { id: 1, type: 'feed', time: '07:10', method: 'breast', durationMin: 18, note: '' },
+    { id: 2, type: 'diaper', time: '08:30', diaperType: '尿尿', note: '' },
+    { id: 3, type: 'feed', time: '10:20', method: 'formula', amount: 120, note: '' },
+    { id: 4, type: 'diaper', time: '12:40', diaperType: '尿 + 便', note: '' },
+    { id: 5, type: 'solid', time: '13:10', food: '米粉', amount: 40, note: '' },
+    { id: 6, type: 'feed', time: '14:05', method: 'formula', amount: 120, note: '' },
+    { id: 7, type: 'sleep', time: '15:20', durationMin: 45, note: '午睡' },
+    { id: 8, type: 'diaper', time: '16:00', diaperType: '尿尿', note: '' }
+  ];
+
+  const SCREENS = {
+    A: [
+      { id: 'a-home', label: '家庭（首页）' },
+      { id: 'a-today', label: '今天（成员页）' },
+      { id: 'a-stats', label: '统计' },
+      { id: 'a-reminder', label: '提醒' },
+      { id: 'a-archive', label: '档案' },
+      { id: 'a-report', label: '报告详情' }
+    ],
+    B: [
+      { id: 'b-home', label: '今天（首页）' },
+      { id: 'b-timeline', label: '今日记录' },
+      { id: 'b-stats', label: '统计' },
+      { id: 'b-reminder', label: '提醒' },
+      { id: 'b-archive', label: '档案' },
+      { id: 'b-report', label: '报告详情' }
+    ],
+    C: [
+      { id: 'c-welcome', label: '首次启动' },
+      { id: 'c-today', label: '日常 · 今天' },
+      { id: 'c-timeline', label: '今日记录' },
+      { id: 'c-stats', label: '日常 · 统计' },
+      { id: 'c-reminder', label: '提醒' },
+      { id: 'c-archive', label: '健康档案' },
+      { id: 'c-report', label: '报告详情' }
+    ],
+    D: [
+      { id: 'd-welcome', label: '首次启动' },
+      { id: 'd-today', label: '今天' },
+      { id: 'd-timeline', label: '今日记录' },
+      { id: 'd-stats', label: '统计' },
+      { id: 'd-reminder', label: '提醒' },
+      { id: 'd-archive', label: '健康档案 · 报告' },
+      { id: 'd-trends', label: '健康档案 · 趋势' },
+      { id: 'd-report', label: '报告详情' }
+    ]
+  };
+
+  const BACK = {
+    'a-today': 'a-home',
+    'a-stats': 'a-today',
+    'a-reminder': 'a-today',
+    'a-report': 'a-archive',
+    'b-timeline': 'b-home',
+    'b-reminder': 'b-home',
+    'b-report': 'b-archive',
+    'c-timeline': 'c-today',
+    'c-reminder': 'c-today',
+    'c-report': 'c-archive',
+    'd-timeline': 'd-today',
+    'd-reminder': 'd-today',
+    'd-report': 'd-archive'
+  };
+
+  const state = {
+    scenario: 'A',
+    screen: 'a-home',
+    events: DEFAULT_EVENTS.map(e => ({ ...e })),
+    reminder: { enabled: false, interval: 3 },
+    sheet: null,
+    draft: null,
+    statTab: 'feeding',
+    chartMetric: 'amount',
+    chartType: 'bar',
+    empty: false,
+    clean: false
+  };
+
+  const screenEl = document.getElementById('screen');
+  const toastEl = document.getElementById('toast');
+  const deviceEl = document.getElementById('device');
+  let toastTimer = null;
+
+  const ICONS = {
+    home: '<path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-9.5Z"/>',
+    archive: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+    stats: '<path d="M5 20V10M12 20V4M19 20v-7"/>',
+    bell: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/>',
+    bottle: '<path d="M9 3h6v3l2 2v13H7V8l2-2V3Z"/><path d="M9 11h6"/>',
+    droplet: '<path d="M12 3s6 6.5 6 10a6 6 0 1 1-12 0c0-3.5 6-10 6-10Z"/>',
+    moon: '<path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5Z"/>',
+    bowl: '<path d="M4 11h16a8 8 0 0 1-16 0Z"/><path d="M8 3v4M12 2v5M16 3v4"/>',
+    report: '<path d="M6 3h9l3 3v15H6V3Z"/><path d="M15 3v3h3M9 11h6M9 15h6"/>',
+    back: '<path d="M15 18l-6-6 6-6"/>',
+    chevron: '<path d="M9 18l6-6-6-6"/>',
+    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    check: '<path d="M20 6 9 17l-5-5"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    settings: '<circle cx="12" cy="12" r="3"/><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
+    user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+    calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/>',
+    filter: '<path d="M4 6h16M7 12h10M10 18h4"/>',
+    more: '<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>'
+  };
+
+  function icon(name, size = 20) {
+    return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ''}</svg>`;
+  }
+
+  function esc(value) {
+    return String(value == null ? '' : value)
+      .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;');
+  }
+
+  function parseTime(value) {
+    const [h, m] = String(value || '00:00').split(':').map(Number);
+    return h * 60 + m;
+  }
+
+  function formatDuration(totalMinutes) {
+    const mins = Math.max(0, totalMinutes);
+    if (mins < 1) return '刚刚';
+    if (mins < 60) return `${mins} 分钟`;
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return m ? `${h} 小时 ${m} 分` : `${h} 小时`;
+  }
+
+  function sortedEvents() {
+    return [...state.events].sort((a, b) => parseTime(b.time) - parseTime(a.time));
+  }
+
+  function lastFeed() {
+    return state.events
+      .filter(e => e.type === 'feed')
+      .sort((a, b) => parseTime(b.time) - parseTime(a.time))[0] || null;
+  }
+
+  function feedDetail(event) {
+    if (!event) return '';
+    if (event.method === 'breast') {
+      return event.durationMin ? `母乳 · ${event.durationMin} 分钟` : '母乳';
+    }
+    return event.amount ? `奶粉 · ${event.amount} ml` : '奶粉';
+  }
+
+  function eventTitle(event) {
+    if (event.type === 'feed') return feedDetail(event);
+    if (event.type === 'diaper') return event.diaperType || '换尿布';
+    if (event.type === 'sleep') return event.durationMin ? `${event.note || '睡觉'} · ${event.durationMin} 分钟` : `${event.note || '睡觉'} · 进行中`;
+    if (event.type === 'solid') return `${event.food || '辅食'}${event.amount ? ` · ${event.amount} g` : ''}`;
+    return '';
+  }
+
+  function eventMeta(event) {
+    if (event.type === 'feed') return '喂奶';
+    if (event.type === 'diaper') return '换尿布';
+    if (event.type === 'sleep') return '睡觉';
+    if (event.type === 'solid') return '辅食';
+    return '';
+  }
+
+  function eventIcon(event) {
+    if (event.type === 'feed') return 'bottle';
+    if (event.type === 'diaper') return 'droplet';
+    if (event.type === 'sleep') return 'moon';
+    if (event.type === 'solid') return 'bowl';
+    return 'clock';
+  }
+
+  function todayStats() {
+    const feeds = state.events.filter(e => e.type === 'feed');
+    return {
+      feeds: feeds.length,
+      amount: feeds.reduce((sum, e) => sum + (Number(e.amount) || 0), 0),
+      diapers: state.events.filter(e => e.type === 'diaper').length,
+      solids: state.events.filter(e => e.type === 'solid').length,
+      sleepMin: state.events.filter(e => e.type === 'sleep').reduce((sum, e) => sum + (Number(e.durationMin) || 0), 0)
+    };
+  }
+
+  function lastFeedSummary() {
+    const last = lastFeed();
+    if (!last) {
+      return { number: '还没有记录', sub: '记录第一次喂奶后，这里会显示间隔' };
+    }
+    const diff = parseTime(NOW) - parseTime(last.time);
+    return {
+      number: formatDuration(Math.max(0, diff)),
+      sub: `上次 ${last.time} · ${feedDetail(last)}`
+    };
+  }
+
+  function statusbar() {
+    return `<div class="statusbar">
+      <span>9:41</span>
+      <span class="status-right"><span class="signal">▂▄▆</span><span>5G</span><span class="battery"><i></i></span></span>
+    </div>`;
+  }
+
+  function appbar(title, { back = false, right = '', rightMuted = false, rightScreen = '' } = {}) {
+    const backHtml = back ? `<span class="back" data-action="back">${icon('back', 20)}</span>` : '';
+    const rightHtml = right
+      ? `<span class="right ${rightMuted ? 'muted' : ''}" ${rightScreen ? `data-action="nav" data-screen="${rightScreen}"` : 'data-action="toast" data-message="原型入口"'}">${right}</span>`
+      : '';
+    return `<div class="appbar">${backHtml}<div class="title">${esc(title)}</div>${rightHtml}</div>`;
+  }
+
+  function tabbar(tabs, active) {
+    return `<div class="tabbar">${tabs.map(tab => `
+      <div class="tab ${tab.id === active ? 'active' : ''}" data-action="nav" data-screen="${tab.screen}">
+        ${icon(tab.icon, 21)}<span>${esc(tab.label)}</span>${tab.badge ? '<span class="tab-badge"></span>' : ''}
+      </div>`).join('')}</div>`;
+  }
+
+  const TABS_A = [
+    { id: 'family', label: '家庭', icon: 'home', screen: 'a-home' },
+    { id: 'archive', label: '档案', icon: 'archive', screen: 'a-archive' }
+  ];
+  const TABS_B = [
+    { id: 'today', label: '今天', icon: 'home', screen: 'b-home' },
+    { id: 'stats', label: '统计', icon: 'stats', screen: 'b-stats' },
+    { id: 'archive', label: '档案', icon: 'archive', screen: 'b-archive', badge: true }
+  ];
+  const TABS_C = [
+    { id: 'daily', label: '日常', icon: 'home', screen: 'c-today' },
+    { id: 'health', label: '健康档案', icon: 'archive', screen: 'c-archive', badge: true }
+  ];
+  const TABS_D_DAILY = [
+    { id: 'today', label: '今天', icon: 'home', screen: 'd-today' },
+    { id: 'stats', label: '统计', icon: 'stats', screen: 'd-stats' }
+  ];
+  const TABS_D_HEALTH = [
+    { id: 'reports', label: '报告', icon: 'report', screen: 'd-archive' },
+    { id: 'trends', label: '趋势', icon: 'stats', screen: 'd-trends' }
+  ];
+
+  function frame({ title, back = false, right = '', rightMuted = false, rightScreen = '', content, tabs = null, activeTab = '', subTabs = null, activeSubTab = '', domainTabs = '' }) {
+    const subHtml = subTabs
+      ? `<div class="subtabs">${subTabs.map(tab => `<span class="subtab ${tab.id === activeSubTab ? 'active' : ''}" data-action="nav" data-screen="${tab.screen}">${esc(tab.label)}</span>`).join('')}</div>`
+      : '';
+    const bar = domainTabs ? appbarDomainTabs(domainTabs) : appbar(title, { back, right, rightMuted, rightScreen });
+    return statusbar() + bar + subHtml +
+      `<div class="content ${tabs ? 'has-tab' : ''}">${content}</div>` +
+      (tabs ? tabbar(tabs, activeTab) : '') +
+      (state.sheet ? sheetHtml() : '');
+  }
+
+  function appbarDomainTabs(active) {
+    return `<div class="appbar domain-appbar">
+      <div class="domain-tabs">
+        <span class="domain-tab ${active === 'daily' ? 'active' : ''}" data-action="nav" data-screen="d-today">日常</span>
+        <span class="domain-tab ${active === 'health' ? 'active' : ''}" data-action="nav" data-screen="d-archive">健康档案<span class="dot"></span></span>
+      </div>
+      <span class="member" data-action="toast" data-message="切换成员（原型）">豆豆 ▾</span>
+    </div>`;
+  }
+
+  function careRow() {
+    const stats = todayStats();
+    const last = lastFeedSummary();
+    return `<div class="care-row" data-action="nav" data-screen="a-today">
+      <span class="care-icon">${icon('bottle', 18)}</span>
+      <span class="care-copy">
+        <span class="care-title">今日护理 · ${stats.feeds + stats.diapers + stats.solids + state.events.filter(e => e.type === 'sleep').length} 条</span>
+        <span class="care-meta">距上次喂养 ${last.number}</span>
+      </span>
+      <span class="chev">${icon('chevron', 18)}</span>
+    </div>`;
+  }
+
+  function memberCard({ name, child, pending, latest, care = false }) {
+    return `<div class="card">
+      <div class="member-head">
+        <span class="member-name">${esc(name)}</span>
+        ${child ? '<span class="badge-child">孩子</span>' : ''}
+      </div>
+      <div class="member-line"><span class="pending">待核对 · ${esc(pending)}</span><span class="muted">${esc(latest)}</span></div>
+      ${care ? careRow() : ''}
+    </div>`;
+  }
+
+  function familyHome() {
+    const content = `
+      <div class="section-title"><b>家庭成员</b><span class="muted small">共 2 人</span></div>
+      ${memberCard({ name: '豆豆', child: true, pending: '2 项', latest: '最近报告 血常规 · 11-02', care: true })}
+      ${memberCard({ name: '妈妈', child: false, pending: '0 项', latest: '最近报告 肝功能 · 10-18' })}
+      <div class="section-title"><span class="link" data-action="toast" data-message="管理成员（原型）">管理成员</span></div>
+      <div class="card soft">
+        <div class="small muted">记录保存在家庭局域网；同一局域网内的设备可以直接看到同一份家庭档案。没有账号，也不需要邀请家人。</div>
+      </div>
+    `;
+    return frame({ title: '家庭', right: '设置', rightMuted: true, content, tabs: TABS_A, activeTab: 'family' });
+  }
+
+  function hero({ child = '' } = {}) {
+    const last = lastFeedSummary();
+    return `<div class="hero">
+      <div class="hero-eyebrow">${child ? `${esc(child)} · ` : ''}距上次喂养</div>
+      <div class="hero-num">${esc(last.number)}</div>
+      <div class="hero-sub">${esc(last.sub)}</div>
+      <div class="hero-foot"><span>${icon('clock', 13)} 以家长记录为准</span><span class="tag">家长记录</span></div>
+    </div>`;
+  }
+
+  function quickGrid() {
+    const actions = [
+      { type: 'feed', label: '喂奶', icon: 'bottle' },
+      { type: 'diaper', label: '尿布', icon: 'droplet' },
+      { type: 'sleep', label: '睡觉', icon: 'moon' },
+      { type: 'solid', label: '辅食', icon: 'bowl' }
+    ];
+    return `<div class="quick-grid">${actions.map(a => `
+      <button class="quick" data-action="log" data-type="${a.type}">
+        <span class="qicon">${icon(a.icon, 19)}</span><span>${a.label}</span>
+      </button>`).join('')}</div>`;
+  }
+
+  function eventRow(event) {
+    return `<div class="event" data-action="open-event" data-id="${event.id}">
+      <div class="event-time">${esc(event.time)}</div>
+      <div class="event-icon">${icon(eventIcon(event), 16)}</div>
+      <div class="event-body">
+        <div class="event-title">${esc(eventTitle(event))}</div>
+        <div class="event-meta">${esc(eventMeta(event))}<span class="tag">家长记录</span></div>
+      </div>
+      <span class="chev">${icon('chevron', 16)}</span>
+    </div>`;
+  }
+
+  function timelineHtml(limit = 0, moreScreen = 'b-timeline') {
+    if (state.empty || state.events.length === 0) {
+      return `<div class="empty-state">
+        <div class="empty-icon">${icon('bottle', 23)}</div>
+        <div class="empty-title">今天还没有记录</div>
+        <div class="empty-text">从上面选一个动作开始；记录只保存在你的家庭局域网。</div>
+      </div>`;
+    }
+    const events = sortedEvents();
+    const shown = limit ? events.slice(0, limit) : events;
+    return `<div class="timeline">${shown.map(eventRow).join('')}</div>` +
+      (limit && events.length > limit ? `<div class="row-link" data-action="nav" data-screen="${moreScreen}"><span class="row-link-title">查看全部 ${events.length} 条</span><span class="chev">${icon('chevron', 17)}</span></div>` : '');
+  }
+
+  function summaryStrip() {
+    const stats = todayStats();
+    const cells = [
+      { val: stats.feeds, label: '喂养' },
+      { val: stats.amount ? `${stats.amount}` : '0', label: '奶量 ml' },
+      { val: stats.sleepMin ? `${stats.sleepMin}` : '0', label: '睡眠 min' },
+      { val: stats.diapers, label: '尿布' }
+    ];
+    return `<div class="summary-strip">${cells.map(c => `
+      <div class="summary-cell"><div class="summary-val">${c.val}</div><div class="summary-label">${c.label}</div></div>`).join('')}</div>`;
+  }
+
+  function reminderCard() {
+    const r = state.reminder;
+    const last = lastFeed();
+    const next = last ? last.time : null;
+    let meta = '未开启';
+    if (r.enabled && next) {
+      const nextMinutes = parseTime(next) + r.interval * 60;
+      const h = Math.floor(nextMinutes / 60) % 24;
+      const m = nextMinutes % 60;
+      meta = `每 ${r.interval} 小时 · 下次 ${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    }
+    const target = state.scenario === 'A' ? 'a-reminder' : state.scenario === 'C' ? 'c-reminder' : state.scenario === 'D' ? 'd-reminder' : 'b-reminder';
+    return `<div class="reminder-card" data-action="nav" data-screen="${target}">
+      <span class="care-icon">${icon('bell', 18)}</span>
+      <span class="reminder-copy"><span class="reminder-title">喂奶间隔提醒</span><span class="reminder-meta">${meta}</span></span>
+      <span class="chev">${icon('chevron', 18)}</span>
+    </div>`;
+  }
+
+  function aToday() {
+    const content = `
+      ${hero()}
+      ${quickGrid()}
+      ${reminderCard()}
+      <div class="section-title"><b>今日时间线</b><span class="muted small">${state.events.length} 条</span></div>
+      ${timelineHtml()}
+    `;
+    return frame({ title: '豆豆 · 今天', back: true, right: '统计', rightScreen: 'a-stats', content });
+  }
+
+  function homeContent(moreScreen, limit = 3, child = '') {
+    return `
+      ${hero({ child })}
+      ${quickGrid()}
+      ${summaryStrip()}
+      ${reminderCard()}
+      <div class="section-title"><b>今日时间线</b><span class="link" data-action="nav" data-screen="${moreScreen}">全部记录</span></div>
+      ${timelineHtml(limit, moreScreen)}
+    `;
+  }
+
+  function bHome() {
+    return frame({ title: '今天', right: '豆豆 ▾', content: homeContent('b-timeline', 3), tabs: TABS_B, activeTab: 'today' });
+  }
+
+  function bTimeline() {
+    const content = `
+      <div class="section-title"><b>今日记录</b><span class="muted small">${state.events.length} 条 · 家长记录</span></div>
+      ${timelineHtml()}
+    `;
+    return frame({ title: '今日记录', back: true, content });
+  }
+
+  const SUB_TABS_DAILY = [
+    { id: 'today', label: '今天', screen: 'c-today' },
+    { id: 'stats', label: '统计', screen: 'c-stats' }
+  ];
+
+  function cToday() {
+    return frame({
+      title: '日常',
+      right: '豆豆 ▾',
+      content: homeContent('c-timeline', 2),
+      tabs: TABS_C,
+      activeTab: 'daily',
+      subTabs: SUB_TABS_DAILY,
+      activeSubTab: 'today'
+    });
+  }
+
+  function cTimeline() {
+    const content = `
+      <div class="section-title"><b>今日记录</b><span class="muted small">${state.events.length} 条 · 家长记录</span></div>
+      ${timelineHtml()}
+    `;
+    return frame({ title: '今日记录', back: true, content });
+  }
+
+  function dToday() {
+    return frame({
+      title: '今天',
+      right: '豆豆 ▾',
+      domainTabs: 'daily',
+      content: homeContent('d-timeline', 3, '豆豆'),
+      tabs: TABS_D_DAILY,
+      activeTab: 'today'
+    });
+  }
+
+  function dTrends() {
+    const content = `
+      <div class="section-title"><b>指标趋势</b><span class="muted small">近 3 次报告</span></div>
+      <div class="card">
+        <div class="item-row"><div class="item-name">血红蛋白 HGB<small>g/L · 参考 110–160</small></div><div class="item-value">118<span class="item-ref">→ 121 → 119</span></div></div>
+        <div class="item-row"><div class="item-name">白细胞 WBC<small>×10⁹/L · 参考 3.5–9.5</small></div><div class="item-value">6.2<span class="item-ref">→ 5.8 → 6.0</span></div></div>
+        <div class="item-row"><div class="item-name">血小板 PLT<small>×10⁹/L · 参考 125–350</small></div><div class="item-value">245<span class="item-ref">→ 250 → 238</span></div></div>
+      </div>
+      <div class="card soft">
+        <div class="small muted">趋势按同一指标名称 + 同一归一单位连接；单位不同不连接；低置信点用空心标记。这里只展示报告事实，不构成诊断。</div>
+      </div>
+    `;
+    return frame({
+      title: '趋势',
+      domainTabs: 'health',
+      content,
+      tabs: TABS_D_HEALTH,
+      activeTab: 'trends'
+    });
+  }
+
+  function welcomeScreen(scenario = 'C') {
+    const todayScreen = scenario === 'D' ? 'd-today' : 'c-today';
+    const archiveScreen = scenario === 'D' ? 'd-archive' : 'c-archive';
+    const content = `<div class="welcome">
+      <div class="welcome-icon">${icon('home', 28)}</div>
+      <h2>先从哪里开始？</h2>
+      <p>默认入口只影响打开 App 的第一屏；之后可以随时切换。健康档案和日常是并列的两个域。</p>
+      <button class="choice" data-action="nav" data-screen="${todayScreen}"><b>记录今天</b><small>喂养、尿布、睡眠、辅食</small></button>
+      <button class="choice" data-action="nav" data-screen="${archiveScreen}"><b>查看健康档案</b><small>检查报告、核对、趋势</small></button>
+      <div class="welcome-note">建议有 0–3 岁孩子的家庭默认进「日常」；也可以记住上次所在的域。健康档案有待核对报告时，入口会显示小圆点。</div>
+    </div>`;
+    return frame({ title: '欢迎', content });
+  }
+
+  const STAT_DATA = {
+    feeding: {
+      title: '每日喂养次数',
+      sub: '过去 7 天',
+      unit: '次',
+      values: [8, 7, 8, 6, 9, 8, 7],
+      labels: ['11/17', '11/18', '11/19', '11/20', '11/21', '11/22', '今天'],
+      max: 10,
+      kpis: [
+        { label: '7 天喂养', value: '53', unit: '次' },
+        { label: '总奶量', value: '4,320', unit: 'ml' },
+        { label: '日均喂养', value: '7.6', unit: '次' },
+        { label: '平均间隔', value: '2h48', unit: '' }
+      ]
+    },
+    sleep: {
+      title: '每日睡眠时长',
+      sub: '过去 7 天',
+      unit: '小时',
+      values: [12.4, 13.1, 12.8, 11.9, 13.4, 12.6, 12.2],
+      labels: ['11/17', '11/18', '11/19', '11/20', '11/21', '11/22', '今天'],
+      max: 14,
+      kpis: [
+        { label: '日均睡眠', value: '12.6', unit: '小时' },
+        { label: '夜间睡眠', value: '9.2', unit: '小时' },
+        { label: '白天小睡', value: '3.4', unit: '小时' },
+        { label: '最长连续', value: '6.5', unit: '小时' }
+      ]
+    },
+    diaper: {
+      title: '每日尿布次数',
+      sub: '过去 7 天',
+      unit: '次',
+      values: [8, 7, 9, 6, 8, 7, 8],
+      labels: ['11/17', '11/18', '11/19', '11/20', '11/21', '11/22', '今天'],
+      max: 10,
+      kpis: [
+        { label: '7 天尿布', value: '53', unit: '次' },
+        { label: '尿尿', value: '38', unit: '次' },
+        { label: '便便', value: '11', unit: '次' },
+        { label: '尿 + 便', value: '4', unit: '次' }
+      ]
+    }
+  };
+
+  const CHART_METRICS = {
+    feeding: {
+      label: '喂养',
+      unit: '次',
+      title: '每日喂养次数',
+      max: 10,
+      days: ['11/17', '11/18', '11/19', '11/20', '11/21', '11/22', '今天'],
+      total: [8, 7, 8, 6, 9, 8, 7],
+      kpis: [
+        { label: '7 天喂养', value: '53', unit: '次' },
+        { label: '日均', value: '7.6', unit: '次' },
+        { label: '平均间隔', value: '2h48', unit: '' }
+      ],
+      segments: [
+        { label: '母乳', color: '#2563eb', values: [3, 3, 4, 2, 4, 3, 3] },
+        { label: '奶粉', color: '#93c5fd', values: [5, 4, 4, 4, 5, 5, 4] }
+      ]
+    },
+    amount: {
+      label: '奶量',
+      unit: 'ml',
+      title: '每日奶量',
+      max: 800,
+      days: ['11/17', '11/18', '11/19', '11/20', '11/21', '11/22', '今天'],
+      total: [640, 560, 680, 480, 720, 660, 580],
+      kpis: [
+        { label: '7 天奶量', value: '4,320', unit: 'ml' },
+        { label: '日均', value: '617', unit: 'ml' },
+        { label: '单次平均', value: '82', unit: 'ml' }
+      ],
+      segments: [
+        { label: '母乳', color: '#2563eb', values: [180, 160, 200, 140, 220, 180, 160] },
+        { label: '奶粉', color: '#93c5fd', values: [460, 400, 480, 340, 500, 480, 420] }
+      ]
+    },
+    sleep: {
+      label: '睡眠',
+      unit: '小时',
+      title: '每日睡眠',
+      max: 14,
+      days: ['11/17', '11/18', '11/19', '11/20', '11/21', '11/22', '今天'],
+      total: [12.4, 13.1, 12.8, 11.9, 13.4, 12.6, 12.2],
+      kpis: [
+        { label: '日均睡眠', value: '12.6', unit: '小时' },
+        { label: '夜间', value: '9.2', unit: '小时' },
+        { label: '白天', value: '3.4', unit: '小时' }
+      ],
+      segments: [
+        { label: '夜间', color: '#1e3a8a', values: [9.0, 9.6, 9.4, 8.7, 9.8, 9.2, 8.9] },
+        { label: '白天', color: '#bfdbfe', values: [3.4, 3.5, 3.4, 3.2, 3.6, 3.4, 3.3] }
+      ]
+    },
+    diaper: {
+      label: '尿布',
+      unit: '次',
+      title: '每日尿布',
+      max: 10,
+      days: ['11/17', '11/18', '11/19', '11/20', '11/21', '11/22', '今天'],
+      total: [8, 7, 9, 6, 8, 7, 8],
+      kpis: [
+        { label: '7 天尿布', value: '53', unit: '次' },
+        { label: '尿', value: '33', unit: '次' },
+        { label: '便 / 混合', value: '20', unit: '次' }
+      ],
+      segments: [
+        { label: '尿', color: '#2563eb', values: [5, 4, 6, 4, 5, 4, 5] },
+        { label: '便', color: '#f59e0b', values: [2, 2, 2, 1, 2, 2, 2] },
+        { label: '尿+便', color: '#d1d5db', values: [1, 1, 1, 1, 1, 1, 1] }
+      ]
+    }
+  };
+
+  const CHART_COPY = {
+    bar: {
+      question: '每天多少？',
+      title: '柱状图：比较每天总量',
+      body: '适合看哪一天多、哪一天少；看不出一天由什么组成，也不擅长表达连续趋势。',
+      fit: '适合：每日总量对比',
+      not: '不适合：构成 / 趋势 / 分布'
+    },
+    stacked: {
+      question: '每天由什么组成？',
+      title: '堆叠柱：总量 + 构成',
+      body: '柱子的总高度还是每天总量，分段告诉你是由什么组成；段与段比较的是构成，不是趋势。',
+      fit: '适合：睡眠夜间/白天、尿布尿/便、母乳/奶粉',
+      not: '不适合：精确趋势 / 分布'
+    },
+    line: {
+      question: '往哪走？',
+      title: '折线图：看 7 天趋势',
+      body: '适合看整体往上、往下还是持平；单日高低不如柱状直观，也看不到构成。',
+      fit: '适合：30 天趋势 / 连续变化',
+      not: '不适合：单日构成 / 分布'
+    }
+  };
+
+  function cKpis(metric) {
+    return `<div class="c-kpis">${metric.kpis.map(k => `
+      <div class="c-kpi"><div class="c-kpi-label">${k.label}</div><div class="c-kpi-value">${k.value}<span class="c-kpi-unit">${k.unit}</span></div></div>`).join('')}</div>`;
+  }
+
+  function cBarChart(metric) {
+    const bars = metric.total.map((value, index) => {
+      const height = Math.max(6, Math.round((value / metric.max) * 100));
+      return `<div class="c-bar-col">
+        <div class="c-bar-val">${value}</div>
+        <div class="c-bar-wrap"><div class="c-bar ${index === metric.total.length - 1 ? 'today' : ''}" style="height:${height}%"></div></div>
+        <div class="c-bar-label">${index === metric.total.length - 1 ? '今天' : metric.days[index]}</div>
+      </div>`;
+    }).join('');
+    return `<div class="c-chart-card">
+      <div class="c-chart-head"><span class="c-chart-title">${metric.title}</span><span class="c-chart-sub">单位：${metric.unit}</span></div>
+      <div class="c-chart-body"><div class="c-baseline"></div><div class="c-bars">${bars}</div></div>
+    </div>`;
+  }
+
+  function cStackedChart(metric) {
+    const bars = metric.days.map((day, index) => {
+      const total = metric.total[index];
+      const stackHeight = Math.max(6, Math.round((total / metric.max) * 100));
+      const segments = metric.segments.map(seg => {
+        const share = total ? (seg.values[index] / total) * 100 : 0;
+        return `<div class="c-stack-seg" style="height:${share}%;background:${seg.color}" title="${seg.label} ${seg.values[index]}"></div>`;
+      }).join('');
+      return `<div class="c-bar-col">
+        <div class="c-bar-val">${total}</div>
+        <div class="c-bar-wrap"><div class="c-stack" style="height:${stackHeight}%">${segments}</div></div>
+        <div class="c-bar-label">${index === metric.days.length - 1 ? '今天' : day}</div>
+      </div>`;
+    }).join('');
+    const legend = metric.segments.map(seg => {
+      const sum = seg.values.reduce((a, b) => a + b, 0);
+      const display = metric.unit === '小时' ? sum.toFixed(1) : Math.round(sum);
+      return `<span class="c-legend-item"><i class="c-legend-dot" style="background:${seg.color}"></i>${seg.label} ${display}${metric.unit === '小时' ? ' h' : metric.unit === 'ml' ? ' ml' : ' 次'}</span>`;
+    }).join('');
+    return `<div class="c-chart-card">
+      <div class="c-chart-head"><span class="c-chart-title">${metric.title}构成</span><span class="c-chart-sub">单位：${metric.unit}</span></div>
+      <div class="c-chart-body" style="height:166px"><div class="c-baseline"></div><div class="c-bars">${bars}</div></div>
+      <div class="c-legend">${legend}</div>
+    </div>`;
+  }
+
+  function cLineChart(metric) {
+    const W = 320, H = 170, padL = 28, padR = 12, padT = 18, padB = 24;
+    const n = metric.total.length;
+    const x = (i) => padL + (i * (W - padL - padR)) / (n - 1);
+    const y = (v) => padT + (1 - v / metric.max) * (H - padT - padB);
+    const points = metric.total.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+    const area = `${padL},${H - padB} ${points} ${x(n - 1).toFixed(1)},${H - padB}`;
+    const grid = [0, 0.5, 1].map(t => {
+      const gy = padT + t * (H - padT - padB);
+      const label = Math.round(metric.max * (1 - t));
+      return `<line x1="${padL}" y1="${gy}" x2="${W - padR}" y2="${gy}" stroke="#f1f5f9" stroke-width="1" />
+        <text x="${padL - 5}" y="${gy + 3}" text-anchor="end" font-size="8" fill="#9ca3af">${label}</text>`;
+    }).join('');
+    const dots = metric.total.map((v, i) => {
+      const isLast = i === n - 1;
+      return `<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="${isLast ? 4 : 3}" fill="${isLast ? '#2563eb' : '#fff'}" stroke="#2563eb" stroke-width="1.5" />
+        <text x="${x(i).toFixed(1)}" y="${(y(v) - 7).toFixed(1)}" text-anchor="middle" font-size="8" fill="#6b7280">${v}</text>`;
+    }).join('');
+    const xLabels = metric.days.map((day, i) => `<text x="${x(i).toFixed(1)}" y="${H - 7}" text-anchor="middle" font-size="8" fill="#9ca3af">${i === n - 1 ? '今天' : day}</text>`).join('');
+    return `<div class="c-chart-card">
+      <div class="c-chart-head"><span class="c-chart-title">${metric.title}趋势</span><span class="c-chart-sub">单位：${metric.unit}</span></div>
+      <div class="c-chart-body">
+        <svg class="c-line-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+          <defs><linearGradient id="cLineFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#2563eb" stop-opacity=".12"/><stop offset="100%" stop-color="#2563eb" stop-opacity="0"/></linearGradient></defs>
+          ${grid}
+          <polygon points="${area}" fill="url(#cLineFill)" />
+          <polyline points="${points}" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          ${dots}
+          ${xLabels}
+        </svg>
+      </div>
+    </div>`;
+  }
+
+  function cChart(metric, type) {
+    if (type === 'stacked') return cStackedChart(metric);
+    if (type === 'line') return cLineChart(metric);
+    return cBarChart(metric);
+  }
+
+  function cChartCaption(type) {
+    const c = CHART_COPY[type];
+    return `<div class="c-caption">
+      <div class="c-caption-title">${c.title}</div>
+      <div class="c-caption-body">${c.body}</div>
+      <div class="c-caption-row"><span class="c-fit">${c.fit}</span><span class="c-not-fit">${c.not}</span></div>
+    </div>`;
+  }
+
+  function dStats() {
+    const metric = CHART_METRICS[state.chartMetric];
+    const type = state.chartType;
+    const content = `
+      <div class="c-metric-tabs">
+        ${Object.entries(CHART_METRICS).map(([key, m]) => `<button class="c-metric ${state.chartMetric === key ? 'active' : ''}" data-action="chart-metric" data-metric="${key}">${m.label}</button>`).join('')}
+      </div>
+      <div class="c-type-tabs">
+        <button class="c-type-tab ${type === 'bar' ? 'active' : ''}" data-action="chart-type" data-chart="bar">柱状</button>
+        <button class="c-type-tab ${type === 'stacked' ? 'active' : ''}" data-action="chart-type" data-chart="stacked">堆叠</button>
+        <button class="c-type-tab ${type === 'line' ? 'active' : ''}" data-action="chart-type" data-chart="line">折线</button>
+      </div>
+      <div class="c-question">当前问题：<b>${CHART_COPY[type].question}</b></div>
+      ${cKpis(metric)}
+      ${cChart(metric, type)}
+      ${cChartCaption(type)}
+      <div class="c-recommend"><b>建议顺序：</b>先保留柱状；需要构成时加堆叠；30 天趋势再用折线；直方图只用于间隔 / 单次奶量分布。</div>
+    `;
+    return frame({
+      title: '统计',
+      right: '豆豆 ▾',
+      domainTabs: 'daily',
+      content,
+      tabs: TABS_D_DAILY,
+      activeTab: 'stats'
+    });
+  }
+
+  function statsScreen(scenario) {
+    const data = STAT_DATA[state.statTab];
+    const bars = data.values.map((value, index) => {
+      const height = Math.max(8, Math.round((value / data.max) * 100));
+      const isToday = index === data.values.length - 1;
+      return `<div class="bar-col">
+        <div class="bar-val">${value}${data.unit === '小时' ? '' : ''}</div>
+        <div class="bar-wrap"><div class="bar ${isToday ? 'today' : ''}" style="height:${height}%"></div></div>
+        <div class="bar-label">${isToday ? '今天' : data.labels[index]}</div>
+      </div>`;
+    }).join('');
+    const kpis = data.kpis.map(k => `
+      <div class="kpi"><div class="kpi-label">${esc(k.label)}</div><div class="kpi-value">${esc(k.value)}<span class="kpi-unit">${esc(k.unit)}</span></div></div>`).join('');
+    const content = `
+      <div class="segmented" style="margin-bottom:12px">
+        <button class="seg ${state.statTab === 'feeding' ? 'active' : ''}" data-action="stat-tab" data-stat="feeding">喂养</button>
+        <button class="seg ${state.statTab === 'sleep' ? 'active' : ''}" data-action="stat-tab" data-stat="sleep">睡眠</button>
+        <button class="seg ${state.statTab === 'diaper' ? 'active' : ''}" data-action="stat-tab" data-stat="diaper">尿布</button>
+      </div>
+      <div class="kpi-grid">${kpis}</div>
+      <div class="chart-card">
+        <div class="chart-head"><span class="chart-title">${esc(data.title)}</span><span class="chart-sub">${esc(data.sub)}</span></div>
+        <div class="bars">${bars}</div>
+      </div>
+      ${scenario !== 'A' ? reminderCard() : ''}
+      <div class="card soft">
+        <div class="small muted">统计来自家长记录，仅用于回顾，不构成喂养或睡眠建议。记录保存在家庭局域网。</div>
+      </div>
+      ${scenario === 'A' ? `<div class="row-link" data-action="nav" data-screen="a-reminder"><div><div class="row-link-title">提醒设置</div><div class="row-link-meta">喂奶间隔 · 默认关闭</div></div><span class="chev">${icon('chevron', 17)}</span></div>` : ''}
+    `;
+    if (scenario === 'A') {
+      return frame({ title: '豆豆 · 护理统计', back: true, right: '7 天', rightMuted: true, content });
+    }
+    if (scenario === 'C') {
+      return frame({
+        title: '日常',
+        right: '豆豆 ▾',
+        content,
+        tabs: TABS_C,
+        activeTab: 'daily',
+        subTabs: SUB_TABS_DAILY,
+        activeSubTab: 'stats'
+      });
+    }
+    return frame({ title: '统计', right: '7 天', rightMuted: true, content, tabs: TABS_B, activeTab: 'stats' });
+  }
+
+  function reminderScreen(scenario) {
+    const r = state.reminder;
+    const last = lastFeed();
+    let nextLine = '开启后，从上次喂养开始计时。';
+    if (r.enabled && last) {
+      const nextMinutes = parseTime(last.time) + r.interval * 60;
+      const h = Math.floor(nextMinutes / 60) % 24;
+      const m = nextMinutes % 60;
+      nextLine = `上次 ${last.time} · 下次提醒 ${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    }
+    const content = `
+      <div class="card">
+        <div class="switch-row">
+          <div>
+            <div class="reminder-title" style="font-size:15px">喂奶间隔提醒</div>
+            <div class="muted small" style="margin-top:3px">${r.enabled ? '已开启' : '默认关闭'} · ${esc(nextLine)}</div>
+          </div>
+          <div class="switch ${r.enabled ? 'on' : ''}" data-action="toggle-reminder" role="switch" aria-checked="${r.enabled}"></div>
+        </div>
+        <div class="interval-row">
+          ${[2, 3, 4].map(hours => `<div class="interval ${r.interval === hours ? 'active' : ''}" data-action="set-interval" data-interval="${hours}">每 ${hours} 小时</div>`).join('')}
+        </div>
+      </div>
+      <div class="section-title"><b>通知预览</b><span class="muted small">本机</span></div>
+      ${r.enabled ? `<div class="notification">
+        <div class="app-icon">HD</div>
+        <div>
+          <div class="notification-title">豆豆 · 距上次喂养已 ${r.interval} 小时</div>
+          <div class="notification-body">打开记录一次，或稍后再说。提醒只陈述时间，不提供喂养建议。</div>
+        </div>
+      </div>` : `<div class="card soft"><div class="small muted">开启后，这里会显示一条本机通知预览。提醒只陈述时间，不提供喂养建议。</div></div>`}
+      <div class="card soft" style="margin-top:12px">
+        <div class="small muted">提醒只在当前设备生效；记录仍可在同一局域网的其他设备查看。没有账号、云同步或远程推送。</div>
+      </div>
+      <div class="section-title"><b>提醒类型</b></div>
+      <div class="row-link" data-action="toast" data-message="睡眠提醒（以后）">
+        <div><div class="row-link-title">睡眠提醒</div><div class="row-link-meta">暂未开放</div></div>
+        <span class="muted small">以后</span>
+      </div>
+      <div class="row-link" data-action="toast" data-message="尿布提醒（以后）">
+        <div><div class="row-link-title">尿布提醒</div><div class="row-link-meta">暂未开放</div></div>
+        <span class="muted small">以后</span>
+      </div>
+    `;
+    return frame({ title: '提醒', back: true, content });
+  }
+
+  function archiveScreen(scenario) {
+    const content = `
+      <div class="chips">
+        <span class="chip active">豆豆</span>
+        <span class="chip" data-action="toast" data-message="切换到妈妈（原型）">妈妈</span>
+      </div>
+      <div class="segmented" style="margin-bottom:12px">
+        <button class="seg active">按时间</button>
+        <button class="seg" data-action="toast" data-message="按项目（原型）">按项目</button>
+      </div>
+      <div class="card report-card" data-action="nav" data-screen="${scenario === 'A' ? 'a-report' : scenario === 'C' ? 'c-report' : scenario === 'D' ? 'd-report' : 'b-report'}">
+        <div class="report-head"><div><div class="report-title">血常规</div><div class="report-meta">2026-11-02 · 项目组 血常规</div></div><span class="status pending">待核对 2 项</span></div>
+        <div class="report-foot"><span class="tag">儿科门诊</span><span class="tag">已核对 2/4</span></div>
+      </div>
+      <div class="card report-card" data-action="nav" data-screen="${scenario === 'A' ? 'a-report' : scenario === 'C' ? 'c-report' : scenario === 'D' ? 'd-report' : 'b-report'}">
+        <div class="report-head"><div><div class="report-title">肝功能</div><div class="report-meta">2026-10-18 · 项目组 肝功</div></div><span class="status ok">已归档</span></div>
+        <div class="report-foot"><span class="tag">复查</span><span class="tag">已核对</span></div>
+      </div>
+      <div class="card report-card" data-action="nav" data-screen="${scenario === 'A' ? 'a-report' : scenario === 'C' ? 'c-report' : scenario === 'D' ? 'd-report' : 'b-report'}">
+        <div class="report-head"><div><div class="report-title">甲状腺功能五项（T3/T4/TSH）</div><div class="report-meta">2026-09-30 · 项目组 甲状腺</div></div><span class="status ok">已归档</span></div>
+        <div class="report-foot"><span class="tag">内分泌</span><span class="tag">已核对</span></div>
+      </div>
+      <div class="card report-card" data-action="toast" data-message="重新上传（原型）">
+        <div class="report-head"><div><div class="report-title">尿常规</div><div class="report-meta">2026-09-12 · 项目组 尿常规</div></div><span class="status fail">识别失败</span></div>
+        <div class="report-foot"><span class="tag">可重试</span><span class="tag">原图已保留</span></div>
+      </div>
+      <div class="card soft">
+        <div class="small muted">报告与护理记录分开保存：报告有核对与信任标记，护理记录标「家长记录」。两者共用成员与时间线展示。</div>
+      </div>
+    `;
+    if (scenario === 'A') {
+      return frame({ title: '档案', right: '筛选', rightMuted: true, content, tabs: TABS_A, activeTab: 'archive' });
+    }
+    if (scenario === 'C') {
+      return frame({ title: '健康档案', right: '筛选', rightMuted: true, content, tabs: TABS_C, activeTab: 'health' });
+    }
+    if (scenario === 'D') {
+      return frame({
+        title: '健康档案',
+        right: '筛选',
+        rightMuted: true,
+        domainTabs: 'health',
+        content,
+        tabs: TABS_D_HEALTH,
+        activeTab: 'reports'
+      });
+    }
+    return frame({ title: '档案', right: '筛选', rightMuted: true, content, tabs: TABS_B, activeTab: 'archive' });
+  }
+
+  function reportScreen(scenario) {
+    const content = `
+      <div class="card accent">
+        <div class="report-head"><div><div class="report-title">血常规</div><div class="report-meta">2026-11-02 · 儿科门诊</div></div><span class="status pending">待核对 2 项</span></div>
+        <div class="report-foot"><span class="tag">项目组 血常规</span><span class="tag">已核对 2/4</span></div>
+        <button class="btn-secondary" style="margin-top:12px" data-action="toast" data-message="去核对（原型）">去核对</button>
+      </div>
+      <div class="section-title"><b>指标项</b><span class="muted small">参考范围以单据为准</span></div>
+      <div class="card">
+        <div class="item-row"><div class="item-name">白细胞 WBC<small>×10⁹/L</small></div><div class="item-value">6.2<span class="item-ref">3.5–9.5</span></div></div>
+        <div class="item-row"><div class="item-name">红细胞 RBC<small>×10¹²/L</small></div><div class="item-value">4.58<span class="item-ref">4.0–5.5</span></div></div>
+        <div class="item-row"><div class="item-name">血红蛋白 HGB<small>g/L</small></div><div class="item-value">118<span class="item-ref">110–160</span></div></div>
+        <div class="item-row"><div class="item-name">血小板 PLT<small>×10⁹/L</small></div><div class="item-value">245<span class="item-ref">125–350</span></div></div>
+        <div class="item-row"><div class="item-name">淋巴细胞百分比<small>待核对 · 低置信</small></div><div class="item-value flag-high">52%<span class="item-ref">20–50</span></div></div>
+      </div>
+      <div class="card soft">
+        <div class="small muted">本页只展示报告事实，不构成诊断。已核对项与低置信项分开呈现；低置信数据不隐藏。</div>
+      </div>
+      <div class="row-link" data-action="toast" data-message="查看解读（原型）">
+        <div><div class="row-link-title">查看解读</div><div class="row-link-meta">基于已核对指标与历史趋势</div></div>
+        <span class="chev">${icon('chevron', 17)}</span>
+      </div>
+    `;
+    return frame({ title: '血常规', back: true, right: '更多', rightMuted: true, content });
+  }
+
+  function defaultDraft(type) {
+    if (type === 'feed') return { method: 'formula', amount: '', durationMin: '', time: NOW, note: '' };
+    if (type === 'diaper') return { diaperType: '尿尿', time: NOW, note: '' };
+    if (type === 'sleep') return { durationMin: '', time: NOW, note: '午睡' };
+    if (type === 'solid') return { food: '', amount: '', time: NOW, note: '' };
+    return { time: NOW, note: '' };
+  }
+
+  function sheetHtml() {
+    if (!state.sheet) return '';
+    const { type, id } = state.sheet;
+    const d = state.draft || defaultDraft(type);
+    const editing = Boolean(id);
+    const titles = { feed: '记录喂奶', diaper: '记录尿布', sleep: '记录睡觉', solid: '记录辅食' };
+    let fields = '';
+    if (type === 'feed') {
+      fields = `
+        <div class="segmented">
+          <button class="seg ${d.method === 'breast' ? 'active' : ''}" data-action="method" data-method="breast">母乳</button>
+          <button class="seg ${d.method === 'formula' ? 'active' : ''}" data-action="method" data-method="formula">奶粉</button>
+        </div>
+        <div class="field"><div class="field-label">时间</div><input class="input" id="draft-time" type="text" inputmode="numeric" placeholder="HH:MM" maxlength="5" value="${esc(d.time)}"></div>
+        ${d.method === 'breast'
+          ? `<div class="field"><div class="field-label">时长（可选）</div><div class="input-row"><input class="input" id="draft-duration" type="number" inputmode="numeric" placeholder="例如 18" value="${esc(d.durationMin || '')}"><span class="input-unit">分钟</span></div></div>`
+          : `<div class="field"><div class="field-label">奶量（可选）</div><div class="input-row"><input class="input" id="draft-amount" type="number" inputmode="numeric" placeholder="例如 120" value="${esc(d.amount || '')}"><span class="input-unit">ml</span></div></div>`}
+        <div class="field"><div class="field-label">备注（可选）</div><input class="input" id="draft-note" type="text" placeholder="例如 左侧、剩余 20 ml" value="${esc(d.note || '')}"></div>
+      `;
+    } else if (type === 'diaper') {
+      fields = `
+        <div class="segmented">
+          ${['尿尿', '便便', '尿 + 便'].map(value => `<button class="seg ${d.diaperType === value ? 'active' : ''}" data-action="diaper-type" data-value="${value}">${value}</button>`).join('')}
+        </div>
+        <div class="field"><div class="field-label">时间</div><input class="input" id="draft-time" type="text" inputmode="numeric" placeholder="HH:MM" maxlength="5" value="${esc(d.time)}"></div>
+        <div class="field"><div class="field-label">备注（可选）</div><input class="input" id="draft-note" type="text" placeholder="例如 量、性状" value="${esc(d.note || '')}"></div>
+      `;
+    } else if (type === 'sleep') {
+      fields = `
+        <div class="field"><div class="field-label">开始时间</div><input class="input" id="draft-time" type="text" inputmode="numeric" placeholder="HH:MM" maxlength="5" value="${esc(d.time)}"></div>
+        <div class="field"><div class="field-label">时长（可选）</div><div class="input-row"><input class="input" id="draft-duration" type="number" inputmode="numeric" placeholder="例如 45" value="${esc(d.durationMin || '')}"><span class="input-unit">分钟</span></div></div>
+        <div class="field"><div class="field-label">备注（可选）</div><input class="input" id="draft-note" type="text" placeholder="例如 午睡、夜醒" value="${esc(d.note || '')}"></div>
+      `;
+    } else if (type === 'solid') {
+      fields = `
+        <div class="field"><div class="field-label">食物</div><input class="input" id="draft-food" type="text" placeholder="例如 米粉、南瓜泥" value="${esc(d.food || '')}"></div>
+        <div class="field"><div class="field-label">数量（可选）</div><div class="input-row"><input class="input" id="draft-amount" type="number" inputmode="numeric" placeholder="例如 40" value="${esc(d.amount || '')}"><span class="input-unit">g</span></div></div>
+        <div class="field"><div class="field-label">时间</div><input class="input" id="draft-time" type="text" inputmode="numeric" placeholder="HH:MM" maxlength="5" value="${esc(d.time)}"></div>
+        <div class="field"><div class="field-label">备注（可选）</div><input class="input" id="draft-note" type="text" placeholder="例如 第一次尝试" value="${esc(d.note || '')}"></div>
+      `;
+    }
+    return `<div class="sheet-backdrop" data-action="close-sheet">
+      <div class="sheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-title">${editing ? '修改记录' : titles[type]}<span class="tag">家长记录</span></div>
+        <div class="sheet-child">记录给 <b>豆豆</b> <span class="tag">当前孩子</span></div>
+        ${fields}
+        <div class="sheet-note">只记录事实，不提供喂养建议；记录保存在家庭局域网。</div>
+        <div class="sheet-actions">
+          <button class="btn-primary" data-action="save-sheet">${editing ? '保存修改' : '保存记录'}</button>
+          ${editing ? '<button class="ghost-danger" data-action="delete-event">删除这条记录</button>' : ''}
+        </div>
+      </div>
+    </div>`;
+  }
+
+  function renderChrome() {
+    document.querySelectorAll('.scenario-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.scenario === state.scenario);
+    });
+    document.querySelectorAll('.floating [data-scenario]').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.scenario === state.scenario);
+    });
+    const list = SCREENS[state.scenario];
+    const current = list.find(s => s.id === state.screen) || list[0];
+    const nav = document.getElementById('screen-nav');
+    nav.innerHTML = list.map(s => `<button class="screen-pill ${s.id === state.screen ? 'active' : ''}" data-action="nav" data-screen="${s.id}">${esc(s.label)}</button>`).join('') +
+      `<div class="prototype-tools"><button class="tool-btn ${state.empty ? 'active' : ''}" data-action="toggle-empty">空态</button><button class="tool-btn" data-action="reset">重置</button></div>`;
+    document.getElementById('floating-label').textContent = `${state.scenario} · ${current ? current.label : ''}`;
+    const copy = document.getElementById('decision-copy');
+    if (state.scenario === 'A') {
+      copy.innerHTML = '方案 A：<b>报告档案仍是首页</b>；护理记录从成员卡进入，统计 / 提醒是次级页面。数据为合成样例；不含账号 / 云同步。';
+    } else if (state.scenario === 'B') {
+      copy.innerHTML = '方案 B1：<b>今天页成为首页</b>；今天 / 统计 / 档案三个 tab 平铺。数据为合成样例；不含账号 / 云同步。';
+    } else if (state.scenario === 'C') {
+      copy.innerHTML = '方案 B2：<b>日常 / 健康档案两个一级域并列</b>；日常内部再分今天 / 统计；默认进日常 > 今天。数据为合成样例；不含账号 / 云同步。';
+    } else {
+      copy.innerHTML = '方案 B3：<b>域在上、视图在下</b>；顶部切日常 / 健康档案，底部只显示当前域的今天 / 统计（或报告 / 趋势）；进入日常后底部不再出现健康档案。数据为合成样例；不含账号 / 云同步。';
+    }
+  }
+
+  function render() {
+    let html = '';
+    if (state.screen === 'a-home') html = familyHome();
+    else if (state.screen === 'a-today') html = aToday();
+    else if (state.screen === 'a-stats') html = statsScreen('A');
+    else if (state.screen === 'a-reminder') html = reminderScreen('A');
+    else if (state.screen === 'a-archive') html = archiveScreen('A');
+    else if (state.screen === 'a-report') html = reportScreen('A');
+    else if (state.screen === 'b-home') html = bHome();
+    else if (state.screen === 'b-timeline') html = bTimeline();
+    else if (state.screen === 'b-stats') html = statsScreen('B');
+    else if (state.screen === 'b-reminder') html = reminderScreen('B');
+    else if (state.screen === 'b-archive') html = archiveScreen('B');
+    else if (state.screen === 'b-report') html = reportScreen('B');
+    else if (state.screen === 'c-welcome') html = welcomeScreen();
+    else if (state.screen === 'c-today') html = cToday();
+    else if (state.screen === 'c-timeline') html = cTimeline();
+    else if (state.screen === 'c-stats') html = statsScreen('C');
+    else if (state.screen === 'c-reminder') html = reminderScreen('C');
+    else if (state.screen === 'c-archive') html = archiveScreen('C');
+    else if (state.screen === 'c-report') html = reportScreen('C');
+    else if (state.screen === 'd-welcome') html = welcomeScreen('D');
+    else if (state.screen === 'd-today') html = dToday();
+    else if (state.screen === 'd-timeline') html = cTimeline();
+    else if (state.screen === 'd-stats') html = dStats();
+    else if (state.screen === 'd-reminder') html = reminderScreen('D');
+    else if (state.screen === 'd-archive') html = archiveScreen('D');
+    else if (state.screen === 'd-trends') html = dTrends();
+    else if (state.screen === 'd-report') html = reportScreen('D');
+    else html = familyHome();
+    screenEl.innerHTML = html;
+    renderChrome();
+  }
+
+  function navigate(screen) {
+    if (!screen) return;
+    state.screen = screen;
+    state.sheet = null;
+    state.draft = null;
+    render();
+    const params = new URLSearchParams(window.location.search);
+    params.set('scenario', state.scenario);
+    params.set('screen', state.screen);
+    if (state.clean) params.set('clean', '1');
+    history.replaceState(null, '', `?${params.toString()}`);
+  }
+
+  function openSheet(type, id = null) {
+    const editing = id ? state.events.find(e => e.id === id) : null;
+    state.sheet = { type, id: id || null };
+    state.draft = editing ? { ...editing } : defaultDraft(type);
+    render();
+  }
+
+  function closeSheet() {
+    state.sheet = null;
+    state.draft = null;
+    render();
+  }
+
+  function saveSheet() {
+    if (!state.sheet) return;
+    const { type, id } = state.sheet;
+    const get = (key) => document.getElementById(key)?.value ?? '';
+    const time = get('draft-time') || NOW;
+    const note = get('draft-note');
+    const amountRaw = get('draft-amount');
+    const durationRaw = get('draft-duration');
+    const food = get('draft-food');
+    if (type === 'solid' && !food.trim()) {
+      showToast('请填写食物名称');
+      return;
+    }
+    const next = { id: id || Date.now(), type, time, note };
+    if (type === 'feed') {
+      next.method = state.draft.method;
+      next.amount = next.method === 'formula' && amountRaw ? Number(amountRaw) : null;
+      next.durationMin = next.method === 'breast' && durationRaw ? Number(durationRaw) : null;
+    } else if (type === 'diaper') {
+      next.diaperType = state.draft.diaperType;
+    } else if (type === 'sleep') {
+      next.durationMin = durationRaw ? Number(durationRaw) : null;
+      next.note = note || '睡觉';
+    } else if (type === 'solid') {
+      next.food = food.trim();
+      next.amount = amountRaw ? Number(amountRaw) : null;
+    }
+    if (id) {
+      state.events = state.events.map(e => e.id === id ? next : e);
+    } else {
+      state.events = [...state.events, next];
+    }
+    state.empty = false;
+    state.sheet = null;
+    state.draft = null;
+    render();
+    showToast(id ? '已更新 · 家长记录' : '已记录 · 家长记录');
+  }
+
+  function deleteEvent() {
+    if (!state.sheet || !state.sheet.id) return;
+    state.events = state.events.filter(e => e.id !== state.sheet.id);
+    state.sheet = null;
+    state.draft = null;
+    render();
+    showToast('已删除 · 家长记录');
+  }
+
+  function showToast(message) {
+    toastEl.textContent = message;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), 1800);
+  }
+
+  function toggleEmpty() {
+    state.empty = !state.empty;
+    if (state.empty) state.events = [];
+    else state.events = DEFAULT_EVENTS.map(e => ({ ...e }));
+    render();
+    showToast(state.empty ? '已切到空态' : '已恢复样例记录');
+  }
+
+  function resetAll() {
+    state.events = DEFAULT_EVENTS.map(e => ({ ...e }));
+    state.reminder = { enabled: false, interval: 3 };
+    state.empty = false;
+    state.sheet = null;
+    state.draft = null;
+    state.statTab = 'feeding';
+    render();
+    showToast('已重置样例数据');
+  }
+
+  function setScenario(scenario) {
+    state.scenario = scenario;
+    state.screen = scenario === 'A' ? 'a-home' : scenario === 'B' ? 'b-home' : scenario === 'C' ? 'c-today' : 'd-today';
+    state.sheet = null;
+    state.draft = null;
+    render();
+    const params = new URLSearchParams(window.location.search);
+    params.set('scenario', state.scenario);
+    params.set('screen', state.screen);
+    if (state.clean) params.set('clean', '1');
+    history.replaceState(null, '', `?${params.toString()}`);
+  }
+
+  function stepScreen(direction) {
+    const list = SCREENS[state.scenario];
+    const index = Math.max(0, list.findIndex(s => s.id === state.screen));
+    const next = (index + direction + list.length) % list.length;
+    navigate(list[next].id);
+  }
+
+  screenEl.addEventListener('click', (event) => {
+    const target = event.target.closest('[data-action]');
+    if (!target) return;
+    const action = target.dataset.action;
+    if (action === 'close-sheet' && event.target.closest('.sheet')) return;
+    if (action === 'nav') navigate(target.dataset.screen);
+    else if (action === 'back') navigate(BACK[state.screen] || 'a-home');
+    else if (action === 'log') openSheet(target.dataset.type);
+    else if (action === 'open-event') {
+      const id = Number(target.dataset.id);
+      const record = state.events.find(e => e.id === id);
+      if (record) openSheet(record.type, id);
+    } else if (action === 'close-sheet') closeSheet();
+    else if (action === 'save-sheet') saveSheet();
+    else if (action === 'delete-event') deleteEvent();
+    else if (action === 'method') {
+      state.draft.method = target.dataset.method;
+      render();
+    } else if (action === 'diaper-type') {
+      state.draft.diaperType = target.dataset.value;
+      render();
+    } else if (action === 'toggle-reminder') {
+      state.reminder.enabled = !state.reminder.enabled;
+      render();
+      showToast(state.reminder.enabled ? '提醒已开启（原型）' : '提醒已关闭');
+    } else if (action === 'set-interval') {
+      state.reminder.interval = Number(target.dataset.interval);
+      if (!state.reminder.enabled) state.reminder.enabled = true;
+      render();
+    } else if (action === 'stat-tab') {
+      state.statTab = target.dataset.stat;
+      render();
+    } else if (action === 'chart-metric') {
+      state.chartMetric = target.dataset.metric;
+      render();
+    } else if (action === 'chart-type') {
+      state.chartType = target.dataset.chart;
+      render();
+    } else if (action === 'toggle-empty') toggleEmpty();
+    else if (action === 'reset') resetAll();
+    else if (action === 'toast') showToast(target.dataset.message || '原型入口');
+  });
+
+  screenEl.addEventListener('input', (event) => {
+    if (!state.draft) return;
+    const id = event.target.id;
+    if (id === 'draft-time') state.draft.time = event.target.value;
+    if (id === 'draft-note') state.draft.note = event.target.value;
+    if (id === 'draft-amount') state.draft.amount = event.target.value;
+    if (id === 'draft-duration') state.draft.durationMin = event.target.value;
+    if (id === 'draft-food') state.draft.food = event.target.value;
+  });
+
+  document.querySelectorAll('.scenario-btn, .floating [data-scenario]').forEach(btn => {
+    btn.addEventListener('click', () => setScenario(btn.dataset.scenario));
+  });
+
+  document.getElementById('screen-nav').addEventListener('click', (event) => {
+    const target = event.target.closest('[data-action]');
+    if (!target) return;
+    if (target.dataset.action === 'nav') navigate(target.dataset.screen);
+    else if (target.dataset.action === 'toggle-empty') toggleEmpty();
+    else if (target.dataset.action === 'reset') resetAll();
+  });
+
+  document.getElementById('floating').addEventListener('click', (event) => {
+    const target = event.target.closest('[data-action]');
+    if (!target) return;
+    if (target.dataset.action === 'prev-screen') stepScreen(-1);
+    if (target.dataset.action === 'next-screen') stepScreen(1);
+  });
+
+  document.addEventListener('keydown', (event) => {
+    const tag = (event.target.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || event.target.isContentEditable) return;
+    if (event.key === 'ArrowLeft') stepScreen(-1);
+    if (event.key === 'ArrowRight') stepScreen(1);
+  });
+
+  function initFromQuery() {
+    const params = new URLSearchParams(window.location.search);
+    state.clean = params.get('clean') === '1';
+    const requestedScenario = params.get('scenario');
+    state.scenario = requestedScenario === 'B' ? 'B' : requestedScenario === 'C' ? 'C' : requestedScenario === 'D' ? 'D' : 'A';
+    const requested = params.get('screen');
+    const valid = SCREENS[state.scenario].some(s => s.id === requested);
+    state.screen = valid ? requested : (state.scenario === 'A' ? 'a-home' : state.scenario === 'B' ? 'b-home' : state.scenario === 'C' ? 'c-today' : 'd-today');
+    if (params.get('empty') === '1') {
+      state.empty = true;
+      state.events = [];
+    }
+    if (params.get('reminder') === 'on') state.reminder.enabled = true;
+    const stat = params.get('stat');
+    if (stat && STAT_DATA[stat]) state.statTab = stat;
+    const chartMetric = params.get('chart_metric');
+    if (chartMetric && CHART_METRICS[chartMetric]) state.chartMetric = chartMetric;
+    const chartType = params.get('chart_type');
+    if (['bar', 'stacked', 'line'].includes(chartType)) state.chartType = chartType;
+    if (state.clean) {
+      document.body.classList.add('clean');
+      deviceEl.classList.add('clean');
+    }
+    render();
+    const sheet = params.get('sheet');
+    if (sheet && ['feed', 'diaper', 'sleep', 'solid'].includes(sheet)) {
+      setTimeout(() => openSheet(sheet), 40);
+    }
+  }
+
+  initFromQuery();
+</script>
+</body>
+</html>

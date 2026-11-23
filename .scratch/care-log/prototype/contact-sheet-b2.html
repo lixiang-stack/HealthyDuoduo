@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=1282, initial-scale=1" />
+<title>HealthyDuoduo · B2 双域导航 contact sheet</title>
+<style>
+  :root {
+    --text: #111827; --muted: #6b7280; --accent: #2563eb; --line: #d1d5db;
+    --soft: #f3f4f6;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--soft); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .sheet { width: 1282px; margin: 0 auto; padding: 34px 32px 46px; }
+  .kicker { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  h1 { margin: 7px 0 8px; font-size: 30px; line-height: 1.2; letter-spacing: -.5px; }
+  .intro { max-width: 980px; margin: 0; color: var(--muted); font-size: 13px; line-height: 21px; }
+  .intro b { color: var(--text); }
+  .legend { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .pill { border-radius: 999px; padding: 5px 12px; font-size: 12px; font-weight: 650; background: #eff6ff; color: var(--accent); border: 1px solid #bfdbfe; }
+  .pill.gray { background: #fff; color: var(--muted); border-color: var(--line); font-weight: 500; }
+  .grid {
+    margin-top: 24px; display: grid; grid-template-columns: repeat(3, 380px);
+    gap: 26px 24px; justify-content: center;
+  }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 10px; }
+  .card img { width: 360px; display: block; border-radius: 8px; border: 1px solid #e5e7eb; }
+  .caption { padding: 10px 2px 2px; }
+  .caption .scene { font-size: 14px; font-weight: 700; }
+  .caption p { margin: 5px 0 0; font-size: 11px; line-height: 17px; color: var(--muted); }
+  .decision { margin-top: 30px; background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; }
+  .decision h2 { margin: 0 0 12px; font-size: 15px; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; }
+  .col h3 { margin: 0 0 5px; font-size: 13px; }
+  .col p { margin: 0; font-size: 11px; line-height: 18px; color: var(--muted); }
+  .footer { margin-top: 16px; color: var(--muted); font-size: 11px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .footer .dot { width: 4px; height: 4px; background: #9ca3af; border-radius: 50%; display: inline-block; }
+</style>
+</head>
+<body>
+  <main class="sheet">
+    <div class="kicker">HealthyDuoduo · B2 navigation prototype · 2026-11-23</div>
+    <h1>B2 · 双域导航：日常 / 健康档案</h1>
+    <p class="intro">
+      一级只放两个并列域：<b>日常</b> 与 <b>健康档案</b>。日常内部再分 <b>今天 / 统计</b>；
+      默认进「日常 > 今天」，健康档案一触可达。首屏不再需要把「今天 / 统计 / 档案」三个视图平铺。
+    </p>
+    <div class="legend">
+      <span class="pill">默认：日常 &gt; 今天</span>
+      <span class="pill gray">一级域：日常 / 健康档案</span>
+      <span class="pill gray">二级视图：今天 / 统计</span>
+      <span class="pill gray">记录是动作，不是 tab</span>
+    </div>
+
+    <section class="grid">
+      <article class="card">
+        <img src="shots/17-c-welcome.png" alt="B2 首次启动" />
+        <div class="caption"><div class="scene">首次启动 · 选默认入口</div><p>首次打开可以让家长选「记录今天 / 查看健康档案」；之后记住上次所在的域，不强制永远落在今天。</p></div>
+      </article>
+      <article class="card">
+        <img src="shots/18-c-today.png" alt="B2 日常今天" />
+        <div class="caption"><div class="scene">日常 · 今天（默认首页）</div><p>一级 tab 是「日常 / 健康档案」；日常内部用「今天 / 统计」二级切换。记录动作留在今天页。</p></div>
+      </article>
+      <article class="card">
+        <img src="shots/19-c-stats.png" alt="B2 日常统计" />
+        <div class="caption"><div class="scene">日常 · 统计</div><p>统计是日常内部的二级视图，不再和健康档案抢一级位置；喂养 / 睡眠 / 尿布切换。</p></div>
+      </article>
+
+      <article class="card">
+        <img src="shots/21-c-archive.png" alt="B2 健康档案" />
+        <div class="caption"><div class="scene">健康档案</div><p>报告、核对、识别失败重试是另一个一级域；底部 tab 有待核对小圆点，报告不会被日常记录淹没。</p></div>
+      </article>
+      <article class="card">
+        <img src="shots/22-c-report.png" alt="B2 报告详情" />
+        <div class="caption"><div class="scene">报告详情</div><p>从健康档案进入报告详情；报告与护理记录分开保存，来源与核对状态仍然可见。</p></div>
+      </article>
+      <article class="card">
+        <img src="shots/20-c-reminder.png" alt="B2 提醒" />
+        <div class="caption"><div class="scene">提醒</div><p>提醒从日常首页卡片进入；只在本机、可选、默认关闭，不承诺准时。</p></div>
+      </article>
+    </section>
+
+    <section class="decision">
+      <h2>这样是否解决了你的疑问？</h2>
+      <div class="cols">
+        <div class="col">
+          <h3>默认打开今天？</h3>
+          <p>可以，但不必写死。首次启动让用户选默认入口；之后记住上次所在的域。高频记录家庭落日常，报告驱动家庭落健康档案。</p>
+        </div>
+        <div class="col">
+          <h3>加一层导航？</h3>
+          <p>可行，而且比 B1 的平铺三 tab 更干净：一级域两个，二级视图两个；最多两层。记录不是 tab，是今天页上的动作。</p>
+        </div>
+        <div class="col">
+          <h3>为什么叫「日常」？</h3>
+          <p>因为后面还会有尿布、睡眠、辅食；「喂养」只是日常里的一个动作。一级域名要能容纳整个护理域，否则很快就要改名。</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="footer">
+      <span>所有截图来自 prototype.html 实际渲染</span><span class="dot"></span>
+      <span>390 × 844 CSS px / 2× 截图</span><span class="dot"></span>
+      <span>可点击版本：prototype.html → 顶部选 B2</span>
+    </div>
+  </main>
+</body>
+</html>
