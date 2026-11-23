@@ -16,7 +16,7 @@
 - [ ] 统计：4 指标 × 3 图表、空态、单点、孩子切换；无报告数据混入。
 - [ ] 契约检查：不出现 `recorded_by` / `device_id` / 全局 active child；护理事件不写入 `reports` / `report_items` / 趋势 / 分析快照。
 - [ ] 若 01 引入数据库迁移：跑 `bash scripts/test-db.sh`；若仅客户端契约，记录不适用。
-- [ ] `python3 scripts/check-docs.py` 全绿；`CONTEXT.md` 已补「日常 / 健康档案 / 当前孩子」。
+- [ ] `python3 scripts/check-docs.py` 全绿；`CONTEXT.md` 已补「育儿 / 健康档案 / 当前孩子」。
 - [ ] `docs/adr/0019-care-log-navigation-child-context.md` 与 `../spec.md` 的实现状态 / 差异已更新。
 - [ ] 无账号 / 邀请 / 云同步 / 远程推送新增；ADR-0006 边界未被突破。
 

@@ -4,6 +4,13 @@ import { colors } from '../components/theme';
 import { DomainTabs } from './DomainTabs';
 
 describe('DomainTabs', () => {
+  it('labels the two domains as 育儿 and 健康档案', async () => {
+    await render(<DomainTabs activeDomain="daily" hasPending={false} onSelect={jest.fn()} />);
+
+    expect(screen.getByTestId('domain-tab-daily-label')).toHaveTextContent('育儿');
+    expect(screen.getByTestId('domain-tab-health-label')).toHaveTextContent('健康档案');
+  });
+
   it('marks the active domain with bold text and a 2px underline', async () => {
     await render(<DomainTabs activeDomain="daily" hasPending onSelect={jest.fn()} />);
 
