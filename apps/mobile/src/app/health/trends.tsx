@@ -9,32 +9,33 @@ import {
   View,
 } from "react-native";
 
-import type { PanelItem, ReportSummary } from "../api/reports";
-import { AnalysisConsentModal } from "../analysis/ConsentModal";
-import { TimeRangeModal } from "../analysis/TimeRangeModal";
-import { useStartAnalysis } from "../analysis/useStartAnalysis";
-import { sharedStyles } from "../components/styles";
-import { colors } from "../components/theme";
-import { MemberChips } from "../members/components";
-import { useCurrentMember } from "../members/CurrentMemberContext";
-import { FLAG_COLORS } from "../reports/colors";
+import type { PanelItem, ReportSummary } from "../../api/reports";
+import { AnalysisConsentModal } from "../../analysis/ConsentModal";
+import { TimeRangeModal } from "../../analysis/TimeRangeModal";
+import { useStartAnalysis } from "../../analysis/useStartAnalysis";
+import { sharedStyles } from "../../components/styles";
+import { colors } from "../../components/theme";
+import { MemberChips } from "../../members/components";
+import { useCurrentMember } from "../../members/CurrentMemberContext";
+import { FLAG_COLORS } from "../../reports/colors";
 import {
   panelTrendOf,
   type AbnormalPanelGroup,
   type PanelTrend,
-} from "../reports/panelOverview";
-import { panelLabel, type PanelCode } from "../reports/panels";
-import { flagLabel, panelDateLabel, refRangeLabel } from "../reports/status";
-import { TrendDetailSheet } from "../reports/TrendDetailSheet";
-import { TrendSparkline } from "../reports/TrendChart";
+} from "../../reports/panelOverview";
+import { panelLabel, type PanelCode } from "../../reports/panels";
+import { healthReportsHref } from "../../reports/routes";
+import { flagLabel, panelDateLabel, refRangeLabel } from "../../reports/status";
+import { TrendDetailSheet } from "../../reports/TrendDetailSheet";
+import { TrendSparkline } from "../../reports/TrendChart";
 import {
   displayTrendUnit,
   formatSeriesMeta,
   TREND_UNAVAILABLE_LABEL,
-} from "../reports/trends";
-import { useAbnormalPanelGroups } from "../reports/useAbnormalPanelGroups";
-import { useMemberPanels } from "../reports/useMemberPanels";
-import { useMemberReports } from "../reports/useMemberReports";
+} from "../../reports/trends";
+import { useAbnormalPanelGroups } from "../../reports/useAbnormalPanelGroups";
+import { useMemberPanels } from "../../reports/useMemberPanels";
+import { useMemberReports } from "../../reports/useMemberReports";
 
 type SelectedTrend = PanelTrend & { panel: PanelCode };
 
@@ -287,7 +288,7 @@ function AbnormalPanelsBody({
       {groups !== undefined && groups.length === 0 ? (
         <View testID="trend-empty-abnormal" style={styles.stack}>
           <Text style={sharedStyles.muted}>这位成员暂时没有异常指标。</Text>
-          <Link href="/timeline" style={styles.link}>
+          <Link href={healthReportsHref({ view: "time" })} style={styles.link}>
             查看全部档案
           </Link>
         </View>

@@ -5,6 +5,7 @@ import { sharedStyles } from '../../components/styles';
 import { colors } from '../../components/theme';
 import { useImageViewer } from '../../components/imageViewer/ImageViewerProvider';
 import { ReportCard } from '../../reports/components';
+import { healthReportsHref } from '../../reports/routes';
 import { useReportData } from '../../reports/useReportData';
 import { ReviewItemCard } from '../../review/components';
 import { pendingItems } from '../../review/items';
@@ -102,7 +103,7 @@ export default function ReviewScreen() {
               </Link>
             </View>
           )}
-          <Link asChild href="/timeline">
+          <Link asChild href={healthReportsHref({ view: 'time' })}>
             <Pressable testID="review-open-timeline">
               <Text style={styles.link}>去档案查看</Text>
             </Pressable>

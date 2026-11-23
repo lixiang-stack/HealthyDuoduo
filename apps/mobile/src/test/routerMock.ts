@@ -12,6 +12,9 @@ export const mockRouter = {
 
 export const mockUseLocalSearchParams = jest.fn<Record<string, string>, []>(() => ({}));
 
+/** Mutable current pathname for tests that render navigation-aware containers. */
+export const mockPathname = { current: '/' };
+
 function Link({ asChild, children, ...props }: { asChild?: boolean; children: React.ReactNode }) {
   if (asChild) {
     return React.createElement(React.Fragment, null, children);
@@ -19,8 +22,21 @@ function Link({ asChild, children, ...props }: { asChild?: boolean; children: Re
   return React.createElement(Text, props, children);
 }
 
+/** Renders the target path as text so entry-route tests can assert where it goes. */
+function Redirect({ href }: { href: string | { pathname: string } }) {
+  return React.createElement(
+    Text,
+    { testID: 'redirect' },
+    typeof href === 'string' ? href : href.pathname,
+  );
+}
+
 function useFocusEffect(effect: React.EffectCallback) {
   React.useEffect(effect, [effect]);
+}
+
+function usePathname() {
+  return mockPathname.current;
 }
 
 /** Screen-level tests render a route component directly; the navigator's
@@ -32,7 +48,9 @@ function Screen() {
 export const routerModule = {
   router: mockRouter,
   Link,
+  Redirect,
   useLocalSearchParams: mockUseLocalSearchParams,
   useFocusEffect,
+  usePathname,
   Stack: { Screen },
 };
