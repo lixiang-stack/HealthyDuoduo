@@ -2,6 +2,7 @@
 
 **状态**：v1 需求基线（语料清单待用户提供）
 **日期**：2026-11-06
+**修订**：2026-11-23 增补检索基线实验（§7.3）、pgvector 过滤说明（§7.4）与 SAG2 选型记录（§14）。
 **关联**：
 - 架构决策：`docs/adr/0018-rag-explanation-layer.md`
 - 现有分析设计：`.scratch/llm-analysis/spec.md`
@@ -332,6 +333,7 @@ documents:
 - RRF 融合 dense/sparse；取 top 8–12。
 - v1 不引入额外 rerank 模型；LLM 在生成时隐式做最终选择。
 - 父章节扩展默认关闭：C0 下扩大上下文会放大治疗段泄漏风险。后续如开启，必须重新评估。
+- **检索基线实验（语料就绪后、实现检索层前，2 天内完成）：** 在同一 chunk 集与 40 个 case 上对比 BM25-only（中文 jieba 或等价 Go 分词器，英文空白/小写）、BGE-M3 dense、dense+sparse RRF；可先用 20 个 case 做方向性判断，最终以 40 个 case 的 Recall@10 为准。若 BM25-only 的 Recall@10 ≥ 0.90 且检索 p95 < 300ms，可删除 `rag-embed`，改为 Go 侧 BM25 + 规则校验；该变更改变 ADR-0018 决策 3，需新 ADR。否则保留 BGE-M3 混合检索。实验报告与 §11 的检索 gate 一并归档；选型依据见 `docs/reference/rag-vs-llm-wiki-vs-sag-wiki.md`。
 
 ### 7.4 存储
 
@@ -389,7 +391,7 @@ CREATE INDEX rag_chunks_panels_idx ON rag_chunks USING gin (panels);
 CREATE INDEX rag_chunks_sections_idx ON rag_chunks USING gin (sections);
 ```
 
-- <10k chunk 时 exact scan 也可；HNSW 为后续规模预留。
+- <10k chunk 时，带 `age_group` / `sections` 过滤的查询默认走 exact scan，或按 `age_group` 建 partial index / partition；HNSW 为后续规模预留。pgvector 的 approximate index 在 index scan 之后才应用 `WHERE`，过滤选择性高时可能召回不足；若必须使用 HNSW，需启用 iterative scan（pgvector ≥ 0.8）并实测过滤后的召回（见 [pgvector README](https://github.com/pgvector/pgvector)）。
 - `sparsevec` 需要 pgvector ≥ 0.7；若部署镜像不支持，改为 `sparse JSONB`，在 Go 侧计算稀疏分数。
 
 ### 7.5 Embedding 服务
@@ -855,6 +857,7 @@ type StandardCheck struct {
 ### 13.2 文档与决策
 
 - RAG 架构决策见 `docs/adr/0018-rag-explanation-layer.md`（2026-11-06 采纳），记录：RAG 取代 YAML、本地 BGE-M3 + pgvector、C0 残余风险、无生产灰度。
+- 知识来源选型调研见 `docs/reference/rag-vs-llm-wiki-vs-sag-wiki.md`（2026-11-18）：维持 RAG；SAG2 不进入 v1 生产路径。
 - 更新 `CONTEXT.md`：知识块、检索、claim、引文、语料版本；更新「分析」解释层定义。
 - 更新 `README.md` 的范围与安全边界。
 - 更新 `docs/agents/contracts.md` 的 Analysis 镜像表。
@@ -896,6 +899,7 @@ type StandardCheck struct {
 | 13 | UI 方案 B：内联编号 + 来源列表 | A 逐条展开；C 现状聚合 |
 | 14 | 12k input / 2.5k output / 20 次/天 | 8k/1.5k；降配额 |
 | 15 | 无第二评审人；DeepSeek flash 生成 / pro judge | 引入外部 judge；人工全量 |
+| 16 | SAG2 仅作 retrieval 备选，不进入 v1 生产路径：无 chunk 级 metadata 过滤、论文 MuSiQue 检索均值 1.47s/query、中文/单跳未评测 | 直接替换 pgvector/BGE-M3 检索层；引入 Jev 出站 |
 
 ---
 
