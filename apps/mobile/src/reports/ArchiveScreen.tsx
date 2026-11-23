@@ -27,14 +27,15 @@ import { panelDateLabel } from "./status";
 import { ReportTimeline } from "./ReportTimeline";
 import { useMemberPanels } from "./useMemberPanels";
 import { useMemberReports, type MemberReportsState } from "./useMemberReports";
+import { HEALTH_TRENDS_PATH, healthReportsHref } from "./routes";
 
 export type ArchiveView = "time" | "panel";
 
 // 全部档案页(票 06;panel-browse 票 03 起分「按时间 / 按项目」):
 // 按时间沿用待核对 / 识别失败筛选与 ?panel= 项目筛选;按项目列出当前成员实际
 // 出现过的项目组(影像直接进最新报告详情),点项目进项目详情。
-// 两个真实路由 /timeline 与 /panels 共用本组件;分段切换用 replace,避免历史栈
-// 累积,并保证从项目详情返回时仍落在原分段。
+// 健康档案 > 报告的两个视图共用本组件(经 ?view= 区分);分段切换用 replace,
+// 避免历史栈累积,并保证从项目详情返回时仍落在原分段。
 export function ArchiveScreen({ view }: { view: ArchiveView }) {
   const { currentMemberId, selectMember } = useCurrentMember();
   const { state, reload } = useMemberReports(currentMemberId);
@@ -75,7 +76,11 @@ export function ArchiveScreen({ view }: { view: ArchiveView }) {
 
         {state.status === "unconfigured" ? (
           <Text style={sharedStyles.muted}>
-            尚未配置后端地址,请先到设置填写。
+            尚未配置后端地址,请先到
+            <Link href="/settings" style={styles.link}>
+              设置
+            </Link>
+            填写。
           </Text>
         ) : null}
 
@@ -85,6 +90,9 @@ export function ArchiveScreen({ view }: { view: ArchiveView }) {
             <Pressable style={styles.button} onPress={() => void reload()}>
               <Text style={styles.buttonText}>重试</Text>
             </Pressable>
+            <Link href="/settings" style={styles.link}>
+              检查后端设置
+            </Link>
           </View>
         ) : null}
 
@@ -167,9 +175,9 @@ function ArchiveReadyView({
           {selectedMemberId === undefined ? (
             <View testID="archive-unselected" style={styles.stack}>
               <Text style={sharedStyles.muted}>选择一个成员查看其档案。</Text>
-              <Link asChild href="/">
-                <Pressable testID="archive-back-home">
-                  <Text style={styles.link}>返回家庭</Text>
+              <Link asChild href="/members">
+                <Pressable testID="archive-manage-members">
+                  <Text style={styles.link}>管理成员</Text>
                 </Pressable>
               </Link>
             </View>
@@ -189,13 +197,21 @@ function ArchiveReadyView({
                 <PanelBrowser
                   key={selectedMemberId}
                   memberId={selectedMemberId}
-                  onShowTime={() => router.replace("/timeline")}
+                  onShowTime={() => router.replace(healthReportsHref({ view: "time" }))}
                 />
               )}
             </View>
           )}
         </>
       )}
+      <View testID="health-archive-links" style={styles.archiveLinks}>
+        <Link href="/members" style={styles.link}>
+          管理成员
+        </Link>
+        <Link href="/settings" style={styles.link}>
+          设置
+        </Link>
+      </View>
     </View>
   );
 }
@@ -220,7 +236,7 @@ function ArchiveTimeView({
       {pending ? (
         <View style={styles.pendingEntries}>
           {pending.partialReports > 0 ? (
-            <Link asChild href="/timeline?filter=partial">
+            <Link asChild href={healthReportsHref({ view: "time", filter: "partial" })}>
               <Pressable
                 testID="archive-pending-partial"
                 style={styles.pendingRow}
@@ -231,7 +247,7 @@ function ArchiveTimeView({
             </Link>
           ) : null}
           {pending.failedReports > 0 ? (
-            <Link asChild href="/timeline?filter=failed">
+            <Link asChild href={healthReportsHref({ view: "time", filter: "failed" })}>
               <Pressable
                 testID="archive-pending-failed"
                 style={styles.pendingRow}
@@ -257,7 +273,7 @@ function ArchiveTimeView({
               <Text style={sharedStyles.muted}>
                 只看{panelLabel(panel)} · {visibleReports.length} 份
               </Text>
-              <Link asChild href="/timeline">
+              <Link asChild href={healthReportsHref({ view: "time" })}>
                 <Pressable testID="archive-panel-clear">
                   <Text style={styles.link}>清除筛选</Text>
                 </Pressable>
@@ -270,7 +286,7 @@ function ArchiveTimeView({
                 {filter === "partial" ? "只看待核对" : "只看识别失败"} ·{" "}
                 {visibleReports.length} 份
               </Text>
-              <Link asChild href="/timeline">
+              <Link asChild href={healthReportsHref({ view: "time" })}>
                 <Pressable testID="archive-filter-clear">
                   <Text style={styles.link}>清除筛选</Text>
                 </Pressable>
@@ -283,7 +299,7 @@ function ArchiveTimeView({
         filtered ? (
           <View testID="archive-empty" style={styles.stack}>
             <Text style={sharedStyles.muted}>没有符合筛选条件的报告。</Text>
-            <Link asChild href="/timeline">
+            <Link asChild href={healthReportsHref({ view: "time" })}>
               <Pressable testID="archive-show-all">
                 <Text style={styles.link}>查看全部档案</Text>
               </Pressable>
@@ -301,9 +317,9 @@ function ArchiveTimeView({
   );
 }
 
-const ARCHIVE_VIEW_HREFS: Record<ArchiveView, "/timeline" | "/panels"> = {
-  time: "/timeline",
-  panel: "/panels",
+const ARCHIVE_VIEW_HREFS: Record<ArchiveView, string> = {
+  time: healthReportsHref({ view: "time" }),
+  panel: healthReportsHref({ view: "panel" }),
 };
 
 function ArchiveSegments({ value }: { value: ArchiveView }) {
@@ -396,7 +412,7 @@ function PanelBrowser({
   return (
     <View style={styles.stack}>
       {abnormalCount > 0 ? (
-        <Link asChild href="/trends">
+        <Link asChild href={HEALTH_TRENDS_PATH}>
           <Pressable testID="archive-all-abnormal">
             <Text style={styles.link}>
               全部异常 {abnormalCount} 项 · {abnormalPanels} 个项目 ›
@@ -471,6 +487,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: 24, gap: 12 },
   stack: { gap: 12 },
+  archiveLinks: { flexDirection: "row", gap: 16, paddingTop: 8 },
   pendingEntries: { gap: 8 },
   pendingRow: {
     flexDirection: "row",

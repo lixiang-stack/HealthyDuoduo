@@ -31,6 +31,7 @@ import {
   type PanelTrend,
 } from "../../reports/panelOverview";
 import { panelLabel } from "../../reports/panels";
+import { HEALTH_REPORTS_PATH, healthReportsHref } from "../../reports/routes";
 import {
   DATE_UNKNOWN_LABEL,
   flagLabel,
@@ -102,7 +103,7 @@ export default function PanelDetailScreen() {
         {panel === undefined ? (
           <View style={styles.stack}>
             <Text style={sharedStyles.muted}>这个项目不存在。</Text>
-            <Link href="/timeline" style={styles.link}>
+            <Link href={healthReportsHref({ view: "time" })} style={styles.link}>
               返回档案
             </Link>
           </View>
@@ -129,8 +130,8 @@ export default function PanelDetailScreen() {
             state.status !== "unconfigured" ? (
               <View style={styles.stack}>
                 <Text style={sharedStyles.muted}>选择一个成员查看其档案。</Text>
-                <Link href="/" style={styles.link}>
-                  返回家庭
+                <Link href={HEALTH_REPORTS_PATH} style={styles.link}>
+                  返回健康档案
                 </Link>
               </View>
             ) : null}
@@ -320,8 +321,8 @@ function PanelDetailReadyView({
       <Link
         asChild
         href={{
-          pathname: "/timeline",
-          params: { panel: detail.panel },
+          pathname: HEALTH_REPORTS_PATH,
+          params: { view: "time", panel: detail.panel },
         }}
       >
         <Pressable testID="panel-reports-link">

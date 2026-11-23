@@ -43,6 +43,7 @@ import {
   windowText,
 } from "../../analysis/facts";
 import { ANALYSIS_SOURCE_STATEMENT } from "../../analysis/consent";
+import { healthReportsHref } from "../../reports/routes";
 import {
   CLINICAL_NOTE_RERUN_TEXT,
   useAnalysisFeedback,
@@ -333,7 +334,7 @@ function AnalysisHeader({
       {facts.insufficient_evidence ? (
         <View testID="analysis-insufficient" style={styles.statusBlock}>
           <Text style={styles.insufficient}>{INSUFFICIENT_EVIDENCE_TEXT}</Text>
-          <Link href="/timeline" style={styles.link}>
+          <Link href={healthReportsHref({ view: "time" })} style={styles.link}>
             去核对报告
           </Link>
         </View>

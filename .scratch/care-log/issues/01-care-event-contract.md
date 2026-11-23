@@ -4,17 +4,17 @@
 
 **Blocked by:** None（可立即开始；完整数据模型另立 spec）。
 
-**Status:** needs-triage
+**Status:** ready-for-agent
 
 ## 验收清单
 
-- [ ] `CareEvent` 是判别联合：`feed` / `diaper` / `sleep` / `solid`；公共字段含 `id`、`member_id`、`type`、`started_at`、`ended_at`、`note`、`source`。
-- [ ] `feed` 含 `method`（breast / formula）、可选 `amount_ml`、可选 `duration_min`；`diaper` 含 `diaper_type`；`sleep` 含可选 `duration_min`；`solid` 含 `food`、可选 `amount_g`。
-- [ ] `member_id` 必填；不出现 `recorded_by`、`device_id`、`caregiver`、全局 active child 字段。
-- [ ] 读接口能按 `member_id` + `from` / `to` 返回当天 / 范围事件，倒序；写接口能创建、修改、删除；形状足以驱动今天时间线、统计和 5 分钟重复提示。
-- [ ] 契约写入 OpenAPI / TypeScript 类型或独立 spec；提供合成 fixture，覆盖四个类型与边界值（空备注、可选奶量、跨午夜）。
-- [ ] 本票不实现 UI；04 / 06 / 07 用 adapter / fixture 先行，正式 API 落地后再替换。
-- [ ] 不新增账号、鉴权、云同步；沿用 `docs/adr/0006-lan-first-no-auth.md`。
+- [x] `CareEvent` 是判别联合：`feed` / `diaper` / `sleep` / `solid`；公共字段含 `id`、`member_id`、`type`、`started_at`、`ended_at`、`note`、`source`。
+- [x] `feed` 含 `method`（breast / formula）、可选 `amount_ml`、可选 `duration_min`；`diaper` 含 `diaper_type`；`sleep` 含可选 `duration_min`；`solid` 含 `food`、可选 `amount_g`。
+- [x] `member_id` 必填；不出现 `recorded_by`、`device_id`、`caregiver`、全局 active child 字段。
+- [x] 读接口能按 `member_id` + `from` / `to` 返回当天 / 范围事件，倒序；写接口能创建、修改、删除；形状足以驱动今天时间线、统计和 5 分钟重复提示。
+- [x] 契约写入 OpenAPI / TypeScript 类型或独立 spec；提供合成 fixture，覆盖四个类型与边界值（空备注、可选奶量、跨午夜）。
+- [x] 本票不实现 UI；04 / 06 / 07 用 adapter / fixture 先行，正式 API 落地后再替换。
+- [x] 不新增账号、鉴权、云同步；沿用 `docs/adr/0006-lan-first-no-auth.md`。
 
 ## 实现提示
 
@@ -26,3 +26,5 @@
 ## Comments
 
 **拆分依据（2026-11-23）：** `../spec.md` §9.8 明确护理事件表 / API 另立 spec；本票是 04 / 06 / 07 的显式前置，避免 UI 票各自发明数据形状。完整表 / 迁移 / 契约冻结不在本票内。
+
+**实现决定（2026-11-23）：** 先落独立 TypeScript 契约 + fixture adapter，不改 `schemas/openapi.yaml`。OpenAPI 端点集合在 `internal/httpapi/contract_test.go` 冻结，护理事件端点需要 Go handler / 存储 / fixture 同步；那属于后续 API spec。契约与验收见 `docs/design/2026-11-23-care-event-contract.md`。

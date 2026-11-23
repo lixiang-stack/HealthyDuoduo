@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
 
 import { resolveApiClient } from '../../api/resolveClient';
-import TrendsScreen from '../../app/trends';
+import TrendsScreen from '../../app/health/trends';
 import { CURRENT_MEMBER_STORAGE_KEY } from '../../members/currentMemberStore';
 import { createFakeApiClient, TEST_BASE_URL } from '../fakeApi';
 import {

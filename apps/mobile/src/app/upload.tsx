@@ -23,6 +23,7 @@ import {
   type PickedImage,
 } from "../platform/imagePicker";
 import { needsReview } from "../review/items";
+import { healthReportsHref } from "../reports/routes";
 import { uploadResultText, uploadWaitText } from "../reports/status";
 import {
   appendPickedImages,
@@ -591,7 +592,7 @@ function UploadReadyView({
                     </Text>
                   </Pressable>
                 ) : null}
-                <Link asChild href="/timeline">
+                <Link asChild href={healthReportsHref({ view: "time" })}>
                   <Pressable testID="upload-open-timeline">
                     <Text style={styles.link}>去档案查看</Text>
                   </Pressable>

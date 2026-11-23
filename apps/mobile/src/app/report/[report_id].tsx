@@ -19,6 +19,7 @@ import { useImageViewer } from "../../components/imageViewer/ImageViewerProvider
 import { useCurrentMember } from "../../members/CurrentMemberContext";
 import { isClinicalNoteReport } from "../../reports/category";
 import { CLINICAL_NOTE_PANEL } from "../../reports/panels";
+import { healthReportsHref } from "../../reports/routes";
 import {
   ReportCard,
   ReportManageCard,
@@ -119,7 +120,7 @@ export default function ReportDetailScreen() {
             onOpenImage={() => open(state.imageUrl, imageNoun)}
             onReviewUpdated={applyReview}
             onReassigned={applyReassign}
-            onDeleted={() => router.dismissTo("/timeline")}
+            onDeleted={() => router.dismissTo(healthReportsHref({ view: "time" }))}
           />
         ) : null}
       </ScrollView>

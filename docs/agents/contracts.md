@@ -6,6 +6,7 @@ This repo mirrors the same contract through several layers. Use this page as a n
 
 - `schemas/report.schema.json` — recognition output (`Report`, `ReportItem`, `ReportSection`, panel enum/order).
 - `schemas/openapi.yaml` — HTTP `/api/v1` contract.
+- `docs/design/2026-11-23-care-event-contract.md` — client-visible care-event shape (`CareEvent`); no HTTP endpoint yet, so it is not in OpenAPI until the care-event API spec lands.
 
 ## Mirrors
 
