@@ -1,15 +1,13 @@
 // Today's care-log page content: hero, four quick actions, today summary and the
 // current child's timeline. Reminders (ticket 06) and charts (ticket 07) are not here.
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import type { Member } from '../api/members';
 import { CARE_EVENT_TYPES, type CareEvent, type CareEventType } from '../care/careEvents';
 import {
   CARE_EVENT_LABELS,
   CARE_EVENT_SOURCE_LABEL,
-  careEventMeta,
-  careEventTitle,
   elapsedMinutes,
   feedSummary,
   formatElapsedMinutes,
@@ -18,6 +16,7 @@ import {
 } from '../care/careEventDisplay';
 import { useTodayCareEvents } from '../care/useTodayCareEvents';
 import { colors } from '../components/theme';
+import { CareTimeline } from './CareTimeline';
 import { RecordSheet } from './RecordSheet';
 
 type SheetState = { type: CareEventType; editingEvent?: CareEvent };
@@ -108,37 +107,38 @@ export function TodayCareLog({ child, members }: { child: Member; members: Membe
         </View>
       ) : null}
 
-      <View style={styles.sectionRow}>
-        <Text style={styles.sectionTitle}>今日时间线</Text>
-        <Text style={styles.muted}>{events.length} 条</Text>
-      </View>
-
-      {loading ? <ActivityIndicator testID="today-loading" /> : null}
-      {state.status === 'error' ? (
-        <View style={styles.stack}>
-          <Text testID="today-error" style={styles.error}>
-            护理记录加载失败:{state.detail}
-          </Text>
-          <Pressable style={styles.retry} onPress={() => void reload()}>
-            <Text style={styles.retryText}>重试</Text>
-          </Pressable>
+      <View style={styles.timelineSection}>
+        <View style={styles.sectionRow}>
+          <Text style={styles.sectionTitle}>今日时间线</Text>
+          <Text style={styles.muted}>{events.length} 条</Text>
         </View>
-      ) : null}
-      {state.status === 'ready' ? (
-        events.length === 0 ? (
-          <Text testID="today-empty" style={styles.muted}>
-            今天还没有记录，从上面的快捷动作开始。
-          </Text>
-        ) : (
-          events.map((event) => (
-            <EventRow
-              key={event.id}
-              event={event}
-              onPress={() => setSheet({ type: event.type, editingEvent: event })}
+
+        <ScrollView
+          testID="today-timeline"
+          style={styles.timeline}
+          contentContainerStyle={styles.timelineContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          {loading ? <ActivityIndicator testID="today-loading" /> : null}
+          {state.status === 'error' ? (
+            <View style={styles.stack}>
+              <Text testID="today-error" style={styles.error}>
+                护理记录加载失败:{state.detail}
+              </Text>
+              <Pressable style={styles.retry} onPress={() => void reload()}>
+                <Text style={styles.retryText}>重试</Text>
+              </Pressable>
+            </View>
+          ) : null}
+          {state.status === 'ready' ? (
+            <CareTimeline
+              events={events}
+              now={now}
+              onPressEvent={(event) => setSheet({ type: event.type, editingEvent: event })}
             />
-          ))
-        )
-      ) : null}
+          ) : null}
+        </ScrollView>
+      </View>
 
       {sheet ? (
         <RecordSheet
@@ -171,30 +171,8 @@ function SummaryCell({
   );
 }
 
-function EventRow({ event, onPress }: { event: CareEvent; onPress: () => void }) {
-  const meta = careEventMeta(event);
-  return (
-    <Pressable
-      testID={`today-event-${event.id}`}
-      accessibilityRole="button"
-      accessibilityLabel={`${localClockTime(event.started_at)} ${careEventTitle(event)}`}
-      onPress={onPress}
-      style={styles.eventRow}
-    >
-      <Text style={styles.eventTime}>{localClockTime(event.started_at)}</Text>
-      <View style={styles.eventBody}>
-        <Text style={styles.eventTitle}>{careEventTitle(event)}</Text>
-        <View style={styles.eventMetaRow}>
-          {meta ? <Text style={styles.eventMeta}>{meta}</Text> : null}
-          <Text style={styles.tag}>{CARE_EVENT_SOURCE_LABEL}</Text>
-        </View>
-      </View>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
-  container: { gap: 14 },
+  container: { flex: 1, gap: 14 },
   hero: {
     gap: 4,
     padding: 14,
@@ -242,6 +220,9 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
     justifyContent: 'space-between',
   },
+  timelineSection: { flex: 1, gap: 8 },
+  timeline: { flex: 1 },
+  timelineContent: { paddingBottom: 8 },
   sectionTitle: { fontSize: 15, color: colors.text, fontWeight: '600' },
   muted: { fontSize: 13, color: colors.muted, lineHeight: 20 },
   error: { fontSize: 13, color: colors.fail },
@@ -254,18 +235,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
   },
   retryText: { fontSize: 14, color: colors.onAccent },
-  eventRow: {
-    flexDirection: 'row',
-    gap: 12,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  eventTime: { width: 48, fontSize: 13, color: colors.muted },
-  eventBody: { flex: 1, gap: 4 },
-  eventTitle: { fontSize: 15, color: colors.text },
-  eventMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  eventMeta: { fontSize: 12, color: colors.muted },
   tag: {
     fontSize: 11,
     color: colors.muted,

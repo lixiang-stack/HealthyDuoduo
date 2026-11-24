@@ -77,6 +77,34 @@
 - **D 首页双卡**：打开先选域；并列最清楚，但每天多一次点击，适合把两个域当两种模式。
 - **结论**：已确认 B；A 作为保守 fallback；C / D 不采用。
 
+## 今日时间线呈现（2026-11-24）
+
+目标：在展示和交互上突出时间线。已确认「最新在上」与四类轻量色（喂养蓝 / 尿布琥珀 / 睡眠靛 / 辅食橙）；密度、上方内容待选。
+
+- **A · 时间轨 + 事件节点**（推荐）：左侧时间栏 + 贯穿竖轨 + 类型节点；行高最高，扫读最快，最像时间线。
+- **B · 间隔线**（低风险）：保留紧凑行，只在事件间显示「间隔 2 小时 10 分」；视觉最轻。
+- **C · 24 小时概览 + 明细**：顶部 24h 比例轴 + 最新在上明细。纯纵向 24h 轴需要按时间正序，与「最新在上」冲突，因此本原型采用「概览轴 + 最新在上列表」。
+
+打开 `timeline.html`，底部浮动条切换 A/B/C、密度、上方内容、空态与时间线特写；也支持 URL 参数：
+
+```text
+?variant=A|B|C&density=comfortable|compact&top=current|compressed&state=events|empty&view=phone|timeline&clean=1
+?contact=1
+```
+
+截图：
+
+- `shots/00-contact-sheet-timeline.png` — A / B / C 整屏对照
+- `shots/01-timeline-a.png` — A 时间线特写
+- `shots/02-timeline-b.png` — B 时间线特写
+- `shots/03-timeline-c.png` — C 时间线特写
+- `shots/04-timeline-a-compact-top.png` — A + 压缩上方 + 紧凑密度
+- `shots/05-timeline-a-empty.png` — A 空态
+
+待决策：A/B/C、舒适 / 紧凑密度、当前 / 压缩上方内容；也可以组合（例如 A 的轨道 + B 的间隔文案）。
+
+**结论（2026-11-24）：** 选 **A · 时间轨 + 事件节点**，**舒适密度**，**保持当前上方内容**；最新在上、四类轻量色不变。生产实现见 `apps/mobile/src/daily/CareTimeline.tsx`。
+
 ## 需要你判断
 
 1. 第一屏是谁：A 的家庭 / 报告，还是 B 的今天 / 护理？

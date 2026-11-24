@@ -48,12 +48,8 @@ export function DailyPlaceholder({ variant }: { variant: Variant }) {
 
   const loading = state.status === 'loading' || (state.status === 'ready' && !childReady);
 
-  return (
-    <ScrollView
-      testID={`daily-${variant}-placeholder`}
-      style={styles.container}
-      contentContainerStyle={styles.content}
-    >
+  const content = (
+    <>
       {ready && childState.status !== 'no-children' ? (
         <ChildSwitcher
           childState={childState}
@@ -118,6 +114,26 @@ export function DailyPlaceholder({ variant }: { variant: Variant }) {
           </Text>
         )
       ) : null}
+    </>
+  );
+
+  // Today fills the first screen and scrolls only the timeline inside; stats keeps
+  // the existing page scroll.
+  if (variant === 'today') {
+    return (
+      <View testID="daily-today-placeholder" style={styles.todayContent}>
+        {content}
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView
+      testID="daily-stats-placeholder"
+      style={styles.container}
+      contentContainerStyle={styles.content}
+    >
+      {content}
     </ScrollView>
   );
 }
@@ -125,6 +141,7 @@ export function DailyPlaceholder({ variant }: { variant: Variant }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: 24, gap: 12 },
+  todayContent: { flex: 1, padding: 24, gap: 12, backgroundColor: colors.background },
   stack: { gap: 12 },
   title: { fontSize: 20, color: colors.text, fontWeight: '600' },
   fail: { fontSize: 13, color: colors.fail },

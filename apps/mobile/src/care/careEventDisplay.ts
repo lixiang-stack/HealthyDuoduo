@@ -1,5 +1,6 @@
 // Presentation helpers for today's care log. They keep device-local day / clock
 // calculations and Chinese event summaries out of the screens and repository.
+import { colors } from '../components/theme';
 import {
   DIAPER_TYPES,
   FEED_METHODS,
@@ -21,6 +22,15 @@ export const CARE_EVENT_LABELS: Record<CareEventType, string> = {
 };
 
 export const CARE_EVENT_SOURCE_LABEL = '家长记录';
+
+/** Four light palettes for the timeline nodes. Only the node/bar uses the color;
+ *  titles stay neutral so the page still reads as a factual log. */
+export const CARE_EVENT_COLORS: Record<CareEventType, { color: string; background: string }> = {
+  feed: { color: '#1d4ed8', background: colors.accentSoft },
+  diaper: { color: '#b45309', background: '#fffbeb' },
+  sleep: { color: '#4f46e5', background: '#eef2ff' },
+  solid: { color: '#c2410c', background: '#fff7ed' },
+};
 
 export const FEED_METHOD_LABELS: Record<FeedMethod, string> = {
   breast: '母乳',

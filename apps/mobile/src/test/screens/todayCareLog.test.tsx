@@ -1,12 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { fireEvent, screen, waitFor } from '@testing-library/react-native';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 
 import { resolveApiClient } from '../../api/resolveClient';
 import { InMemoryCareEventRepository } from '../../care/careEventRepository';
 import { DailyPlaceholder } from '../../daily/DailyPlaceholder';
 import { CURRENT_CHILD_STORAGE_KEY } from '../../members/currentMemberStore';
 import { createFakeApiClient, TEST_BASE_URL } from '../fakeApi';
-import { makeDiaperEvent, makeFeedEvent, makeMember } from '../fixtures';
+import { makeDiaperEvent, makeFeedEvent, makeMember, makeSleepEvent } from '../fixtures';
 import { renderScreen } from '../renderScreen';
 
 jest.mock('../../api/resolveClient', () => ({
@@ -30,6 +30,13 @@ function minutesAgo(minutes: number): string {
   return new Date(Date.now() - minutes * 60000).toISOString();
 }
 
+function localAt(hour: number, minute: number, dayOffset = 0): string {
+  const date = new Date();
+  date.setDate(date.getDate() + dayOffset);
+  date.setHours(hour, minute, 0, 0);
+  return date.toISOString();
+}
+
 beforeEach(async () => {
   jest.clearAllMocks();
   await AsyncStorage.clear();
@@ -42,6 +49,13 @@ describe('Today care log', () => {
     const repository = new InMemoryCareEventRepository([
       makeFeedEvent({ id: 1, started_at: minutesAgo(30), note: '剩下 20 ml' }),
       makeDiaperEvent({ id: 2, started_at: minutesAgo(20) }),
+      makeSleepEvent({ id: 4, started_at: minutesAgo(10) }),
+      makeSleepEvent({
+        id: 5,
+        started_at: localAt(23, 50, -1),
+        ended_at: localAt(6, 20),
+        duration_min: 390,
+      }),
       makeFeedEvent({ id: 3, member_id: second.member_id, started_at: minutesAgo(10) }),
     ]);
 
@@ -56,11 +70,19 @@ describe('Today care log', () => {
     expect(screen.getByTestId('today-summary-feeds')).toHaveTextContent(/1/);
     expect(screen.getByTestId('today-summary-amount')).toHaveTextContent(/120/);
     expect(screen.getByTestId('today-summary-diapers')).toHaveTextContent(/1/);
-    expect(await screen.findByTestId('today-event-1')).toHaveTextContent(/奶粉 120 ml/);
-    expect(screen.getByTestId('today-event-2')).toHaveTextContent(/尿布 · 尿尿/);
-    expect(screen.queryByTestId('today-event-3')).toBeNull();
-    expect(screen.getByTestId('today-event-1')).toHaveTextContent(/家长记录/);
-    expect(screen.getByTestId('today-event-2')).toHaveTextContent(/家长记录/);
+    const timeline = await screen.findByTestId('today-timeline');
+    expect(within(timeline).getByTestId('today-now')).toHaveTextContent(/现在 \d{2}:\d{2}/);
+    expect(within(timeline).getByTestId('today-event-1')).toHaveTextContent(/奶粉 120 ml/);
+    expect(within(timeline).getByTestId('today-event-2')).toHaveTextContent(/尿布 · 尿尿/);
+    expect(within(timeline).getByTestId('today-event-node-1')).toBeTruthy();
+    expect(within(timeline).getByTestId('today-event-4')).toHaveTextContent(/进行中/);
+    expect(within(timeline).getByTestId('today-event-4')).toHaveTextContent(/已睡 \d+ 分钟/);
+    expect(within(timeline).getByTestId('today-event-5')).toHaveTextContent(/昨天/);
+    expect(within(timeline).getByTestId('today-event-5')).toHaveTextContent(/跨夜/);
+    expect(within(timeline).queryByTestId('today-event-3')).toBeNull();
+    expect(within(timeline).queryByTestId('today-hero')).toBeNull();
+    expect(within(timeline).getByTestId('today-event-1')).toHaveTextContent(/家长记录/);
+    expect(within(timeline).getByTestId('today-event-2')).toHaveTextContent(/家长记录/);
     expect(screen.queryByText('妈妈')).toBeNull();
   });
 
@@ -71,6 +93,9 @@ describe('Today care log', () => {
 
     await renderScreen(<DailyPlaceholder variant="today" />, { careEvents: repository });
     expect(await screen.findByTestId('today-empty')).toBeTruthy();
+    expect(
+      within(screen.getByTestId('today-timeline')).getByTestId('today-empty'),
+    ).toBeTruthy();
 
     await fireEvent.press(screen.getByTestId('today-quick-feed'));
     expect(await screen.findByTestId('record-title')).toHaveTextContent('记录喂奶');

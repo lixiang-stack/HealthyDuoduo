@@ -88,6 +88,22 @@ export function makeDiaperEvent(
   };
 }
 
+export function makeSleepEvent(
+  overrides: Partial<Extract<CareEvent, { type: 'sleep' }>> = {},
+): Extract<CareEvent, { type: 'sleep' }> {
+  return {
+    id: 4,
+    member_id: 1,
+    type: 'sleep',
+    started_at: '2026-11-23T13:00:00+08:00',
+    ended_at: null,
+    note: null,
+    source: 'parent',
+    duration_min: null,
+    ...overrides,
+  };
+}
+
 export function makeReportItem(overrides: Partial<ReportItem> = {}): ReportItem {
   return {
     item_id: 1,

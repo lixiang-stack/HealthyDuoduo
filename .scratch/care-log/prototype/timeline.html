@@ -1,0 +1,764 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>育儿 · 时间线方案对照（原型）</title>
+<style>
+  :root {
+    --text: #111827;
+    --muted: #6b7280;
+    --border: #e5e7eb;
+    --bg: #ffffff;
+    --accent: #2563eb;
+    --accent-soft: #eff6ff;
+    --feed: #1d4ed8;
+    --feed-bg: #eff6ff;
+    --diaper: #b45309;
+    --diaper-bg: #fffbeb;
+    --sleep: #4f46e5;
+    --sleep-bg: #eef2ff;
+    --solid: #c2410c;
+    --solid-bg: #fff7ed;
+  }
+  * { box-sizing: border-box; }
+  .type-feed { --type: var(--feed); --type-bg: var(--feed-bg); }
+  .type-diaper { --type: var(--diaper); --type-bg: var(--diaper-bg); }
+  .type-sleep { --type: var(--sleep); --type-bg: var(--sleep-bg); }
+  .type-solid { --type: var(--solid); --type-bg: var(--solid-bg); }
+  html, body { margin: 0; padding: 0; }
+  body {
+    color: var(--text);
+    background: #f3f4f6;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  button { font-family: inherit; }
+
+  .page-head { padding: 24px 24px 8px; }
+  .page-head h1 { margin: 0 0 6px; font-size: 20px; }
+  .page-head p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+
+  .stage { display: flex; justify-content: center; padding: 16px 24px 96px; }
+  .contact-stage { display: flex; gap: 20px; align-items: flex-start; justify-content: center; padding: 24px; }
+  .phone-wrap { width: 390px; flex: 0 0 390px; }
+  .phone-label { margin: 0 0 2px; font-size: 14px; font-weight: 700; }
+  .phone-desc { margin: 0 0 10px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+  .badge { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 10px; vertical-align: 1px; }
+
+  .phone {
+    position: relative;
+    width: 390px;
+    height: 844px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--bg);
+    border: 1px solid #d1d5db;
+    border-radius: 28px;
+  }
+  .statusbar {
+    flex: 0 0 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 18px;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .statusbar .right { color: var(--muted); font-weight: 500; }
+  .appbar {
+    flex: 0 0 56px;
+    display: flex;
+    align-items: flex-end;
+    gap: 20px;
+    padding: 0 16px 9px;
+    border-bottom: 1px solid var(--border);
+  }
+  .domain { position: relative; padding-bottom: 6px; font-size: 16px; color: var(--muted); }
+  .domain.active { color: var(--text); font-weight: 700; }
+  .domain.active::after {
+    content: "";
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--accent);
+  }
+  .screen {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px 16px 0;
+    overflow: hidden;
+  }
+  .top { flex: 0 0 auto; display: flex; flex-direction: column; gap: 9px; }
+  .child { align-self: flex-start; font-size: 14px; color: var(--accent); display: flex; align-items: center; }
+  .child .caret {
+    width: 0; height: 0;
+    margin-left: 4px;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid var(--accent);
+  }
+
+  .hero {
+    border: 1px solid var(--accent);
+    border-radius: 12px;
+    padding: 12px 13px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .hero-eyebrow { font-size: 12px; color: var(--muted); }
+  .hero-value { font-size: 26px; line-height: 1.1; font-weight: 650; }
+  .hero-sub { font-size: 12px; color: var(--muted); }
+  .hero-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 5px; }
+  .hero-foot .small { font-size: 11px; color: var(--muted); }
+
+  .quick-row { display: flex; gap: 6px; }
+  .quick {
+    flex: 1;
+    height: 44px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    color: var(--text);
+  }
+  .summary { display: flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .summary-cell { flex: 1; padding: 6px 0; text-align: center; border-right: 1px solid var(--border); }
+  .summary-cell:last-child { border-right: 0; }
+  .summary-val { font-size: 18px; font-weight: 650; line-height: 1.15; }
+  .summary-label { font-size: 10px; color: var(--muted); }
+
+  /* compressed top: one-line hero, small actions, one-line summary */
+  .top.compressed .hero { padding: 8px 11px; gap: 1px; }
+  .top.compressed .hero-value { font-size: 20px; }
+  .top.compressed .hero-sub { display: none; }
+  .top.compressed .hero-foot { display: none; }
+  .top.compressed .quick { height: 36px; font-size: 13px; }
+  .top.compressed .summary { border: 0; padding: 0 2px; }
+  .top.compressed .summary-cell { padding: 1px 0; border: 0; }
+  .top.compressed .summary-val { font-size: 13px; display: inline; margin-right: 3px; }
+  .top.compressed .summary-label { font-size: 11px; display: inline; }
+  .top.compressed .summary-cell:nth-child(n+3) { display: none; }
+
+  .timeline { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
+  .timeline-head { flex: 0 0 auto; display: flex; align-items: baseline; justify-content: space-between; }
+  .timeline-head b { font-size: 15px; }
+  .timeline-head span { font-size: 12px; color: var(--muted); }
+  .timeline-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+  }
+  .timeline-body::-webkit-scrollbar { display: none; }
+
+  .tag {
+    display: inline-block;
+    padding: 1px 7px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 10px;
+    line-height: 16px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .chip {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-size: 10px;
+    line-height: 16px;
+    white-space: nowrap;
+  }
+  .chip-ongoing { background: var(--sleep-bg); color: var(--sleep); }
+  .chip-cross { background: #f3f4f6; color: var(--muted); }
+  .chev { color: #9ca3af; font-size: 18px; line-height: 1; }
+
+  .now-row {
+    display: grid;
+    grid-template-columns: 42px 28px 1fr;
+    gap: 8px;
+    align-items: center;
+    min-height: 28px;
+  }
+  .now-node {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 4px var(--accent-soft);
+    justify-self: center;
+    position: relative;
+    z-index: 2;
+  }
+  .now-text { font-size: 11px; color: var(--accent); font-weight: 600; }
+
+  /* ---------- A: rail + nodes ---------- */
+  .rail-list { position: relative; padding-bottom: 6px; }
+  .rail-list::before {
+    content: "";
+    position: absolute;
+    left: 63px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--border);
+    z-index: 0;
+  }
+  .event-a {
+    position: relative;
+    display: grid;
+    grid-template-columns: 42px 28px 1fr 16px;
+    gap: 8px;
+    align-items: start;
+    padding: 9px 0;
+    cursor: pointer;
+  }
+  .event-a .time {
+    padding-top: 5px;
+    text-align: right;
+    font-size: 11px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.3;
+  }
+  .event-a .rail { position: relative; z-index: 1; display: flex; justify-content: center; padding-top: 3px; }
+  .event-a .node {
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--type);
+    background: var(--type-bg);
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 1.5px var(--type);
+  }
+  .event-a .node svg { width: 13px; height: 13px; }
+  .event-a .main { min-width: 0; padding-top: 1px; }
+  .event-a .title { font-size: 14px; line-height: 1.35; }
+  .event-a .meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 3px; min-height: 18px; }
+  .event-a .note { font-size: 11px; color: var(--muted); }
+  .event-a .chev { align-self: center; }
+  .event-a.ongoing .main {
+    margin: -5px -6px;
+    padding: 5px 6px;
+    border-radius: 8px;
+    background: var(--sleep-bg);
+  }
+  .event-a.ongoing .node { animation: pulse 1.6s ease-in-out infinite; }
+  .event-a.cross .time { color: var(--muted); }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 1.5px var(--sleep), 0 0 0 3px transparent; }
+    50% { box-shadow: 0 0 0 1.5px var(--sleep), 0 0 0 6px rgba(79, 70, 229, .10); }
+  }
+  .empty-a { position: relative; min-height: 220px; padding-top: 8px; }
+  .empty-a::before {
+    content: "";
+    position: absolute;
+    left: 63px; top: 0; bottom: 0;
+    width: 2px;
+    background: repeating-linear-gradient(to bottom, var(--border) 0 5px, transparent 5px 10px);
+  }
+  .empty-a .ghost {
+    position: absolute; left: 56px; top: 6px;
+    width: 16px; height: 16px; border-radius: 50%;
+    border: 2px dashed var(--border);
+    background: #fff;
+  }
+  .empty-message { margin-left: 78px; padding-top: 6px; color: var(--muted); font-size: 12px; line-height: 1.7; }
+
+  /* ---------- B: interval line ---------- */
+  .interval-list { position: relative; padding-bottom: 6px; }
+  .event-b {
+    display: grid;
+    grid-template-columns: 42px 16px 1fr 16px;
+    gap: 8px;
+    align-items: center;
+    padding: 8px 0;
+    cursor: pointer;
+  }
+  .event-b .time { text-align: right; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .event-b .bar {
+    width: 4px; height: 26px; border-radius: 3px;
+    justify-self: center;
+    background: var(--type);
+    opacity: .9;
+  }
+  .event-b.ongoing .bar { animation: barPulse 1.6s ease-in-out infinite; }
+  @keyframes barPulse { 0%,100% { opacity: .9; } 50% { opacity: .35; } }
+  .event-b .main { min-width: 0; }
+  .event-b .title { font-size: 14px; line-height: 1.35; }
+  .event-b .meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
+  .event-b .note { font-size: 11px; color: var(--muted); }
+  .gap-row {
+    display: grid;
+    grid-template-columns: 42px 16px 1fr;
+    gap: 8px;
+    align-items: center;
+    min-height: 24px;
+  }
+  .gap-row .gap-line {
+    width: 1px; height: 24px;
+    justify-self: center;
+    background: repeating-linear-gradient(to bottom, var(--border) 0 4px, transparent 4px 8px);
+  }
+  .gap-row .gap-text { font-size: 10px; color: #9ca3af; font-variant-numeric: tabular-nums; }
+  .empty-b { min-height: 220px; padding-top: 10px; color: var(--muted); font-size: 12px; line-height: 1.7; }
+  .empty-b .empty-rail { width: 1px; height: 70px; margin: 12px 0 10px 58px; background: repeating-linear-gradient(to bottom, var(--border) 0 4px, transparent 4px 8px); }
+
+  /* ---------- C: 24h overview + list ---------- */
+  .day-strip {
+    flex: 0 0 auto;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 9px 10px 8px;
+    margin-bottom: 4px;
+  }
+  .strip-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
+  .strip-head b { font-size: 12px; }
+  .strip-head span { font-size: 10px; color: var(--muted); }
+  .strip-track {
+    position: relative;
+    height: 14px;
+    border-radius: 7px;
+    background: #f3f4f6;
+  }
+  .sleep-seg {
+    position: absolute;
+    top: 0;
+    height: 14px;
+    border-radius: 7px;
+    background: var(--sleep-bg);
+    border: 1px solid var(--sleep);
+  }
+  .strip-dot {
+    position: absolute;
+    top: 2px;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    transform: translateX(-50%);
+    box-shadow: 0 0 0 1px var(--type);
+    background: var(--type);
+  }
+  .strip-now {
+    position: absolute;
+    top: -5px;
+    bottom: -5px;
+    width: 2px;
+    background: var(--accent);
+  }
+  .strip-now span {
+    position: absolute;
+    top: -15px; left: 50%;
+    transform: translateX(-50%);
+    font-size: 9px;
+    color: var(--accent);
+    white-space: nowrap;
+    font-weight: 600;
+  }
+  .strip-labels { display: flex; justify-content: space-between; margin-top: 5px; font-size: 9px; color: #9ca3af; font-variant-numeric: tabular-nums; }
+  .legend { display: flex; gap: 9px; margin-top: 7px; font-size: 9px; color: var(--muted); flex-wrap: wrap; }
+  .legend i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 3px; vertical-align: 0; }
+  .compact-list { position: relative; padding-bottom: 6px; }
+  .event-c {
+    display: grid;
+    grid-template-columns: 42px 18px 1fr 16px;
+    gap: 8px;
+    align-items: center;
+    padding: 7px 0;
+    cursor: pointer;
+  }
+  .event-c .time { text-align: right; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .event-c .icon { color: var(--type); display: flex; justify-content: center; }
+  .event-c .icon svg { width: 14px; height: 14px; }
+  .event-c .title { font-size: 14px; line-height: 1.35; }
+  .event-c .meta { display: flex; align-items: center; gap: 6px; margin-top: 2px; flex-wrap: wrap; }
+  .event-c .note { font-size: 11px; color: var(--muted); }
+  .empty-c { min-height: 170px; padding-top: 16px; color: var(--muted); font-size: 12px; line-height: 1.7; }
+
+  .tabbar {
+    flex: 0 0 56px;
+    display: flex;
+    border-top: 1px solid var(--border);
+    background: #fff;
+  }
+  .tab {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    font-size: 10px;
+    color: var(--muted);
+  }
+  .tab .glyph { width: 20px; height: 16px; border: 1.5px solid currentColor; border-radius: 3px; position: relative; }
+  .tab.active { color: var(--accent); }
+  .tab.active .glyph { border-color: var(--accent); }
+  .tab .glyph::after { content: ""; position: absolute; left: 4px; right: 4px; bottom: 3px; height: 1px; background: currentColor; box-shadow: 0 -4px 0 currentColor; }
+  .tab.stats .glyph { border: 0; width: 20px; height: 16px; }
+  .tab.stats .glyph::after { left: 1px; bottom: 0; width: 4px; height: 8px; box-shadow: 6px -4px 0 currentColor, 12px -8px 0 currentColor; }
+
+  .toast {
+    position: absolute;
+    left: 50%;
+    bottom: 72px;
+    transform: translateX(-50%) translateY(8px);
+    max-width: 320px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: rgba(17, 24, 39, .92);
+    color: #fff;
+    font-size: 12px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .16s ease, transform .16s ease;
+    z-index: 20;
+    white-space: nowrap;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ---------- controls ---------- */
+  .controls {
+    position: fixed;
+    left: 50%;
+    bottom: 18px;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 9px;
+    border-radius: 999px;
+    background: #111827;
+    color: #fff;
+    box-shadow: 0 10px 30px rgba(0,0,0,.25);
+    z-index: 50;
+    font-size: 12px;
+    max-width: calc(100vw - 24px);
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .controls button {
+    border: 1px solid rgba(255,255,255,.22);
+    background: transparent;
+    color: #fff;
+    border-radius: 999px;
+    padding: 5px 9px;
+    font-size: 11px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .controls button.active { background: #fff; color: #111827; border-color: #fff; font-weight: 600; }
+  .controls .group { display: flex; gap: 3px; align-items: center; padding: 0 3px; border-left: 1px solid rgba(255,255,255,.16); }
+  .controls .group:first-child { border-left: 0; }
+  .controls .label { color: #9ca3af; font-size: 10px; padding: 0 2px; }
+
+  body.clean { background: #fff; overflow: hidden; }
+  body.clean .page-head, body.clean .controls { display: none; }
+  body.clean .stage { padding: 0; display: block; }
+  body.clean .phone { border: 0; border-radius: 0; }
+  body.clean .phone-wrap { width: 390px; }
+  body.clean .phone-label, body.clean .phone-desc { display: none; }
+  body.clean .contact-stage { padding: 0; gap: 0; }
+  body.clean .timeline-body { overflow: hidden; }
+</style>
+</head>
+<body>
+  <header class="page-head" id="page-head">
+    <h1>育儿 · 今日时间线方案对照</h1>
+    <p>同一份记录 · 最新在上 · 四类轻量色 · 390px。<span id="head-hint">用底部切换方案，或在浏览器地址里改 ?variant=。</span></p>
+  </header>
+  <main id="stage" class="stage"></main>
+  <div class="controls" id="controls"></div>
+  <script>
+    const NOW_MIN = 13 * 60 + 20;
+    const NOW_LABEL = "13:20";
+
+    const EVENTS = [
+      { id: 1, type: "solid",  minutes: 793, sort: 793,  time: "13:13", title: "辅食 · 米粉 40 g", note: "第一次尝试" },
+      { id: 2, type: "sleep",  minutes: 780, sort: 780,  time: "13:00", title: "睡觉 · 进行中", note: "已睡 20 分钟", ongoing: true },
+      { id: 3, type: "diaper", minutes: 667, sort: 667,  time: "11:07", title: "尿布 · 便便", note: null },
+      { id: 4, type: "feed",   minutes: 664, sort: 664,  time: "11:04", title: "奶粉 60 ml", note: "剩余 20 ml" },
+      { id: 5, type: "feed",   minutes: 550, sort: 550,  time: "09:10", title: "母乳 18 分钟", note: null },
+      { id: 6, type: "diaper", minutes: 500, sort: 500,  time: "08:20", title: "尿布 · 尿尿", note: null },
+      { id: 7, type: "solid",  minutes: 465, sort: 465,  time: "07:45", title: "辅食 · 南瓜泥 30 g", note: null },
+      { id: 8, type: "sleep",  minutes: 1430, sort: -10, time: "昨天 23:50", title: "睡觉 6 小时 30 分钟", note: "06:20 结束", cross: true, startToday: 0, endToday: 380 }
+    ];
+
+    const TYPE_LABEL = { feed: "喂养", diaper: "尿布", sleep: "睡眠", solid: "辅食" };
+    const ICONS = {
+      feed: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6v3l2 2v13H7V8l2-2V3Z"/><path d="M9 11h6"/></svg>',
+      diaper: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3s6 6.5 6 10a6 6 0 1 1-12 0c0-3.5 6-10 6-10Z"/></svg>',
+      sleep: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5Z"/></svg>',
+      solid: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11h16a8 8 0 0 1-16 0Z"/><path d="M8 3v4M12 2v5M16 3v4"/></svg>'
+    };
+
+    const fmtDuration = (minutes) => {
+      if (minutes < 1) return "刚刚";
+      if (minutes < 60) return `${minutes} 分钟`;
+      const h = Math.floor(minutes / 60);
+      const m = minutes % 60;
+      return m ? `${h} 小时 ${m} 分` : `${h} 小时`;
+    };
+
+    function readState() {
+      const p = new URLSearchParams(location.search);
+      return {
+        variant: (p.get("variant") || "A").toUpperCase(),
+        density: p.get("density") === "compact" ? "compact" : "comfortable",
+        top: p.get("top") === "compressed" ? "compressed" : "current",
+        empty: p.get("state") === "empty",
+        view: p.get("view") === "timeline" ? "timeline" : "phone",
+        contact: p.get("contact") === "1",
+        clean: p.get("clean") === "1"
+      };
+    }
+
+    function writeState(next) {
+      const p = new URLSearchParams(location.search);
+      Object.entries(next).forEach(([key, value]) => p.set(key, String(value)));
+      history.replaceState(null, "", `${location.pathname}?${p.toString()}`);
+    }
+
+    function topHtml(state) {
+      const compressed = state.top === "compressed";
+      return `
+        <div class="top ${compressed ? "compressed" : ""}">
+          <div class="child">小虎 <span class="caret"></span></div>
+          <div class="hero">
+            <div class="hero-eyebrow">小虎 · 距上次喂养</div>
+            <div class="hero-value">2 小时 16 分钟</div>
+            <div class="hero-sub">上次 11:04 · 奶粉 60 ml</div>
+            <div class="hero-foot"><span class="small">以家长记录为准</span><span class="tag">家长记录</span></div>
+          </div>
+          <div class="quick-row">
+            <div class="quick">喂奶</div><div class="quick">尿布</div><div class="quick">睡觉</div><div class="quick">辅食</div>
+          </div>
+          <div class="summary">
+            <div class="summary-cell"><div class="summary-val">2</div><div class="summary-label">喂养</div></div>
+            <div class="summary-cell"><div class="summary-val">60</div><div class="summary-label">奶量 ml</div></div>
+            <div class="summary-cell"><div class="summary-val">400</div><div class="summary-label">睡眠 min</div></div>
+            <div class="summary-cell"><div class="summary-val">2</div><div class="summary-label">尿布</div></div>
+          </div>
+        </div>`;
+    }
+
+    function timelineHead(count, label = "今日时间线") {
+      return `<div class="timeline-head"><b>${label}</b><span>${count} 条</span></div>`;
+    }
+
+    function nowRow() {
+      return `<div class="now-row"><span></span><span class="now-node"></span><span class="now-text">现在 ${NOW_LABEL}</span></div>`;
+    }
+
+    function eventMeta(e) {
+      const bits = [];
+      if (e.note) bits.push(`<span class="note">${e.note}</span>`);
+      if (e.ongoing) bits.push('<span class="chip chip-ongoing">进行中</span>');
+      if (e.cross) bits.push('<span class="chip chip-cross">跨夜</span>');
+      bits.push('<span class="tag">家长记录</span>');
+      return bits.join("");
+    }
+
+    function variantA(state) {
+      if (state.empty) {
+        return `${timelineHead(0)}${nowRow()}<div class="empty-a"><span class="ghost"></span><div class="empty-message">今天还没有记录<br>从上面的快捷动作开始。</div></div>`;
+      }
+      const rows = EVENTS.map((e) => `
+        <div class="event-a type-${e.type} ${e.ongoing ? "ongoing" : ""} ${e.cross ? "cross" : ""}" data-event="${e.id}">
+          <div class="time">${e.time}</div>
+          <div class="rail"><span class="node">${ICONS[e.type]}</span></div>
+          <div class="main"><div class="title">${e.title}</div><div class="meta">${eventMeta(e)}</div></div>
+          <span class="chev">›</span>
+        </div>`).join("");
+      return `${timelineHead(EVENTS.length)}${nowRow()}<div class="rail-list">${rows}</div>`;
+    }
+
+    function variantB(state) {
+      if (state.empty) {
+        return `${timelineHead(0)}${nowRow()}<div class="empty-b"><div>今天还没有记录</div><div class="empty-rail"></div><div>从上面的快捷动作开始。</div></div>`;
+      }
+      let rows = "";
+      EVENTS.forEach((e, index) => {
+        rows += `
+          <div class="event-b type-${e.type} ${e.ongoing ? "ongoing" : ""}" data-event="${e.id}">
+            <div class="time">${e.time}</div>
+            <span class="bar"></span>
+            <div class="main"><div class="title">${e.title}</div><div class="meta">${eventMeta(e)}</div></div>
+            <span class="chev">›</span>
+          </div>`;
+        const next = EVENTS[index + 1];
+        if (next) {
+          const diff = e.sort - next.sort;
+          if (next.cross) {
+            rows += `<div class="gap-row"><span></span><span class="gap-line"></span><span class="gap-text">跨夜</span></div>`;
+          } else if (diff >= 15) {
+            rows += `<div class="gap-row"><span></span><span class="gap-line"></span><span class="gap-text">间隔 ${fmtDuration(diff)}</span></div>`;
+          }
+        }
+      });
+      return `${timelineHead(EVENTS.length)}${nowRow()}<div class="interval-list">${rows}</div>`;
+    }
+
+    function pct(minutes) { return `${(minutes / 1440) * 100}%`; }
+
+    function variantC(state) {
+      if (state.empty) {
+        return `${timelineHead(0)}
+          <div class="day-strip">
+            <div class="strip-head"><b>24 小时概览</b><span>最新在上</span></div>
+            <div class="strip-track"><div class="strip-now" style="left:${pct(NOW_MIN)}"><span>现在</span></div></div>
+            <div class="strip-labels"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span></div>
+            <div class="legend">${legend()}</div>
+          </div>
+          <div class="empty-c">今天还没有记录<br>从上面的快捷动作开始。</div>`;
+      }
+      const feed = EVENTS.filter((e) => e.type === "feed");
+      const diapers = EVENTS.filter((e) => e.type === "diaper");
+      const solids = EVENTS.filter((e) => e.type === "solid");
+      const sleeps = EVENTS.filter((e) => e.type === "sleep");
+      const dots = (list) => list.map((e) => `<span class="strip-dot type-${e.type}" style="left:${pct(e.minutes)}" title="${e.time} ${e.title}"></span>`).join("");
+      const sleepBars = sleeps.map((e) => {
+        if (e.cross) {
+          return `<span class="sleep-seg" style="left:0%;width:${(380 / 1440) * 100}%"></span><span class="sleep-seg" style="left:${pct(1430)};width:0.7%"></span>`;
+        }
+        const end = e.ongoing ? NOW_MIN : e.minutes + 45;
+        return `<span class="sleep-seg" style="left:${pct(e.minutes)};width:${((end - e.minutes) / 1440) * 100}%"></span>`;
+      }).join("");
+      const list = EVENTS.map((e) => `
+        <div class="event-c type-${e.type}" data-event="${e.id}">
+          <div class="time">${e.time}</div>
+          <div class="icon">${ICONS[e.type]}</div>
+          <div><div class="title">${e.title}</div><div class="meta">${eventMeta(e)}</div></div>
+          <span class="chev">›</span>
+        </div>`).join("");
+      return `${timelineHead(EVENTS.length)}
+        <div class="day-strip">
+          <div class="strip-head"><b>24 小时概览</b><span>最新在上</span></div>
+          <div class="strip-track">
+            ${sleepBars}${dots(feed)}${dots(diapers)}${dots(solids)}
+            <div class="strip-now" style="left:${pct(NOW_MIN)}"><span>现在</span></div>
+          </div>
+          <div class="strip-labels"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span></div>
+          <div class="legend">${legend()}</div>
+        </div>
+        ${nowRow()}<div class="compact-list">${list}</div>`;
+    }
+
+    function legend() {
+      return ["feed", "diaper", "sleep", "solid"].map((type) =>
+        `<span><i class="type-${type}" style="background:var(--${type})"></i>${TYPE_LABEL[type]}</span>`
+      ).join("");
+    }
+
+    function phoneHtml(state) {
+      const body = state.variant === "B" ? variantB(state) : state.variant === "C" ? variantC(state) : variantA(state);
+      const showTop = state.view !== "timeline";
+      return `
+        <div class="phone" data-variant="${state.variant}" data-density="${state.density}" data-top="${state.top}">
+          ${showTop ? `
+            <div class="statusbar"><span>13:20</span><span class="right">5G · 30%</span></div>
+            <div class="appbar"><span class="domain active">育儿</span><span class="domain">健康档案</span></div>` : ""}
+          <div class="screen">
+            ${showTop ? topHtml(state) : ""}
+            <div class="timeline">${body}</div>
+          </div>
+          ${showTop ? `<div class="tabbar"><span class="tab active"><i class="glyph"></i>今天</span><span class="tab stats"><i class="glyph"></i>统计</span></div>` : ""}
+          <div class="toast" id="toast"></div>
+        </div>`;
+    }
+
+    function attachToast() {
+      const phone = document.querySelector(".phone");
+      const toast = document.getElementById("toast");
+      document.querySelectorAll("[data-event]").forEach((row) => {
+        row.addEventListener("click", () => {
+          const e = EVENTS.find((item) => item.id === Number(row.dataset.event));
+          if (!toast || !e) return;
+          toast.textContent = `点按 ${e.time} ${e.title} → 打开修改`;
+          toast.classList.add("show");
+          clearTimeout(window.__toastTimer);
+          window.__toastTimer = setTimeout(() => toast.classList.remove("show"), 1600);
+        });
+      });
+    }
+
+    function renderContact(state) {
+      document.body.classList.remove("clean");
+      document.getElementById("page-head").style.display = "block";
+      const variants = [
+        ["A", "时间轨 + 事件节点", "最像时间线：竖轨、节点、时间栏和类型色。行高最高，扫读最快。", true],
+        ["B", "间隔线", "最紧凑：保留行列表，用「间隔 2 小时 10 分」强调时间。视觉最轻。", false],
+        ["C", "24 小时概览 + 明细", "最能看出一天的分布：比例轴 + 最新在上明细。跨夜睡眠更直观。", false]
+      ];
+      document.getElementById("stage").className = "contact-stage";
+      document.getElementById("stage").innerHTML = variants.map(([key, label, desc, recommend]) => `
+        <div class="phone-wrap">
+          <h2 class="phone-label">${key} · ${label}${recommend ? '<span class="badge">推荐</span>' : ""}</h2>
+          <p class="phone-desc">${desc}</p>
+          ${phoneHtml({ ...state, variant: key, view: "phone", empty: false })}
+        </div>`).join("");
+      document.getElementById("controls").style.display = "none";
+    }
+
+    function renderControls(state) {
+      const controls = document.getElementById("controls");
+      controls.style.display = "flex";
+      const group = (label, buttons) => `<span class="label">${label}</span><span class="group">${buttons}</span>`;
+      const btn = (text, active, action) => `<button class="${active ? "active" : ""}" data-action="${action}">${text}</button>`;
+      controls.innerHTML = `
+        ${group("方案", ["A", "B", "C"].map((v) => btn(v, state.variant === v, `variant:${v}`)).join(""))}
+        ${group("密度", btn("舒适", state.density === "comfortable", "density:comfortable") + btn("紧凑", state.density === "compact", "density:compact"))}
+        ${group("上方", btn("当前", state.top === "current", "top:current") + btn("压缩", state.top === "compressed", "top:compressed"))}
+        ${group("状态", btn("有记录", !state.empty, "state:events") + btn("空态", state.empty, "state:empty"))}
+        ${group("视图", btn("整屏", state.view === "phone", "view:phone") + btn("时间线特写", state.view === "timeline", "view:timeline"))}`;
+      controls.querySelectorAll("[data-action]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const [key, value] = button.dataset.action.split(":");
+          if (key === "variant") writeState({ variant: value });
+          if (key === "density") writeState({ density: value });
+          if (key === "top") writeState({ top: value });
+          if (key === "state") writeState({ state: value });
+          if (key === "view") writeState({ view: value });
+          render(readState());
+        });
+      });
+    }
+
+    function render(state) {
+      document.body.classList.toggle("clean", state.clean);
+      if (state.contact) {
+        renderContact(state);
+        attachToast();
+        return;
+      }
+      document.getElementById("stage").className = "stage";
+      document.getElementById("stage").innerHTML = phoneHtml(state);
+      if (!state.clean) renderControls(state);
+      else document.getElementById("controls").style.display = "none";
+      attachToast();
+    }
+
+    document.addEventListener("keydown", (event) => {
+      if (["INPUT", "TEXTAREA"].includes(document.activeElement?.tagName)) return;
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      const state = readState();
+      const order = ["A", "B", "C"];
+      const index = order.indexOf(state.variant);
+      const next = order[(index + (event.key === "ArrowRight" ? 1 : order.length - 1)) % order.length];
+      writeState({ variant: next });
+      render(readState());
+    });
+
+    render(readState());
+  </script>
+</body>
+</html>
