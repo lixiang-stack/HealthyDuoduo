@@ -27,12 +27,12 @@ beforeEach(async () => {
 });
 
 describe('entry route', () => {
-  it('starts in daily today when the family has a child', async () => {
+  it('starts in care today when the family has a child', async () => {
     useApi([makeMember({ member_id: 1, is_child: true })]);
 
     await render(<IndexScreen />);
 
-    expect(await screen.findByTestId('redirect')).toHaveTextContent('/daily/today');
+    expect(await screen.findByTestId('redirect')).toHaveTextContent('/care/today');
   });
 
   it('starts in health reports when the family has no child', async () => {
@@ -48,7 +48,7 @@ describe('entry route', () => {
       DOMAIN_NAVIGATION_STORAGE_KEY,
       JSON.stringify({
         lastDomain: 'health',
-        lastPaths: { daily: '/daily/stats', health: '/health/trends' },
+        lastPaths: { care: '/care/stats', health: '/health/trends' },
       }),
     );
 

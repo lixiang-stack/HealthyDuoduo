@@ -9,7 +9,7 @@ import { useDomainNavigation } from './DomainNavigationContext';
 import type { Domain } from './domainRoutes';
 import { DomainTabs } from './DomainTabs';
 
-// B3 appbar: domain tabs only. The current child lives in the daily content area
+// B3 appbar: domain tabs only. The current child lives in the care content area
 // (ticket 03); health keeps its member chips in the page body.
 export function DomainHeader({ activeDomain }: { activeDomain: Domain }) {
   const { navigateFromDomain } = useDomainNavigation();

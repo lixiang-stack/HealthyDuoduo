@@ -28,7 +28,7 @@ export default function RootLayout() {
                 }
               >
                 <Stack.Screen name="index" options={{ headerShown: false }} />
-                <Stack.Screen name="daily" options={{ headerShown: false }} />
+                <Stack.Screen name="care" options={{ headerShown: false }} />
                 <Stack.Screen name="health" options={{ headerShown: false }} />
                 <Stack.Screen name="settings" options={{ title: '设置' }} />
                 <Stack.Screen name="members" options={{ title: '家庭成员' }} />

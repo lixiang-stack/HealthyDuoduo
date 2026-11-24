@@ -4,7 +4,7 @@
 
 **Blocked by:** 01（护理事件契约）、03（当前孩子上下文）。
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 ## 验收清单
 

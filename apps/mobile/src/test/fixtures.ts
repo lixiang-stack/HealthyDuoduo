@@ -56,6 +56,12 @@ export function makeGrowthRecord(overrides: Partial<GrowthRecord> = {}): GrowthR
   };
 }
 
+/** Wide enough to cover any synthetic care event regardless of the test clock. */
+export const WIDE_CARE_EVENT_RANGE = {
+  from: '2000-01-01T00:00:00.000Z',
+  to: '2100-01-01T00:00:00.000Z',
+};
+
 export function makeFeedEvent(
   overrides: Partial<Extract<CareEvent, { type: 'feed' }>> = {},
 ): Extract<CareEvent, { type: 'feed' }> {

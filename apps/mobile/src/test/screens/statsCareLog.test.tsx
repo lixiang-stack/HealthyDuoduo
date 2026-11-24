@@ -138,7 +138,7 @@ describe('Stats care log', () => {
     expect(await screen.findByTestId('stats-empty')).toHaveTextContent(/还没有记录/);
     expect(screen.queryByTestId('stats-chart-bar')).toBeNull();
     await fireEvent.press(screen.getByTestId('stats-go-today'));
-    expect(mockRouter.replace).toHaveBeenCalledWith('/daily/today');
+    expect(mockRouter.replace).toHaveBeenCalledWith('/care/today');
   });
 
   it('renders a single recorded day without hiding the chart', async () => {

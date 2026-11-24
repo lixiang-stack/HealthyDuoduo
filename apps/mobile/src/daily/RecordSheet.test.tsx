@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import type { ComponentProps } from 'react';
 
-import { makeFeedEvent, makeMember } from '../test/fixtures';
+import { makeFeedEvent, makeMember, WIDE_CARE_EVENT_RANGE } from '../test/fixtures';
 import type { CareEvent } from '../care/careEvents';
 import { InMemoryCareEventRepository } from '../care/careEventRepository';
 import { CareEventProvider } from '../care/CareEventProvider';
@@ -10,11 +10,6 @@ import { RecordSheet } from './RecordSheet';
 const doudou = makeMember({ member_id: 1, name: '豆豆', is_child: true });
 const second = makeMember({ member_id: 2, name: '老二', is_child: true });
 const mom = makeMember({ member_id: 9, name: '妈妈', is_child: false });
-
-const WIDE_RANGE = {
-  from: '2000-01-01T00:00:00.000Z',
-  to: '2100-01-01T00:00:00.000Z',
-};
 
 async function renderSheet(
   props: Partial<ComponentProps<typeof RecordSheet>> = {},
@@ -100,8 +95,7 @@ describe('RecordSheet target', () => {
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
     const events = await repository.list({
       member_id: doudou.member_id,
-      from: '2000-01-01T00:00:00.000Z',
-      to: '2100-01-01T00:00:00.000Z',
+      ...WIDE_CARE_EVENT_RANGE,
     });
     expect(events).toHaveLength(1);
     expect(events[0].member_id).toBe(doudou.member_id);
@@ -132,7 +126,7 @@ describe('RecordSheet fields and saving', () => {
       '请填写 HH:MM 格式的时间',
     );
     expect(onSaved).not.toHaveBeenCalled();
-    expect(await repository.list({ member_id: 1, ...WIDE_RANGE })).toHaveLength(0);
+    expect(await repository.list({ member_id: 1, ...WIDE_CARE_EVENT_RANGE })).toHaveLength(0);
   });
 
   it('creates a formula feed with amount, note and the frozen member', async () => {
@@ -150,7 +144,7 @@ describe('RecordSheet fields and saving', () => {
     await fireEvent.press(screen.getByTestId('record-submit'));
 
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
-    const [created] = await repository.list({ member_id: 1, ...WIDE_RANGE });
+    const [created] = await repository.list({ member_id: 1, ...WIDE_CARE_EVENT_RANGE });
     expect(created).toMatchObject({
       member_id: 1,
       type: 'feed',
@@ -172,7 +166,7 @@ describe('RecordSheet fields and saving', () => {
     await fireEvent.press(screen.getByTestId('record-submit'));
 
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
-    const [created] = await repository.list({ member_id: 1, ...WIDE_RANGE });
+    const [created] = await repository.list({ member_id: 1, ...WIDE_CARE_EVENT_RANGE });
     expect(created).toMatchObject({ type: 'diaper', diaper_type: 'mixed' });
   });
 
@@ -186,7 +180,7 @@ describe('RecordSheet fields and saving', () => {
     await fireEvent.press(screen.getByTestId('record-submit'));
 
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
-    const [created] = await repository.list({ member_id: 1, ...WIDE_RANGE });
+    const [created] = await repository.list({ member_id: 1, ...WIDE_CARE_EVENT_RANGE });
     expect(created).toMatchObject({ type: 'sleep', duration_min: 45 });
     expect(created.type === 'sleep' && created.ended_at).toBeTruthy();
   });
@@ -204,7 +198,7 @@ describe('RecordSheet fields and saving', () => {
     await fireEvent.press(screen.getByTestId('record-submit'));
 
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
-    const [created] = await repository.list({ member_id: 1, ...WIDE_RANGE });
+    const [created] = await repository.list({ member_id: 1, ...WIDE_CARE_EVENT_RANGE });
     expect(created).toMatchObject({ type: 'solid', food: '米粉', amount_g: 40 });
   });
 
@@ -226,7 +220,7 @@ describe('RecordSheet fields and saving', () => {
     await fireEvent.press(screen.getByTestId('record-submit'));
 
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
-    const [updated] = await repository.list({ member_id: 1, ...WIDE_RANGE });
+    const [updated] = await repository.list({ member_id: 1, ...WIDE_CARE_EVENT_RANGE });
     expect(updated).toMatchObject({
       id: feed.id,
       member_id: feed.member_id,
@@ -236,7 +230,7 @@ describe('RecordSheet fields and saving', () => {
 
     await fireEvent.press(screen.getByTestId('record-delete'));
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(2));
-    expect(await repository.list({ member_id: 1, ...WIDE_RANGE })).toHaveLength(0);
+    expect(await repository.list({ member_id: 1, ...WIDE_CARE_EVENT_RANGE })).toHaveLength(0);
   });
 });
 
@@ -275,7 +269,7 @@ describe('RecordSheet duplicate feed guard', () => {
     await fireEvent.press(screen.getByTestId('duplicate-feed-continue'));
 
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
-    expect(await repository.list({ member_id: 1, ...WIDE_RANGE })).toHaveLength(2);
+    expect(await repository.list({ member_id: 1, ...WIDE_CARE_EVENT_RANGE })).toHaveLength(2);
   });
 
   it('keeps the form content and writes nothing when the parent chooses 返回修改', async () => {
@@ -292,7 +286,7 @@ describe('RecordSheet duplicate feed guard', () => {
     expect(screen.queryByTestId('duplicate-feed-confirm')).toBeNull();
     expect(screen.getByTestId('record-note').props.value).toBe('保留这条备注');
     expect(onSaved).not.toHaveBeenCalled();
-    expect(await repository.list({ member_id: 1, ...WIDE_RANGE })).toHaveLength(1);
+    expect(await repository.list({ member_id: 1, ...WIDE_CARE_EVENT_RANGE })).toHaveLength(1);
   });
 
   it('does not ask outside the window', async () => {
@@ -317,7 +311,7 @@ describe('RecordSheet duplicate feed guard', () => {
 
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
     expect(screen.queryByTestId('duplicate-feed-confirm')).toBeNull();
-    expect(await repository.list({ member_id: 2, ...WIDE_RANGE })).toHaveLength(1);
+    expect(await repository.list({ member_id: 2, ...WIDE_CARE_EVENT_RANGE })).toHaveLength(1);
   });
 
   it('does not ask when editing the feed itself', async () => {
@@ -330,7 +324,7 @@ describe('RecordSheet duplicate feed guard', () => {
 
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
     expect(screen.queryByTestId('duplicate-feed-confirm')).toBeNull();
-    expect(await repository.list({ member_id: 1, ...WIDE_RANGE })).toHaveLength(1);
+    expect(await repository.list({ member_id: 1, ...WIDE_CARE_EVENT_RANGE })).toHaveLength(1);
   });
 
   it('asks when an edited feed moves into another feed’s window and updates on 仍然添加', async () => {
@@ -346,7 +340,7 @@ describe('RecordSheet duplicate feed guard', () => {
     await fireEvent.press(screen.getByTestId('duplicate-feed-continue'));
 
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
-    const events = await repository.list({ member_id: 1, ...WIDE_RANGE });
+    const events = await repository.list({ member_id: 1, ...WIDE_CARE_EVENT_RANGE });
     expect(events.map((event) => event.id).sort()).toEqual([1, 10]);
   });
 });

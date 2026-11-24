@@ -1,6 +1,6 @@
 # Spec：B3 护理记录导航与孩子上下文
 
-Status: **ready-for-agent**（2026-11-23 用户确认 B3 + appbar tabs）
+Status: **implemented / accepted with known gaps**（2026-11-23 用户确认 B3 + appbar tabs；2026-11-24 票 01–08 跨票验收通过；差异见 §15）
 
 范围：App 一级 / 二级导航、当前孩子、记录弹层目标、重复喂养提示、提醒入口、统计页入口与空态。不含护理事件表 / API / OCR / 报告分析实现；护理事件数据模型按 `docs/reference/wechat-feeding-tracker.md` §7 另立实现 spec。
 
@@ -111,7 +111,7 @@ Status: **ready-for-agent**（2026-11-23 用户确认 B3 + appbar tabs）
 
 ### 4.4 页面
 
-- **育儿 > 今天**：hero「豆豆 · 距上次喂养」、四个快捷动作、今日摘要、提醒卡片、今日时间线、全部记录。
+- **育儿 > 今天**：hero「豆豆 · 距上次喂养」、四个快捷动作、今日摘要、提醒卡片、今日时间线（独立「全部记录」入口未接线，见 §15.8）。
 - **育儿 > 统计**：指标 tab（喂养 / 奶量 / 睡眠 / 尿布）、图表类型（柱状 / 堆叠 / 折线）、3 个 KPI、图表、图注与建议；不重复放提醒卡片。
 - **健康档案 > 报告**：成员 chips、按时间 / 按项目、报告卡、识别失败重试。
 - **健康档案 > 趋势**：指标趋势列表；后续可扩展。
@@ -128,7 +128,7 @@ Status: **ready-for-agent**（2026-11-23 用户确认 B3 + appbar tabs）
 - 每台设备本地保存 `currentMemberId`（健康档案查看对象）与 `currentChildId`（育儿记录对象），均为 AsyncStorage；不写服务端。
 - 单孩子：自动选中并锁定；只显示名字，不显示选择箭头，不需要选择器。
 - 多孩子：首次进入育儿页时要求选择；之后记住。清除 App 数据 / 换设备后重新选择。
-- 当前孩子被删除：清空本地选择；若仍有其他孩子，打开选择器；没有孩子则育儿页显示空态；首次启动 / 无本地偏好时默认入口落到健康档案。
+- 当前孩子被删除：清空本地选择；仍有多个孩子则打开选择器；只剩一个则自动选中并锁定；没有孩子则育儿页显示空态；首次启动 / 无本地偏好时默认入口落到健康档案。
 - 成人成员不作为护理目标；健康档案仍可切换成人查看报告。
 
 ### 5.2 展示
@@ -195,7 +195,7 @@ Status: **ready-for-agent**（2026-11-23 用户确认 B3 + appbar tabs）
 
 ## 9. 怎么实施
 
-1. **路由**：用两个域分组承载 B3：`/daily`（今天 / 统计）与 `/health`（报告 / 趋势）；appbar 域 tab 在两组之间切换，底部 tab 由各组自己的 tab layout 渲染。报告详情 / 今日记录 / 提醒为栈页面。
+1. **路由**：用两个域分组承载 B3：`/care`（今天 / 统计）与 `/health`（报告 / 趋势）；appbar 域 tab 在两组之间切换，底部 tab 由各组自己的 tab layout 渲染。报告详情 / 今日记录 / 提醒为栈页面。
 2. **Appbar**：新增共享 `DomainTabs` 组件；接收 active domain、健康档案待核对计数；域切换用 `router.replace` 保留各域上次二级 tab。当前孩子不放 appbar，改在育儿页内容区左上角。
 3. **孩子上下文**：扩展现有 `CurrentMemberContext`，增加 `currentChildId` / `setCurrentChild`；AsyncStorage 持久化；单孩子自动选中并锁定；多孩子选择器；成员删除时清理。
 4. **记录弹层**：打开时冻结 `targetMemberId`；多孩子 chips；保存禁用条件；保存后刷新当前孩子今天数据。
@@ -277,3 +277,22 @@ Status: **ready-for-agent**（2026-11-23 用户确认 B3 + appbar tabs）
 - 调研与护理事件草案：`../../docs/reference/wechat-feeding-tracker.md`
 - 局域网边界：`../../docs/adr/0006-lan-first-no-auth.md`
 - App 验收：`../../docs/adr/0013-native-only-acceptance.md`
+
+---
+
+## 15. 实现状态与差异（2026-11-24）
+
+**实现状态：** 票 01–08 已实现并通过跨票验收（`.scratch/care-log/issues/08-acceptance-and-regression.md`）。实现集中在 `apps/mobile/src/care/`（契约、fixture、内存 adapter）、`daily/`（今天 / 统计）、`reminders/`、`navigation/` 与 `members/`；未改 Go / Python / DB / OpenAPI。
+
+**与本文初始方案的差异：**
+
+1. **「日常」改名「育儿」**（2026-11-23 体验定稿）：用户可见文案与 `CONTEXT.md` 使用「育儿」；2026-11-24 路由与域标识由 `/daily` / `daily` 统一为 `/care` / `care`，旧本地导航偏好自动迁移。
+2. **当前孩子入口从 appbar 移到育儿页内容区左上角**：避免与域 tab 争位置；单孩子只显示名字并锁定，多孩子 `豆豆 ▾` 打开底部选择器。当前孩子被删除后：仍有多个孩子 → 打开选择器；只剩一个 → 自动选中并锁定；没有孩子 → 空态。健康档案继续使用页内成员 chips 与独立的 `currentMemberId`。
+3. **护理事件仍是客户端契约 + 内存 adapter**：`CareEvent` 判别联合、四类型 fixture 与 `InMemoryCareEventRepository` 已落地；正式 HTTP / 表 / 迁移未在本期，重启 App 后事件清空，提醒设置持久化但「上次喂养」可能回到空态。合成 fixture 只供测试 / 显式预览，生产 provider 默认空仓储，不能把 fixture 当真实记录。
+4. **重复喂养窗口以候选记录时间为准**：读写 `started_at` 前后各 5 分钟，便于补录旧时间与跨午夜；仍是 best-effort，不做服务端去重。
+5. **统计固定 7 个本机自然日**：睡眠按 07:00 / 19:00 拆分夜间 / 白天；单点照常渲染，不伪造趋势；统计页不渲染提醒卡片。
+6. **提醒只做本机一次性本地通知**：默认关闭、2 / 3 / 4 小时间隔、不申请精确闹钟、不接远程推送 / token；未申请权限时保持关闭并说明原因。
+7. **首次启动欢迎屏未实现**：按「有孩子 → 育儿 > 今天；无孩子 → 健康档案 > 报告」自动入口，并记住上次域与二级 tab（票 02 已记录）。
+8. **「全部记录」入口未接线**：`/today-records` 仍是占位栈页且无入口；当前由今天页时间线承担记录浏览。若后续需要独立全部记录页，另开票。
+
+**验收口径：** RNTL 57 suites / 447 tests、`npx tsc --noEmit`、`npm run lint -- --max-warnings=0`、`npx expo export --platform android` 全绿；契约 grep 无 `recorded_by` / `device_id` / 全局 active child，护理事件未进入报告 / 趋势 / 分析链路；无数据库迁移，`scripts/test-db.sh` 本票不适用；Android 真机 smoke 见票 08 Comments。

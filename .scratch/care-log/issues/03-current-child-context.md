@@ -4,7 +4,7 @@
 
 **Blocked by:** 02（导航壳）。
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 ## 验收清单
 

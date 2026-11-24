@@ -9,7 +9,7 @@ export type DomainTabConfig = {
 
 /** Bottom tabs are contextual: only the active domain's two secondary views appear. */
 export const DOMAIN_TABS: Record<Domain, readonly DomainTabConfig[]> = {
-  daily: [
+  care: [
     { name: 'today', title: '今天', Icon: TodayIcon },
     { name: 'stats', title: '统计', Icon: StatsIcon },
   ],

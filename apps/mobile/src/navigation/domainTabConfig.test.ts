@@ -1,8 +1,8 @@
 import { DOMAIN_TABS } from './domainTabConfig';
 
 describe('domain bottom tabs', () => {
-  it('shows only today/stats inside daily', () => {
-    expect(DOMAIN_TABS.daily.map((tab) => [tab.name, tab.title])).toEqual([
+  it('shows only today/stats inside care', () => {
+    expect(DOMAIN_TABS.care.map((tab) => [tab.name, tab.title])).toEqual([
       ['today', '今天'],
       ['stats', '统计'],
     ]);
@@ -16,7 +16,7 @@ describe('domain bottom tabs', () => {
   });
 
   it('does not add record, reminder or settings as bottom tabs', () => {
-    const names = [...DOMAIN_TABS.daily, ...DOMAIN_TABS.health].map((tab) => tab.name);
+    const names = [...DOMAIN_TABS.care, ...DOMAIN_TABS.health].map((tab) => tab.name);
     expect(names).not.toContain('record');
     expect(names).not.toContain('reminder');
     expect(names).not.toContain('settings');

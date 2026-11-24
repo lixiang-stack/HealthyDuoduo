@@ -4,12 +4,50 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import {
   DEFAULT_DOMAIN_NAVIGATION,
-  isDailyPath,
+  isCarePath,
   isHealthPath,
+  type CarePath,
+  type Domain,
   type DomainNavigationState,
 } from './domainRoutes';
 
 export const DOMAIN_NAVIGATION_STORAGE_KEY = 'healthyduoduo.domainNavigation';
+
+// The care domain used to live at /daily. Keep the old preference across the rename
+// instead of resetting the user's last domain and secondary tab.
+const LEGACY_DAILY_PATHS = {
+  '/daily/today': '/care/today',
+  '/daily/stats': '/care/stats',
+} as const;
+
+type LegacyDailyPath = keyof typeof LEGACY_DAILY_PATHS;
+
+function isLegacyDailyPath(value: unknown): value is LegacyDailyPath {
+  return (
+    typeof value === 'string' &&
+    Object.prototype.hasOwnProperty.call(LEGACY_DAILY_PATHS, value)
+  );
+}
+
+function storedCarePath(value: unknown): CarePath {
+  if (isCarePath(value)) {
+    return value;
+  }
+  if (isLegacyDailyPath(value)) {
+    return LEGACY_DAILY_PATHS[value];
+  }
+  return DEFAULT_DOMAIN_NAVIGATION.lastPaths.care;
+}
+
+function storedDomain(value: unknown): Domain | undefined {
+  if (value === 'care' || value === 'health') {
+    return value;
+  }
+  if (value === 'daily') {
+    return 'care';
+  }
+  return undefined;
+}
 
 function parseStored(raw: string): DomainNavigationState {
   try {
@@ -22,17 +60,12 @@ function parseStored(raw: string): DomainNavigationState {
       record.lastPaths !== null && typeof record.lastPaths === 'object'
         ? (record.lastPaths as Record<string, unknown>)
         : {};
-    const daily = isDailyPath(paths.daily)
-      ? paths.daily
-      : DEFAULT_DOMAIN_NAVIGATION.lastPaths.daily;
+    const care = storedCarePath(paths.care ?? paths.daily);
     const health = isHealthPath(paths.health)
       ? paths.health
       : DEFAULT_DOMAIN_NAVIGATION.lastPaths.health;
-    const lastDomain =
-      record.lastDomain === 'daily' || record.lastDomain === 'health'
-        ? record.lastDomain
-        : undefined;
-    return { lastDomain, lastPaths: { daily, health } };
+    const lastDomain = storedDomain(record.lastDomain);
+    return { lastDomain, lastPaths: { care, health } };
   } catch {
     return DEFAULT_DOMAIN_NAVIGATION;
   }

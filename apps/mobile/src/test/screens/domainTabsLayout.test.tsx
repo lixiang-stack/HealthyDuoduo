@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react-native';
 
-import DailyTabsLayout from '../../app/daily/_layout';
+import CareTabsLayout from '../../app/care/_layout';
 import HealthTabsLayout from '../../app/health/_layout';
 
 jest.mock('../../navigation/DomainHeader', () => ({
@@ -26,11 +26,11 @@ jest.mock('expo-router/js-tabs', () => {
 });
 
 describe('domain tab layouts', () => {
-  it('daily renders only today and stats', async () => {
-    await render(<DailyTabsLayout />);
+  it('care renders only today and stats', async () => {
+    await render(<CareTabsLayout />);
 
-    expect(screen.getByTestId('daily-tab-today')).toHaveTextContent('今天');
-    expect(screen.getByTestId('daily-tab-stats')).toHaveTextContent('统计');
+    expect(screen.getByTestId('care-tab-today')).toHaveTextContent('今天');
+    expect(screen.getByTestId('care-tab-stats')).toHaveTextContent('统计');
     expect(screen.queryByTestId('health-tab-reports')).toBeNull();
     expect(screen.queryByTestId('health-tab-trends')).toBeNull();
   });
@@ -40,7 +40,7 @@ describe('domain tab layouts', () => {
 
     expect(screen.getByTestId('health-tab-reports')).toHaveTextContent('报告');
     expect(screen.getByTestId('health-tab-trends')).toHaveTextContent('趋势');
-    expect(screen.queryByTestId('daily-tab-today')).toBeNull();
-    expect(screen.queryByTestId('daily-tab-stats')).toBeNull();
+    expect(screen.queryByTestId('care-tab-today')).toBeNull();
+    expect(screen.queryByTestId('care-tab-stats')).toBeNull();
   });
 });
