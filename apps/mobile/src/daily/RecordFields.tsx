@@ -10,7 +10,11 @@ import {
 } from 'react-native';
 
 import { DIAPER_TYPE_OPTIONS, FEED_METHOD_OPTIONS } from '../care/careEventDisplay';
-import type { RecordDraft, RecordDraftErrors } from '../care/recordDraft';
+import {
+  sleepStartPreview,
+  type RecordDraft,
+  type RecordDraftErrors,
+} from '../care/recordDraft';
 import { colors } from '../components/theme';
 
 export function RecordFields({
@@ -22,6 +26,7 @@ export function RecordFields({
   errors: RecordDraftErrors;
   onChange: (patch: Partial<RecordDraft>) => void;
 }) {
+  const sleepStart = draft.type === 'sleep' ? sleepStartPreview(draft) : null;
   return (
     <>
       {draft.type === 'feed' ? (
@@ -105,16 +110,29 @@ export function RecordFields({
         />
       ) : null}
 
-      <SheetInput
-        testID="record-time"
-        label="时间"
-        value={draft.time}
-        onChangeText={(value) => onChange({ time: value })}
-        placeholder="HH:MM"
-        keyboardType="numbers-and-punctuation"
-        maxLength={5}
-        error={errors.time}
-      />
+      {draft.type === 'sleep' ? (
+        <SheetInput
+          testID="record-end-time"
+          label="结束时间"
+          value={draft.endTime}
+          onChangeText={(value) => onChange({ endTime: value })}
+          placeholder="HH:MM"
+          keyboardType="numbers-and-punctuation"
+          maxLength={5}
+          error={errors.endTime}
+        />
+      ) : (
+        <SheetInput
+          testID="record-time"
+          label="时间"
+          value={draft.time}
+          onChangeText={(value) => onChange({ time: value })}
+          placeholder="HH:MM"
+          keyboardType="numbers-and-punctuation"
+          maxLength={5}
+          error={errors.time}
+        />
+      )}
 
       {draft.type === 'feed' && draft.method === 'formula' ? (
         <SheetInput
@@ -143,16 +161,23 @@ export function RecordFields({
       ) : null}
 
       {draft.type === 'sleep' ? (
-        <SheetInput
-          testID="record-duration"
-          label="时长（可选）"
-          value={draft.durationMin}
-          onChangeText={(value) => onChange({ durationMin: value })}
-          placeholder="例如 45"
-          unit="分钟"
-          keyboardType="number-pad"
-          error={errors.durationMin}
-        />
+        <>
+          <SheetInput
+            testID="record-duration"
+            label="睡了多久（必填）"
+            value={draft.durationMin}
+            onChangeText={(value) => onChange({ durationMin: value })}
+            placeholder="例如 45"
+            unit="分钟"
+            keyboardType="number-pad"
+            error={errors.durationMin}
+          />
+          {sleepStart ? (
+            <Text testID="record-sleep-start-preview" style={styles.preview}>
+              {sleepStart}
+            </Text>
+          ) : null}
+        </>
       ) : null}
 
       <SheetInput
@@ -238,5 +263,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   unit: { fontSize: 13, color: colors.muted },
+  preview: { fontSize: 13, color: colors.muted },
   error: { fontSize: 12, color: colors.fail },
 });

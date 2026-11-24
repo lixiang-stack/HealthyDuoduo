@@ -20,7 +20,7 @@ export const MINUTES_PER_HOUR = 60;
 export const CARE_EVENT_LABELS: Record<CareEventType, string> = {
   feed: '喂奶',
   diaper: '尿布',
-  sleep: '睡觉',
+  sleep: '睡眠',
   solid: '辅食',
 };
 

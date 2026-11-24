@@ -1,7 +1,12 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import type { ComponentProps } from 'react';
 
-import { makeFeedEvent, makeMember, WIDE_CARE_EVENT_RANGE } from '../test/fixtures';
+import {
+  makeFeedEvent,
+  makeMember,
+  makeSleepEvent,
+  WIDE_CARE_EVENT_RANGE,
+} from '../test/fixtures';
 import type { CareEvent } from '../care/careEvents';
 import { InMemoryCareEventRepository } from '../care/careEventRepository';
 import { CareEventProvider } from '../care/CareEventProvider';
@@ -170,19 +175,122 @@ describe('RecordSheet fields and saving', () => {
     expect(created).toMatchObject({ type: 'diaper', diaper_type: 'mixed' });
   });
 
-  it('creates a sleep event with duration and derives its end', async () => {
+  it('records a finished sleep from its end time and duration', async () => {
+    const today = new Date();
     const repository = new InMemoryCareEventRepository();
     const onSaved = jest.fn();
     await renderSheet({ members: [doudou, mom], type: 'sleep', onSaved }, repository);
 
-    expect(screen.getByTestId('record-title')).toHaveTextContent('记录睡觉');
+    expect(screen.getByTestId('record-title')).toHaveTextContent('记录睡眠');
+    expect(screen.getByTestId('record-hint')).toHaveTextContent(/已经结束的睡眠/);
+    expect(screen.getByTestId('record-hint')).toHaveTextContent(/夜醒后再次入睡可另记一条/);
+    expect(screen.getByTestId('record-end-time').props.value).toMatch(/^\d{2}:\d{2}$/);
+
+    await fireEvent.changeText(screen.getByTestId('record-end-time'), '25:00');
+    await fireEvent.press(screen.getByTestId('record-submit'));
+    expect(screen.getByTestId('record-end-time-error')).toHaveTextContent(
+      '请填写 HH:MM 格式的时间',
+    );
+    expect(screen.getByTestId('record-duration-error')).toHaveTextContent('请填写睡了多久');
+
+    await fireEvent.changeText(screen.getByTestId('record-end-time'), '13:00');
+    await fireEvent.changeText(screen.getByTestId('record-duration'), '0');
+    await fireEvent.press(screen.getByTestId('record-submit'));
+    expect(screen.getByTestId('record-duration-error')).toHaveTextContent(
+      '时长需为正整数分钟',
+    );
+
     await fireEvent.changeText(screen.getByTestId('record-duration'), '45');
+    expect(screen.getByTestId('record-sleep-start-preview')).toHaveTextContent('开始 12:15');
     await fireEvent.press(screen.getByTestId('record-submit'));
 
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
     const [created] = await repository.list({ member_id: 1, ...WIDE_CARE_EVENT_RANGE });
-    expect(created).toMatchObject({ type: 'sleep', duration_min: 45 });
-    expect(created.type === 'sleep' && created.ended_at).toBeTruthy();
+    const endedAt = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate(),
+      13,
+      0,
+    ).toISOString();
+    const startedAt = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate(),
+      12,
+      15,
+    ).toISOString();
+    expect(created).toMatchObject({
+      type: 'sleep',
+      duration_min: 45,
+      started_at: startedAt,
+      ended_at: endedAt,
+    });
+  });
+
+  it('previews and saves a sleep that starts the previous day', async () => {
+    const today = new Date();
+    const repository = new InMemoryCareEventRepository();
+    const onSaved = jest.fn();
+    await renderSheet({ members: [doudou, mom], type: 'sleep', onSaved }, repository);
+
+    await fireEvent.changeText(screen.getByTestId('record-end-time'), '00:20');
+    await fireEvent.changeText(screen.getByTestId('record-duration'), '30');
+    expect(screen.getByTestId('record-sleep-start-preview')).toHaveTextContent(
+      '开始 昨天 23:50',
+    );
+    await fireEvent.press(screen.getByTestId('record-submit'));
+
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
+    const [created] = await repository.list({ member_id: 1, ...WIDE_CARE_EVENT_RANGE });
+    const endedAt = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate(),
+      0,
+      20,
+    ).toISOString();
+    const startedAt = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate() - 1,
+      23,
+      50,
+    ).toISOString();
+    expect(created).toMatchObject({
+      type: 'sleep',
+      duration_min: 30,
+      started_at: startedAt,
+      ended_at: endedAt,
+    });
+  });
+
+  it('completes an ongoing legacy sleep with now and its elapsed duration', async () => {
+    const ongoing = makeSleepEvent({
+      id: 7,
+      started_at: new Date(Date.now() - 90 * 60000).toISOString(),
+      ended_at: null,
+      duration_min: null,
+    });
+    const repository = new InMemoryCareEventRepository([ongoing]);
+    const onSaved = jest.fn();
+    await renderSheet(
+      { members: [doudou, mom], type: 'sleep', editingEvent: ongoing, onSaved },
+      repository,
+    );
+
+    expect(screen.getByTestId('record-duration').props.value).toBe('90');
+    expect(screen.getByTestId('record-end-time').props.value).toMatch(/^\d{2}:\d{2}$/);
+
+    await fireEvent.press(screen.getByTestId('record-submit'));
+
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
+    const [updated] = await repository.list({ member_id: 1, ...WIDE_CARE_EVENT_RANGE });
+    expect(updated).toMatchObject({ id: 7, type: 'sleep', duration_min: 90 });
+    expect(updated.ended_at).not.toBeNull();
+    expect(Date.parse(updated.ended_at ?? '')).toBe(
+      Date.parse(updated.started_at) + 90 * 60000,
+    );
   });
 
   it('requires solid food and creates the solid event with its amount', async () => {

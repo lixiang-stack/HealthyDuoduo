@@ -300,7 +300,7 @@ Status: **implemented / accepted with known gaps**（2026-11-23 用户确认 B3 
 **后续（2026-11-24）：**
 
 - 护理事件持久化（A1）另立 spec：`.scratch/care-events/spec.md`；四类事件单表 `care_events`、四个 HTTP 端点、App HTTP adapter、提醒跟随当前孩子。票 01–08 的验收口径不变。
-- 睡眠记录方式已定：结束后补记（结束时间 + 时长，生产不再创建进行中），见 `issues/09-sleep-completion.md`；删除确认 / 跨天补录 / 键盘仍 deferred。
+- 睡眠记录方式已实现（票 09，自动化全绿）：结束后补记（结束时间 + 时长，生产不再创建进行中），见 `issues/09-sleep-completion.md`；真机 smoke 待补；删除确认 / 跨天补录 / 键盘仍 deferred。
 - `/today-records` 占位将移除，时间线继续承担浏览，见 `issues/10-cleanup.md`。
 
 **验收口径：** RNTL 57 suites / 447 tests、`npx tsc --noEmit`、`npm run lint -- --max-warnings=0`、`npx expo export --platform android` 全绿；契约 grep 无 `recorded_by` / `device_id` / 全局 active child，护理事件未进入报告 / 趋势 / 分析链路；无数据库迁移，`scripts/test-db.sh` 本票不适用；Android 真机 smoke 见票 08 Comments。

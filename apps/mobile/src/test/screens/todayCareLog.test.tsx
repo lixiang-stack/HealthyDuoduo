@@ -73,6 +73,7 @@ describe('Today care log', () => {
     for (const type of ['feed', 'diaper', 'sleep', 'solid']) {
       expect(screen.getByTestId(`today-quick-${type}`)).toBeTruthy();
     }
+    expect(screen.getByTestId('today-quick-sleep')).toHaveTextContent('睡眠');
     expect(screen.getByTestId('today-summary-feeds')).toHaveTextContent(/1/);
     expect(screen.getByTestId('today-summary-amount')).toHaveTextContent(/120/);
     expect(screen.getByTestId('today-summary-diapers')).toHaveTextContent(/1/);

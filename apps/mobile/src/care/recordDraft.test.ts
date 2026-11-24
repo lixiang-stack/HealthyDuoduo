@@ -1,6 +1,12 @@
 import type { CareEvent } from './careEvents';
 import { makeFeedEvent } from '../test/fixtures';
-import { createRecordDraft, editRecordDraft, recordDraftErrors, recordDraftToBody } from './recordDraft';
+import {
+  createRecordDraft,
+  editRecordDraft,
+  recordDraftErrors,
+  recordDraftToBody,
+  sleepStartPreview,
+} from './recordDraft';
 
 const NOW = new Date(2026, 10, 23, 14, 5);
 
@@ -21,7 +27,12 @@ describe('record drafts', () => {
       type: 'diaper',
       diaperType: 'wet',
     });
-    expect(createRecordDraft('sleep', NOW)).toMatchObject({ type: 'sleep', durationMin: '' });
+    expect(createRecordDraft('sleep', NOW)).toMatchObject({
+      type: 'sleep',
+      date: '2026-11-23',
+      endTime: '14:05',
+      durationMin: '',
+    });
     expect(createRecordDraft('solid', NOW)).toMatchObject({
       type: 'solid',
       food: '',
@@ -29,7 +40,7 @@ describe('record drafts', () => {
     });
   });
 
-  it('keeps an edited event’s original local date across midnight', () => {
+  it('anchors an edited sleep to its end date across midnight', () => {
     const sleep: CareEvent = {
       id: 4,
       member_id: 1,
@@ -42,9 +53,28 @@ describe('record drafts', () => {
     };
 
     expect(editRecordDraft(sleep)).toMatchObject({
-      date: '2026-11-22',
-      time: '23:50',
+      date: '2026-11-23',
+      endTime: '06:20',
       durationMin: '390',
+    });
+  });
+
+  it('prefills an ongoing legacy sleep with now and its elapsed duration', () => {
+    const sleep: CareEvent = {
+      id: 6,
+      member_id: 1,
+      type: 'sleep',
+      started_at: new Date(2026, 10, 22, 22, 0).toISOString(),
+      ended_at: null,
+      note: null,
+      source: 'parent',
+      duration_min: null,
+    };
+
+    expect(editRecordDraft(sleep, NOW)).toMatchObject({
+      date: '2026-11-23',
+      endTime: '14:05',
+      durationMin: '965',
     });
   });
 
@@ -129,14 +159,35 @@ describe('record draft validation', () => {
     ).toEqual({});
   });
 
-  it('allows an empty sleep duration but rejects invalid ones', () => {
-    expect(recordDraftErrors(createRecordDraft('sleep', NOW))).toEqual({});
-    expect(
-      recordDraftErrors({ ...createRecordDraft('sleep', NOW), durationMin: '-1' }),
-    ).toMatchObject({ durationMin: '时长需为正整数分钟' });
-    expect(
-      recordDraftErrors({ ...createRecordDraft('sleep', NOW), durationMin: '45' }),
-    ).toEqual({});
+  it('requires a positive whole-minute sleep duration up to 24 hours', () => {
+    const base = { ...createRecordDraft('sleep', NOW), durationMin: '45' };
+
+    expect(recordDraftErrors(base)).toEqual({});
+    expect(recordDraftErrors({ ...base, durationMin: '' })).toMatchObject({
+      durationMin: '请填写睡了多久',
+    });
+    expect(recordDraftErrors({ ...base, durationMin: '-1' })).toMatchObject({
+      durationMin: '时长需为正整数分钟',
+    });
+    expect(recordDraftErrors({ ...base, durationMin: '1.5' })).toMatchObject({
+      durationMin: '时长需为正整数分钟',
+    });
+    expect(recordDraftErrors({ ...base, durationMin: '1441' })).toMatchObject({
+      durationMin: '时长不能超过 24 小时',
+    });
+    expect(recordDraftErrors({ ...base, durationMin: '1440' })).toEqual({});
+  });
+
+  it('validates the sleep end time instead of the start time', () => {
+    const base = { ...createRecordDraft('sleep', NOW), durationMin: '45' };
+
+    expect(recordDraftErrors({ ...base, endTime: '24:00' })).toMatchObject({
+      endTime: '请填写 HH:MM 格式的时间',
+    });
+    expect(recordDraftErrors({ ...base, endTime: '9:5' })).toMatchObject({
+      endTime: '请填写 HH:MM 格式的时间',
+    });
+    expect(recordDraftErrors({ ...base, time: 'not-a-time' })).toEqual({});
   });
 });
 
@@ -178,16 +229,41 @@ describe('record payloads', () => {
     });
   });
 
-  it('derives a sleep end from its duration and keeps an empty duration ongoing', () => {
-    const base = createRecordDraft('sleep', NOW);
+  it('derives a finished sleep start from its end and duration', () => {
+    const draft = {
+      ...createRecordDraft('sleep', NOW),
+      endTime: '13:00',
+      durationMin: '30',
+    };
 
-    expect(recordDraftToBody({ ...base, durationMin: '45' })).toMatchObject({
+    expect(recordDraftToBody(draft)).toEqual({
       type: 'sleep',
-      started_at: new Date(2026, 10, 23, 14, 5).toISOString(),
-      ended_at: new Date(2026, 10, 23, 14, 50).toISOString(),
-      duration_min: 45,
+      started_at: new Date(2026, 10, 23, 12, 30).toISOString(),
+      ended_at: new Date(2026, 10, 23, 13, 0).toISOString(),
+      note: null,
+      duration_min: 30,
     });
-    expect(recordDraftToBody(base)).toMatchObject({ ended_at: null, duration_min: null });
+  });
+
+  it('derives a start on the previous day when sleep crosses midnight', () => {
+    const base = { ...createRecordDraft('sleep', NOW), durationMin: '30' };
+
+    expect(recordDraftToBody({ ...base, endTime: '00:20' })).toMatchObject({
+      started_at: new Date(2026, 10, 22, 23, 50).toISOString(),
+      ended_at: new Date(2026, 10, 23, 0, 20).toISOString(),
+    });
+    expect(recordDraftToBody({ ...base, endTime: '23:50' })).toMatchObject({
+      started_at: new Date(2026, 10, 23, 23, 20).toISOString(),
+      ended_at: new Date(2026, 10, 23, 23, 50).toISOString(),
+    });
+  });
+
+  it('previews the derived sleep start and marks the previous day', () => {
+    const base = { ...createRecordDraft('sleep', NOW), durationMin: '30' };
+
+    expect(sleepStartPreview({ ...base, endTime: '13:00' }, NOW)).toBe('开始 12:30');
+    expect(sleepStartPreview({ ...base, endTime: '00:20' }, NOW)).toBe('开始 昨天 23:50');
+    expect(sleepStartPreview({ ...base, durationMin: '' }, NOW)).toBeNull();
   });
 
   it('trims solid food and writes optional grams', () => {
