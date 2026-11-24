@@ -17,9 +17,9 @@ export function DomainTabs({ activeDomain, hasPending, onSelect }: DomainTabsPro
     <View testID="domain-tabs" style={styles.tabs}>
       <DomainTab
         label="育儿"
-        active={activeDomain === 'daily'}
-        testID="domain-tab-daily"
-        onPress={() => onSelect('daily')}
+        active={activeDomain === 'care'}
+        testID="domain-tab-care"
+        onPress={() => onSelect('care')}
       />
       <DomainTab
         label="健康档案"

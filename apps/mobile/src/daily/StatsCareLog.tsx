@@ -122,7 +122,7 @@ export function StatsCareLog({ child }: { child: Member }) {
           <Pressable
             testID="stats-go-today"
             accessibilityRole="button"
-            onPress={() => router.replace('/daily/today')}
+            onPress={() => router.replace('/care/today')}
             style={styles.primary}
           >
             <Text style={styles.primaryText}>去今天页</Text>

@@ -2,18 +2,18 @@
 // domain tabs live in the appbar; each domain owns its contextual bottom tabs.
 // Stack pages (report detail, today records, reminder) stay outside these routes.
 
-export const DOMAINS = ['daily', 'health'] as const;
+export const DOMAINS = ['care', 'health'] as const;
 export type Domain = (typeof DOMAINS)[number];
 
-export const DAILY_PATHS = ['/daily/today', '/daily/stats'] as const;
+export const CARE_PATHS = ['/care/today', '/care/stats'] as const;
 export const HEALTH_PATHS = ['/health/reports', '/health/trends'] as const;
 
-export type DailyPath = (typeof DAILY_PATHS)[number];
+export type CarePath = (typeof CARE_PATHS)[number];
 export type HealthPath = (typeof HEALTH_PATHS)[number];
-export type DomainPath = DailyPath | HealthPath;
+export type DomainPath = CarePath | HealthPath;
 
 export type DomainPaths = {
-  daily: DailyPath;
+  care: CarePath;
   health: HealthPath;
 };
 
@@ -24,16 +24,16 @@ export type DomainNavigationState = {
 };
 
 export const DOMAIN_ROOT: Record<Domain, DomainPath> = {
-  daily: '/daily/today',
+  care: '/care/today',
   health: '/health/reports',
 };
 
 export const DEFAULT_DOMAIN_NAVIGATION: DomainNavigationState = {
-  lastPaths: { daily: '/daily/today', health: '/health/reports' },
+  lastPaths: { care: '/care/today', health: '/health/reports' },
 };
 
-export function isDailyPath(value: unknown): value is DailyPath {
-  return typeof value === 'string' && DAILY_PATHS.includes(value as DailyPath);
+export function isCarePath(value: unknown): value is CarePath {
+  return typeof value === 'string' && CARE_PATHS.includes(value as CarePath);
 }
 
 export function isHealthPath(value: unknown): value is HealthPath {
@@ -41,8 +41,8 @@ export function isHealthPath(value: unknown): value is HealthPath {
 }
 
 export function domainOfPath(pathname: string): Domain | undefined {
-  if (isDailyPath(pathname)) {
-    return 'daily';
+  if (isCarePath(pathname)) {
+    return 'care';
   }
   if (isHealthPath(pathname)) {
     return 'health';
@@ -62,10 +62,10 @@ export function rememberDomainPath(
   if (state.lastDomain === domain && state.lastPaths[domain] === pathname) {
     return state;
   }
-  if (domain === 'daily') {
+  if (domain === 'care') {
     return {
       lastDomain: domain,
-      lastPaths: { ...state.lastPaths, daily: pathname as DailyPath },
+      lastPaths: { ...state.lastPaths, care: pathname as CarePath },
     };
   }
   return {
@@ -84,7 +84,7 @@ export function domainTabTarget(
 }
 
 export function defaultDomain(hasChild: boolean): Domain {
-  return hasChild ? 'daily' : 'health';
+  return hasChild ? 'care' : 'health';
 }
 
 /** First launch falls back by child presence; later launches resume the remembered view. */

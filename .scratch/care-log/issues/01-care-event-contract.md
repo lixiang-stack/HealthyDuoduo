@@ -4,7 +4,7 @@
 
 **Blocked by:** None（可立即开始；完整数据模型另立 spec）。
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 ## 验收清单
 

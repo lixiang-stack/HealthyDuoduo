@@ -92,7 +92,7 @@ type CareEventRepository = {
 - 可选奶量 / 克数为 `null`；
 - 跨午夜睡眠（`2026-11-22T23:50:00+08:00` → `2026-11-23T06:20:00+08:00`）。
 
-`InMemoryCareEventRepository` 实现上面的 seam，供 04 / 06 / 07 在真实 API 落地前渲染与验收。它的 `create` 固定 `source: 'parent'`，`update` 保留身份字段，`remove` 对未知 id 抛错。
+`InMemoryCareEventRepository` 实现上面的 seam，供 04 / 06 / 07 在真实 API 落地前渲染与验收。它的 `create` 固定 `source: 'parent'`，`update` 保留身份字段，`remove` 对未知 id 抛错。App 生产 `CareEventProvider` 默认使用**空仓储**；`CARE_EVENT_FIXTURES` 只在测试或显式注入时使用，不能作为真实记录展示（票 08 验收修正）。
 
 内存 adapter 只模拟读写 seam，不替代服务端校验；不变量 3–5（金额 / 时长 / 克数 > 0、`ended_at >= started_at`、`food` / `note` 去空白）由后续 HTTP / storage 实现负责并补测试。
 

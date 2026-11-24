@@ -19,7 +19,7 @@ describe('domain navigation store', () => {
   it('round-trips the remembered domain and secondary views', async () => {
     const state = {
       lastDomain: 'health' as const,
-      lastPaths: { daily: '/daily/stats' as const, health: '/health/trends' as const },
+      lastPaths: { care: '/care/stats' as const, health: '/health/trends' as const },
     };
 
     await saveDomainNavigation(state);
@@ -27,10 +27,25 @@ describe('domain navigation store', () => {
     expect(await loadDomainNavigation()).toEqual(state);
   });
 
+  it('migrates the pre-rename daily preference to care', async () => {
+    await AsyncStorage.setItem(
+      DOMAIN_NAVIGATION_STORAGE_KEY,
+      JSON.stringify({
+        lastDomain: 'daily',
+        lastPaths: { daily: '/daily/stats', health: '/health/trends' },
+      }),
+    );
+
+    expect(await loadDomainNavigation()).toEqual({
+      lastDomain: 'care',
+      lastPaths: { care: '/care/stats', health: '/health/trends' },
+    });
+  });
+
   it('repairs malformed or partial stored state', async () => {
     await AsyncStorage.setItem(
       DOMAIN_NAVIGATION_STORAGE_KEY,
-      JSON.stringify({ lastDomain: 'nope', lastPaths: { daily: '/daily/nope' } }),
+      JSON.stringify({ lastDomain: 'nope', lastPaths: { care: '/care/nope' } }),
     );
 
     expect(await loadDomainNavigation()).toEqual(DEFAULT_DOMAIN_NAVIGATION);

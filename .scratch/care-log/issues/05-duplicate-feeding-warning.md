@@ -4,7 +4,7 @@
 
 **Blocked by:** 04（记录弹层与目标孩子）。
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 ## 验收清单
 

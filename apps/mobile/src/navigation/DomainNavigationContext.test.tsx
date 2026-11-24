@@ -10,9 +10,9 @@ function Probe({ active }: { active: Domain }) {
   const { state, navigateFromDomain } = useDomainNavigation();
   return (
     <View>
-      <Text testID="last-daily">{state.lastPaths.daily}</Text>
+      <Text testID="last-care">{state.lastPaths.care}</Text>
       <Text testID="last-health">{state.lastPaths.health}</Text>
-      <Pressable testID="to-daily" onPress={() => navigateFromDomain(active, 'daily')} />
+      <Pressable testID="to-care" onPress={() => navigateFromDomain(active, 'care')} />
       <Pressable testID="to-health" onPress={() => navigateFromDomain(active, 'health')} />
     </View>
   );
@@ -38,15 +38,15 @@ beforeEach(async () => {
 
 describe('DomainNavigationProvider', () => {
   it('preserves each domain secondary tab across appbar switches', async () => {
-    const { rerender } = await renderAt('/daily/today', 'daily');
+    const { rerender } = await renderAt('/care/today', 'care');
 
-    mockPathname.current = '/daily/stats';
+    mockPathname.current = '/care/stats';
     await rerender(
       <DomainNavigationProvider>
-        <Probe active="daily" />
+        <Probe active="care" />
       </DomainNavigationProvider>,
     );
-    expect(await screen.findByText('/daily/stats')).toBeTruthy();
+    expect(await screen.findByText('/care/stats')).toBeTruthy();
 
     await fireEvent.press(await screen.findByTestId('to-health'));
     expect(mockRouter.replace).toHaveBeenLastCalledWith('/health/reports');
@@ -58,15 +58,15 @@ describe('DomainNavigationProvider', () => {
       </DomainNavigationProvider>,
     );
 
-    await fireEvent.press(await screen.findByTestId('to-daily'));
-    expect(mockRouter.replace).toHaveBeenLastCalledWith('/daily/stats');
+    await fireEvent.press(await screen.findByTestId('to-care'));
+    expect(mockRouter.replace).toHaveBeenLastCalledWith('/care/stats');
   });
 
   it('returns to the domain root when pressing the active domain', async () => {
-    await renderAt('/daily/stats', 'daily');
+    await renderAt('/care/stats', 'care');
 
-    await fireEvent.press(await screen.findByTestId('to-daily'));
+    await fireEvent.press(await screen.findByTestId('to-care'));
 
-    expect(mockRouter.replace).toHaveBeenLastCalledWith('/daily/today');
+    expect(mockRouter.replace).toHaveBeenLastCalledWith('/care/today');
   });
 });
