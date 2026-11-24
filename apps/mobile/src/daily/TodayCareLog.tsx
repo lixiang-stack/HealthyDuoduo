@@ -1,9 +1,10 @@
-// Today's care-log page content: hero, four quick actions, today summary and the
-// current child's timeline. Reminders (ticket 06) and charts (ticket 07) are not here.
+// Today's care-log page content: hero, four quick actions, today summary, the
+// reminder entry and the current child's timeline. Charts belong to the stats view.
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import type { Member } from '../api/members';
+import { useCareEventRepository } from '../care/CareEventProvider';
 import { CARE_EVENT_TYPES, type CareEvent, type CareEventType } from '../care/careEvents';
 import {
   CARE_EVENT_LABELS,
@@ -16,12 +17,15 @@ import {
 } from '../care/careEventDisplay';
 import { useTodayCareEvents } from '../care/useTodayCareEvents';
 import { colors } from '../components/theme';
+import { ReminderCard } from '../reminders/ReminderCard';
+import { syncReminderToLatestFeed } from '../reminders/syncReminderToLatestFeed';
 import { CareTimeline } from './CareTimeline';
 import { RecordSheet } from './RecordSheet';
 
 type SheetState = { type: CareEventType; editingEvent?: CareEvent };
 
 export function TodayCareLog({ child, members }: { child: Member; members: Member[] }) {
+  const repository = useCareEventRepository();
   const { state, reload } = useTodayCareEvents(child.member_id);
   const [sheet, setSheet] = useState<SheetState>();
   const now = new Date();
@@ -35,6 +39,12 @@ export function TodayCareLog({ child, members }: { child: Member; members: Membe
   const closeAndReload = () => {
     setSheet(undefined);
     void reload();
+    // A new / edited / deleted feed changes the latest feed, so the local reminder
+    // window must move with it. Failures stay out of the record path.
+    void syncReminderToLatestFeed({
+      repository,
+      memberId: child.member_id,
+    }).catch(() => undefined);
   };
 
   return (
@@ -106,6 +116,8 @@ export function TodayCareLog({ child, members }: { child: Member; members: Membe
           />
         </View>
       ) : null}
+
+      <ReminderCard lastFeed={lastFeed} now={now} />
 
       <View style={styles.timelineSection}>
         <View style={styles.sectionRow}>

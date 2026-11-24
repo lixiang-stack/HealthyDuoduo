@@ -1,19 +1,23 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 
 import { resolveApiClient } from '../../api/resolveClient';
 import { InMemoryCareEventRepository } from '../../care/careEventRepository';
 import { DailyPlaceholder } from '../../daily/DailyPlaceholder';
 import { CURRENT_CHILD_STORAGE_KEY } from '../../members/currentMemberStore';
+import { REMINDER_SETTINGS_STORAGE_KEY } from '../../reminders/reminderSettings';
 import { createFakeApiClient, TEST_BASE_URL } from '../fakeApi';
 import { makeDiaperEvent, makeFeedEvent, makeMember, makeSleepEvent } from '../fixtures';
 import { renderScreen } from '../renderScreen';
+import { mockRouter } from '../routerMock';
 
 jest.mock('../../api/resolveClient', () => ({
   resolveApiClient: jest.fn(),
 }));
 
 const mockedResolveApiClient = jest.mocked(resolveApiClient);
+const mockedNotifications = jest.mocked(Notifications);
 
 const doudou = makeMember({ member_id: 1, name: '豆豆', is_child: true });
 const second = makeMember({ member_id: 2, name: '老二', is_child: true });
@@ -40,6 +44,8 @@ function localAt(hour: number, minute: number, dayOffset = 0): string {
 beforeEach(async () => {
   jest.clearAllMocks();
   await AsyncStorage.clear();
+  mockedNotifications.scheduleNotificationAsync.mockResolvedValue('notification-1');
+  mockedNotifications.cancelAllScheduledNotificationsAsync.mockResolvedValue();
 });
 
 describe('Today care log', () => {
@@ -171,5 +177,66 @@ describe('Today care log', () => {
     );
     expect(screen.queryByTestId('today-summary')).toBeNull();
     expect(screen.queryByTestId('today-empty')).toBeNull();
+  });
+
+  it('shows the reminder card, opens its settings and stays off by default', async () => {
+    await AsyncStorage.setItem(CURRENT_CHILD_STORAGE_KEY, String(doudou.member_id));
+    useApi();
+
+    await renderScreen(<DailyPlaceholder variant="today" />, {
+      careEvents: new InMemoryCareEventRepository(),
+    });
+
+    expect(await screen.findByTestId('today-reminder-meta')).toHaveTextContent('未开启');
+    await fireEvent.press(screen.getByTestId('today-reminder'));
+    expect(mockRouter.push).toHaveBeenCalledWith('/reminder');
+  });
+
+  it('shows the last and next reminder time from the latest feed', async () => {
+    await AsyncStorage.setItem(CURRENT_CHILD_STORAGE_KEY, String(doudou.member_id));
+    await AsyncStorage.setItem(
+      REMINDER_SETTINGS_STORAGE_KEY,
+      '{"enabled":true,"intervalHours":3}',
+    );
+    useApi();
+
+    await renderScreen(<DailyPlaceholder variant="today" />, {
+      careEvents: new InMemoryCareEventRepository([
+        makeFeedEvent({ id: 1, started_at: minutesAgo(30) }),
+      ]),
+    });
+
+    expect(await screen.findByTestId('today-reminder-meta')).toHaveTextContent(
+      /每 3 小时 · 上次 \d{2}:\d{2} · 下次 \d{2}:\d{2}/,
+    );
+  });
+
+  it('replaces the scheduled reminder after a new feed is saved', async () => {
+    await AsyncStorage.setItem(CURRENT_CHILD_STORAGE_KEY, String(doudou.member_id));
+    await AsyncStorage.setItem(
+      REMINDER_SETTINGS_STORAGE_KEY,
+      '{"enabled":true,"intervalHours":3}',
+    );
+    useApi();
+
+    await renderScreen(<DailyPlaceholder variant="today" />, {
+      careEvents: new InMemoryCareEventRepository([
+        makeFeedEvent({ id: 1, started_at: minutesAgo(120) }),
+      ]),
+    });
+    const beforeOpen = Date.now();
+    await fireEvent.press(await screen.findByTestId('today-quick-feed'));
+    await fireEvent.press(screen.getByTestId('record-method-formula'));
+    await fireEvent.changeText(screen.getByTestId('record-amount'), '90');
+    await fireEvent.press(screen.getByTestId('record-submit'));
+
+    await waitFor(() =>
+      expect(mockedNotifications.scheduleNotificationAsync).toHaveBeenCalledTimes(1),
+    );
+    expect(mockedNotifications.cancelAllScheduledNotificationsAsync).toHaveBeenCalled();
+    const request = mockedNotifications.scheduleNotificationAsync.mock.calls[0][0];
+    const scheduledAt = (request.trigger as { date: Date }).date.getTime();
+    expect(scheduledAt).toBeGreaterThanOrEqual(beforeOpen - 60_000 + 3 * 60 * 60 * 1000);
+    expect(scheduledAt).toBeLessThanOrEqual(Date.now() + 3 * 60 * 60 * 1000);
   });
 });

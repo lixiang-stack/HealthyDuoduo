@@ -34,10 +34,10 @@ describe('local care-log day and clock', () => {
     expect(range.to).toBe(new Date(2026, 10, 24, 0, 0).toISOString());
   });
 
-  it('reads yesterday and today for the last feed around midnight', () => {
+  it('reads the last seven local days for the latest feed', () => {
     const range = recentCareEventRange(NOW);
 
-    expect(range.from).toBe(new Date(2026, 10, 22, 0, 0).toISOString());
+    expect(range.from).toBe(new Date(2026, 10, 17, 0, 0).toISOString());
     expect(range.to).toBe(new Date(2026, 10, 24, 0, 0).toISOString());
   });
 

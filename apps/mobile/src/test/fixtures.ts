@@ -7,6 +7,8 @@ import type {
 } from '../api/analyses';
 import type { GrowthRecord } from '../api/growth';
 import type { Member } from '../api/members';
+import type { NotificationPermissionsStatus } from 'expo-notifications';
+
 import type { CareEvent } from '../care/careEvents';
 import type {
   FlagCounts,
@@ -371,4 +373,17 @@ export function makeAnalysisResult(overrides: Partial<AnalysisResult> = {}): Ana
     stale: false,
     ...overrides,
   };
+}
+
+
+export function makeNotificationPermission(
+  overrides: Record<string, unknown> = {},
+): NotificationPermissionsStatus {
+  return {
+    status: 'granted',
+    granted: true,
+    canAskAgain: true,
+    expires: 'never',
+    ...overrides,
+  } as NotificationPermissionsStatus;
 }

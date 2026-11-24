@@ -11,6 +11,10 @@ jest.mock('expo-router/js-tabs', () => ({
   useBottomTabBarHeight: () => 0,
 }));
 
+jest.mock('expo-notifications', () =>
+  require('./src/test/expoNotificationsMock').expoNotificationsMock,
+);
+
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
 );
