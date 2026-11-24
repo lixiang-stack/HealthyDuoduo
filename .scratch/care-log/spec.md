@@ -268,6 +268,8 @@ Status: **implemented / accepted with known gaps**（2026-11-23 用户确认 B3 
 | [06](issues/06-reminder-entry-and-local-notification.md) | 提醒入口与本地通知 | 01、02、03 |
 | [07](issues/07-stats-charts.md) | 统计页图表接入 | 01、02、03 |
 | [08](issues/08-acceptance-and-regression.md) | 跨票验收与契约回归 | 01–07 |
+| [09](issues/09-sleep-completion.md) | 睡眠改为结束后补记（后续） | 无 |
+| [10](issues/10-cleanup.md) | 占位路由清理 + 时间线滚动 smoke（后续） | 无 |
 
 ## 14. 关联
 
@@ -294,5 +296,11 @@ Status: **implemented / accepted with known gaps**（2026-11-23 用户确认 B3 
 6. **提醒只做本机一次性本地通知**：默认关闭、2 / 3 / 4 小时间隔、不申请精确闹钟、不接远程推送 / token；未申请权限时保持关闭并说明原因。
 7. **首次启动欢迎屏未实现**：按「有孩子 → 育儿 > 今天；无孩子 → 健康档案 > 报告」自动入口，并记住上次域与二级 tab（票 02 已记录）。
 8. **「全部记录」入口未接线**：`/today-records` 仍是占位栈页且无入口；当前由今天页时间线承担记录浏览。若后续需要独立全部记录页，另开票。
+
+**后续（2026-11-24）：**
+
+- 护理事件持久化（A1）另立 spec：`.scratch/care-events/spec.md`；四类事件单表 `care_events`、四个 HTTP 端点、App HTTP adapter、提醒跟随当前孩子。票 01–08 的验收口径不变。
+- 睡眠记录方式已定：结束后补记（结束时间 + 时长，生产不再创建进行中），见 `issues/09-sleep-completion.md`；删除确认 / 跨天补录 / 键盘仍 deferred。
+- `/today-records` 占位将移除，时间线继续承担浏览，见 `issues/10-cleanup.md`。
 
 **验收口径：** RNTL 57 suites / 447 tests、`npx tsc --noEmit`、`npm run lint -- --max-warnings=0`、`npx expo export --platform android` 全绿；契约 grep 无 `recorded_by` / `device_id` / 全局 active child，护理事件未进入报告 / 趋势 / 分析链路；无数据库迁移，`scripts/test-db.sh` 本票不适用；Android 真机 smoke 见票 08 Comments。

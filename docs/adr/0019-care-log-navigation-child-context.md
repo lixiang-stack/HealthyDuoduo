@@ -28,12 +28,13 @@
 - 重复记录提示是 best-effort：两台设备都可能在窗口内各记一次；提示能减少误记，但不能消除。没有账号，不能判断「谁记的」。
 - appbar tabs 省 46px，但 appbar 会更满；如果未来加入通知、搜索等动作，回退到顶部独立 segmented（B3 的 A 呈现）。回退只改呈现，不改两级结构。
 - 健康档案仍是报告、核对、趋势的主路径；育儿不替代报告，也不把护理事件写进报告趋势或分析快照。
-- 本 ADR 不定义 `feeding_events` 表与 API；护理事件数据模型、契约和 E2E 另立 spec。当前 spec 只锁定导航、孩子上下文、记录目标与重复提示。
+- 本 ADR 不定义 `feeding_events` 表与 API；护理事件数据模型、契约和 E2E 另立 spec（2026-11-24：`.scratch/care-events/spec.md`）。当前 spec 只锁定导航、孩子上下文、记录目标与重复提示。
 
 ## 实现状态（2026-11-24）
 
 - 票 01–08 已实现并通过跨票验收；详细差异、已知限制与验收证据以 `.scratch/care-log/spec.md` §15 和 `.scratch/care-log/issues/08-acceptance-and-regression.md` 为准。
 - 关键偏差：用户可见「日常」改名「育儿」，路由与域标识统一为 `/care`（旧 `/daily` 本地偏好自动迁移）；当前孩子在育儿页内容区左上角；护理事件仍为客户端内存 adapter（无正式表 / API / 迁移）；提醒与统计均为本机 / 7 天口径，不写报告、趋势或分析快照。
+- 护理事件持久化：2026-11-24 已确认 A1 方案，见 `.scratch/care-events/spec.md`（单表 `care_events`、HTTP API、显式 HTTP provider、提醒跟随当前孩子）。实现前生产仍是内存 adapter；落地后更新本节与 `.scratch/care-log/spec.md` §15。
 
 ## Considered Options
 
@@ -56,6 +57,7 @@
 ## 关联
 
 - 需求与验收：`.scratch/care-log/spec.md`
+- 护理事件持久化：`.scratch/care-events/spec.md`
 - B3 原型：`.scratch/care-log/prototype/prototype.html`
 - 一级导航对比：`.scratch/care-log/prototype/shots/00-contact-sheet-nav.png`
 - 小程序调研与护理事件数据草案：`docs/reference/wechat-feeding-tracker.md`

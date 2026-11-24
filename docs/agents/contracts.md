@@ -6,7 +6,7 @@ This repo mirrors the same contract through several layers. Use this page as a n
 
 - `schemas/report.schema.json` — recognition output (`Report`, `ReportItem`, `ReportSection`, panel enum/order).
 - `schemas/openapi.yaml` — HTTP `/api/v1` contract.
-- `docs/design/2026-11-23-care-event-contract.md` — client-visible care-event shape (`CareEvent`); no HTTP endpoint yet, so it is not in OpenAPI until the care-event API spec lands.
+- `docs/design/2026-11-23-care-event-contract.md` — client-visible care-event shape (`CareEvent`); HTTP persistence is planned in `.scratch/care-events/spec.md` and will enter `schemas/openapi.yaml` once implemented.
 
 ## Mirrors
 
@@ -18,6 +18,7 @@ This repo mirrors the same contract through several layers. Use this page as a n
 | App | `apps/mobile/src/api/schema.d.ts` | `npm run codegen`; pre-commit and CI fail on stale generated file |
 | HTTP fixtures | `schemas/testdata/http/*.json` | round-trip against Go mirrors and OpenAPI schemas |
 | Growth record | `schemas/openapi.yaml` `GrowthRecord` | `internal/httpapi/types.go`; App `src/api/growth.ts`; storage `growth_records` |
+| Care event (planned) | `schemas/openapi.yaml` `CareEvent*` | `.scratch/care-events/spec.md`; `internal/care` / `internal/httpapi` / `internal/storage` `care_events`; App `src/api/careEvents.ts`; fixtures + contract tests |
 | Analysis facts / snapshot | `schemas/openapi.yaml` `Analysis*` | `internal/httpapi/analysis.go` → `internal/analysis` types; App `src/api/analyses.ts`; storage `analyses.layers/snapshot` |
 | Analysis framework / explanation / quota | `schemas/openapi.yaml` `AnalysisFramework`, `AnalysisExplanation`, `AnalysisQuota` | `internal/analysis/framework*.go`, `knowledge/`, `explain.go`; App `src/analysis/components.tsx`, `framework.ts` |
 | Analysis feedback / metrics | `schemas/openapi.yaml` `AnalysisFeedback*`, `AnalysisMetrics` | `cmd/hdd/serve_analysis_feedback.go`; `internal/analysis/store.go`; storage `analysis_feedback`, `analysis_events`, `analysis_llm_calls`; App `src/analysis/FeedbackModal.tsx` |
