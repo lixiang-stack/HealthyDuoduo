@@ -192,14 +192,11 @@ ORDER BY started_at DESC, id DESC;
   "ended_at": null,
   "note": null,
   "method": "formula",
-  "amount_ml": 120,
-  "duration_min": null,
-  "diaper_type": null,
-  "food": null,
-  "amount_g": null
+  "amount_ml": 120
 }
 ```
 
+- 类型专属字段只出现在对应分支；未列出的字段不出现（不要求其它类型字段填 null）。
 - 创建 / 修改 body 不包含 `id`、`member_id`、`source`。
 - `PATCH` 是完整替换：缺少的可选字段按 `null` 处理；类型改变时旧类型字段必须为 `null`。
 - 列表空结果返回 `{ "events": [] }`，不返回 `null`。

@@ -39,6 +39,11 @@ func newServeHandler(d *deps) http.Handler {
 	// 生长记录端点(llm-analysis 票 02):按测量日期降序;BMI 读取时实时计算。
 	mux.HandleFunc("POST /api/v1/members/{member_id}/growth", handleCreateGrowth(d))
 	mux.HandleFunc("GET /api/v1/members/{member_id}/growth", handleListGrowth(d))
+	// 护理事件端点(care-events 票 02):成员范围读取;创建 / 完整替换 / 删除。
+	mux.HandleFunc("GET /api/v1/members/{member_id}/care-events", handleListCareEvents(d))
+	mux.HandleFunc("POST /api/v1/members/{member_id}/care-events", handleCreateCareEvent(d))
+	mux.HandleFunc("PATCH /api/v1/care-events/{event_id}", handleUpdateCareEvent(d))
+	mux.HandleFunc("DELETE /api/v1/care-events/{event_id}", handleDeleteCareEvent(d))
 	// 趋势端点(票 02):成员维度指标时序(unit 门控;无点 = 200 + [])。
 	mux.HandleFunc("GET /api/v1/members/{member_id}/indicators/{name}/trend", handleGetTrend(d))
 	// 项目浏览端点(panel-browse 票 03):项目列表与项目详情(按项目视图)。

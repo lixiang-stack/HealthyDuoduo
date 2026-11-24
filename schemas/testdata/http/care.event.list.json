@@ -1,0 +1,46 @@
+{
+  "events": [
+    {
+      "id": 1,
+      "member_id": 2,
+      "type": "feed",
+      "source": "parent",
+      "started_at": "2026-11-24T14:05:00+08:00",
+      "ended_at": null,
+      "note": null,
+      "method": "formula",
+      "amount_ml": 120
+    },
+    {
+      "id": 2,
+      "member_id": 2,
+      "type": "diaper",
+      "source": "parent",
+      "started_at": "2026-11-24T15:10:00+08:00",
+      "ended_at": null,
+      "note": "量多",
+      "diaper_type": "mixed"
+    },
+    {
+      "id": 3,
+      "member_id": 2,
+      "type": "sleep",
+      "source": "parent",
+      "started_at": "2026-11-22T23:50:00+08:00",
+      "ended_at": "2026-11-23T06:20:00+08:00",
+      "note": null,
+      "duration_min": 390
+    },
+    {
+      "id": 4,
+      "member_id": 2,
+      "type": "solid",
+      "source": "parent",
+      "started_at": "2026-11-24T12:30:00+08:00",
+      "ended_at": null,
+      "note": null,
+      "food": "米粉",
+      "amount_g": 40
+    }
+  ]
+}

@@ -145,6 +145,100 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "404":
           $ref: "#/components/responses/NotFound"
+  /members/{member_id}/care-events:
+    get:
+      operationId: listCareEvents
+      summary: 护理事件范围读取
+      description: |
+        返回与该范围有重叠的护理事件:from 含、to 不含,按 started_at 倒序、同刻按 id 倒序。
+        点事件只出现在 started_at 所在范围;进行中睡眠开放到未来;跨午夜睡眠同时出现在两天的范围。
+        成员不存在 404;范围缺失 / 非法 / from >= to 返回 400。本期不分页。
+      parameters:
+        - $ref: "#/components/parameters/MemberID"
+        - name: from
+          in: query
+          required: true
+          description: 范围起点(含),RFC3339 带时区偏移
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          required: true
+          description: 范围终点(不含),RFC3339 带时区偏移
+          schema: { type: string, format: date-time }
+      responses:
+        "200":
+          description: 护理事件列表(空数组而非 null)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CareEventList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      operationId: createCareEvent
+      summary: 新增护理事件
+      description: |
+        body 不包含 id / member_id / source;目标成员必须是孩子(成人返回 400),source 固定 parent。
+        事件类型与类型专属字段由服务端校验:feed 必填 method,diaper 必填 diaper_type,
+        solid 必填非空 food;sleep 的 ended_at 与 duration_min 必须同时为空(进行中)或同时非空。
+      parameters:
+        - $ref: "#/components/parameters/MemberID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CareEventCreate"
+      responses:
+        "201":
+          description: 已创建
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CareEvent"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /care-events/{event_id}:
+    patch:
+      operationId: updateCareEvent
+      summary: 修改护理事件
+      description: |
+        完整替换可编辑内容;id / member_id / source 不变。类型可以改变,旧类型专属字段必须清空。
+        事件不存在 404;body 非法 400。修改不重新校验成员是否仍为孩子。
+      parameters:
+        - $ref: "#/components/parameters/EventID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CareEventUpdate"
+      responses:
+        "200":
+          description: 已修改
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CareEvent"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deleteCareEvent
+      summary: 删除护理事件
+      description: 硬删除单条护理事件;事件不存在 404。
+      parameters:
+        - $ref: "#/components/parameters/EventID"
+      responses:
+        "204":
+          description: 已删除
+        "404":
+          $ref: "#/components/responses/NotFound"
   /reports:
     get:
       operationId: listReports
@@ -514,6 +608,11 @@ components:
       in: path
       required: true
       schema: { type: integer, format: int64 }
+    EventID:
+      name: event_id
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
     ReportID:
       name: report_id
       in: path
@@ -678,6 +777,189 @@ components:
         records:
           type: array
           items: { $ref: "#/components/schemas/GrowthRecord" }
+    CareEventSource:
+      type: string
+      enum: [parent]
+      description: 来源固定家长记录;不标识具体记录人。
+    FeedMethod:
+      type: string
+      enum: [breast, formula]
+      description: 喂养方式。
+    DiaperType:
+      type: string
+      enum: [wet, dirty, mixed]
+      description: 尿布类型。
+    CareEvent:
+      oneOf:
+        - $ref: "#/components/schemas/CareEventFeed"
+        - $ref: "#/components/schemas/CareEventDiaper"
+        - $ref: "#/components/schemas/CareEventSleep"
+        - $ref: "#/components/schemas/CareEventSolid"
+      description: |
+        护理事件判别联合。类型专属字段只出现在对应分支;未列出的字段不出现。
+        点事件的 ended_at 固定为 null;进行中睡眠的 ended_at / duration_min 为 null。
+    CareEventFeed:
+      type: object
+      additionalProperties: false
+      required: [id, member_id, type, source, started_at, ended_at, note, method]
+      properties:
+        id: { type: integer, format: int64 }
+        member_id: { type: integer, format: int64 }
+        type: { const: feed }
+        source: { $ref: "#/components/schemas/CareEventSource" }
+        started_at: { type: string, format: date-time }
+        ended_at:
+          type: [string, "null"]
+          description: 点事件恒为 null
+        note:
+          type: [string, "null"]
+        method: { $ref: "#/components/schemas/FeedMethod" }
+        amount_ml:
+          type: [number, "null"]
+          description: 瓶喂 / 奶粉奶量;亲喂可不填
+        duration_min:
+          type: [integer, "null"]
+          description: 亲喂时长;只记时刻时不填
+    CareEventDiaper:
+      type: object
+      additionalProperties: false
+      required: [id, member_id, type, source, started_at, ended_at, note, diaper_type]
+      properties:
+        id: { type: integer, format: int64 }
+        member_id: { type: integer, format: int64 }
+        type: { const: diaper }
+        source: { $ref: "#/components/schemas/CareEventSource" }
+        started_at: { type: string, format: date-time }
+        ended_at:
+          type: [string, "null"]
+          description: 点事件恒为 null
+        note:
+          type: [string, "null"]
+        diaper_type: { $ref: "#/components/schemas/DiaperType" }
+    CareEventSleep:
+      type: object
+      additionalProperties: false
+      required: [id, member_id, type, source, started_at, ended_at, note]
+      properties:
+        id: { type: integer, format: int64 }
+        member_id: { type: integer, format: int64 }
+        type: { const: sleep }
+        source: { $ref: "#/components/schemas/CareEventSource" }
+        started_at: { type: string, format: date-time }
+        ended_at:
+          type: [string, "null"]
+          description: 进行中为 null;完成后不得早于 started_at
+        note:
+          type: [string, "null"]
+        duration_min:
+          type: [integer, "null"]
+          description: 进行中为 null;完成后为正整数分钟
+    CareEventSolid:
+      type: object
+      additionalProperties: false
+      required: [id, member_id, type, source, started_at, ended_at, note, food]
+      properties:
+        id: { type: integer, format: int64 }
+        member_id: { type: integer, format: int64 }
+        type: { const: solid }
+        source: { $ref: "#/components/schemas/CareEventSource" }
+        started_at: { type: string, format: date-time }
+        ended_at:
+          type: [string, "null"]
+          description: 点事件恒为 null
+        note:
+          type: [string, "null"]
+        food:
+          type: string
+          minLength: 1
+          description: 食物名称,去除首尾空白后非空
+        amount_g:
+          type: [number, "null"]
+    CareEventCreate:
+      oneOf:
+        - $ref: "#/components/schemas/CareEventCreateFeed"
+        - $ref: "#/components/schemas/CareEventCreateDiaper"
+        - $ref: "#/components/schemas/CareEventCreateSleep"
+        - $ref: "#/components/schemas/CareEventCreateSolid"
+      description: 创建 / 完整替换的可编辑内容;不包含 id / member_id / source。
+    CareEventCreateFeed:
+      type: object
+      additionalProperties: false
+      required: [type, started_at, ended_at, note, method]
+      properties:
+        type: { const: feed }
+        started_at: { type: string, format: date-time }
+        ended_at:
+          type: [string, "null"]
+          description: 点事件必须为 null
+        note:
+          type: [string, "null"]
+        method: { $ref: "#/components/schemas/FeedMethod" }
+        amount_ml:
+          type: [number, "null"]
+        duration_min:
+          type: [integer, "null"]
+    CareEventCreateDiaper:
+      type: object
+      additionalProperties: false
+      required: [type, started_at, ended_at, note, diaper_type]
+      properties:
+        type: { const: diaper }
+        started_at: { type: string, format: date-time }
+        ended_at:
+          type: [string, "null"]
+          description: 点事件必须为 null
+        note:
+          type: [string, "null"]
+        diaper_type: { $ref: "#/components/schemas/DiaperType" }
+    CareEventCreateSleep:
+      type: object
+      additionalProperties: false
+      required: [type, started_at, ended_at, note]
+      properties:
+        type: { const: sleep }
+        started_at: { type: string, format: date-time }
+        ended_at:
+          type: [string, "null"]
+          description: 进行中为 null;完成后不得早于 started_at
+        note:
+          type: [string, "null"]
+        duration_min:
+          type: [integer, "null"]
+          description: 进行中为 null;完成后为正整数分钟
+    CareEventCreateSolid:
+      type: object
+      additionalProperties: false
+      required: [type, started_at, ended_at, note, food]
+      properties:
+        type: { const: solid }
+        started_at: { type: string, format: date-time }
+        ended_at:
+          type: [string, "null"]
+          description: 点事件必须为 null
+        note:
+          type: [string, "null"]
+        food:
+          type: string
+          minLength: 1
+          description: 食物名称,去除首尾空白后非空
+        amount_g:
+          type: [number, "null"]
+    CareEventUpdate:
+      oneOf:
+        - $ref: "#/components/schemas/CareEventCreateFeed"
+        - $ref: "#/components/schemas/CareEventCreateDiaper"
+        - $ref: "#/components/schemas/CareEventCreateSleep"
+        - $ref: "#/components/schemas/CareEventCreateSolid"
+      description: 完整替换可编辑内容;与创建 body 相同,id / member_id / source 不变。
+    CareEventList:
+      type: object
+      additionalProperties: false
+      required: [events]
+      properties:
+        events:
+          type: array
+          items: { $ref: "#/components/schemas/CareEvent" }
     MemberCreate:
       type: object
       additionalProperties: false

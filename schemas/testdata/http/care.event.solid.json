@@ -1,0 +1,11 @@
+{
+  "id": 4,
+  "member_id": 2,
+  "type": "solid",
+  "source": "parent",
+  "started_at": "2026-11-24T12:30:00+08:00",
+  "ended_at": null,
+  "note": null,
+  "food": "米粉",
+  "amount_g": 40
+}

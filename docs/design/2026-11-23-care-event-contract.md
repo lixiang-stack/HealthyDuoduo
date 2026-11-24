@@ -1,6 +1,6 @@
 # 护理事件最小契约（前置）
 
-**状态：** 采纳（2026-11-23，工单 01）；持久化 / HTTP 实现 spec：`.scratch/care-events/spec.md`（2026-11-24，proposed）。
+**状态：** 采纳（2026-11-23，工单 01）；持久化 / HTTP 已落地（2026-11-24，care-events 票 01 / 02）；App adapter 待票 03。
 **范围：** B3 今天时间线、统计、记录弹层与 5 分钟重复提示所需的**客户端可见**护理事件形状。
 **不在本契约：** 完整表结构、迁移、服务端校验、HTTP handler、OCR、报告 / 分析链路。
 
@@ -76,7 +76,7 @@ type CareEventRepository = {
 - `update` 替换可编辑内容（类型、时间、类型专属字段、备注），不改变 `id`、`member_id`、`source`。
 - `remove` 删除单条事件。
 
-HTTP 映射（由 `.scratch/care-events/spec.md` 冻结；实现后进入 OpenAPI）：
+HTTP 映射（已由 care-events 02 冻结进 `schemas/openapi.yaml`）：
 
 | 操作 | 形状 |
 | --- | --- |

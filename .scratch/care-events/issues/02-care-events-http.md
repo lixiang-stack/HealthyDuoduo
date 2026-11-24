@@ -4,7 +4,7 @@
 
 **Blocked by:** 01。
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 ## 验收清单
 
@@ -34,3 +34,17 @@
 - 错误体沿用 `httpapi.Error`，message 中性；不要把 SQL / 内部路径暴露给客户端。
 - 更新 `internal/httpapi/contract_test.go` 的 frozen path set 是预期变更；不要用“测试放行”绕过。
 - 文档收尾见票 05；本票可先更新 `docs/design/2026-11-23-care-event-contract.md` 的“HTTP 落地”状态。
+
+## Comments
+
+**实现（2026-11-24）：**
+
+- `schemas/openapi.yaml`：新增 4 个端点、`EventID` 参数、`CareEvent*` / `CareEventCreate*` schemas；`CareEvent` 与创建 / 修改 body 都用四个完整对象 `oneOf`，每个分支 `additionalProperties: false`，`type` 用 `const` 判别；类型专属字段只出现在对应分支，未列出的字段不出现。
+- `internal/httpapi/types.go`：新增 `CareEvent` / `CareEventCreate` / `CareEventUpdate` / `CareEventList` 镜像；`EndedAt` / `Note` 始终序列化为 null，类型专属可选字段用 `omitempty`。
+- `cmd/hdd/serve_care.go`：列表解析必填 RFC3339 `from` / `to` 并校验 `from < to`；创建校验成员存在且 `is_child`；修改 / 删除按事件 id 返回 404；handler 只做编解码、成员校验与错误映射，类型规则复用 `internal/care.Validate`。
+- `cmd/hdd/commands.go` / `config.go` / `serve.go`：注入 `care.Store` 并注册 4 条路由。
+- `schemas/testdata/http/`：新增 feed / diaper / sleep / solid / list / create / update / invalid 8 个 fixture；`internal/httpapi/contract_test.go` 更新冻结端点集合、fixture 对账、invalid 用例。
+- `cmd/hdd/serve_care_test.go`：覆盖创建 / 列表 / 空数组 / 修改保身份 / 删除 / 成人拒绝 / 未知成员 / 未知事件 / 范围校验 / 非法 body / 存储错误。
+- `npm run codegen` 更新 `apps/mobile/src/api/schema.d.ts`；App 仍不消费（票 03）。
+- 验证：`go test ./...`、`go vet ./...`、`bash scripts/test-db.sh`、`cd apps/mobile && npm run codegen && npm run typecheck && TZ=UTC npm test -- --runInBand && npm run lint -- --max-warnings=0`、`python3 scripts/check-docs.py` 全绿。
+- 取舍：`CareEventUpdate` 与创建 body 共用同一组分支；`sleep.duration_min` 在 wire 上可选（缺省 = null），由服务端按 `ended_at` 配对校验；`CareEvent` 响应中空的可选类型字段省略，App 侧映射时按 null 处理。

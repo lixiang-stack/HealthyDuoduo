@@ -161,6 +161,7 @@ func openDeps(c config) (*deps, func(), error) {
 		trends:        st,
 		panels:        st,
 		growth:        st,
+		care:          st,
 		analyses:      st,
 		quota:         st,
 		observability: st,
