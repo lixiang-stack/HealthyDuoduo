@@ -27,7 +27,7 @@ B3 的 04 / 06 / 07 都需要同一条护理事件数据：今天时间线要按
 | `member_id` | `number` | 是 | 事件归属的孩子成员；成人不是护理目标 |
 | `type` | `'feed' \| 'diaper' \| 'sleep' \| 'solid'` | 是 | 判别字段 |
 | `started_at` | ISO 8601 字符串 | 是 | 绝对时刻，必须带时区偏移；跨午夜不拆事件 |
-| `ended_at` | ISO 8601 字符串 \| `null` | 是 | 进行中为 `null`；非空时不得早于 `started_at` |
+| `ended_at` | ISO 8601 字符串 \| `null` | 是 | `sleep` 进行中为 `null`；`feed` / `diaper` / `solid` 是瞬时事件，也存 `null`；非空时不得早于 `started_at` |
 | `note` | `string \| null` | 是 | 去除首尾空白；空备注统一为 `null` |
 | `source` | `'parent'` | 是 | 固定「家长记录」；不标识具体记录人 |
 
@@ -69,7 +69,7 @@ type CareEventRepository = {
 ```
 
 - `from` 含、`to` 不含，均为带时区偏移的绝对时刻。
-- `list` 返回与 `[from, to)` **有重叠**的事件，按 `started_at` 倒序；同一时刻按 `id` 倒序。这样 23:50 开始、次日 06:20 结束的睡眠会同时出现在两天的范围读取中；统计按重叠时长自行切分，不丢跨午夜数据。
+- `list` 返回与 `[from, to)` **有重叠**的事件，按 `started_at` 倒序；同一时刻按 `id` 倒序。`sleep` 的 `ended_at` 为 `null` 表示仍在进行，会出现在起始日之后的每个范围里；`feed` / `diaper` / `solid` 的 `ended_at` 为 `null` 表示瞬时事件，只出现在 `started_at` 所在的范围。这样 23:50 开始、次日 06:20 结束的睡眠会同时出现在两天的范围读取中；统计按重叠时长自行切分，不丢跨午夜数据。
 - `create` 的 `member_id` 在 payload 中显式给出；未来 HTTP 适配器把它映射到 `/members/{member_id}/care-events` 的路径参数。
 - `update` 替换可编辑内容（类型、时间、类型专属字段、备注），不改变 `id`、`member_id`、`source`。
 - `remove` 删除单条事件。
@@ -98,10 +98,10 @@ type CareEventRepository = {
 
 ## 消费方式
 
-- **04 记录弹层**：用 `CareEventCreate` 构造保存 payload；保存后刷新当前孩子当天 `list`。
+- **04 记录弹层**：用 `CareEventCreate` 构造保存 payload；保存后刷新当前孩子当天 `list`。今天页读取「昨天 + 今天」两天，时间线只显示今天；hero 的「距上次喂养」可以用昨天的最后一条，避免跨午夜后归零。
 - **06 提醒**：只从 `list` 的最新喂养派生「距上次喂养」，不新增服务端字段；提醒仍默认关闭、本机。
 - **07 统计**：用 `list` 的 4 类事件按天聚合；跨午夜事件按重叠时长切分，不伪造趋势。
-- **05 重复喂养**：保存前查同一 `member_id` 最近一条 `type === 'feed'`；5 分钟窗口与「不是正在修改的同一条」由客户端判断。
+- **05 重复喂养**：保存（新建或修改）前查同一 `member_id` 最近一条 `type === 'feed'`；5 分钟窗口与「不是正在修改的同一条」由客户端判断。窗口以候选 `started_at` 为中心、前后各 5 分钟，因此补录旧时间和跨午夜的前一条都能命中；`DUPLICATE_FEED_WINDOW_MINUTES` 集中定义在 `duplicateFeed.ts`。这是 best-effort：不做服务端去重或全局锁。
 
 ## 验收
 
