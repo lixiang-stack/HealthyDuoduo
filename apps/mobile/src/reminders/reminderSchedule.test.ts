@@ -4,7 +4,11 @@ import {
   reminderTimingLabel,
 } from './reminderSchedule';
 
-const NOW = new Date('2026-11-24T15:00:00+08:00');
+const NOW = new Date(2026, 10, 24, 15, 0, 0);
+
+function localAt(hour: number, minute: number, day = 24): string {
+  return new Date(2026, 10, day, hour, minute).toISOString();
+}
 
 describe('reminder timing', () => {
   it('has no reminder without a last feed', () => {
@@ -12,20 +16,20 @@ describe('reminder timing', () => {
   });
 
   it('schedules from the last feed when the interval ends in the future', () => {
-    const timing = reminderTiming('2026-11-24T14:00:00+08:00', 3, NOW);
+    const timing = reminderTiming(localAt(14, 0), 3, NOW);
 
     expect(timing).toEqual({
       status: 'scheduled',
-      at: new Date('2026-11-24T17:00:00+08:00'),
+      at: new Date(2026, 10, 24, 17, 0),
     });
   });
 
   it('reports an overdue reminder when the interval already passed', () => {
-    const timing = reminderTiming('2026-11-24T09:00:00+08:00', 3, NOW);
+    const timing = reminderTiming(localAt(9, 0), 3, NOW);
 
     expect(timing).toEqual({
       status: 'overdue',
-      at: new Date('2026-11-24T12:00:00+08:00'),
+      at: new Date(2026, 10, 24, 12, 0),
     });
   });
 
@@ -34,10 +38,10 @@ describe('reminder timing', () => {
   });
 
   it('labels the last and next clock times', () => {
-    expect(reminderTimingLabel('2026-11-24T14:00:00+08:00', 3, NOW)).toBe(
+    expect(reminderTimingLabel(localAt(14, 0), 3, NOW)).toBe(
       '上次 14:00 · 下次 17:00',
     );
-    expect(reminderTimingLabel('2026-11-24T09:00:00+08:00', 3, NOW)).toBe(
+    expect(reminderTimingLabel(localAt(9, 0), 3, NOW)).toBe(
       '上次 09:00 · 已过提醒时间 12:00',
     );
     expect(reminderTimingLabel(undefined, 3, NOW)).toBe('开启后从上次喂养开始计时');
@@ -49,9 +53,7 @@ describe('reminder notification copy', () => {
     const content = reminderNotificationContent(3);
 
     expect(content.title).toBe('距上次喂养已 3 小时');
-    expect(content.body).toBe(
-      '提醒只陈述时间，不提供喂养建议。',
-    );
+    expect(content.body).toBe('提醒只陈述时间，不提供喂养建议。');
     expect(`${content.title}${content.body}`).not.toMatch(/该喂|ml|奶量/);
   });
 });
