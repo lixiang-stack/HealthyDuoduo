@@ -29,21 +29,22 @@ func TestMigrationSchema(t *testing.T) {
 		t.Fatalf("migrate: %v", err)
 	}
 
-	// 基线固定在 version 20:0019 是当前完整 schema,0020 追加解释层缓存表。
+	// 基线固定在 version 21:0019 是当前完整 schema,0020 追加解释层缓存表,
+	// 0021 追加护理事件表。
 	var latest int
 	if err := pool.QueryRow(ctx, `SELECT max(version_id) FROM goose_db_version`).Scan(&latest); err != nil {
 		t.Fatalf("read goose version: %v", err)
 	}
-	if latest != 20 {
-		t.Fatalf("goose version = %d, want 20", latest)
+	if latest != 21 {
+		t.Fatalf("goose version = %d, want 21", latest)
 	}
 
 	t.Run("tables", func(t *testing.T) {
 		want := []string{
 			"analyses", "analysis_events", "analysis_explanation_cache",
 			"analysis_feedback", "analysis_llm_calls",
-			"correction_pairs", "growth_records", "images", "members", "ocr_results",
-			"report_items", "reports",
+			"care_events", "correction_pairs", "growth_records", "images", "members",
+			"ocr_results", "report_items", "reports",
 		}
 		for _, table := range want {
 			var n int
@@ -68,6 +69,7 @@ func TestMigrationSchema(t *testing.T) {
 			"analysis_events_created_idx",
 			"analysis_events_analysis_idx",
 			"analysis_llm_calls_created_idx",
+			"care_events_member_started_idx",
 		} {
 			var n int
 			if err := pool.QueryRow(ctx, `SELECT count(*) FROM pg_indexes
@@ -332,24 +334,84 @@ func TestMigrationSchema(t *testing.T) {
 		}
 	})
 
+	t.Run("care event constraints", func(t *testing.T) {
+		cases := []struct {
+			name string
+			sql  string
+			want string
+		}{
+			{"invalid type", `INSERT INTO care_events (member_id, type, started_at)
+				VALUES (1, 'pump', '2026-11-24 08:00:00+08')`, "care_events_type_check"},
+			{"feed missing method", `INSERT INTO care_events (member_id, type, started_at)
+				VALUES (1, 'feed', '2026-11-24 08:00:00+08')`, "care_events_type_fields"},
+			{"diaper with method", `INSERT INTO care_events
+				(member_id, type, started_at, method, diaper_type)
+				VALUES (1, 'diaper', '2026-11-24 08:00:00+08', 'breast', 'wet')`, "care_events_type_fields"},
+			{"solid missing food", `INSERT INTO care_events (member_id, type, started_at)
+				VALUES (1, 'solid', '2026-11-24 08:00:00+08')`, "care_events_type_fields"},
+			{"sleep ended without duration", `INSERT INTO care_events
+				(member_id, type, started_at, ended_at)
+				VALUES (1, 'sleep', '2026-11-24 08:00:00+08', '2026-11-24 09:00:00+08')`, "care_events_sleep_pair"},
+			{"negative amount", `INSERT INTO care_events
+				(member_id, type, started_at, method, amount_ml)
+				VALUES (1, 'feed', '2026-11-24 08:00:00+08', 'formula', -1)`, "care_events_positive_values"},
+			{"ended before started", `INSERT INTO care_events
+				(member_id, type, started_at, ended_at, duration_min)
+				VALUES (1, 'sleep', '2026-11-24 09:00:00+08', '2026-11-24 08:00:00+08', 60)`, "care_events_time_order"},
+			{"untrimmed note", `INSERT INTO care_events
+				(member_id, type, started_at, note, method, amount_ml)
+				VALUES (1, 'feed', '2026-11-24 08:00:00+08', ' 早晨奶 ', 'formula', 120)`, "care_events_note_trimmed"},
+			{"untrimmed food", `INSERT INTO care_events
+				(member_id, type, started_at, food)
+				VALUES (1, 'solid', '2026-11-24 08:00:00+08', ' 米糊 ')`, "care_events_food_trimmed"},
+			{"invalid source", `INSERT INTO care_events
+				(member_id, type, source, started_at, method)
+				VALUES (1, 'feed', 'device', '2026-11-24 08:00:00+08', 'formula')`, "care_events_source_check"},
+		}
+		for _, c := range cases {
+			t.Run(c.name, func(t *testing.T) {
+				if _, err := pool.Exec(ctx, c.sql); err == nil {
+					t.Fatal("invalid care event accepted, want CHECK rejection")
+				} else if !strings.Contains(err.Error(), c.want) {
+					t.Fatalf("expected %s violation, got %v", c.want, err)
+				}
+			})
+		}
+
+		// 合法跨午夜睡眠；source 未传时取默认 parent。
+		if _, err := pool.Exec(ctx, `INSERT INTO care_events
+			(member_id, type, started_at, ended_at, duration_min)
+			VALUES (1, 'sleep', '2026-11-22 23:50:00+08', '2026-11-23 06:20:00+08', 390)`); err != nil {
+			t.Fatalf("seed care event: %v", err)
+		}
+		var source string
+		if err := pool.QueryRow(ctx, `SELECT source FROM care_events WHERE member_id = 1`).Scan(&source); err != nil {
+			t.Fatal(err)
+		}
+		if source != "parent" {
+			t.Fatalf("care event source = %q, want parent", source)
+		}
+	})
+
 	t.Run("member delete cascades owned data", func(t *testing.T) {
 		if _, err := pool.Exec(ctx, `DELETE FROM members WHERE id = 1`); err != nil {
 			t.Fatalf("delete member: %v", err)
 		}
-		var growth, analyses, feedback, events, calls, cached, ownedReports int
+		var growth, analyses, feedback, events, calls, cached, care, ownedReports int
 		if err := pool.QueryRow(ctx, `SELECT
 			(SELECT count(*) FROM growth_records), (SELECT count(*) FROM analyses),
 			(SELECT count(*) FROM analysis_feedback), (SELECT count(*) FROM analysis_events),
 			(SELECT count(*) FROM analysis_llm_calls),
 			(SELECT count(*) FROM analysis_explanation_cache),
+			(SELECT count(*) FROM care_events),
 			(SELECT count(*) FROM reports WHERE member_id = 1)`).
-			Scan(&growth, &analyses, &feedback, &events, &calls, &cached, &ownedReports); err != nil {
+			Scan(&growth, &analyses, &feedback, &events, &calls, &cached, &care, &ownedReports); err != nil {
 			t.Fatal(err)
 		}
 		if growth != 0 || analyses != 0 || feedback != 0 || events != 0 || calls != 0 ||
-			cached != 0 || ownedReports != 0 {
-			t.Fatalf("after member delete: growth=%d analyses=%d feedback=%d events=%d calls=%d cached=%d reports=%d, want all 0",
-				growth, analyses, feedback, events, calls, cached, ownedReports)
+			cached != 0 || care != 0 || ownedReports != 0 {
+			t.Fatalf("after member delete: growth=%d analyses=%d feedback=%d events=%d calls=%d cached=%d care=%d reports=%d, want all 0",
+				growth, analyses, feedback, events, calls, cached, care, ownedReports)
 		}
 		// 无主存量报告不受成员删除影响。
 		var unowned int

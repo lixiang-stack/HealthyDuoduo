@@ -4,7 +4,7 @@
 
 **Blocked by:** None。
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 ## 验收清单
 
@@ -28,3 +28,15 @@
 - 列表 SQL 用 `type` 条件区分“点事件 / 进行中睡眠”，不要用 `ended_at IS NULL` 直接判断。
 - 迁移编号沿用 0021；Down 只删表。没有历史数据需要回填。
 - 测试数据用真实形状（ISO 带偏移、跨午夜、可选字段为空），不要只造 `2026-01-01` 占位。
+
+## Comments
+
+**实现（2026-11-24）：**
+
+- 新增 `internal/care/care.go`：四类型常量、`CareEvent` / `EventInput`、`Normalize` + `Validate`、领域错误；`store.go` 定义 `care.Store` 端口。
+- 新增 `internal/storage/migrations/0021_care_events.sql`：单表四类型、类型专属 CHECK、数值 / 时间 / sleep 配对 / trim / source 约束、`(member_id, started_at DESC, id DESC)` 索引、级联删除。
+- 新增 `internal/storage/store_care.go`：列表按重叠语义、创建 / 完整替换 / 删除；写入前 `Normalize` + `Validate`；`Update` 保留 `id` / `member_id` / `source`，未知 id 返回 `(nil, nil)`；`Delete` 返回是否删除。
+- 新增 `internal/care/care_test.go` 与 `internal/storage/store_care_test.go`；`internal/storage/migrate_test.go` 更新 goose 基线 21、`care_events` 表 / 索引 / 约束 / 级联断言。
+- 取舍：`Normalize` 单独导出，note 去空白、空串转 nil，solid food 去空白；其余类型把 food 留给 `Validate` 判类型字段非法。DB 仍用 CHECK 兜底，HTTP 边界不信任客户端。
+- 验证：`go test ./...`、`go vet ./...`、`bash scripts/test-db.sh` 全绿（含 `TestMigrationSchema`、`TestCareEventStoreSmoke`）。
+- 未实现 HTTP / OpenAPI / handler（票 02）；未改 App / 契约文档。
