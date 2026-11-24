@@ -14,6 +14,9 @@ import {
   type FeedMethod,
 } from './careEvents';
 
+export const MS_PER_MINUTE = 60 * 1000;
+export const MINUTES_PER_HOUR = 60;
+
 export const CARE_EVENT_LABELS: Record<CareEventType, string> = {
   feed: '喂奶',
   diaper: '尿布',
@@ -60,10 +63,11 @@ export function localDayRange(now: Date): CareEventRange {
   return { from: from.toISOString(), to: to.toISOString() };
 }
 
-/** Read window covering the previous local day plus today, so the hero can show a
- *  feed recorded just before midnight without adding it to today's timeline. */
+/** Read window covering the last seven local days plus today, so the hero and the
+ *  reminder can show the latest feed after a quiet day without adding older events
+ *  to today's timeline. */
 export function recentCareEventRange(now: Date): CareEventRange {
-  const from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  const from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
   const to = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
   return { from: from.toISOString(), to: to.toISOString() };
 }
@@ -81,7 +85,7 @@ export function localClockTime(value: Date | string): string {
 }
 
 export function elapsedMinutes(startedAt: string, now: Date): number {
-  return Math.max(0, Math.floor((now.getTime() - Date.parse(startedAt)) / 60000));
+  return Math.max(0, Math.floor((now.getTime() - Date.parse(startedAt)) / MS_PER_MINUTE));
 }
 
 export function formatElapsedMinutes(minutes: number): string {
@@ -177,8 +181,8 @@ export function careEventMeta(event: CareEvent): string {
 }
 
 export function formatDurationMinutes(minutes: number): string {
-  const hours = Math.floor(minutes / 60);
-  const rest = minutes % 60;
+  const hours = Math.floor(minutes / MINUTES_PER_HOUR);
+  const rest = minutes % MINUTES_PER_HOUR;
   if (hours === 0) {
     return `${rest} 分钟`;
   }
@@ -191,7 +195,7 @@ function sleepMinutesWithin(event: CareEvent, range: CareEventRange, now: Date):
     event.ended_at === null ? now.getTime() : Date.parse(event.ended_at),
     Date.parse(range.to),
   );
-  return Math.max(0, Math.round((end - start) / 60000));
+  return Math.max(0, Math.round((end - start) / MS_PER_MINUTE));
 }
 
 function pad(value: number): string {

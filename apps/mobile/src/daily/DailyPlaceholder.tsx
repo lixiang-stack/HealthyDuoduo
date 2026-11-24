@@ -8,13 +8,13 @@ import { useCurrentMember } from '../members/CurrentMemberContext';
 import { childMembers, resolveCurrentChild } from '../members/currentChild';
 import { useMembers } from '../members/useMembers';
 import { ChildSwitcher } from './ChildSwitcher';
+import { StatsCareLog } from './StatsCareLog';
 import { TodayCareLog } from './TodayCareLog';
 
 type Variant = 'today' | 'stats';
 
-// B3 育儿二级视图的占位页:导航壳先行,护理事件数据 / 记录弹层 / 图表分别在
-// 01、04、07 接入。这里先承载当前孩子上下文:单孩子锁定、多孩子选择、
-// 无孩子空态;成人当前成员不影响育儿页。
+// B3 育儿二级视图:当前孩子上下文在这里回落 / 自动选中;今天页承载护理记录,
+// 统计页承载 7 天聚合图表。护理事件数据 / 记录弹层由 01、04 提供。
 export function DailyPlaceholder({ variant }: { variant: Variant }) {
   const { currentChildId, childReady, setCurrentChild, clearChild } = useCurrentMember();
   const { state, reload } = useMembers();
@@ -109,9 +109,7 @@ export function DailyPlaceholder({ variant }: { variant: Variant }) {
             members={allMembers}
           />
         ) : (
-          <Text testID="daily-stats-empty" style={sharedStyles.muted}>
-            {childState.child.name} 还没有可统计的护理记录。4 个指标 × 3 种图表将在护理记录开放后显示。
-          </Text>
+          <StatsCareLog key={childState.child.member_id} child={childState.child} />
         )
       ) : null}
     </>
@@ -129,7 +127,7 @@ export function DailyPlaceholder({ variant }: { variant: Variant }) {
 
   return (
     <ScrollView
-      testID="daily-stats-placeholder"
+      testID="daily-stats"
       style={styles.container}
       contentContainerStyle={styles.content}
     >

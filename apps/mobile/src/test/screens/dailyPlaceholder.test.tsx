@@ -126,7 +126,7 @@ describe('DailyPlaceholder', () => {
     await renderScreen(<DailyPlaceholder variant="stats" />);
 
     expect(await screen.findByTestId('daily-current-child')).toHaveTextContent('老二');
-    expect(await screen.findByTestId('daily-stats-empty')).toHaveTextContent(/老二/);
+    expect(await screen.findByTestId('stats-empty')).toHaveTextContent(/还没有记录/);
     await waitFor(() =>
       expect(AsyncStorage.setItem).toHaveBeenCalledWith(CURRENT_CHILD_STORAGE_KEY, '2'),
     );
