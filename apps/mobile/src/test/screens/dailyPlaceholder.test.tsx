@@ -45,7 +45,7 @@ describe('DailyPlaceholder', () => {
     expect(await screen.findByTestId('daily-current-child')).toHaveTextContent('豆豆');
     expect(screen.queryByTestId('daily-child-switcher')).toBeNull();
     expect(screen.queryByTestId('child-picker')).toBeNull();
-    expect(await screen.findByTestId('daily-today-empty')).toHaveTextContent(/记录给 豆豆/);
+    expect(await screen.findByTestId('today-hero-eyebrow')).toHaveTextContent(/豆豆/);
     await waitFor(() =>
       expect(AsyncStorage.setItem).toHaveBeenCalledWith(CURRENT_CHILD_STORAGE_KEY, '1'),
     );
@@ -79,7 +79,7 @@ describe('DailyPlaceholder', () => {
 
     await waitFor(() => expect(screen.queryByTestId('child-picker')).toBeNull());
     expect(screen.getByTestId('daily-child-switcher')).toHaveTextContent('老二 ▾');
-    expect(await screen.findByTestId('daily-today-empty')).toHaveTextContent(/记录给 老二/);
+    expect(await screen.findByTestId('today-hero-eyebrow')).toHaveTextContent(/老二/);
     await waitFor(() =>
       expect(AsyncStorage.setItem).toHaveBeenCalledWith(CURRENT_CHILD_STORAGE_KEY, '2'),
     );
@@ -93,7 +93,7 @@ describe('DailyPlaceholder', () => {
 
     expect(await screen.findByTestId('daily-child-switcher')).toHaveTextContent('老二 ▾');
     expect(screen.queryByTestId('child-picker')).toBeNull();
-    expect(await screen.findByTestId('daily-today-empty')).toHaveTextContent(/记录给 老二/);
+    expect(await screen.findByTestId('today-hero-eyebrow')).toHaveTextContent(/老二/);
 
     await fireEvent.press(screen.getByTestId('daily-child-switcher'));
     expect(screen.getByTestId('child-option-2').props.accessibilityLabel).toBe('老二');

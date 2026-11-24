@@ -7,6 +7,7 @@ import type {
 } from '../api/analyses';
 import type { GrowthRecord } from '../api/growth';
 import type { Member } from '../api/members';
+import type { CareEvent } from '../care/careEvents';
 import type {
   FlagCounts,
   PanelDetail,
@@ -49,6 +50,56 @@ export function makeGrowthRecord(overrides: Partial<GrowthRecord> = {}): GrowthR
     source: 'measured',
     bmi: 16,
     weight_status: null,
+    ...overrides,
+  };
+}
+
+export function makeFeedEvent(
+  overrides: Partial<Extract<CareEvent, { type: 'feed' }>> = {},
+): Extract<CareEvent, { type: 'feed' }> {
+  return {
+    id: 1,
+    member_id: 1,
+    type: 'feed',
+    started_at: '2026-11-23T14:00:00+08:00',
+    ended_at: null,
+    note: null,
+    source: 'parent',
+    method: 'formula',
+    amount_ml: 120,
+    duration_min: null,
+    ...overrides,
+  };
+}
+
+export function makeDiaperEvent(
+  overrides: Partial<Extract<CareEvent, { type: 'diaper' }>> = {},
+): Extract<CareEvent, { type: 'diaper' }> {
+  return {
+    id: 2,
+    member_id: 1,
+    type: 'diaper',
+    started_at: '2026-11-23T09:00:00+08:00',
+    ended_at: null,
+    note: null,
+    source: 'parent',
+    diaper_type: 'wet',
+    ...overrides,
+  };
+}
+
+export function makeSleepEvent(
+  overrides: Partial<Extract<CareEvent, { type: 'sleep' }>> = {},
+): Extract<CareEvent, { type: 'sleep' }> {
+  return {
+    id: 4,
+    member_id: 1,
+    type: 'sleep',
+    started_at: '2026-11-23T13:00:00+08:00',
+    ended_at: null,
+    note: null,
+    source: 'parent',
+    duration_min: null,
     ...overrides,
   };
 }

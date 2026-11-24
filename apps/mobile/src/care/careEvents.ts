@@ -21,7 +21,8 @@ export type CareEventSource = typeof CARE_EVENT_SOURCE_PARENT;
 type CareEventBodyBase = {
   /** Absolute ISO 8601 instant with an offset (cross-midnight stays on one event). */
   started_at: string;
-  /** Null while ongoing; otherwise an instant >= started_at. */
+  /** Null while sleep is ongoing. Feed / diaper / solid events are point events at
+   *  `started_at`, so they also store null. */
   ended_at: string | null;
   /** Trimmed free text; null when empty. */
   note: string | null;
@@ -90,9 +91,10 @@ export type CareEventRepository = {
 };
 
 /** Range reads are overlap-based so a sleep that starts before midnight still appears
- *  in today's timeline. `from` is inclusive and `to` is exclusive. */
+ *  in today's timeline. `from` is inclusive and `to` is exclusive. A `null` end means
+ *  an ongoing sleep for sleep events, but a point event for feed / diaper / solid. */
 export function careEventOverlapsRange(
-  event: Pick<CareEvent, 'started_at' | 'ended_at'>,
+  event: Pick<CareEvent, 'type' | 'started_at' | 'ended_at'>,
   range: CareEventRange,
 ): boolean {
   const started = Date.parse(event.started_at);
@@ -102,8 +104,12 @@ export function careEventOverlapsRange(
     return false;
   }
   if (event.ended_at === null) {
-    // Ongoing events have an open end, so any earlier range still intersects them.
-    return true;
+    if (event.type === 'sleep') {
+      // Ongoing sleep has an open end, so any earlier range still intersects it.
+      return true;
+    }
+    // Point events are half-open [start, start+1): include the inclusive `from` edge.
+    return started >= from;
   }
   const ended = Date.parse(event.ended_at);
   if (ended === started) {
@@ -117,4 +123,18 @@ export function careEventOverlapsRange(
 export function compareCareEventsDesc(a: CareEvent, b: CareEvent): number {
   const byStart = Date.parse(b.started_at) - Date.parse(a.started_at);
   return byStart !== 0 ? byStart : b.id - a.id;
+}
+
+/** Sleep duration from the stored minutes or from a completed start/end pair. */
+export function careEventDurationMinutes(event: CareEvent): number | null {
+  if (event.type !== 'sleep') {
+    return null;
+  }
+  if (event.duration_min !== null) {
+    return event.duration_min;
+  }
+  if (event.ended_at === null) {
+    return null;
+  }
+  return Math.max(0, Math.round((Date.parse(event.ended_at) - Date.parse(event.started_at)) / 60000));
 }

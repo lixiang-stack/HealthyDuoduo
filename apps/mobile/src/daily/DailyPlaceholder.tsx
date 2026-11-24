@@ -8,6 +8,7 @@ import { useCurrentMember } from '../members/CurrentMemberContext';
 import { childMembers, resolveCurrentChild } from '../members/currentChild';
 import { useMembers } from '../members/useMembers';
 import { ChildSwitcher } from './ChildSwitcher';
+import { TodayCareLog } from './TodayCareLog';
 
 type Variant = 'today' | 'stats';
 
@@ -19,6 +20,7 @@ export function DailyPlaceholder({ variant }: { variant: Variant }) {
   const { state, reload } = useMembers();
 
   const ready = state.status === 'ready' && childReady;
+  const allMembers = state.status === 'ready' ? state.members : [];
   const children = state.status === 'ready' ? childMembers(state.members) : [];
   const childState = resolveCurrentChild(
     state.status === 'ready' ? state.members : [],
@@ -46,12 +48,8 @@ export function DailyPlaceholder({ variant }: { variant: Variant }) {
 
   const loading = state.status === 'loading' || (state.status === 'ready' && !childReady);
 
-  return (
-    <ScrollView
-      testID={`daily-${variant}-placeholder`}
-      style={styles.container}
-      contentContainerStyle={styles.content}
-    >
+  const content = (
+    <>
       {ready && childState.status !== 'no-children' ? (
         <ChildSwitcher
           childState={childState}
@@ -60,7 +58,7 @@ export function DailyPlaceholder({ variant }: { variant: Variant }) {
         />
       ) : null}
 
-      <Text style={styles.title}>{variant === 'today' ? '今天' : '统计'}</Text>
+      {variant === 'stats' ? <Text style={styles.title}>统计</Text> : null}
 
       {loading ? (
         <View style={sharedStyles.horizontal}>
@@ -104,14 +102,38 @@ export function DailyPlaceholder({ variant }: { variant: Variant }) {
           <Text testID="daily-needs-child" style={sharedStyles.muted}>
             {variant === 'today' ? '请先选择今天要记录的孩子。' : '请先选择要统计的孩子。'}
           </Text>
+        ) : variant === 'today' ? (
+          <TodayCareLog
+            key={childState.child.member_id}
+            child={childState.child}
+            members={allMembers}
+          />
         ) : (
-          <Text testID={`daily-${variant}-empty`} style={sharedStyles.muted}>
-            {variant === 'today'
-              ? `记录给 ${childState.child.name}。今天还没有记录，护理记录功能即将开放。`
-              : `${childState.child.name} 还没有可统计的护理记录。4 个指标 × 3 种图表将在护理记录开放后显示。`}
+          <Text testID="daily-stats-empty" style={sharedStyles.muted}>
+            {childState.child.name} 还没有可统计的护理记录。4 个指标 × 3 种图表将在护理记录开放后显示。
           </Text>
         )
       ) : null}
+    </>
+  );
+
+  // Today fills the first screen and scrolls only the timeline inside; stats keeps
+  // the existing page scroll.
+  if (variant === 'today') {
+    return (
+      <View testID="daily-today-placeholder" style={styles.todayContent}>
+        {content}
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView
+      testID="daily-stats-placeholder"
+      style={styles.container}
+      contentContainerStyle={styles.content}
+    >
+      {content}
     </ScrollView>
   );
 }
@@ -119,6 +141,7 @@ export function DailyPlaceholder({ variant }: { variant: Variant }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: 24, gap: 12 },
+  todayContent: { flex: 1, padding: 24, gap: 12, backgroundColor: colors.background },
   stack: { gap: 12 },
   title: { fontSize: 20, color: colors.text, fontWeight: '600' },
   fail: { fontSize: 13, color: colors.fail },

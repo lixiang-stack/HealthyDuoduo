@@ -54,14 +54,43 @@ describe('care event range', () => {
     expect(careEventOverlapsRange(fixtureById(4), TODAY)).toBe(true);
   });
 
-  it('includes an ongoing event in any later range', () => {
-    const ongoing = { started_at: '2026-11-22T23:40:00+08:00', ended_at: null };
+  it('includes an ongoing sleep in any later range', () => {
+    const ongoing = {
+      type: 'sleep' as const,
+      started_at: '2026-11-22T23:40:00+08:00',
+      ended_at: null,
+    };
 
     expect(careEventOverlapsRange(ongoing, TODAY)).toBe(true);
   });
 
+  it('treats a feed with no end as a point event only on its start day', () => {
+    const feed = fixtureById(1);
+
+    expect(careEventOverlapsRange(feed, TODAY)).toBe(true);
+    expect(
+      careEventOverlapsRange(feed, {
+        from: '2026-11-24T00:00:00+08:00',
+        to: '2026-11-25T00:00:00+08:00',
+      }),
+    ).toBe(false);
+  });
+
+  it('treats diaper and solid events with no end as point events too', () => {
+    for (const id of [3, 5]) {
+      const event = fixtureById(id);
+      expect(
+        careEventOverlapsRange(event, {
+          from: '2026-11-24T00:00:00+08:00',
+          to: '2026-11-25T00:00:00+08:00',
+        }),
+      ).toBe(false);
+    }
+  });
+
   it('excludes an event that ended exactly at the inclusive from edge', () => {
     const endedAtFrom = {
+      type: 'sleep' as const,
       started_at: '2026-11-22T23:00:00+08:00',
       ended_at: TODAY.from,
     };
@@ -70,7 +99,7 @@ describe('care event range', () => {
   });
 
   it('includes a zero-duration point event exactly at from', () => {
-    const pointAtFrom = { started_at: TODAY.from, ended_at: TODAY.from };
+    const pointAtFrom = { type: 'feed' as const, started_at: TODAY.from, ended_at: TODAY.from };
 
     expect(careEventOverlapsRange(pointAtFrom, TODAY)).toBe(true);
   });

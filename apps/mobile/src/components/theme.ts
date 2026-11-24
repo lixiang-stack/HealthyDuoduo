@@ -3,6 +3,7 @@ export const colors = {
   text: '#111827',
   muted: '#6b7280',
   accent: '#2563eb',
+  accentSoft: '#eff6ff',
   onAccent: '#ffffff',
   ok: '#15803d',
   fail: '#b91c1c',
