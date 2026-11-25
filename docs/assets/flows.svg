@@ -1,0 +1,179 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="940" viewBox="0 0 1200 940" role="img" aria-labelledby="flow-title flow-desc" font-family="'PingFang SC','Hiragino Sans GB','Noto Sans CJK SC','Microsoft YaHei',sans-serif">
+  <title id="flow-title">HealthyDuoduo 核心使用流程</title>
+  <desc id="flow-desc">检查单归档：App 上传，hdd 编排并调用 recognizer，报告与 OCR 落库、原图写入对象存储，App 再读取报告用于核对和趋势。育儿记录：App 记录喂养、尿布、睡眠、辅食，hdd 写入 PostgreSQL，今天页和统计读取事件，提醒在本机由最新喂养派生。报告解读：hdd 本地生成事实层与框架层并保存快照，配置 OpenAI 兼容端点与模型时可选调用解释层，结果页展示。</desc>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b"/>
+    </marker>
+    <marker id="arrow-optional" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#db2777"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="940" fill="#ffffff"/>
+  <text x="40" y="42" font-size="24" font-weight="700" fill="#0f172a">核心使用流程</text>
+  <text x="40" y="66" font-size="13" fill="#64748b">检查单归档、育儿记录、报告解读三条主链路</text>
+
+  <g font-size="12" fill="#475569">
+    <line x1="900" y1="42" x2="938" y2="42" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)"/>
+    <text x="948" y="46">必选步骤</text>
+    <line x1="1020" y1="42" x2="1058" y2="42" stroke="#db2777" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#arrow-optional)"/>
+    <text x="1068" y="46">可选</text>
+  </g>
+
+  <!-- 1. 检查单归档 -->
+  <rect x="30" y="88" width="1140" height="232" rx="16" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="54" y="118" font-size="15" font-weight="700" fill="#334155">① 检查单归档与复核</text>
+
+  <g>
+    <rect x="60" y="150" width="150" height="110" rx="12" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
+    <text x="78" y="180" font-size="15" font-weight="700" fill="#1e3a8a">App</text>
+    <text x="78" y="204" font-size="12.5" fill="#1e3a8a">拍摄 / 相册</text>
+    <text x="78" y="224" font-size="12.5" fill="#1e3a8a">选择成员</text>
+  </g>
+  <g>
+    <rect x="240" y="150" width="150" height="110" rx="12" fill="#ecfdf5" stroke="#34d399" stroke-width="1.5"/>
+    <text x="258" y="180" font-size="15" font-weight="700" fill="#065f46">hdd</text>
+    <text x="258" y="204" font-size="12.5" fill="#065f46">幂等 + 编排</text>
+    <text x="258" y="224" font-size="12.5" fill="#065f46">POST /reports</text>
+  </g>
+  <g>
+    <rect x="420" y="150" width="170" height="110" rx="12" fill="#f5f3ff" stroke="#a78bfa" stroke-width="1.5"/>
+    <text x="438" y="180" font-size="15" font-weight="700" fill="#5b21b6">recognizer</text>
+    <text x="438" y="204" font-size="12.5" fill="#5b21b6">OCR + 规则</text>
+    <text x="438" y="224" font-size="12.5" fill="#5b21b6">POST /report</text>
+  </g>
+  <g>
+    <rect x="620" y="150" width="160" height="110" rx="12" fill="#ecfdf5" stroke="#34d399" stroke-width="1.5"/>
+    <text x="638" y="180" font-size="15" font-weight="700" fill="#065f46">hdd</text>
+    <text x="638" y="204" font-size="12.5" fill="#065f46">写库 / 图片代理</text>
+    <text x="638" y="224" font-size="12.5" fill="#065f46">幂等 sha256</text>
+  </g>
+  <g>
+    <rect x="810" y="150" width="160" height="110" rx="12" fill="#fff7ed" stroke="#fb923c" stroke-width="1.5"/>
+    <text x="828" y="180" font-size="15" font-weight="700" fill="#9a3412">存储</text>
+    <text x="828" y="204" font-size="12.5" fill="#7c2d12">PostgreSQL</text>
+    <text x="828" y="224" font-size="12.5" fill="#7c2d12">+ SeaweedFS</text>
+  </g>
+  <g>
+    <rect x="1000" y="150" width="140" height="110" rx="12" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
+    <text x="1018" y="180" font-size="15" font-weight="700" fill="#1e3a8a">App</text>
+    <text x="1018" y="204" font-size="12.5" fill="#1e3a8a">报告 / 核对</text>
+    <text x="1018" y="224" font-size="12.5" fill="#1e3a8a">趋势 / 项目</text>
+  </g>
+
+  <g stroke="#64748b" stroke-width="2" fill="none">
+    <line x1="210" y1="205" x2="240" y2="205" marker-end="url(#arrow)"/>
+    <line x1="390" y1="205" x2="420" y2="205" marker-end="url(#arrow)"/>
+    <line x1="590" y1="205" x2="620" y2="205" marker-end="url(#arrow)"/>
+    <line x1="780" y1="205" x2="810" y2="205" marker-end="url(#arrow)"/>
+    <line x1="970" y1="205" x2="1000" y2="205" marker-end="url(#arrow)"/>
+  </g>
+  <g font-size="11.5" fill="#475569" text-anchor="middle">
+    <text x="225" y="190">上传</text>
+    <text x="405" y="190">HTTP</text>
+    <text x="605" y="190">报告 / OCR</text>
+    <text x="795" y="190">写入</text>
+    <text x="985" y="190">读取</text>
+  </g>
+  <text x="60" y="300" font-size="12" fill="#64748b">识别服务只返回结果；hdd 负责落库、幂等与图像代理。</text>
+
+  <!-- 2. 育儿记录 -->
+  <rect x="30" y="336" width="1140" height="232" rx="16" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="54" y="366" font-size="15" font-weight="700" fill="#334155">② 育儿记录与提醒</text>
+
+  <g>
+    <rect x="60" y="398" width="170" height="110" rx="12" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
+    <text x="78" y="428" font-size="15" font-weight="700" fill="#1e3a8a">App</text>
+    <text x="78" y="452" font-size="12.5" fill="#1e3a8a">选择当前孩子</text>
+  </g>
+  <g>
+    <rect x="270" y="398" width="240" height="110" rx="12" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
+    <text x="288" y="428" font-size="15" font-weight="700" fill="#1e3a8a">App · 记录</text>
+    <text x="288" y="452" font-size="12.5" fill="#1e3a8a">喂养 / 尿布 / 睡眠 / 辅食</text>
+    <text x="288" y="474" font-size="12.5" fill="#64748b">只看当前孩子</text>
+  </g>
+  <g>
+    <rect x="550" y="398" width="170" height="110" rx="12" fill="#ecfdf5" stroke="#34d399" stroke-width="1.5"/>
+    <text x="568" y="428" font-size="15" font-weight="700" fill="#065f46">hdd</text>
+    <text x="568" y="452" font-size="12.5" fill="#065f46">/care-events</text>
+    <text x="568" y="474" font-size="12.5" fill="#065f46">增 / 改 / 删 / 查</text>
+  </g>
+  <g>
+    <rect x="760" y="398" width="170" height="110" rx="12" fill="#fff7ed" stroke="#fb923c" stroke-width="1.5"/>
+    <text x="778" y="428" font-size="15" font-weight="700" fill="#9a3412">PostgreSQL</text>
+    <text x="778" y="452" font-size="12.5" fill="#7c2d12">care_events</text>
+    <text x="778" y="474" font-size="12.5" fill="#7c2d12">按孩子与时间范围</text>
+  </g>
+  <g>
+    <rect x="970" y="398" width="200" height="110" rx="12" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
+    <text x="988" y="428" font-size="15" font-weight="700" fill="#1e3a8a">App · 展示</text>
+    <text x="988" y="452" font-size="12.5" fill="#1e3a8a">今天 / 统计</text>
+    <text x="988" y="474" font-size="12.5" fill="#1e3a8a">提醒（本机派生）</text>
+  </g>
+
+  <g stroke="#64748b" stroke-width="2" fill="none">
+    <line x1="230" y1="453" x2="270" y2="453" marker-end="url(#arrow)"/>
+    <line x1="510" y1="453" x2="550" y2="453" marker-end="url(#arrow)"/>
+    <line x1="720" y1="453" x2="760" y2="453" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+    <line x1="930" y1="453" x2="970" y2="453" marker-end="url(#arrow)"/>
+  </g>
+  <g font-size="11.5" fill="#475569" text-anchor="middle">
+    <text x="250" y="438">选择</text>
+    <text x="530" y="438">HTTP</text>
+    <text x="740" y="438">写入 / 查询</text>
+    <text x="950" y="438">读取</text>
+  </g>
+  <text x="60" y="548" font-size="12" fill="#64748b">提醒设置保存在本机，由最新喂养记录派生；不新增服务端提醒表。</text>
+
+  <!-- 3. 报告解读 -->
+  <rect x="30" y="584" width="1140" height="336" rx="16" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="54" y="614" font-size="15" font-weight="700" fill="#334155">③ 报告解读</text>
+
+  <g>
+    <rect x="60" y="680" width="180" height="100" rx="12" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
+    <text x="78" y="710" font-size="15" font-weight="700" fill="#1e3a8a">App</text>
+    <text x="78" y="734" font-size="12.5" fill="#1e3a8a">选择项目 / 指标</text>
+    <text x="78" y="754" font-size="12.5" fill="#1e3a8a">或病历</text>
+  </g>
+  <g>
+    <rect x="300" y="680" width="220" height="100" rx="12" fill="#ecfdf5" stroke="#34d399" stroke-width="1.5"/>
+    <text x="318" y="710" font-size="15" font-weight="700" fill="#065f46">hdd · 本地计算</text>
+    <text x="318" y="734" font-size="12.5" fill="#065f46">事实层 + 框架层</text>
+    <text x="318" y="754" font-size="12.5" fill="#065f46">无需 LLM</text>
+  </g>
+  <g>
+    <rect x="950" y="700" width="170" height="110" rx="12" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
+    <text x="968" y="730" font-size="15" font-weight="700" fill="#1e3a8a">App · 结果页</text>
+    <text x="968" y="754" font-size="12.5" fill="#1e3a8a">事实 / 框架</text>
+    <text x="968" y="774" font-size="12.5" fill="#1e3a8a">可选解释层</text>
+  </g>
+  <g>
+    <rect x="300" y="828" width="220" height="70" rx="12" fill="#fff7ed" stroke="#fb923c" stroke-width="1.5"/>
+    <text x="318" y="855" font-size="14" font-weight="700" fill="#9a3412">PostgreSQL</text>
+    <text x="318" y="877" font-size="12" fill="#7c2d12">分析快照永久保留</text>
+  </g>
+  <g>
+    <rect x="600" y="828" width="180" height="70" rx="12" fill="#fdf2f8" stroke="#f472b6" stroke-width="1.5" stroke-dasharray="6 4"/>
+    <text x="618" y="855" font-size="14" font-weight="700" fill="#9d174d">模型端点（可选）</text>
+    <text x="618" y="877" font-size="12" fill="#831843">配置后启用 · key 可选</text>
+  </g>
+
+  <g stroke="#64748b" stroke-width="2" fill="none">
+    <line x1="240" y1="730" x2="300" y2="730" marker-end="url(#arrow)"/>
+    <line x1="520" y1="760" x2="950" y2="760" marker-end="url(#arrow)"/>
+    <line x1="410" y1="780" x2="410" y2="828" marker-end="url(#arrow)"/>
+  </g>
+  <g font-size="11.5" fill="#475569">
+    <text x="270" y="715" text-anchor="middle">发起</text>
+    <text x="660" y="746" text-anchor="middle">本地结果</text>
+    <text x="422" y="812">保存快照</text>
+  </g>
+
+  <g stroke="#db2777" stroke-width="2" stroke-dasharray="7 5" fill="none">
+    <path d="M 520 790 L 600 828" marker-end="url(#arrow-optional)"/>
+    <path d="M 780 850 L 950 800" marker-end="url(#arrow-optional)"/>
+  </g>
+  <text x="556" y="806" font-size="11.5" fill="#9d174d">已配置时</text>
+</svg>
