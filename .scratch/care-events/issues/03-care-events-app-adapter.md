@@ -6,7 +6,7 @@
 
 跨 feature 依赖：[09-sleep-completion](../../care-log/issues/09-sleep-completion.md)。
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 ## 验收清单
 
@@ -29,3 +29,14 @@
 - 根布局注入后，`CareEventProvider.test.tsx` 需要改为显式 repository；`renderScreen` 已支持注入，保持测试默认空仓储。
 - 提醒重排在票 04，不在本票改系统通知；本票只保证数据读取正确。
 - 真机 smoke 放票 05；本票至少跑 `expo export` 与 RNTL。
+
+## Comments
+
+**实现（2026-11-25）：**
+
+- `apps/mobile/src/api/careEvents.ts`：list / create / update / delete 四个封装，wire 类型取自 `schema.d.ts`；`toCareEvent` 把可选类型字段按 `?? null` 映射回手写 `CareEvent`，创建 / 修改只发送可编辑字段。
+- `apps/mobile/src/care/httpCareEventRepository.ts`：每次调用 `resolveApiClient()`；未配置抛 `CARE_EVENTS_UNCONFIGURED_MESSAGE`（「尚未配置后端地址」）；服务端错误沿用 `unwrap` / `assertOk` 的 `Error(message)`。
+- `CareEventProvider` 的 `repository` 改为必填并删除生产默认内存仓储；根布局注入模块级 `HttpCareEventRepository`，`renderScreen` 继续显式注入 `InMemoryCareEventRepository`。
+- 今天时间线与统计整页滚动增加 `RefreshControl`；统计页滚动下沉到 `StatsDaily`，与 7 天读模型同层。刷新失败时 `ready` 状态保留 `error`，页面继续显示旧时间线 / 摘要 / 图表并复用原错误态。
+- 测试：`api/careEvents.test.ts`（wire 映射 / 错误）、`httpCareEventRepository.test.ts`（未配置 / 每次解析 / 服务端错误）、`CareEventProvider.test.tsx`（显式注入）、今天 / 统计屏幕测试（下拉刷新、刷新失败保留数据、创建修改删除、孩子切换）。
+- 验证：`npm run typecheck`、`TZ=UTC npm test -- --runInBand`（60 suites / 483 tests）、`npm run lint -- --max-warnings=0`、`npx expo export --platform android` 全绿；未改 Go / Python / DB / OpenAPI。

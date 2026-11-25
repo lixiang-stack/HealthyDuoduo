@@ -1,5 +1,6 @@
 // Seven-day care-event read model for the stats page. Kept separate from today's
-// timeline so switching to stats does not depend on the local-day filtering.
+// timeline so switching to stats does not depend on the local-day filtering. A
+// failed refresh keeps the previous data on screen and exposes the error alongside it.
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 
@@ -10,7 +11,7 @@ import type { CareEvent } from './careEvents';
 export type StatsCareEventsState =
   | { status: 'loading' }
   | { status: 'error'; detail: string }
-  | { status: 'ready'; events: CareEvent[] };
+  | { status: 'ready'; events: CareEvent[]; error?: string };
 
 export function useStatsCareEvents(memberId: number): {
   state: StatsCareEventsState;
@@ -32,10 +33,10 @@ export function useStatsCareEvents(memberId: number): {
       }
     } catch (error) {
       if (request === requestId.current) {
-        setState({
-          status: 'error',
-          detail: error instanceof Error ? error.message : String(error),
-        });
+        const detail = error instanceof Error ? error.message : String(error);
+        setState((previous) =>
+          previous.status === 'ready' ? { ...previous, error: detail } : { status: 'error', detail },
+        );
       }
     }
   }, [memberId, repository]);

@@ -1,6 +1,6 @@
 # 护理事件最小契约（前置）
 
-**状态：** 采纳（2026-11-23，工单 01）；持久化 / HTTP 已落地（2026-11-24，care-events 票 01 / 02）；App adapter 待票 03。
+**状态：** 采纳（2026-11-23，工单 01）；持久化 / HTTP 已落地（2026-11-24，care-events 票 01 / 02）；App HTTP adapter 已落地（2026-11-25，care-events 票 03）。
 **范围：** B3 今天时间线、统计、记录弹层与 5 分钟重复提示所需的**客户端可见**护理事件形状。
 **不在本契约：** 完整表结构、迁移、服务端校验、HTTP handler、OCR、报告 / 分析链路。
 
@@ -14,7 +14,8 @@ B3 的 04 / 06 / 07 都需要同一条护理事件数据：今天时间线要按
 
 - TypeScript：`apps/mobile/src/care/careEvents.ts`（唯一客户端形状）。
 - 合成 fixture：`apps/mobile/src/care/careEventFixtures.ts`。
-- 内存 adapter：`apps/mobile/src/care/careEventRepository.ts`。
+- 内存 adapter：`apps/mobile/src/care/careEventRepository.ts`（仅测试 / 显式注入）。
+- HTTP adapter：`apps/mobile/src/care/httpCareEventRepository.ts`（生产注入）。
 - 行为测试：`apps/mobile/src/care/careEvents.test.ts`。
 
 本票没有直接改 `schemas/openapi.yaml`：OpenAPI 的端点集合在 `internal/httpapi/contract_test.go` 中冻结，新增护理事件端点必须同时落 Go handler、存储与 fixture；那属于后续护理事件 API 实现 spec，不在本票范围。先以独立 TypeScript 契约 + fixture adapter 解除 04 / 06 / 07 的阻塞，正式 API 落地后再按 `docs/agents/contracts.md` 同步 OpenAPI / codegen。
@@ -94,14 +95,14 @@ HTTP 映射（已由 care-events 02 冻结进 `schemas/openapi.yaml`）：
 - 可选奶量 / 克数为 `null`；
 - 跨午夜睡眠（`2026-11-22T23:50:00+08:00` → `2026-11-23T06:20:00+08:00`）。
 
-`InMemoryCareEventRepository` 实现上面的 seam，供 04 / 06 / 07 在真实 API 落地前渲染与验收。它的 `create` 固定 `source: 'parent'`，`update` 保留身份字段，`remove` 对未知 id 抛错。App 生产 `CareEventProvider` 当前默认使用**空仓储**；`CARE_EVENT_FIXTURES` 只在测试或显式注入时使用，不能作为真实记录展示（票 08 验收修正）。care-events A1 落地后生产 provider 改为显式注入 HTTP repository，内存 adapter 只保留给测试 / 显式注入。
+`InMemoryCareEventRepository` 实现上面的 seam，供测试 / 显式注入渲染与验收。它的 `create` 固定 `source: 'parent'`，`update` 保留身份字段，`remove` 对未知 id 抛错。App 生产 `CareEventProvider` 的 `repository` 必填，根布局注入 `HttpCareEventRepository`；`CARE_EVENT_FIXTURES` 只在测试或显式注入时使用，不能作为真实记录展示（票 08 验收修正、care-events 票 03 完成接线）。
 
 内存 adapter 只模拟读写 seam，不替代服务端校验；不变量 3–5（金额 / 时长 / 克数 > 0、`ended_at >= started_at`、`food` / `note` 去空白）由后续 HTTP / storage 实现负责并补测试。
 
 ## 消费方式
 
 - **04 记录弹层**：用 `CareEventCreate` 构造保存 payload；保存后刷新当前孩子当天 `list`。今天页读取「昨天 + 今天」两天，时间线只显示今天；hero 的「距上次喂养」可以用昨天的最后一条，避免跨午夜后归零。
-- **06 提醒**：只从 `list` 的最新喂养派生「距上次喂养」，不新增服务端字段；提醒仍默认关闭、本机。
+- **06 提醒**：只从 `list` 的最新喂养派生「距上次喂养」，不新增服务端字段；提醒仍默认关闭、本机，每设备一份设置并跟随当前孩子（切换孩子 / 冷启动按最新喂养重排，见 care-events 票 04）。
 - **07 统计**：用 `list` 的 4 类事件按天聚合；跨午夜事件按重叠时长切分，不伪造趋势。
 - **05 重复喂养**：保存（新建或修改）前查同一 `member_id` 最近一条 `type === 'feed'`；5 分钟窗口与「不是正在修改的同一条」由客户端判断。窗口以候选 `started_at` 为中心、前后各 5 分钟，因此补录旧时间和跨午夜的前一条都能命中；`DUPLICATE_FEED_WINDOW_MINUTES` 集中定义在 `duplicateFeed.ts`。这是 best-effort：不做服务端去重或全局锁。
 

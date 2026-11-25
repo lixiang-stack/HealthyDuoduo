@@ -4,7 +4,7 @@
 
 **Blocked by:** None。
 
-**Status:** ready-for-human
+**Status:** resolved
 
 ## 验收清单
 
@@ -40,4 +40,11 @@
 - `RecordFields` 只对 sleep 换成「结束时间」「睡了多久（必填）」并显示开始预览；feed / diaper / solid 字段不变。`CARE_EVENT_LABELS.sleep` 由「睡觉」改为「睡眠」，快捷动作 / 标题 / 时间线标题随之更新。
 - 测试：`recordDraft.test.ts` 覆盖默认结束时间、同日 / 跨午夜推导、预览、必填 / 非法 / 超 24 小时、legacy ongoing 预填；`RecordSheet.test.tsx` 覆盖标题 / 提示、结束时间 + 时长保存、跨午夜保存、legacy ongoing 编辑完成；`careEventDisplay.test.ts`、`todayCareLog.test.tsx` 更新文案断言。
 - 验证：`TZ=UTC npm test -- --runInBand`（57 suites / 453 tests）、`npx tsc --noEmit`、`npm run lint -- --max-warnings=0`、`npx expo export --platform android` 全绿。
-- 已知：Android 真机 smoke 未执行（当前环境无设备），ticket 保持 `ready-for-human`；未来结束时间与跨天补录仍属于 A4，未在本票处理。legacy ongoing 预填可能因秒级截断与保存后的开始时间差不足 1 分钟。
+- 实现时已知：未来结束时间与跨天补录仍属于 A4，未在本票处理。legacy ongoing 预填可能因秒级截断与保存后的开始时间差不足 1 分钟。
+
+**Android 真机 smoke（2026-11-25，隔离栈 + Android 16 物理真机）：**
+
+- 睡眠弹层：结束时间默认当前钟点、时长必填、开始时间预览、夜醒提示文案均符合预期。
+- 跨午夜：结束 00:20 + 30 分钟 → 预览「开始 昨天 23:50」；保存后 `started_at=2026-11-24T23:50+08`、`ended_at=2026-11-25T00:20+08`、`duration_min=30`；今天时间线显示「昨天」「跨夜」「睡眠 30 分钟」；统计睡眠 KPI / 今天柱状图正常。
+- legacy 进行中：API 预置 `started_at=08:00`、`ended_at=null` 的睡眠，时间线显示「进行中」；点开编辑预填结束 14:07 / 时长 367 / 「开始 08:00」；保存后 `ended_at=14:07`、`duration_min=367`，时间线显示 6 小时 7 分钟，列表不再有进行中事件。
+- 结论：生产路径未新增 `ended_at = null` 的睡眠；进行中只作为 legacy / fixture 兼容分支存在。

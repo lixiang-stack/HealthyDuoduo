@@ -1,5 +1,5 @@
-// In-memory adapter for the care-event contract. Tickets 04 / 06 / 07 render against
-// this seam; the HTTP adapter replaces it once the care-event API spec lands.
+// In-memory adapter for the care-event contract. Tests and explicit previews inject
+// it through CareEventProvider; production uses HttpCareEventRepository.
 import {
   careEventOverlapsRange,
   compareCareEventsDesc,

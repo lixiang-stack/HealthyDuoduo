@@ -5,7 +5,6 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import type { Member } from '../api/members';
 import {
   CARE_METRICS,
   CARE_METRIC_CONFIG,
@@ -14,12 +13,17 @@ import {
   type CareMetric,
   type ChartType,
 } from '../care/careStats';
-import { useStatsCareEvents } from '../care/useStatsCareEvents';
+import type { StatsCareEventsState } from '../care/useStatsCareEvents';
 import { colors } from '../components/theme';
 import { CHART_COPY, StatsChart } from './CareStatsChart';
 
-export function StatsCareLog({ child }: { child: Member }) {
-  const { state, reload } = useStatsCareEvents(child.member_id);
+export function StatsCareLog({
+  state,
+  reload,
+}: {
+  state: StatsCareEventsState;
+  reload: () => Promise<void>;
+}) {
   const [metric, setMetric] = useState<CareMetric>('feeds');
   const [chart, setChart] = useState<ChartType>('bar');
 
@@ -33,19 +37,7 @@ export function StatsCareLog({ child }: { child: Member }) {
   }
 
   if (state.status === 'error') {
-    return (
-      <View testID="stats-error" style={styles.center}>
-        <Text style={styles.error}>护理记录加载失败:{state.detail}</Text>
-        <Pressable
-          testID="stats-retry"
-          accessibilityRole="button"
-          onPress={() => void reload()}
-          style={styles.primary}
-        >
-          <Text style={styles.primaryText}>重试</Text>
-        </Pressable>
-      </View>
-    );
+    return <StatsError detail={state.detail} onRetry={() => void reload()} />;
   }
 
   const stats = buildCareStats(state.events, new Date());
@@ -53,6 +45,10 @@ export function StatsCareLog({ child }: { child: Member }) {
 
   return (
     <View testID="stats-care-log" style={styles.container}>
+      {state.error ? (
+        <StatsError detail={state.error} onRetry={() => void reload()} />
+      ) : null}
+
       <View style={styles.segmented}>
         {CARE_METRICS.map((value) => {
           const active = metric === value;
@@ -129,6 +125,22 @@ export function StatsCareLog({ child }: { child: Member }) {
           </Pressable>
         </View>
       )}
+    </View>
+  );
+}
+
+function StatsError({ detail, onRetry }: { detail: string; onRetry: () => void }) {
+  return (
+    <View testID="stats-error" style={styles.center}>
+      <Text style={styles.error}>护理记录加载失败:{detail}</Text>
+      <Pressable
+        testID="stats-retry"
+        accessibilityRole="button"
+        onPress={onRetry}
+        style={styles.primary}
+      >
+        <Text style={styles.primaryText}>重试</Text>
+      </Pressable>
     </View>
   );
 }

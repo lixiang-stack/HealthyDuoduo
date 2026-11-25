@@ -1,7 +1,15 @@
 // Today's care-log page content: hero, four quick actions, today summary, the
 // reminder entry and the current child's timeline. Charts belong to the stats view.
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 import type { Member } from '../api/members';
 import { useCareEventRepository } from '../care/CareEventProvider';
@@ -28,6 +36,7 @@ export function TodayCareLog({ child, members }: { child: Member; members: Membe
   const repository = useCareEventRepository();
   const { state, reload } = useTodayCareEvents(child.member_id);
   const [sheet, setSheet] = useState<SheetState>();
+  const [refreshing, setRefreshing] = useState(false);
   const now = new Date();
   const events = state.status === 'ready' ? state.events : [];
   const lastFeed = state.status === 'ready' ? state.lastFeed : undefined;
@@ -35,6 +44,17 @@ export function TodayCareLog({ child, members }: { child: Member; members: Membe
   const summary = summarizeToday(events, now);
   const loading = state.status === 'loading';
   const loadFailed = state.status === 'error';
+  const errorDetail =
+    state.status === 'error' ? state.detail : state.status === 'ready' ? state.error : undefined;
+
+  const refresh = async () => {
+    setRefreshing(true);
+    try {
+      await reload();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const closeAndReload = () => {
     setSheet(undefined);
@@ -130,12 +150,20 @@ export function TodayCareLog({ child, members }: { child: Member; members: Membe
           style={styles.timeline}
           contentContainerStyle={styles.timelineContent}
           keyboardShouldPersistTaps="handled"
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => void refresh()}
+              tintColor={colors.accent}
+              colors={[colors.accent]}
+            />
+          }
         >
           {loading ? <ActivityIndicator testID="today-loading" /> : null}
-          {state.status === 'error' ? (
+          {errorDetail ? (
             <View style={styles.stack}>
               <Text testID="today-error" style={styles.error}>
-                护理记录加载失败:{state.detail}
+                护理记录加载失败:{errorDetail}
               </Text>
               <Pressable style={styles.retry} onPress={() => void reload()}>
                 <Text style={styles.retryText}>重试</Text>

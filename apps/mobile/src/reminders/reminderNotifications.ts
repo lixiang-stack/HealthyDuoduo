@@ -64,14 +64,17 @@ export async function cancelReminderNotifications(): Promise<void> {
 }
 
 /** Replace the previous reminder with one derived from the latest feed. Overdue
- *  intervals are not scheduled retroactively; the next feed starts a fresh window. */
+ *  intervals are not scheduled retroactively; the next feed starts a fresh window.
+ *  `isCurrent` is re-checked right before scheduling so a superseded sync (rapid
+ *  child switch) cannot re-arm the previous child's reminder. */
 export async function syncReminderNotification(
   settings: ReminderSettings,
   lastFeedStartedAt: string | undefined,
   now: Date,
+  isCurrent: () => boolean = () => true,
 ): Promise<void> {
   await cancelReminderNotifications();
-  if (!settings.enabled) {
+  if (!settings.enabled || !isCurrent()) {
     return;
   }
   const timing = reminderTiming(lastFeedStartedAt, settings.intervalHours, now);
@@ -79,6 +82,9 @@ export async function syncReminderNotification(
     return;
   }
   const hasChannel = await prepareAndroidChannel();
+  if (!isCurrent()) {
+    return;
+  }
   await Notifications.scheduleNotificationAsync({
     content: reminderNotificationContent(settings.intervalHours),
     trigger: {

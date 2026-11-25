@@ -6,15 +6,19 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { HeaderBackButton } from '../components/HeaderBackButton';
 import { ImageViewerProvider } from '../components/imageViewer/ImageViewerProvider';
 import { CareEventProvider } from '../care/CareEventProvider';
+import { HttpCareEventRepository } from '../care/httpCareEventRepository';
 import { CurrentMemberProvider } from '../members/CurrentMemberContext';
 import { DomainNavigationProvider } from '../navigation/DomainNavigationContext';
+
+// One repository for the whole app; Base URL resolution still happens per request.
+const careEventRepository = new HttpCareEventRepository();
 
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={styles.root}>
       <CurrentMemberProvider>
         <DomainNavigationProvider>
-          <CareEventProvider>
+          <CareEventProvider repository={careEventRepository}>
             <ImageViewerProvider>
               <Stack
                 screenOptions={
@@ -32,7 +36,6 @@ export default function RootLayout() {
                 <Stack.Screen name="health" options={{ headerShown: false }} />
                 <Stack.Screen name="settings" options={{ title: '设置' }} />
                 <Stack.Screen name="members" options={{ title: '家庭成员' }} />
-                <Stack.Screen name="today-records" options={{ title: '今日记录' }} />
                 <Stack.Screen name="reminder" options={{ title: '提醒' }} />
                 <Stack.Screen name="report/[report_id]" options={{ title: '报告详情' }} />
                 <Stack.Screen name="image/[report_id]" options={{ title: '原始图像' }} />
