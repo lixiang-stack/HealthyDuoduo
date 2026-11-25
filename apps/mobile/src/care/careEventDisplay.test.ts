@@ -222,7 +222,7 @@ describe('care event rows', () => {
 
     expect(careEventTitle(diaper)).toBe('尿布 · 尿 + 便');
     expect(careEventMeta(diaper)).toBe('量多');
-    expect(careEventTitle(sleep)).toBe('睡觉 · 进行中');
+    expect(careEventTitle(sleep)).toBe('睡眠 · 进行中');
     expect(careEventMeta(sleep)).toBe('');
     expect(careEventTitle(solid)).toBe('辅食 · 米粉 40 g');
     expect(careEventMeta(solid)).toBe('第一次尝试');

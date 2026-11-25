@@ -1,0 +1,10 @@
+{
+  "id": 2,
+  "member_id": 2,
+  "type": "diaper",
+  "source": "parent",
+  "started_at": "2026-11-24T15:10:00+08:00",
+  "ended_at": null,
+  "note": "量多",
+  "diaper_type": "mixed"
+}

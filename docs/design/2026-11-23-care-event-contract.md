@@ -1,6 +1,6 @@
 # 护理事件最小契约（前置）
 
-**状态：** 采纳（2026-11-23，工单 01）。
+**状态：** 采纳（2026-11-23，工单 01）；持久化 / HTTP 已落地（2026-11-24，care-events 票 01 / 02）；App adapter 待票 03。
 **范围：** B3 今天时间线、统计、记录弹层与 5 分钟重复提示所需的**客户端可见**护理事件形状。
 **不在本契约：** 完整表结构、迁移、服务端校验、HTTP handler、OCR、报告 / 分析链路。
 
@@ -18,6 +18,8 @@ B3 的 04 / 06 / 07 都需要同一条护理事件数据：今天时间线要按
 - 行为测试：`apps/mobile/src/care/careEvents.test.ts`。
 
 本票没有直接改 `schemas/openapi.yaml`：OpenAPI 的端点集合在 `internal/httpapi/contract_test.go` 中冻结，新增护理事件端点必须同时落 Go handler、存储与 fixture；那属于后续护理事件 API 实现 spec，不在本票范围。先以独立 TypeScript 契约 + fixture adapter 解除 04 / 06 / 07 的阻塞，正式 API 落地后再按 `docs/agents/contracts.md` 同步 OpenAPI / codegen。
+
+2026-11-24 的 `.scratch/care-events/spec.md` 已冻结表 / HTTP / App adapter 方案（单表 `care_events`、四个端点、显式 HTTP provider）。实现后按该 spec 更新本节的落地状态与 `docs/agents/contracts.md`；本契约的客户端形状不变。
 
 ## 共同字段
 
@@ -74,7 +76,7 @@ type CareEventRepository = {
 - `update` 替换可编辑内容（类型、时间、类型专属字段、备注），不改变 `id`、`member_id`、`source`。
 - `remove` 删除单条事件。
 
-未来 HTTP 映射（实现 spec 冻结，当前不落 OpenAPI）：
+HTTP 映射（已由 care-events 02 冻结进 `schemas/openapi.yaml`）：
 
 | 操作 | 形状 |
 | --- | --- |
@@ -92,7 +94,7 @@ type CareEventRepository = {
 - 可选奶量 / 克数为 `null`；
 - 跨午夜睡眠（`2026-11-22T23:50:00+08:00` → `2026-11-23T06:20:00+08:00`）。
 
-`InMemoryCareEventRepository` 实现上面的 seam，供 04 / 06 / 07 在真实 API 落地前渲染与验收。它的 `create` 固定 `source: 'parent'`，`update` 保留身份字段，`remove` 对未知 id 抛错。App 生产 `CareEventProvider` 默认使用**空仓储**；`CARE_EVENT_FIXTURES` 只在测试或显式注入时使用，不能作为真实记录展示（票 08 验收修正）。
+`InMemoryCareEventRepository` 实现上面的 seam，供 04 / 06 / 07 在真实 API 落地前渲染与验收。它的 `create` 固定 `source: 'parent'`，`update` 保留身份字段，`remove` 对未知 id 抛错。App 生产 `CareEventProvider` 当前默认使用**空仓储**；`CARE_EVENT_FIXTURES` 只在测试或显式注入时使用，不能作为真实记录展示（票 08 验收修正）。care-events A1 落地后生产 provider 改为显式注入 HTTP repository，内存 adapter 只保留给测试 / 显式注入。
 
 内存 adapter 只模拟读写 seam，不替代服务端校验；不变量 3–5（金额 / 时长 / 克数 > 0、`ended_at >= started_at`、`food` / `note` 去空白）由后续 HTTP / storage 实现负责并补测试。
 
@@ -108,12 +110,13 @@ type CareEventRepository = {
 - `apps/mobile/src/care/careEvents.test.ts` 覆盖四类型 fixture、范围重叠、倒序、创建 / 修改 / 删除与身份字段保留。
 - `npx tsc --noEmit` 与 `npm test` 全绿。
 - `rg 'recorded_by|device_id|caregiver' apps/mobile/src/care --glob '!*.test.ts'` 无新增归属字段（fixture 测试保留这些词用于断言缺失）。
-- 后续 API 落地时按 `docs/agents/contracts.md` 补 OpenAPI、Go mirror、fixture 与 App codegen。
+- 后续 API 落地时按 `docs/agents/contracts.md` 补 OpenAPI、Go mirror、fixture 与 App codegen；实现验收见 `.scratch/care-events/issues/05-acceptance.md`。
 
 ## 关联
 
 - 决策：`docs/adr/0019-care-log-navigation-child-context.md`
 - 需求与验收：`.scratch/care-log/spec.md` §6
+- 持久化与 HTTP spec：`.scratch/care-events/spec.md`
 - 护理事件草案：`docs/reference/wechat-feeding-tracker.md` §7
 - 网络边界：`docs/adr/0006-lan-first-no-auth.md`
 - 工单：`.scratch/care-log/issues/01-care-event-contract.md`

@@ -52,6 +52,8 @@ func TestOpenAPIFrozenPathSet(t *testing.T) {
 		"GET /members": true, "POST /members": true,
 		"PATCH /members/{member_id}": true, "DELETE /members/{member_id}": true,
 		"GET /members/{member_id}/growth": true, "POST /members/{member_id}/growth": true,
+		"GET /members/{member_id}/care-events": true, "POST /members/{member_id}/care-events": true,
+		"PATCH /care-events/{event_id}": true, "DELETE /care-events/{event_id}": true,
 		"GET /reports": true, "POST /reports": true,
 		"GET /reports/{report_id}": true, "PATCH /reports/{report_id}": true,
 		"DELETE /reports/{report_id}":                true,
@@ -296,6 +298,13 @@ var reconcileCases = []fixtureCase{
 	{"growth.record.json", "GrowthRecord", unmarshal[GrowthRecord]},
 	{"growth.create.json", "GrowthRecordCreate", unmarshal[GrowthRecordCreate]},
 	{"growth.list.json", "GrowthList", unmarshal[GrowthList]},
+	{"care.event.feed.json", "CareEvent", unmarshal[CareEvent]},
+	{"care.event.diaper.json", "CareEvent", unmarshal[CareEvent]},
+	{"care.event.sleep.json", "CareEvent", unmarshal[CareEvent]},
+	{"care.event.solid.json", "CareEvent", unmarshal[CareEvent]},
+	{"care.event.create.json", "CareEventCreate", unmarshal[CareEventCreate]},
+	{"care.event.update.json", "CareEventUpdate", unmarshal[CareEventUpdate]},
+	{"care.event.list.json", "CareEventList", unmarshal[CareEventList]},
 	{"report.summary.json", "ReportSummary", unmarshal[ReportSummary]},
 	{"report.summary.failed.json", "ReportSummary", unmarshal[ReportSummary]},
 	{"report.detail.json", "ReportDetail", unmarshal[ReportDetail]},
@@ -350,6 +359,15 @@ func TestFixturesReconcileOpenAPI(t *testing.T) {
 		}
 		if errs := validate(componentSchema(t, doc, "GrowthRecordCreate"), body); len(errs) == 0 {
 			t.Error("growth record without height/weight was accepted — contract requires at least one")
+		}
+	})
+	t.Run("care.event.invalid.json rejected", func(t *testing.T) {
+		var body any
+		if err := json.Unmarshal(loadFixture(t, "care.event.invalid.json"), &body); err != nil {
+			t.Fatal(err)
+		}
+		if errs := validate(componentSchema(t, doc, "CareEventCreate"), body); len(errs) == 0 {
+			t.Error("feed without method was accepted — contract requires method for feed")
 		}
 	})
 }

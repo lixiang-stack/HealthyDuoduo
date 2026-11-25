@@ -18,6 +18,7 @@ import (
 	"text/tabwriter"
 
 	"healthyduoduo/internal/analysis"
+	"healthyduoduo/internal/care"
 	"healthyduoduo/internal/contract"
 	"healthyduoduo/internal/pipeline"
 )
@@ -33,6 +34,7 @@ type deps struct {
 	trends        pipeline.TrendStore
 	panels        pipeline.PanelStore
 	growth        pipeline.GrowthStore
+	care          care.Store
 	analyses      analysis.Store
 	quota         analysis.QuotaStore
 	observability analysis.ObservabilityStore

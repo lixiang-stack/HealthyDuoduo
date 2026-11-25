@@ -100,6 +100,59 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/members/{member_id}/care-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 护理事件范围读取
+         * @description 返回与该范围有重叠的护理事件:from 含、to 不含,按 started_at 倒序、同刻按 id 倒序。
+         *     点事件只出现在 started_at 所在范围;进行中睡眠开放到未来;跨午夜睡眠同时出现在两天的范围。
+         *     成员不存在 404;范围缺失 / 非法 / from >= to 返回 400。本期不分页。
+         */
+        get: operations["listCareEvents"];
+        put?: never;
+        /**
+         * 新增护理事件
+         * @description body 不包含 id / member_id / source;目标成员必须是孩子(成人返回 400),source 固定 parent。
+         *     事件类型与类型专属字段由服务端校验:feed 必填 method,diaper 必填 diaper_type,
+         *     solid 必填非空 food;sleep 的 ended_at 与 duration_min 必须同时为空(进行中)或同时非空。
+         */
+        post: operations["createCareEvent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/care-events/{event_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * 删除护理事件
+         * @description 硬删除单条护理事件;事件不存在 404。
+         */
+        delete: operations["deleteCareEvent"];
+        options?: never;
+        head?: never;
+        /**
+         * 修改护理事件
+         * @description 完整替换可编辑内容;id / member_id / source 不变。类型可以改变,旧类型专属字段必须清空。
+         *     事件不存在 404;body 非法 400。修改不重新校验成员是否仍为孩子。
+         */
+        patch: operations["updateCareEvent"];
+        trace?: never;
+    };
     "/reports": {
         parameters: {
             query?: never;
@@ -462,6 +515,145 @@ export interface components {
         } | unknown | unknown;
         GrowthList: {
             records: components["schemas"]["GrowthRecord"][];
+        };
+        /**
+         * @description 来源固定家长记录;不标识具体记录人。
+         * @enum {string}
+         */
+        CareEventSource: "parent";
+        /**
+         * @description 喂养方式。
+         * @enum {string}
+         */
+        FeedMethod: "breast" | "formula";
+        /**
+         * @description 尿布类型。
+         * @enum {string}
+         */
+        DiaperType: "wet" | "dirty" | "mixed";
+        /**
+         * @description 护理事件判别联合。类型专属字段只出现在对应分支;未列出的字段不出现。
+         *     点事件的 ended_at 固定为 null;进行中睡眠的 ended_at / duration_min 为 null。
+         */
+        CareEvent: components["schemas"]["CareEventFeed"] | components["schemas"]["CareEventDiaper"] | components["schemas"]["CareEventSleep"] | components["schemas"]["CareEventSolid"];
+        CareEventFeed: {
+            /** Format: int64 */
+            id: number;
+            /** Format: int64 */
+            member_id: number;
+            /** @constant */
+            type: "feed";
+            source: components["schemas"]["CareEventSource"];
+            /** Format: date-time */
+            started_at: string;
+            /** @description 点事件恒为 null */
+            ended_at: string | null;
+            note: string | null;
+            method: components["schemas"]["FeedMethod"];
+            /** @description 瓶喂 / 奶粉奶量;亲喂可不填 */
+            amount_ml?: number | null;
+            /** @description 亲喂时长;只记时刻时不填 */
+            duration_min?: number | null;
+        };
+        CareEventDiaper: {
+            /** Format: int64 */
+            id: number;
+            /** Format: int64 */
+            member_id: number;
+            /** @constant */
+            type: "diaper";
+            source: components["schemas"]["CareEventSource"];
+            /** Format: date-time */
+            started_at: string;
+            /** @description 点事件恒为 null */
+            ended_at: string | null;
+            note: string | null;
+            diaper_type: components["schemas"]["DiaperType"];
+        };
+        CareEventSleep: {
+            /** Format: int64 */
+            id: number;
+            /** Format: int64 */
+            member_id: number;
+            /** @constant */
+            type: "sleep";
+            source: components["schemas"]["CareEventSource"];
+            /** Format: date-time */
+            started_at: string;
+            /** @description 进行中为 null;完成后不得早于 started_at */
+            ended_at: string | null;
+            note: string | null;
+            /** @description 进行中为 null;完成后为正整数分钟 */
+            duration_min?: number | null;
+        };
+        CareEventSolid: {
+            /** Format: int64 */
+            id: number;
+            /** Format: int64 */
+            member_id: number;
+            /** @constant */
+            type: "solid";
+            source: components["schemas"]["CareEventSource"];
+            /** Format: date-time */
+            started_at: string;
+            /** @description 点事件恒为 null */
+            ended_at: string | null;
+            note: string | null;
+            /** @description 食物名称,去除首尾空白后非空 */
+            food: string;
+            amount_g?: number | null;
+        };
+        /** @description 创建 / 完整替换的可编辑内容;不包含 id / member_id / source。 */
+        CareEventCreate: components["schemas"]["CareEventCreateFeed"] | components["schemas"]["CareEventCreateDiaper"] | components["schemas"]["CareEventCreateSleep"] | components["schemas"]["CareEventCreateSolid"];
+        CareEventCreateFeed: {
+            /** @constant */
+            type: "feed";
+            /** Format: date-time */
+            started_at: string;
+            /** @description 点事件必须为 null */
+            ended_at: string | null;
+            note: string | null;
+            method: components["schemas"]["FeedMethod"];
+            amount_ml?: number | null;
+            duration_min?: number | null;
+        };
+        CareEventCreateDiaper: {
+            /** @constant */
+            type: "diaper";
+            /** Format: date-time */
+            started_at: string;
+            /** @description 点事件必须为 null */
+            ended_at: string | null;
+            note: string | null;
+            diaper_type: components["schemas"]["DiaperType"];
+        };
+        CareEventCreateSleep: {
+            /** @constant */
+            type: "sleep";
+            /** Format: date-time */
+            started_at: string;
+            /** @description 进行中为 null;完成后不得早于 started_at */
+            ended_at: string | null;
+            note: string | null;
+            /** @description 进行中为 null;完成后为正整数分钟 */
+            duration_min?: number | null;
+        };
+        CareEventCreateSolid: {
+            /** @constant */
+            type: "solid";
+            /** Format: date-time */
+            started_at: string;
+            /** @description 点事件必须为 null */
+            ended_at: string | null;
+            note: string | null;
+            /** @description 食物名称,去除首尾空白后非空 */
+            food: string;
+            amount_g?: number | null;
+        };
+        /** @description 完整替换可编辑内容;与创建 body 相同,id / member_id / source 不变。 */
+        CareEventUpdate: components["schemas"]["CareEventCreateFeed"] | components["schemas"]["CareEventCreateDiaper"] | components["schemas"]["CareEventCreateSleep"] | components["schemas"]["CareEventCreateSolid"];
+        CareEventList: {
+            events: components["schemas"]["CareEvent"][];
         };
         MemberCreate: {
             name: string;
@@ -1102,6 +1294,7 @@ export interface components {
     };
     parameters: {
         MemberID: number;
+        EventID: number;
         /** @description 图像内容 sha256(64 hex,对外身份) */
         ReportID: string;
         /** @description 指标项不透明句柄(BIGSERIAL;重跑识别后全换) */
@@ -1278,6 +1471,112 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GrowthRecord"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listCareEvents: {
+        parameters: {
+            query: {
+                /** @description 范围起点(含),RFC3339 带时区偏移 */
+                from: string;
+                /** @description 范围终点(不含),RFC3339 带时区偏移 */
+                to: string;
+            };
+            header?: never;
+            path: {
+                member_id: components["parameters"]["MemberID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 护理事件列表(空数组而非 null) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CareEventList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createCareEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                member_id: components["parameters"]["MemberID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CareEventCreate"];
+            };
+        };
+        responses: {
+            /** @description 已创建 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CareEvent"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deleteCareEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event_id: components["parameters"]["EventID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 已删除 */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateCareEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event_id: components["parameters"]["EventID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CareEventUpdate"];
+            };
+        };
+        responses: {
+            /** @description 已修改 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CareEvent"];
                 };
             };
             400: components["responses"]["BadRequest"];

@@ -43,6 +43,46 @@ type GrowthList struct {
 	Records []GrowthRecord `json:"records"`
 }
 
+// CareEvent components/CareEvent:护理事件判别联合的 Go 镜像。类型专属字段只在
+// 对应类型出现(omitempty);ended_at / note 是所有类型都有的可空字段,序列化为 null。
+type CareEvent struct {
+	ID          int64    `json:"id"`
+	MemberID    int64    `json:"member_id"`
+	Type        string   `json:"type"`
+	Source      string   `json:"source"`
+	StartedAt   string   `json:"started_at"`
+	EndedAt     *string  `json:"ended_at"`
+	Note        *string  `json:"note"`
+	Method      *string  `json:"method,omitempty"`
+	AmountML    *float64 `json:"amount_ml,omitempty"`
+	DurationMin *int     `json:"duration_min,omitempty"`
+	DiaperType  *string  `json:"diaper_type,omitempty"`
+	Food        *string  `json:"food,omitempty"`
+	AmountG     *float64 `json:"amount_g,omitempty"`
+}
+
+// CareEventCreate POST /members/{member_id}/care-events 请求体:不包含 id / member_id / source。
+type CareEventCreate struct {
+	Type        string   `json:"type"`
+	StartedAt   string   `json:"started_at"`
+	EndedAt     *string  `json:"ended_at"`
+	Note        *string  `json:"note"`
+	Method      *string  `json:"method,omitempty"`
+	AmountML    *float64 `json:"amount_ml,omitempty"`
+	DurationMin *int     `json:"duration_min,omitempty"`
+	DiaperType  *string  `json:"diaper_type,omitempty"`
+	Food        *string  `json:"food,omitempty"`
+	AmountG     *float64 `json:"amount_g,omitempty"`
+}
+
+// CareEventUpdate PATCH /care-events/{event_id} 请求体:完整替换,形状同创建 body。
+type CareEventUpdate = CareEventCreate
+
+// CareEventList GET /members/{member_id}/care-events 响应信封;空数组而非 null。
+type CareEventList struct {
+	Events []CareEvent `json:"events"`
+}
+
 // MembersList GET /members 响应信封;列表按 member_id 升序(创建序)返回。
 type MembersList struct {
 	Members []Member `json:"members"`

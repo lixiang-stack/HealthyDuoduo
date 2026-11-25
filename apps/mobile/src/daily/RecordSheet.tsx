@@ -233,8 +233,10 @@ export function RecordSheet({
 
             <RecordFields draft={draft} errors={visibleErrors} onChange={updateDraft} />
 
-            <Text style={styles.hint}>
-              只记录事实，不提供喂养建议；记录保存在家庭局域网。
+            <Text testID="record-hint" style={styles.hint}>
+              {draft.type === 'sleep'
+                ? '记录已经结束的睡眠；夜醒后再次入睡可另记一条。记录保存在家庭局域网。'
+                : '只记录事实，不提供喂养建议；记录保存在家庭局域网。'}
             </Text>
             {submitError ? (
               <Text testID="record-submit-error" style={styles.error}>
