@@ -26,7 +26,13 @@ func TestCompleteSendsProtocolAndReadsTruncation(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := New(Config{BaseURL: srv.URL, APIKey: "test-key", Model: "deepseek-chat", Timeout: time.Second})
+	client := New(Config{
+		BaseURL:         srv.URL,
+		APIKey:          "test-key",
+		Model:           "test-model",
+		Timeout:         time.Second,
+		ReasoningEffort: "none",
+	})
 	response, err := client.Complete(context.Background(), analysis.LLMRequest{
 		System: "system", User: "user", MaxTokens: 1500,
 	})
@@ -36,10 +42,34 @@ func TestCompleteSendsProtocolAndReadsTruncation(t *testing.T) {
 	if response.Content != `{"sections":[]}` || !response.Truncated {
 		t.Fatalf("response = %+v", response)
 	}
-	if got.Model != "deepseek-chat" || got.MaxTokens != 1500 || got.Temperature != 0 ||
+	if got.Model != "test-model" || got.MaxTokens != 1500 || got.Temperature != 0 ||
+		got.ReasoningEffort != "none" ||
 		len(got.Messages) != 2 || got.Messages[0].Role != "system" ||
 		got.ResponseFormat == nil || got.ResponseFormat.Type != "json_object" {
 		t.Fatalf("request payload = %+v", got)
+	}
+}
+
+func TestCompleteOmitsAuthorizationAndReasoningEffortWhenUnset(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Authorization"); got != "" {
+			t.Errorf("Authorization = %q, want empty", got)
+		}
+		var payload map[string]json.RawMessage
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Errorf("decode request: %v", err)
+		}
+		if _, ok := payload["reasoning_effort"]; ok {
+			t.Error("reasoning_effort sent without config")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"{}"}}]}`))
+	}))
+	defer srv.Close()
+
+	client := New(Config{BaseURL: srv.URL, Model: "test-model", Timeout: time.Second})
+	if _, err := client.Complete(context.Background(), analysis.LLMRequest{System: "s", User: "u"}); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -49,7 +79,7 @@ func TestCompleteHTTPError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := New(Config{BaseURL: srv.URL, APIKey: "test-key", Model: "deepseek-chat", Timeout: time.Second})
+	client := New(Config{BaseURL: srv.URL, APIKey: "test-key", Model: "test-model", Timeout: time.Second})
 	_, err := client.Complete(context.Background(), analysis.LLMRequest{System: "s", User: "u"})
 	if err == nil {
 		t.Fatal("HTTP 502 returned nil error")
@@ -63,7 +93,7 @@ func TestCompleteTimeoutMapsToSentinel(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := New(Config{BaseURL: srv.URL, APIKey: "test-key", Model: "deepseek-chat", Timeout: 10 * time.Millisecond})
+	client := New(Config{BaseURL: srv.URL, APIKey: "test-key", Model: "test-model", Timeout: 10 * time.Millisecond})
 	_, err := client.Complete(context.Background(), analysis.LLMRequest{System: "s", User: "u"})
 	if !errors.Is(err, analysis.ErrLLMTimeout) {
 		t.Fatalf("timeout error = %v, want ErrLLMTimeout", err)

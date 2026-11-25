@@ -15,6 +15,7 @@ var llmEnvKeys = []string{
 	"HDD_LLM_API_KEY_FILE",
 	"HDD_LLM_BASE_URL",
 	"HDD_LLM_MODEL",
+	"HDD_LLM_REASONING_EFFORT",
 	"HDD_LLM_TIMEOUT_SECONDS",
 	"HDD_LLM_INPUT_TOKENS",
 	"HDD_LLM_OUTPUT_TOKENS",
@@ -24,7 +25,11 @@ var llmEnvKeys = []string{
 func clearLLMEnv(t *testing.T) {
 	t.Helper()
 	for _, key := range llmEnvKeys {
+		// t.Setenv 注册用例结束后的恢复;随后 Unsetenv 让用例看到“未设置”而非空字符串。
 		t.Setenv(key, "")
+		if err := os.Unsetenv(key); err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 
@@ -34,11 +39,11 @@ func TestEnvConfigLLMDefaults(t *testing.T) {
 	if c.llmAPIKey != "" || c.llmAPIKeyFile != "" {
 		t.Errorf("llmAPIKey/file = %q/%q, want empty", c.llmAPIKey, c.llmAPIKeyFile)
 	}
-	if c.llmBaseURL != "https://api.deepseek.com" {
-		t.Errorf("llmBaseURL = %q", c.llmBaseURL)
+	if c.llmBaseURL != "" || c.llmModel != "" {
+		t.Errorf("llmBaseURL/model = %q/%q, want empty", c.llmBaseURL, c.llmModel)
 	}
-	if c.llmModel != "deepseek-chat" {
-		t.Errorf("llmModel = %q", c.llmModel)
+	if c.llmReasoningEffort != "none" {
+		t.Errorf("llmReasoningEffort = %q, want none", c.llmReasoningEffort)
 	}
 	if c.llmTimeout != 30*time.Second {
 		t.Errorf("llmTimeout = %v, want 30s", c.llmTimeout)
@@ -50,14 +55,23 @@ func TestEnvConfigLLMDefaults(t *testing.T) {
 		t.Errorf("analysisLimit = %d, want %d", c.analysisLimit, analysisDailyLimitDefault)
 	}
 	if explainer, err := newExplainer(c, nil, nil, nil); err != nil || explainer != nil {
-		t.Fatalf("explainer = %+v, err = %v; want nil, nil without API key", explainer, err)
+		t.Fatalf("explainer = %+v, err = %v; want nil, nil without endpoint/model", explainer, err)
+	}
+}
+
+func TestEnvConfigLLMReasoningEffortCanBeOmitted(t *testing.T) {
+	clearLLMEnv(t)
+	t.Setenv("HDD_LLM_REASONING_EFFORT", "")
+	if got := envConfig().llmReasoningEffort; got != "" {
+		t.Fatalf("llmReasoningEffort = %q, want empty", got)
 	}
 }
 
 func TestEnvConfigLLMOverrides(t *testing.T) {
 	t.Setenv("HDD_LLM_API_KEY", "sk-test")
 	t.Setenv("HDD_LLM_BASE_URL", "https://llm.example")
-	t.Setenv("HDD_LLM_MODEL", "deepseek-reasoner")
+	t.Setenv("HDD_LLM_MODEL", "test-model")
+	t.Setenv("HDD_LLM_REASONING_EFFORT", "high")
 	t.Setenv("HDD_LLM_TIMEOUT_SECONDS", "45")
 	t.Setenv("HDD_LLM_INPUT_TOKENS", "9000")
 	t.Setenv("HDD_LLM_OUTPUT_TOKENS", "2000")
@@ -65,7 +79,7 @@ func TestEnvConfigLLMOverrides(t *testing.T) {
 
 	c := envConfig()
 	if c.llmAPIKey != "sk-test" || c.llmBaseURL != "https://llm.example" ||
-		c.llmModel != "deepseek-reasoner" {
+		c.llmModel != "test-model" || c.llmReasoningEffort != "high" {
 		t.Fatalf("llm config = %+v", c)
 	}
 	if c.llmTimeout != 45*time.Second || c.llmInputTokens != 9000 ||
@@ -73,7 +87,7 @@ func TestEnvConfigLLMOverrides(t *testing.T) {
 		t.Fatalf("llm limits = %+v", c)
 	}
 	if explainer, err := newExplainer(c, nil, nil, nil); err != nil || explainer == nil {
-		t.Fatalf("explainer = %+v, err = %v; want explainer with API key", explainer, err)
+		t.Fatalf("explainer = %+v, err = %v; want explainer with endpoint/model", explainer, err)
 	}
 }
 
@@ -129,16 +143,50 @@ func TestNewExplainerReadsKeyFile(t *testing.T) {
 	if err := os.WriteFile(path, []byte("sk-file\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	explainer, err := newExplainer(config{llmAPIKeyFile: path}, nil, nil, nil)
+	explainer, err := newExplainer(config{
+		llmAPIKeyFile: path,
+		llmBaseURL:    "https://llm.example",
+		llmModel:      "test-model",
+	}, nil, nil, nil)
 	if err != nil || explainer == nil {
 		t.Fatalf("explainer = %+v, err = %v; want explainer from key file", explainer, err)
 	}
 }
 
-func TestNewExplainerMissingKeyFileDisables(t *testing.T) {
-	explainer, err := newExplainer(config{llmAPIKeyFile: filepath.Join(t.TempDir(), "missing")}, nil, nil, nil)
-	if err != nil || explainer != nil {
-		t.Fatalf("explainer = %+v, err = %v; want disabled without key file", explainer, err)
+func TestNewExplainerEnabledWithoutAPIKey(t *testing.T) {
+	explainer, err := newExplainer(config{
+		llmBaseURL: "http://localhost:11434/v1",
+		llmModel:   "test-model",
+	}, nil, nil, nil)
+	if err != nil || explainer == nil {
+		t.Fatalf("explainer = %+v, err = %v; want keyless explainer", explainer, err)
+	}
+}
+
+func TestNewExplainerDisabledWithoutEndpointOrModel(t *testing.T) {
+	cases := map[string]config{
+		"neither":       {},
+		"endpoint only": {llmBaseURL: "http://localhost:11434/v1"},
+		"model only":    {llmModel: "test-model"},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			explainer, err := newExplainer(c, nil, nil, nil)
+			if err != nil || explainer != nil {
+				t.Fatalf("explainer = %+v, err = %v; want disabled", explainer, err)
+			}
+		})
+	}
+}
+
+func TestNewExplainerMissingKeyFileUsesKeylessEndpoint(t *testing.T) {
+	explainer, err := newExplainer(config{
+		llmAPIKeyFile: filepath.Join(t.TempDir(), "missing"),
+		llmBaseURL:    "http://localhost:11434/v1",
+		llmModel:      "test-model",
+	}, nil, nil, nil)
+	if err != nil || explainer == nil {
+		t.Fatalf("explainer = %+v, err = %v; want keyless endpoint despite missing key file", explainer, err)
 	}
 }
 
@@ -166,16 +214,18 @@ func TestFromEnvIntFallsBackOnInvalidValues(t *testing.T) {
 
 func TestLLMClientConfigMapsFields(t *testing.T) {
 	c := config{
-		llmAPIKey:       "sk-test",
-		llmBaseURL:      "https://llm.example",
-		llmModel:        "deepseek-chat",
-		llmTimeout:      45 * time.Second,
-		llmOutputTokens: 2000,
+		llmAPIKey:          "sk-test",
+		llmBaseURL:         "https://llm.example",
+		llmModel:           "test-model",
+		llmReasoningEffort: "none",
+		llmTimeout:         45 * time.Second,
+		llmOutputTokens:    2000,
 	}
 	got := llmClientConfig(c)
 	if got.BaseURL != c.llmBaseURL || got.APIKey != c.llmAPIKey ||
 		got.Model != c.llmModel || got.Timeout != c.llmTimeout ||
-		got.MaxOutputTokens != c.llmOutputTokens {
+		got.MaxOutputTokens != c.llmOutputTokens ||
+		got.ReasoningEffort != c.llmReasoningEffort {
 		t.Fatalf("llm client config = %+v", got)
 	}
 }
@@ -183,13 +233,14 @@ func TestLLMClientConfigMapsFields(t *testing.T) {
 func TestNewExplainerWiresConfigAndStores(t *testing.T) {
 	store := &fakeAnalysisStore{}
 	c := config{
-		llmAPIKey:       "sk-test",
-		llmBaseURL:      "https://llm.example",
-		llmModel:        "deepseek-chat",
-		llmTimeout:      45 * time.Second,
-		llmInputTokens:  9000,
-		llmOutputTokens: 2000,
-		analysisLimit:   7,
+		llmAPIKey:          "sk-test",
+		llmBaseURL:         "https://llm.example",
+		llmModel:           "test-model",
+		llmReasoningEffort: "none",
+		llmTimeout:         45 * time.Second,
+		llmInputTokens:     9000,
+		llmOutputTokens:    2000,
+		analysisLimit:      7,
 	}
 	explainer, err := newExplainer(c, store, store, store)
 	if err != nil || explainer == nil {
@@ -204,8 +255,8 @@ func TestNewExplainerWiresConfigAndStores(t *testing.T) {
 	if explainer.Quota != store || explainer.Events != store || explainer.Cache != store {
 		t.Fatal("quota/events/cache store not wired")
 	}
-	if explainer.Model != "deepseek-chat" {
-		t.Fatalf("model = %q, want deepseek-chat", explainer.Model)
+	if explainer.Model != "test-model" {
+		t.Fatalf("model = %q, want test-model", explainer.Model)
 	}
 	if explainer.DailyLimit != 7 || explainer.InputTokenLimit != 9000 ||
 		explainer.OutputTokenLimit != 2000 {

@@ -1,5 +1,5 @@
-// 云端 LLM 客户端(llm-analysis 票 07):OpenAI 兼容的 chat/completions 协议。
-// 只负责协议、超时与响应形状;重试、配额、脱敏与校验在 internal/analysis。
+// LLM 客户端(llm-analysis 票 07):OpenAI 兼容的 chat/completions 协议,
+// 不绑定具体模型提供商。只负责协议、超时与响应形状;重试、配额、脱敏与校验在 internal/analysis。
 package llm
 
 import (
@@ -18,12 +18,14 @@ import (
 )
 
 // Config 客户端配置;BaseURL 可带 /v1,最终请求路径为 /chat/completions。
+// APIKey 可为空(本地模型通常不需要鉴权);ReasoningEffort 为空时不发送。
 type Config struct {
 	BaseURL         string
 	APIKey          string
 	Model           string
 	Timeout         time.Duration
 	MaxOutputTokens int
+	ReasoningEffort string
 }
 
 const maxErrorBodyBytes = 512
@@ -34,6 +36,7 @@ type Client struct {
 	apiKey          string
 	model           string
 	maxOutputTokens int
+	reasoningEffort string
 	http            *http.Client
 }
 
@@ -48,6 +51,7 @@ func New(cfg Config) *Client {
 		apiKey:          cfg.APIKey,
 		model:           cfg.Model,
 		maxOutputTokens: cfg.MaxOutputTokens,
+		reasoningEffort: cfg.ReasoningEffort,
 		http:            &http.Client{Timeout: timeout},
 	}
 }
@@ -62,11 +66,12 @@ type responseFormat struct {
 }
 
 type chatRequest struct {
-	Model          string          `json:"model"`
-	Messages       []chatMessage   `json:"messages"`
-	ResponseFormat *responseFormat `json:"response_format,omitempty"`
-	MaxTokens      int             `json:"max_tokens,omitempty"`
-	Temperature    float64         `json:"temperature"`
+	Model           string          `json:"model"`
+	Messages        []chatMessage   `json:"messages"`
+	ResponseFormat  *responseFormat `json:"response_format,omitempty"`
+	MaxTokens       int             `json:"max_tokens,omitempty"`
+	Temperature     float64         `json:"temperature"`
+	ReasoningEffort string          `json:"reasoning_effort,omitempty"`
 }
 
 type chatResponse struct {
@@ -93,7 +98,8 @@ func (c *Client) Complete(ctx context.Context, req analysis.LLMRequest) (analysi
 		ResponseFormat: &responseFormat{Type: "json_object"},
 		MaxTokens:      maxTokens,
 		// temperature=0 只降低随机性,不保证跨请求完全一致;相同输入的复用由解释层缓存负责。
-		Temperature: 0,
+		Temperature:     0,
+		ReasoningEffort: c.reasoningEffort,
 	}
 	raw, err := json.Marshal(payload)
 	if err != nil {
@@ -105,7 +111,9 @@ func (c *Client) Complete(ctx context.Context, req analysis.LLMRequest) (analysi
 		return analysis.LLMResponse{}, err
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", "Bearer "+c.apiKey)
+	if c.apiKey != "" {
+		httpReq.Header.Set("Authorization", "Bearer "+c.apiKey)
+	}
 	response, err := c.http.Do(httpReq)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) || os.IsTimeout(err) {

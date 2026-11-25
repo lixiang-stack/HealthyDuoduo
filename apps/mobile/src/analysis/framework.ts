@@ -45,7 +45,7 @@ export function explanationUnavailableText(
   return available ? undefined : QUOTA_EXHAUSTED_TEXT;
 }
 
-/** 解释层不可用时给下一步;云端重试端点尚未落地,先给「稍后重新解读」。 */
+/** 解释层不可用时给下一步;模型重试端点尚未落地,先给「稍后重新解读」。 */
 export function explanationUnavailableNextStep(
   reason: string | undefined,
   available: boolean,

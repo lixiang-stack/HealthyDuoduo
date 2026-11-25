@@ -64,9 +64,12 @@ services:
       HDD_S3_BUCKET: raw
       HDD_FLAG_POLICY: /app/flag_policy.yaml
       HDD_LLM_API_KEY_FILE: /run/secrets/llm_api_key
+      HDD_LLM_BASE_URL: ${HDD_LLM_BASE_URL:-}
+      HDD_LLM_MODEL: ${HDD_LLM_MODEL:-}
+      HDD_LLM_REASONING_EFFORT: ${HDD_LLM_REASONING_EFFORT-none}
       HDD_ANALYSIS_DAILY_LIMIT: ${HDD_ANALYSIS_DAILY_LIMIT:-20}
       TZ: ${TZ:-Asia/Shanghai}
-    # 文件型 secret：目录只读挂载；文件不存在时解释层关闭，事实层/框架层照常可用。
+    # 文件型 secret：目录只读挂载；key 文件不存在时按无鉴权端点处理，事实层/框架层照常可用。
     volumes:
       - ${HDD_LLM_SECRET_DIR:-./secrets}:/run/secrets:ro
     ports:

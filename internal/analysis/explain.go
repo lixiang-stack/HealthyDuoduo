@@ -56,7 +56,7 @@ type LLMResponse struct {
 	Truncated bool
 }
 
-// LLMClient 云端模型端口(实现见 internal/llm;测试注入 fake,不打真实模型)。
+// LLMClient 模型端口(实现见 internal/llm;测试注入 fake,不打真实模型)。
 type LLMClient interface {
 	Complete(ctx context.Context, req LLMRequest) (LLMResponse, error)
 }

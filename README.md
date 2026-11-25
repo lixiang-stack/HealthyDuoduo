@@ -86,7 +86,30 @@ docker compose -p deploy -f deploy/docker-compose.yml up -d
 
 NAS 局域网常驻部署（端口 19080、数据盘、USB 备份与验收）见 `deploy/NAS.md`。
 
-解释层需要 LLM key 时，用文件型 secret，不建议把 key 写进命令行或 `environment:`。密钥放在 home 下，多 worktree 共用一份：
+解释层是可选能力：同时设置 `HDD_LLM_BASE_URL` 与 `HDD_LLM_MODEL` 才启用，未设置时只输出事实层与框架层。`internal/llm` 只依赖 OpenAI 兼容的 `/chat/completions`，不绑定具体模型提供商。
+
+本机 Ollama 示例：
+
+```bash
+# Ollama 默认上下文为 4096；先调到大于 HDD_LLM_INPUT_TOKENS + HDD_LLM_OUTPUT_TOKENS（默认 9500）。
+export OLLAMA_CONTEXT_LENGTH=16384
+ollama serve
+
+export HDD_LLM_BASE_URL=http://localhost:11434/v1
+export HDD_LLM_MODEL=qwen3.5:4b
+export HDD_LLM_REASONING_EFFORT=none   # 留空则省略；qwen 等 thinking 模型用 none 关闭 reasoning
+go run ./cmd/hdd serve
+```
+
+compose 内的 `hdd` 要把 `localhost` 换成 `host.docker.internal`：
+
+```bash
+HDD_LLM_BASE_URL=http://host.docker.internal:11434/v1 \
+HDD_LLM_MODEL=qwen3.5:4b \
+docker compose -p deploy -f deploy/docker-compose.yml up -d hdd
+```
+
+需要鉴权的云端 OpenAI 兼容服务再额外提供 key；推荐文件型 secret，不建议把 key 写进命令行或 `environment:`：
 
 ```bash
 mkdir -p ~/.config/healthyduoduo && chmod 700 ~/.config/healthyduoduo
@@ -95,7 +118,7 @@ printf '%s' "$KEY" > ~/.config/healthyduoduo/llm_api_key
 chmod 600 ~/.config/healthyduoduo/llm_api_key
 ```
 
-基础 compose 会把 `~/.config/healthyduoduo` 只读挂到 `/run/secrets`，并设置 `HDD_LLM_API_KEY_FILE=/run/secrets/llm_api_key`；不需要额外 compose 文件或每次显式设置。文件不存在或为空时解释层关闭，事实层 / 框架层照常可用。设置 `HDD_LLM_SECRET_DIR` 可换挂载目录（目录内文件名仍须为 `llm_api_key`）。
+基础 compose 会把 `~/.config/healthyduoduo` 只读挂到 `/run/secrets`，并设置 `HDD_LLM_API_KEY_FILE=/run/secrets/llm_api_key`。文件缺失或为空表示没有 key（本地模型不需要），不影响启动；是否启用解释层只取决于 endpoint 与模型名。设置 `HDD_LLM_SECRET_DIR` 可换挂载目录（目录内文件名仍须为 `llm_api_key`）。
 
 App 屏幕测试随 `npm test` 运行；合并 UI 改动前按 `apps/mobile/ANDROID.md` 做真机 smoke。
 
