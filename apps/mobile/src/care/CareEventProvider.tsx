@@ -1,10 +1,8 @@
-// App-level care-event repository seam. Tickets 04 / 06 / 07 consume the same
-// in-memory adapter until the HTTP adapter replaces it; keeping it in context makes
-// the dependency explicit and lets tests inject their own repository. Production
-// starts empty: synthetic fixtures must never appear as a real feed.
-import { createContext, useContext, useMemo, type ReactNode } from 'react';
+// App-level care-event repository seam. The root layout injects the HTTP repository;
+// tests inject an in-memory one. There is deliberately no default: forgetting to wire
+// the provider is a type error instead of silently showing an empty in-memory log.
+import { createContext, useContext, type ReactNode } from 'react';
 
-import { InMemoryCareEventRepository } from './careEventRepository';
 import type { CareEventRepository } from './careEvents';
 
 const CareEventContext = createContext<CareEventRepository | undefined>(undefined);
@@ -13,14 +11,10 @@ export function CareEventProvider({
   repository,
   children,
 }: {
-  repository?: CareEventRepository;
+  repository: CareEventRepository;
   children: ReactNode;
 }) {
-  const value = useMemo(
-    () => repository ?? new InMemoryCareEventRepository(),
-    [repository],
-  );
-  return <CareEventContext.Provider value={value}>{children}</CareEventContext.Provider>;
+  return <CareEventContext.Provider value={repository}>{children}</CareEventContext.Provider>;
 }
 
 export function useCareEventRepository(): CareEventRepository {

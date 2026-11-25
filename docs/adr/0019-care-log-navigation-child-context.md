@@ -33,8 +33,9 @@
 ## 实现状态（2026-11-24）
 
 - 票 01–08 已实现并通过跨票验收；详细差异、已知限制与验收证据以 `.scratch/care-log/spec.md` §15 和 `.scratch/care-log/issues/08-acceptance-and-regression.md` 为准。
-- 关键偏差：用户可见「日常」改名「育儿」，路由与域标识统一为 `/care`（旧 `/daily` 本地偏好自动迁移）；当前孩子在育儿页内容区左上角；护理事件仍为客户端内存 adapter（无正式表 / API / 迁移）；提醒与统计均为本机 / 7 天口径，不写报告、趋势或分析快照。
-- 护理事件持久化：2026-11-24 已确认 A1 方案，见 `.scratch/care-events/spec.md`（单表 `care_events`、HTTP API、显式 HTTP provider、提醒跟随当前孩子）。实现前生产仍是内存 adapter；落地后更新本节与 `.scratch/care-log/spec.md` §15。
+- 关键偏差：用户可见「日常」改名「育儿」，路由与域标识统一为 `/care`（旧 `/daily` 本地偏好自动迁移）；当前孩子在育儿页内容区左上角；提醒与统计均为本机 / 7 天口径，不写报告、趋势或分析快照。
+- 护理事件持久化（A1，2026-11-25）：`care_events` 表 / 迁移 0021、四个 HTTP 端点、App 显式注入 `HttpCareEventRepository`；生产 provider 不再回落到内存或 fixture。提醒仍是每设备一份设置，但排程跟随当前孩子：切换孩子 / 冷启动按最新喂养重排。
+- 真机验收（2026-11-25）：物理真机 + Android 模拟器两个 App 实例在隔离栈验证跨设备刷新、重复提示、修改 / 删除同步、冷启动、提醒 AlarmManager 重排与睡眠 UX；第二端为模拟器，属降级事实。证据见 `.scratch/care-events/issues/05-acceptance.md` Comments。
 
 ## Considered Options
 

@@ -1,12 +1,23 @@
 import { Link } from 'expo-router';
-import { useEffect } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState, type ReactNode } from 'react';
+import {
+  ActivityIndicator,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
+import type { Member } from '../api/members';
+import { useStatsCareEvents } from '../care/useStatsCareEvents';
 import { sharedStyles } from '../components/styles';
 import { colors } from '../components/theme';
 import { useCurrentMember } from '../members/CurrentMemberContext';
 import { childMembers, resolveCurrentChild } from '../members/currentChild';
 import { useMembers } from '../members/useMembers';
+import { useReminderResync } from '../reminders/useReminderResync';
 import { ChildSwitcher } from './ChildSwitcher';
 import { StatsCareLog } from './StatsCareLog';
 import { TodayCareLog } from './TodayCareLog';
@@ -29,6 +40,9 @@ export function DailyPlaceholder({ variant }: { variant: Variant }) {
   const resolvedChildId =
     childState.status === 'selected' ? childState.child.member_id : undefined;
 
+  // Reminder follows the current child from the shared care view, not either page.
+  useReminderResync(resolvedChildId, ready);
+
   // 成员列表和本地选择都就绪后再回落 / 自动选中,避免把「存储加载中」当成「未选择」
   // 而清掉已有选择。
   useEffect(() => {
@@ -48,15 +62,26 @@ export function DailyPlaceholder({ variant }: { variant: Variant }) {
 
   const loading = state.status === 'loading' || (state.status === 'ready' && !childReady);
 
+  const switcher =
+    ready && childState.status !== 'no-children' ? (
+      <ChildSwitcher childState={childState} members={children} onSelect={setCurrentChild} />
+    ) : null;
+
+  // Stats owns its own scroll (pull-to-refresh); the shared placeholder only renders
+  // the member / child states that do not depend on the seven-day read model.
+  if (variant === 'stats' && ready && childState.status === 'selected') {
+    return (
+      <StatsDaily
+        key={childState.child.member_id}
+        switcher={switcher}
+        child={childState.child}
+      />
+    );
+  }
+
   const content = (
     <>
-      {ready && childState.status !== 'no-children' ? (
-        <ChildSwitcher
-          childState={childState}
-          members={children}
-          onSelect={setCurrentChild}
-        />
-      ) : null}
+      {switcher}
 
       {variant === 'stats' ? <Text style={styles.title}>统计</Text> : null}
 
@@ -89,7 +114,7 @@ export function DailyPlaceholder({ variant }: { variant: Variant }) {
         </View>
       ) : null}
 
-      {ready ? (
+      {ready && childState.status !== 'selected' ? (
         childState.status === 'no-children' ? (
           <Text testID="daily-no-child" style={sharedStyles.muted}>
             还没有孩子成员。育儿记录只给孩子，请先到
@@ -98,25 +123,25 @@ export function DailyPlaceholder({ variant }: { variant: Variant }) {
             </Link>
             添加孩子。
           </Text>
-        ) : childState.status === 'needs-selection' ? (
+        ) : (
           <Text testID="daily-needs-child" style={sharedStyles.muted}>
             {variant === 'today' ? '请先选择今天要记录的孩子。' : '请先选择要统计的孩子。'}
           </Text>
-        ) : variant === 'today' ? (
-          <TodayCareLog
-            key={childState.child.member_id}
-            child={childState.child}
-            members={allMembers}
-          />
-        ) : (
-          <StatsCareLog key={childState.child.member_id} child={childState.child} />
         )
+      ) : null}
+
+      {variant === 'today' && childState.status === 'selected' ? (
+        <TodayCareLog
+          key={childState.child.member_id}
+          child={childState.child}
+          members={allMembers}
+        />
       ) : null}
     </>
   );
 
-  // Today fills the first screen and scrolls only the timeline inside; stats keeps
-  // the existing page scroll.
+  // Today fills the first screen and scrolls only the timeline inside; leftover stats
+  // states (no child / needs selection) keep the existing page scroll.
   if (variant === 'today') {
     return (
       <View testID="daily-today-placeholder" style={styles.todayContent}>
@@ -132,6 +157,42 @@ export function DailyPlaceholder({ variant }: { variant: Variant }) {
       contentContainerStyle={styles.content}
     >
       {content}
+    </ScrollView>
+  );
+}
+
+/** Stats view owns the page scroll so pull-to-refresh reloads the same seven-day read
+ *  model the charts use, without lifting the hook into the shared placeholder. */
+function StatsDaily({ switcher, child }: { switcher: ReactNode; child: Member }) {
+  const { state, reload } = useStatsCareEvents(child.member_id);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const refresh = async () => {
+    setRefreshing(true);
+    try {
+      await reload();
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  return (
+    <ScrollView
+      testID="daily-stats"
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={() => void refresh()}
+          tintColor={colors.accent}
+          colors={[colors.accent]}
+        />
+      }
+    >
+      {switcher}
+      <Text style={styles.title}>统计</Text>
+      <StatsCareLog state={state} reload={reload} />
     </ScrollView>
   );
 }

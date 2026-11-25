@@ -14,8 +14,8 @@ export type ScreenRenderOptions = RenderOptions & {
 
 /** Render a screen with app-level member, care-event and image viewer contexts.
  * AsyncStorage is the shared Jest mock, so a test can persist a current member
- * before rendering. Screens default to empty care events so tests seed only what
- * the case needs; production also starts empty until the care-event API lands. */
+ * before rendering. Screens default to an empty in-memory repository so tests seed
+ * only what the case needs; production injects the HTTP repository instead. */
 export function renderScreen(
   ui: ReactElement,
   { careEvents, ...options }: ScreenRenderOptions = {},

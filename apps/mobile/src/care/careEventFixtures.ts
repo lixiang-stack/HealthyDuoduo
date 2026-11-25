@@ -1,7 +1,7 @@
-// Synthetic care-event fixtures for tests and explicit previews only. The production
-// CareEventProvider starts empty until the HTTP adapter lands, so these must never be
-// shown as real records. They cover all four types plus the boundaries the contract
-// must keep: null note, null optional amounts, and a sleep spanning midnight.
+// Synthetic care-event fixtures for tests and explicit previews only. Production
+// injects the HTTP repository, so these must never be shown as real records. They
+// cover all four types plus the boundaries the contract must keep: null note, null
+// optional amounts, and a sleep spanning midnight.
 import type { CareEvent } from './careEvents';
 
 export const CARE_EVENT_FIXTURES: CareEvent[] = [

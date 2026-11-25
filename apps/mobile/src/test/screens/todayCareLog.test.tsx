@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
-import { fireEvent, screen, waitFor, within } from '@testing-library/react-native';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 
 import { resolveApiClient } from '../../api/resolveClient';
 import { InMemoryCareEventRepository } from '../../care/careEventRepository';
@@ -39,6 +39,14 @@ function localAt(hour: number, minute: number, dayOffset = 0): string {
   date.setDate(date.getDate() + dayOffset);
   date.setHours(hour, minute, 0, 0);
   return date.toISOString();
+}
+
+/** RefreshControl is a native child of the ScrollView; trigger the JS handler directly. */
+async function pullToRefresh(testID: string) {
+  const scroll = screen.getByTestId(testID);
+  await act(async () => {
+    scroll.props.refreshControl.props.onRefresh();
+  });
 }
 
 beforeEach(async () => {
@@ -180,6 +188,41 @@ describe('Today care log', () => {
     expect(screen.queryByTestId('today-empty')).toBeNull();
   });
 
+  it('reloads the timeline on pull-to-refresh', async () => {
+    await AsyncStorage.setItem(CURRENT_CHILD_STORAGE_KEY, String(doudou.member_id));
+    useApi();
+    const repository = new InMemoryCareEventRepository([
+      makeFeedEvent({ id: 1, started_at: minutesAgo(30) }),
+    ]);
+    const list = jest.spyOn(repository, 'list');
+
+    await renderScreen(<DailyPlaceholder variant="today" />, { careEvents: repository });
+    await screen.findByTestId('today-event-1');
+    expect(list).toHaveBeenCalledTimes(1);
+
+    await pullToRefresh('today-timeline');
+
+    await waitFor(() => expect(list).toHaveBeenCalledTimes(2));
+  });
+
+  it('keeps the previous timeline and summary when a refresh fails', async () => {
+    await AsyncStorage.setItem(CURRENT_CHILD_STORAGE_KEY, String(doudou.member_id));
+    useApi();
+    const repository = new InMemoryCareEventRepository([
+      makeFeedEvent({ id: 1, started_at: minutesAgo(30) }),
+    ]);
+    await renderScreen(<DailyPlaceholder variant="today" />, { careEvents: repository });
+    expect(await screen.findByTestId('today-event-1')).toBeTruthy();
+    const list = jest.spyOn(repository, 'list').mockRejectedValue(new Error('backend down'));
+
+    await pullToRefresh('today-timeline');
+
+    expect(await screen.findByTestId('today-error')).toHaveTextContent(/backend down/);
+    expect(screen.getByTestId('today-event-1')).toBeTruthy();
+    expect(screen.getByTestId('today-summary-feeds')).toHaveTextContent(/1/);
+    expect(list).toHaveBeenCalledTimes(1);
+  });
+
   it('shows the reminder card, opens its settings and stays off by default', async () => {
     await AsyncStorage.setItem(CURRENT_CHILD_STORAGE_KEY, String(doudou.member_id));
     useApi();
@@ -231,13 +274,151 @@ describe('Today care log', () => {
     await fireEvent.changeText(screen.getByTestId('record-amount'), '90');
     await fireEvent.press(screen.getByTestId('record-submit'));
 
+    // One schedule from the cold-start resync, one after the new feed.
     await waitFor(() =>
-      expect(mockedNotifications.scheduleNotificationAsync).toHaveBeenCalledTimes(1),
+      expect(mockedNotifications.scheduleNotificationAsync).toHaveBeenCalledTimes(2),
     );
     expect(mockedNotifications.cancelAllScheduledNotificationsAsync).toHaveBeenCalled();
-    const request = mockedNotifications.scheduleNotificationAsync.mock.calls[0][0];
+    const request = mockedNotifications.scheduleNotificationAsync.mock.calls[1][0];
     const scheduledAt = (request.trigger as { date: Date }).date.getTime();
     expect(scheduledAt).toBeGreaterThanOrEqual(beforeOpen - 60_000 + 3 * 60 * 60 * 1000);
     expect(scheduledAt).toBeLessThanOrEqual(Date.now() + 3 * 60 * 60 * 1000);
+  });
+
+  it('re-arms the reminder from persisted events on a cold start', async () => {
+    await AsyncStorage.setItem(CURRENT_CHILD_STORAGE_KEY, String(doudou.member_id));
+    await AsyncStorage.setItem(
+      REMINDER_SETTINGS_STORAGE_KEY,
+      '{"enabled":true,"intervalHours":3}',
+    );
+    useApi();
+    const feed = makeFeedEvent({ id: 1, started_at: minutesAgo(30) });
+
+    await renderScreen(<DailyPlaceholder variant="today" />, {
+      careEvents: new InMemoryCareEventRepository([feed]),
+    });
+
+    await waitFor(() =>
+      expect(mockedNotifications.scheduleNotificationAsync).toHaveBeenCalledTimes(1),
+    );
+    const request = mockedNotifications.scheduleNotificationAsync.mock.calls[0][0];
+    expect((request.trigger as { date: Date }).date.getTime()).toBe(
+      Date.parse(feed.started_at) + 3 * 60 * 60 * 1000,
+    );
+  });
+
+  it('re-arms the reminder for the newly selected child', async () => {
+    await AsyncStorage.setItem(CURRENT_CHILD_STORAGE_KEY, String(doudou.member_id));
+    await AsyncStorage.setItem(
+      REMINDER_SETTINGS_STORAGE_KEY,
+      '{"enabled":true,"intervalHours":3}',
+    );
+    useApi();
+    const secondFeed = makeFeedEvent({
+      id: 2,
+      member_id: second.member_id,
+      started_at: minutesAgo(10),
+    });
+
+    await renderScreen(<DailyPlaceholder variant="today" />, {
+      careEvents: new InMemoryCareEventRepository([
+        makeFeedEvent({ id: 1, started_at: minutesAgo(30) }),
+        secondFeed,
+      ]),
+    });
+    await waitFor(() =>
+      expect(mockedNotifications.scheduleNotificationAsync).toHaveBeenCalledTimes(1),
+    );
+
+    await fireEvent.press(screen.getByTestId('daily-child-switcher'));
+    await fireEvent.press(await screen.findByTestId('child-option-2'));
+
+    await waitFor(() =>
+      expect(mockedNotifications.scheduleNotificationAsync).toHaveBeenCalledTimes(2),
+    );
+    const request = mockedNotifications.scheduleNotificationAsync.mock.calls[1][0];
+    expect((request.trigger as { date: Date }).date.getTime()).toBe(
+      Date.parse(secondFeed.started_at) + 3 * 60 * 60 * 1000,
+    );
+  });
+
+  it('cancels the reminder when the current child has no feed', async () => {
+    await AsyncStorage.setItem(CURRENT_CHILD_STORAGE_KEY, String(doudou.member_id));
+    await AsyncStorage.setItem(
+      REMINDER_SETTINGS_STORAGE_KEY,
+      '{"enabled":true,"intervalHours":3}',
+    );
+    useApi();
+
+    await renderScreen(<DailyPlaceholder variant="today" />, {
+      careEvents: new InMemoryCareEventRepository(),
+    });
+
+    await waitFor(() =>
+      expect(mockedNotifications.cancelAllScheduledNotificationsAsync).toHaveBeenCalled(),
+    );
+    expect(mockedNotifications.scheduleNotificationAsync).not.toHaveBeenCalled();
+  });
+
+  it('cancels any stale schedule without scheduling when reminders are off', async () => {
+    await AsyncStorage.setItem(CURRENT_CHILD_STORAGE_KEY, String(doudou.member_id));
+    useApi();
+
+    await renderScreen(<DailyPlaceholder variant="today" />, {
+      careEvents: new InMemoryCareEventRepository([
+        makeFeedEvent({ id: 1, started_at: minutesAgo(30) }),
+      ]),
+    });
+    await screen.findByTestId('today-reminder');
+    await act(async () => undefined);
+
+    expect(mockedNotifications.cancelAllScheduledNotificationsAsync).toHaveBeenCalledTimes(1);
+    expect(mockedNotifications.scheduleNotificationAsync).not.toHaveBeenCalled();
+  });
+
+  it('cancels the old child’s reminder when no care child is selected', async () => {
+    await AsyncStorage.setItem(
+      REMINDER_SETTINGS_STORAGE_KEY,
+      '{"enabled":true,"intervalHours":3}',
+    );
+    useApi();
+
+    await renderScreen(<DailyPlaceholder variant="today" />, {
+      careEvents: new InMemoryCareEventRepository([
+        makeFeedEvent({ id: 1, started_at: minutesAgo(30) }),
+      ]),
+    });
+
+    expect(await screen.findByTestId('daily-needs-child')).toBeTruthy();
+    await waitFor(() =>
+      expect(mockedNotifications.cancelAllScheduledNotificationsAsync).toHaveBeenCalled(),
+    );
+    expect(mockedNotifications.scheduleNotificationAsync).not.toHaveBeenCalled();
+  });
+
+  it('keeps one schedule when the same child and feed mount again', async () => {
+    await AsyncStorage.setItem(CURRENT_CHILD_STORAGE_KEY, String(doudou.member_id));
+    await AsyncStorage.setItem(
+      REMINDER_SETTINGS_STORAGE_KEY,
+      '{"enabled":true,"intervalHours":3}',
+    );
+    useApi();
+    const repository = new InMemoryCareEventRepository([
+      makeFeedEvent({ id: 1, started_at: minutesAgo(30) }),
+    ]);
+
+    const first = await renderScreen(<DailyPlaceholder variant="today" />, {
+      careEvents: repository,
+    });
+    await waitFor(() =>
+      expect(mockedNotifications.scheduleNotificationAsync).toHaveBeenCalledTimes(1),
+    );
+    first.unmount();
+
+    await renderScreen(<DailyPlaceholder variant="today" />, { careEvents: repository });
+    await screen.findByTestId('today-reminder');
+    await act(async () => undefined);
+
+    expect(mockedNotifications.scheduleNotificationAsync).toHaveBeenCalledTimes(1);
   });
 });

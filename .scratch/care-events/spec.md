@@ -1,6 +1,6 @@
 # Spec：护理事件持久化与跨设备共享（A1）
 
-Status: **proposed**（2026-11-24；等待实现）
+Status: **implemented / accepted**（2026-11-25；票 01–05 与 care-log 09 自动化 + 真机 smoke 通过；`/today-records` 占位已由 care-log 10 清理，无已知差异）
 范围：把票 01 的客户端 `CareEvent` 契约落到 LAN 后端：`care_events` 表、HTTP API、App HTTP adapter、跨设备刷新与提醒重排。
 不包含：睡眠记录方式改动（`../care-log/issues/09-sleep-completion.md`）、删除确认、跨天补录、键盘遮挡、统计窗口、健康档案圆点、就诊摘要。
 依据：`docs/design/2026-11-23-care-event-contract.md` · `docs/adr/0019-care-log-navigation-child-context.md` · `docs/adr/0006-lan-first-no-auth.md` · `docs/reference/wechat-feeding-tracker.md` §7。

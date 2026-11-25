@@ -4,6 +4,7 @@ import { Text } from 'react-native';
 
 import { WIDE_CARE_EVENT_RANGE } from '../test/fixtures';
 import { CareEventProvider, useCareEventRepository } from './CareEventProvider';
+import { InMemoryCareEventRepository } from './careEventRepository';
 import { CARE_EVENT_FIXTURES } from './careEventFixtures';
 
 function CountEvents() {
@@ -13,7 +14,7 @@ function CountEvents() {
   useEffect(() => {
     let cancelled = false;
     // Check every owner used by the synthetic fixtures, so a future fixture for
-    // another child cannot sneak into production unnoticed.
+    // another child cannot sneak into an injected empty repository unnoticed.
     const memberIds = [...new Set(CARE_EVENT_FIXTURES.map((event) => event.member_id))];
     void Promise.all(
       memberIds.map((memberId) =>
@@ -33,11 +34,15 @@ function CountEvents() {
 }
 
 function wrapper({ children }: { children: ReactNode }) {
-  return <CareEventProvider>{children}</CareEventProvider>;
+  return (
+    <CareEventProvider repository={new InMemoryCareEventRepository()}>
+      {children}
+    </CareEventProvider>
+  );
 }
 
 describe('CareEventProvider', () => {
-  it('starts production with no synthetic care events', async () => {
+  it('reads only from the explicitly injected repository', async () => {
     expect(CARE_EVENT_FIXTURES.length).toBeGreaterThan(0);
 
     await render(<CountEvents />, { wrapper });

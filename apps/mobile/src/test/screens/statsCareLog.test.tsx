@@ -1,10 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { fireEvent, screen, waitFor } from '@testing-library/react-native';
+import * as Notifications from 'expo-notifications';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 
 import { resolveApiClient } from '../../api/resolveClient';
 import { InMemoryCareEventRepository } from '../../care/careEventRepository';
 import { DailyPlaceholder } from '../../daily/DailyPlaceholder';
 import { CURRENT_CHILD_STORAGE_KEY } from '../../members/currentMemberStore';
+import { REMINDER_SETTINGS_STORAGE_KEY } from '../../reminders/reminderSettings';
 import { createFakeApiClient, TEST_BASE_URL } from '../fakeApi';
 import {
   makeDiaperEvent,
@@ -20,6 +22,7 @@ jest.mock('../../api/resolveClient', () => ({
 }));
 
 const mockedResolveApiClient = jest.mocked(resolveApiClient);
+const mockedNotifications = jest.mocked(Notifications);
 const doudou = makeMember({ member_id: 1, name: '豆豆', is_child: true });
 const second = makeMember({ member_id: 2, name: '老二', is_child: true });
 
@@ -35,6 +38,18 @@ function at(daysAgo: number, hour: number, minute = 0): string {
   date.setDate(date.getDate() - daysAgo);
   date.setHours(hour, minute, 0, 0);
   return date.toISOString();
+}
+
+function minutesAgo(minutes: number): string {
+  return new Date(Date.now() - minutes * 60000).toISOString();
+}
+
+/** RefreshControl is a native child of the ScrollView; trigger the JS handler directly. */
+async function pullToRefresh(testID: string) {
+  const scroll = screen.getByTestId(testID);
+  await act(async () => {
+    scroll.props.refreshControl.props.onRefresh();
+  });
 }
 
 function statsEvents(memberId = doudou.member_id) {
@@ -64,6 +79,8 @@ beforeEach(async () => {
   jest.clearAllMocks();
   await AsyncStorage.clear();
   await AsyncStorage.setItem(CURRENT_CHILD_STORAGE_KEY, String(doudou.member_id));
+  mockedNotifications.scheduleNotificationAsync.mockResolvedValue('notification-1');
+  mockedNotifications.cancelAllScheduledNotificationsAsync.mockResolvedValue();
 });
 
 describe('Stats care log', () => {
@@ -189,5 +206,67 @@ describe('Stats care log', () => {
 
     expect(await screen.findByTestId('stats-error')).toHaveTextContent(/backend down/);
     expect(screen.queryByTestId('stats-empty')).toBeNull();
+  });
+
+  it('reloads the seven-day read model on pull-to-refresh', async () => {
+    useApi();
+    const repository = new InMemoryCareEventRepository(statsEvents());
+    const list = jest.spyOn(repository, 'list');
+
+    await renderScreen(<DailyPlaceholder variant="stats" />, { careEvents: repository });
+    await screen.findByTestId('stats-care-log');
+    expect(list).toHaveBeenCalledTimes(1);
+
+    await pullToRefresh('daily-stats');
+
+    await waitFor(() => expect(list).toHaveBeenCalledTimes(2));
+  });
+
+  it('keeps the previous stats when a refresh fails', async () => {
+    useApi();
+    const repository = new InMemoryCareEventRepository(statsEvents());
+    await renderScreen(<DailyPlaceholder variant="stats" />, { careEvents: repository });
+    expect(await screen.findByTestId('stats-kpi-0')).toHaveTextContent(/3/);
+    jest.spyOn(repository, 'list').mockRejectedValue(new Error('backend down'));
+
+    await pullToRefresh('daily-stats');
+
+    expect(await screen.findByTestId('stats-error')).toHaveTextContent(/backend down/);
+    expect(screen.getByTestId('stats-kpi-0')).toHaveTextContent(/3/);
+    expect(screen.queryByTestId('stats-empty')).toBeNull();
+  });
+
+  it('re-arms the reminder for the child selected on the stats page', async () => {
+    await AsyncStorage.setItem(
+      REMINDER_SETTINGS_STORAGE_KEY,
+      '{"enabled":true,"intervalHours":3}',
+    );
+    useApi();
+    const secondFeed = makeFeedEvent({
+      id: 2,
+      member_id: second.member_id,
+      started_at: minutesAgo(10),
+    });
+
+    await renderScreen(<DailyPlaceholder variant="stats" />, {
+      careEvents: new InMemoryCareEventRepository([
+        makeFeedEvent({ id: 1, started_at: minutesAgo(30) }),
+        secondFeed,
+      ]),
+    });
+    await waitFor(() =>
+      expect(mockedNotifications.scheduleNotificationAsync).toHaveBeenCalledTimes(1),
+    );
+
+    await fireEvent.press(screen.getByTestId('daily-child-switcher'));
+    await fireEvent.press(await screen.findByTestId('child-option-2'));
+
+    await waitFor(() =>
+      expect(mockedNotifications.scheduleNotificationAsync).toHaveBeenCalledTimes(2),
+    );
+    const request = mockedNotifications.scheduleNotificationAsync.mock.calls[1][0];
+    expect((request.trigger as { date: Date }).date.getTime()).toBe(
+      Date.parse(secondFeed.started_at) + 3 * 60 * 60 * 1000,
+    );
   });
 });

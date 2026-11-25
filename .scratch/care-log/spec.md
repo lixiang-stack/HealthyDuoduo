@@ -115,7 +115,7 @@ Status: **implemented / accepted with known gaps**（2026-11-23 用户确认 B3 
 - **育儿 > 统计**：指标 tab（喂养 / 奶量 / 睡眠 / 尿布）、图表类型（柱状 / 堆叠 / 折线）、3 个 KPI、图表、图注与建议；不重复放提醒卡片。
 - **健康档案 > 报告**：成员 chips、按时间 / 按项目、报告卡、识别失败重试。
 - **健康档案 > 趋势**：指标趋势列表；后续可扩展。
-- **报告详情 / 今日记录 / 提醒**：栈页面，带返回；不显示底部 tab。
+- **报告详情 / 提醒**：栈页面，带返回；不显示底部 tab。
 - **记录弹层**：从今天页打开；标题下固定显示「记录给 豆豆 · 当前孩子」。
 
 ---
@@ -179,7 +179,9 @@ Status: **implemented / accepted with known gaps**（2026-11-23 用户确认 B3 
 - 不是 tab，不在统计页重复放卡片。
 - 唯一入口：今天页提醒卡片 → 提醒设置栈页。
 - 本机通知、默认关闭、用户设定间隔（2 / 3 / 4 小时）、不承诺准时、不提供喂养建议。
-- 没有账号 / 云同步 / 远程推送；记录仍可在同一 LAN 的其他设备查看。
+- 每设备一份设置，不按孩子拆多套；排程跟随当前孩子：切换孩子 / 冷启动按当前孩子最新喂养重排，最近 7 天无喂养时取消，旧孩子的系统通知不残留。
+- 切换孩子时先取消旧排程，新孩子读取失败保持取消（宁缺勿错）；冷启动读取失败保留既有同孩子通知，下次成功加载再校正。
+- 没有账号 / 云同步 / 远程推送；记录仍可在同一 LAN 的其他设备查看。不申请精确闹钟，到达时间受系统省电 / 通知策略影响。
 
 ---
 
@@ -195,7 +197,7 @@ Status: **implemented / accepted with known gaps**（2026-11-23 用户确认 B3 
 
 ## 9. 怎么实施
 
-1. **路由**：用两个域分组承载 B3：`/care`（今天 / 统计）与 `/health`（报告 / 趋势）；appbar 域 tab 在两组之间切换，底部 tab 由各组自己的 tab layout 渲染。报告详情 / 今日记录 / 提醒为栈页面。
+1. **路由**：用两个域分组承载 B3：`/care`（今天 / 统计）与 `/health`（报告 / 趋势）；appbar 域 tab 在两组之间切换，底部 tab 由各组自己的 tab layout 渲染。报告详情 / 提醒为栈页面。
 2. **Appbar**：新增共享 `DomainTabs` 组件；接收 active domain、健康档案待核对计数；域切换用 `router.replace` 保留各域上次二级 tab。当前孩子不放 appbar，改在育儿页内容区左上角。
 3. **孩子上下文**：扩展现有 `CurrentMemberContext`，增加 `currentChildId` / `setCurrentChild`；AsyncStorage 持久化；单孩子自动选中并锁定；多孩子选择器；成员删除时清理。
 4. **记录弹层**：打开时冻结 `targetMemberId`；多孩子 chips；保存禁用条件；保存后刷新当前孩子今天数据。
@@ -290,17 +292,25 @@ Status: **implemented / accepted with known gaps**（2026-11-23 用户确认 B3 
 
 1. **「日常」改名「育儿」**（2026-11-23 体验定稿）：用户可见文案与 `CONTEXT.md` 使用「育儿」；2026-11-24 路由与域标识由 `/daily` / `daily` 统一为 `/care` / `care`，旧本地导航偏好自动迁移。
 2. **当前孩子入口从 appbar 移到育儿页内容区左上角**：避免与域 tab 争位置；单孩子只显示名字并锁定，多孩子 `豆豆 ▾` 打开底部选择器。当前孩子被删除后：仍有多个孩子 → 打开选择器；只剩一个 → 自动选中并锁定；没有孩子 → 空态。健康档案继续使用页内成员 chips 与独立的 `currentMemberId`。
-3. **护理事件仍是客户端契约 + 内存 adapter**：`CareEvent` 判别联合、四类型 fixture 与 `InMemoryCareEventRepository` 已落地；正式 HTTP / 表 / 迁移未在本期，重启 App 后事件清空，提醒设置持久化但「上次喂养」可能回到空态。合成 fixture 只供测试 / 显式预览，生产 provider 默认空仓储，不能把 fixture 当真实记录。
+3. **护理事件在 B3 首期为客户端契约 + 内存 adapter**：`CareEvent` 判别联合、四类型 fixture 与 `InMemoryCareEventRepository` 已落地；正式 HTTP / 表 / 迁移随后由 care-events A1 补齐（见本节 2026-11-25 更新），内存 adapter 只保留给测试 / 显式注入。
 4. **重复喂养窗口以候选记录时间为准**：读写 `started_at` 前后各 5 分钟，便于补录旧时间与跨午夜；仍是 best-effort，不做服务端去重。
 5. **统计固定 7 个本机自然日**：睡眠按 07:00 / 19:00 拆分夜间 / 白天；单点照常渲染，不伪造趋势；统计页不渲染提醒卡片。
 6. **提醒只做本机一次性本地通知**：默认关闭、2 / 3 / 4 小时间隔、不申请精确闹钟、不接远程推送 / token；未申请权限时保持关闭并说明原因。
 7. **首次启动欢迎屏未实现**：按「有孩子 → 育儿 > 今天；无孩子 → 健康档案 > 报告」自动入口，并记住上次域与二级 tab（票 02 已记录）。
-8. **「全部记录」入口未接线**：`/today-records` 仍是占位栈页且无入口；当前由今天页时间线承担记录浏览。若后续需要独立全部记录页，另开票。
+8. **「全部记录」入口未接线**：无独立「全部记录」页；当前由今天页时间线承担记录浏览。若后续需要独立全部记录页，另开票（2026-11-25 已删除无入口的 `/today-records` 占位）。
 
 **后续（2026-11-24）：**
 
 - 护理事件持久化（A1）另立 spec：`.scratch/care-events/spec.md`；四类事件单表 `care_events`、四个 HTTP 端点、App HTTP adapter、提醒跟随当前孩子。票 01–08 的验收口径不变。
-- 睡眠记录方式已实现（票 09，自动化全绿）：结束后补记（结束时间 + 时长，生产不再创建进行中），见 `issues/09-sleep-completion.md`；真机 smoke 待补；删除确认 / 跨天补录 / 键盘仍 deferred。
-- `/today-records` 占位将移除，时间线继续承担浏览，见 `issues/10-cleanup.md`。
+- 睡眠记录方式已实现（票 09，自动化 + 2026-11-25 真机 smoke 全绿）：结束后补记（结束时间 + 时长，生产不再创建进行中），见 `issues/09-sleep-completion.md`；删除确认 / 跨天补录 / 键盘仍 deferred。
+- `/today-records` 占位已移除（票 10，2026-11-25）；时间线继续承担浏览，需要独立「全部记录」页时另开票。
 
 **验收口径：** RNTL 57 suites / 447 tests、`npx tsc --noEmit`、`npm run lint -- --max-warnings=0`、`npx expo export --platform android` 全绿；契约 grep 无 `recorded_by` / `device_id` / 全局 active child，护理事件未进入报告 / 趋势 / 分析链路；无数据库迁移，`scripts/test-db.sh` 本票不适用；Android 真机 smoke 见票 08 Comments。
+
+**2026-11-25 更新（care-events A1 / 护理记录 09）：**
+
+- 护理事件已持久化到 LAN 后端：`care_events` 表 / 迁移 0021、四类事件 GET / POST / PATCH / DELETE、App 显式注入 `HttpCareEventRepository`；重启不再清空，跨设备通过 focus 重载 / 下拉刷新同步。生产 provider 不再有内存默认值，fixture 只供测试 / 显式注入。
+- 睡眠改为结束后补记（票 09）：结束时间 + 必填时长，开始时间推导；生产不再创建进行中睡眠，legacy 进行中事件仍可渲染与编辑完成。2026-11-25 真机 smoke 通过（同日 / 跨午夜 / legacy 完成）。
+- 提醒设置仍是每设备一份，但排程跟随当前孩子：切换孩子先取消旧排程再按新孩子最新喂养重排；冷启动成功读取后校正；最近 7 天无喂养 / 提醒关闭 / 无当前孩子时取消。不申请精确闹钟、不接远程推送。
+- 剩余差异：无占位路由；`/today-records` 已删除（票 10）。跨设备刷新、提醒 AlarmManager 与睡眠 UX 的真机 smoke 已于 2026-11-25 用真机 + AVD 两个 App 实例在隔离栈通过（第二端为模拟器，属降级事实）。
+- 验收口径更新：App 60 suites / 483 tests；`go test ./...`、`go vet ./...`、`bash scripts/test-db.sh`（14 个 storage 测试）、`npm run codegen`（无 diff）、`npx tsc --noEmit`、`npm run lint -- --max-warnings=0`、`npx expo export --platform android`、`python3 scripts/check-docs.py` 全绿。
