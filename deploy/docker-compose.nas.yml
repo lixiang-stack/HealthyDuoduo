@@ -1,0 +1,104 @@
+# 家庭 NAS 局域网常驻栈（amd64/arm64 均可，按目标机构建）。
+#
+# 与 deploy/docker-compose.yml 的区别：
+# - 只有 hdd 发布宿主端口（缺省 19080，避开 8xxx）；postgres/seaweedfs/recognizer 只在 Docker 内网。
+# - 所有服务 restart: unless-stopped + 日志轮转 + 时区。
+# - Postgres/SeaweedFS 数据用数据盘 bind mount；构建目标机关机/换机时可备份恢复。
+# - 不挂载 samples；生产不需要脱敏样本。
+#
+# 用法（在仓库根执行）：
+#   cp deploy/.env.example deploy/.env && chmod 600 deploy/.env
+#   docker compose -p healthyduoduo -f deploy/docker-compose.nas.yml --env-file deploy/.env up -d --build
+#
+# 公网访问不在此文件范围：当前边界仍是 ADR-0006 的局域网无鉴权；
+# 未来要做外网，必须先补鉴权/TLS/审计并修订 ADR。
+
+name: healthyduoduo
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:-postgres:17-alpine}
+    environment:
+      POSTGRES_USER: healthyduoduo
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}
+      POSTGRES_DB: healthyduoduo
+      TZ: ${TZ:-Asia/Shanghai}
+    # 显式设置数据库时区：analysis_llm_calls 的「今日额度」按 date_trunc('day', now()) 统计。
+    command: ["postgres", "-c", "timezone=${TZ:-Asia/Shanghai}"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U healthyduoduo -d healthyduoduo"]
+      interval: 5s
+      timeout: 3s
+      retries: 6
+    volumes:
+      - ${HDD_DATA_DIR:?set HDD_DATA_DIR in deploy/.env}/pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    logging: *default-logging
+
+  seaweedfs:
+    # 单进程 master/volume/filer/S3；对象按图像 sha256 内容寻址，重启后需等 raft 收敛。
+    image: ${SEAWEEDFS_IMAGE:-chrislusf/seaweedfs:latest}
+    command: server -dir=/data -s3
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+    volumes:
+      - ${HDD_DATA_DIR:?set HDD_DATA_DIR in deploy/.env}/seaweed:/data
+    restart: unless-stopped
+    logging: *default-logging
+
+  hdd:
+    image: ${HDD_IMAGE:-healthyduoduo/hdd:nas}
+    build:
+      context: ..
+      dockerfile: deploy/hdd.Dockerfile
+    environment:
+      HDD_DATABASE_URL: postgres://healthyduoduo:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}@postgres:5432/healthyduoduo?sslmode=disable
+      HDD_RECOGNIZER_URL: http://recognizer:8000
+      HDD_S3_ENDPOINT: http://seaweedfs:8333
+      HDD_S3_BUCKET: raw
+      HDD_FLAG_POLICY: /app/flag_policy.yaml
+      HDD_LLM_API_KEY_FILE: /run/secrets/llm_api_key
+      HDD_ANALYSIS_DAILY_LIMIT: ${HDD_ANALYSIS_DAILY_LIMIT:-20}
+      TZ: ${TZ:-Asia/Shanghai}
+    # 文件型 secret：目录只读挂载；文件不存在时解释层关闭，事实层/框架层照常可用。
+    volumes:
+      - ${HDD_LLM_SECRET_DIR:-./secrets}:/run/secrets:ro
+    ports:
+      # 默认对局域网开放；只想本机调试时把 HDD_BIND_ADDR 改成 127.0.0.1。
+      - "${HDD_BIND_ADDR:-0.0.0.0}:${HDD_SERVE_PORT:-19080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      # SeaweedFS 首启 raft 收敛约 15–20 秒；hdd 的 restart 兜底 EnsureBucket 的 fail-fast。
+      seaweedfs:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/api/v1/health >/dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    logging: *default-logging
+
+  recognizer:
+    image: ${RECOGNIZER_IMAGE:-healthyduoduo/recognizer:nas}
+    build:
+      context: ..
+      dockerfile: deploy/recognizer.Dockerfile
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    logging: *default-logging
