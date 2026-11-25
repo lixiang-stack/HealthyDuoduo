@@ -27,14 +27,15 @@ type config struct {
 	s3Bucket      string
 	flagPolicy    string
 
-	llmAPIKey       string
-	llmAPIKeyFile   string
-	llmBaseURL      string
-	llmModel        string
-	llmTimeout      time.Duration
-	llmInputTokens  int
-	llmOutputTokens int
-	analysisLimit   int
+	llmAPIKey          string
+	llmAPIKeyFile      string
+	llmBaseURL         string
+	llmModel           string
+	llmReasoningEffort string
+	llmTimeout         time.Duration
+	llmInputTokens     int
+	llmOutputTokens    int
+	analysisLimit      int
 }
 
 func envConfig() config {
@@ -47,20 +48,30 @@ func envConfig() config {
 		s3Bucket:      fromEnv("HDD_S3_BUCKET", "raw"),
 		flagPolicy:    fromEnv("HDD_FLAG_POLICY", "recognizer/recognizer/flag_policy.yaml"),
 
-		llmAPIKey:       fromEnv("HDD_LLM_API_KEY", ""),
-		llmAPIKeyFile:   fromEnv("HDD_LLM_API_KEY_FILE", ""),
-		llmBaseURL:      fromEnv("HDD_LLM_BASE_URL", "https://api.deepseek.com"),
-		llmModel:        fromEnv("HDD_LLM_MODEL", "deepseek-chat"),
-		llmTimeout:      time.Duration(fromEnvInt("HDD_LLM_TIMEOUT_SECONDS", 30)) * time.Second,
-		llmInputTokens:  fromEnvInt("HDD_LLM_INPUT_TOKENS", 8000),
-		llmOutputTokens: fromEnvInt("HDD_LLM_OUTPUT_TOKENS", 1500),
-		analysisLimit:   fromEnvInt("HDD_ANALYSIS_DAILY_LIMIT", analysisDailyLimitDefault),
+		llmAPIKey:          fromEnv("HDD_LLM_API_KEY", ""),
+		llmAPIKeyFile:      fromEnv("HDD_LLM_API_KEY_FILE", ""),
+		llmBaseURL:         fromEnv("HDD_LLM_BASE_URL", ""),
+		llmModel:           fromEnv("HDD_LLM_MODEL", ""),
+		llmReasoningEffort: fromEnvAllowEmpty("HDD_LLM_REASONING_EFFORT", "none"),
+		llmTimeout:         time.Duration(fromEnvInt("HDD_LLM_TIMEOUT_SECONDS", 30)) * time.Second,
+		llmInputTokens:     fromEnvInt("HDD_LLM_INPUT_TOKENS", 8000),
+		llmOutputTokens:    fromEnvInt("HDD_LLM_OUTPUT_TOKENS", 1500),
+		analysisLimit:      fromEnvInt("HDD_ANALYSIS_DAILY_LIMIT", analysisDailyLimitDefault),
 	}
 }
 
 func fromEnv(key, def string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
+	}
+	return def
+}
+
+// fromEnvAllowEmpty 与 fromEnv 类似,但显式设置为空字符串时保留空值;
+// 用于可省略的透传字段,例如不识别 reasoning_effort 的端点。
+func fromEnvAllowEmpty(key, def string) string {
+	if v, ok := os.LookupEnv(key); ok {
+		return strings.TrimSpace(v)
 	}
 	return def
 }
@@ -81,11 +92,12 @@ func llmClientConfig(c config) llm.Config {
 		Model:           c.llmModel,
 		Timeout:         c.llmTimeout,
 		MaxOutputTokens: c.llmOutputTokens,
+		ReasoningEffort: c.llmReasoningEffort,
 	}
 }
 
 // resolveLLMAPIKey 文件型 secret 优先于环境变量:设置 HDD_LLM_API_KEY_FILE 后,
-// 即使环境里残留旧 key 也以文件为准。文件缺失或为空表示未配置,只关闭解释层;
+// 即使环境里残留旧 key 也以文件为准。文件缺失或为空表示未配置 key(本地模型通常不需要);
 // 其他读取错误(权限 / 目录等)仍启动失败,避免配置错误被静默吞掉。
 func resolveLLMAPIKey(c config) (string, error) {
 	if c.llmAPIKeyFile == "" {
@@ -101,15 +113,16 @@ func resolveLLMAPIKey(c config) (string, error) {
 	return strings.TrimSpace(string(raw)), nil
 }
 
-// newExplainer 只有配置了 API key 才创建解释层编排器;未配置时保持 nil,
-// 分析只输出事实层与框架层,不发起任何云端请求。
+// newExplainer 只有同时配置了 OpenAI 兼容端点与模型才创建解释层编排器;
+// API key 可选,本地模型通常不需要。未配置时保持 nil,分析只输出事实层与框架层,
+// 不发起任何模型请求。
 func newExplainer(c config, quota analysis.QuotaStore, events analysis.ObservabilityStore, cache analysis.ExplanationCache) (*analysis.Explainer, error) {
+	if c.llmBaseURL == "" || c.llmModel == "" {
+		return nil, nil
+	}
 	apiKey, err := resolveLLMAPIKey(c)
 	if err != nil {
 		return nil, err
-	}
-	if apiKey == "" {
-		return nil, nil
 	}
 	c.llmAPIKey = apiKey
 	matcher, err := analysis.NewKnowledgeMatcher()

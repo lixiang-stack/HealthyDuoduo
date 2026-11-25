@@ -1,4 +1,4 @@
-// 云端证据包(llm-analysis 票 07):只发送脱敏后的指标、相对时间、年龄段、
+// 脱敏证据包(llm-analysis 票 07):只发送脱敏后的指标、相对时间、年龄段、
 // 病历诊断 / 处理原文与知识条目原文。姓名、生日、精确日期、报告 id、图像哈希、
 // 主诉 / 现病史、整页 OCR 兜底一律不发送。
 package analysis
@@ -18,7 +18,7 @@ import (
 // ErrEvidenceTooLarge 条目原文本身已超过 input 上限;不能裁条目,只能省略解释层。
 var ErrEvidenceTooLarge = errors.New("evidence pack exceeds input token limit")
 
-// EvidencePack 发给云端模型的脱敏载荷;字段名即模型看到的 JSON 键。
+// EvidencePack 发给模型的脱敏载荷;字段名即模型看到的 JSON 键。
 type EvidencePack struct {
 	Panel           string              `json:"panel"`
 	Entry           string              `json:"entry"`

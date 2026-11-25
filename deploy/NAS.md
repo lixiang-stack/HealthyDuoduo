@@ -96,7 +96,8 @@ chmod 600 deploy/.env
 
 - `POSTGRES_PASSWORD`：改成长随机、URL 安全的密码（建议只字母数字，避免拼进 DSN 时转义）；
 - `HDD_DATA_DIR`：NAS 数据盘目录；
-- `HDD_LLM_SECRET_DIR`：secret 目录；不需要解释层时留空目录即可；
+- `HDD_LLM_SECRET_DIR`：secret 目录；不需要鉴权时可留空目录；
+- `HDD_LLM_BASE_URL` / `HDD_LLM_MODEL`：可选；两者都设置才启用解释层；
 - `HDD_SERVE_PORT=19080`；
 - `BACKUP_ROOT`：USB 挂载点下的备份目录；
 - `RESTIC_PASSWORD_FILE`：restic 密码文件路径（首次创建，600 权限）。
@@ -115,7 +116,19 @@ docker compose -p healthyduoduo -f deploy/docker-compose.nas.yml --env-file depl
 
 按输出的 UID/GID 修正 `pgdata` 属主（postgres:17-alpine 常见为 `70:70`，以实际为准）。
 
-LLM key 可选：
+解释层使用 OpenAI 兼容端点，任意提供商均可；本机 Ollama 示例：
+
+```dotenv
+HDD_LLM_BASE_URL=http://<NAS_IP>:11434/v1
+HDD_LLM_MODEL=qwen3.5:4b
+HDD_LLM_REASONING_EFFORT=none
+```
+
+留空 `HDD_LLM_REASONING_EFFORT` 则省略该字段，兼容不识别它的端点。
+
+Ollama 默认上下文为 4096，小于本项目默认的输入 + 输出上限（9500）。启动 Ollama 前设置 `OLLAMA_CONTEXT_LENGTH=16384`，或把 `HDD_LLM_INPUT_TOKENS` / `HDD_LLM_OUTPUT_TOKENS` 调到总和不超上下文。容器通过 NAS 局域网 IP 访问时，Ollama 还需监听 `0.0.0.0`（如 `OLLAMA_HOST=0.0.0.0`）。
+
+需要鉴权的云端服务再添加 key 文件：
 
 ```bash
 read -s KEY
@@ -123,7 +136,7 @@ printf '%s' "$KEY" > "$HDD_LLM_SECRET_DIR/llm_api_key"
 chmod 600 "$HDD_LLM_SECRET_DIR/llm_api_key"
 ```
 
-没有 key 时解释层关闭，事实层/框架层照常可用；不要因此阻塞首次部署。
+未配置 endpoint / model 时解释层关闭，事实层/框架层照常可用；key 文件缺失或为空表示无鉴权，不影响启动。
 
 ## 6. 启动与检查
 

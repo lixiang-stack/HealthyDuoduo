@@ -14,7 +14,7 @@
 1. **RAG 取代 YAML 作为解释层知识来源。** v1 只做肝功、成人 18+、Panel + 单指标入口；生产环境不再加载 `knowledge/*.yaml`，旧 YAML 只留在 `internal/analysis/testdata/legacy_yaml/` 作为离线评估 baseline。
 2. **模型写四段，服务端校验。** LLM 基于检索 chunk 生成 `claims`（`text + quote + chunk_id + source_id + evidence_ids`），服务端校验结构、引用存在、quote 逐字子串、数字/方向、内容边界；不再要求四段正文逐字来自 YAML。
 3. **本地 embedding + pgvector。** 新增独立 Python 服务 `rag-embed`（BGE-M3，CPU，模型缓存 volume）；Postgres 改用 `pgvector/pgvector:pg17`，新增 `rag_documents` / `rag_chunks` / `rag_index_versions`。检索用 dense + sparse/BM25，RRF 融合，top 8–12。Embedding 不走出站请求。
-4. **聊天模型仍走云端 DeepSeek，模型档位可配置。** 生成用 flash 档；评估 judge 用 pro/reasoner 档。沿用 ADR-0006 的局域网前提与既有 LLM 出站例外；本 ADR 不新增第三方出站，发送内容仍限于既有脱敏事实 + 公开指南片段。
+4. **聊天模型仍走云端 DeepSeek，模型档位可配置。** 生成用 flash 档；评估 judge 用 pro/reasoner 档。沿用 ADR-0006 的局域网前提与既有 LLM 出站例外；本 ADR 不新增第三方出站，发送内容仍限于既有脱敏事实 + 公开指南片段。（2026-11-25：该点由 ADR-0020 修订为可配置的 OpenAI 兼容端点，默认本地 Ollama。）
 5. **产品边界前移。** 允许展示指南中的病因、进一步检查、生活建议、跟踪、红黄绿灯、一般诊断标准和一般复查间隔；在证据完整时允许判断「符合/不符合某指南标准」。禁止个体疾病诊断、治疗/药物/剂量、预后、个体化复查医嘱；v1 儿科语料只入库、不检索、不输出。
 6. **上线方式：RAG-only + kill switch，不做生产灰度，不兼容旧数据。** 项目未上线，可删除存量分析、旧缓存；`HDD_RAG_ENABLED=false` 时只输出事实层 + 框架层。YAML 不参与生产回退。
 7. **语料按 C0 处理：整段保留，不按内容类型拆分、不丢弃治疗段。** 只按标题/段落切块；治疗、诊断标准、预后、儿科内容与允许内容可能在同一 chunk。

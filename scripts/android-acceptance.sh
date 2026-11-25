@@ -11,6 +11,7 @@
 # Env overrides:
 #   HDD_PORT=18080 RECOGNIZER_PORT=18000 METRO_PORT=18081
 #   S3_ENDPOINT=http://127.0.0.1:8333 ADB=$HOME/Library/Android/sdk/platform-tools/adb
+#   HDD_LLM_BASE_URL=http://127.0.0.1:11434/v1 HDD_LLM_MODEL=qwen3.5:4b
 #   HDD_LLM_API_KEY_FILE=$HOME/.config/healthyduoduo/llm_api_key
 set -euo pipefail
 
