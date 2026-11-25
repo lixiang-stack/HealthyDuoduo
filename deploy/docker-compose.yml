@@ -1,3 +1,5 @@
+# 本地开发/验证栈：默认发布 postgres/seaweedfs/recognizer/hdd 端口。
+# NAS 家庭常驻请用 deploy/docker-compose.nas.yml（只发布 hdd 一个端口）。
 services:
   postgres:
     image: postgres:17-alpine

@@ -6,6 +6,10 @@
 
 # 本机密钥:文件型 secret 与 .env 一律不入库
 deploy/.env*
+!deploy/.env.example
+
+# NAS 文件型 secret（LLM key / restic 密码），目录内文件永不入库
+deploy/secrets/
 __pycache__/
 *.py[cod]
 dist/

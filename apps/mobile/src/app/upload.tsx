@@ -498,6 +498,9 @@ function UploadReadyView({
           ) : null}
 
           <Text style={sharedStyles.label}>检查单照片</Text>
+          <Text testID="upload-capture-hint" style={sharedStyles.muted}>
+            医院拍照请用系统相机；回家后从相册选择上传。App 内拍照仅用于当场上传。
+          </Text>
           {images.length > 0 ? (
             <Text testID="upload-selected-count" style={sharedStyles.muted}>
               已选 {images.length}/{MAX_UPLOAD_IMAGES} 张
@@ -580,6 +583,11 @@ function UploadReadyView({
               >
                 {summary}
               </Text>
+              {uploadFailed ? (
+                <Text style={sharedStyles.muted}>
+                  照片仍在系统相册；请回家连上家庭网络后重新选择上传。
+                </Text>
+              ) : null}
               <View style={styles.actions}>
                 {retryIndexes.length > 0 ? (
                   <Pressable

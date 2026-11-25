@@ -84,6 +84,8 @@ python3 scripts/check-docs.py
 docker compose -p deploy -f deploy/docker-compose.yml up -d
 ```
 
+NAS 局域网常驻部署（端口 19080、数据盘、USB 备份与验收）见 `deploy/NAS.md`。
+
 解释层需要 LLM key 时，用文件型 secret，不建议把 key 写进命令行或 `environment:`。密钥放在 home 下，多 worktree 共用一份：
 
 ```bash
@@ -106,6 +108,7 @@ App 屏幕测试随 `npm test` 运行；合并 UI 改动前按 `apps/mobile/ANDR
 - `docs/agents/documentation.md`：文档约定
 - `docs/agents/complexity.md`：增量复杂度信号
 - `docs/agents/prototype-driven-development.md`：前端方案选型与原型规范
+- `deploy/NAS.md`：NAS 局域网部署、USB 备份与验收
 - `.scratch/<feature>/`：本地 spec 与 ticket
 
 ## 开发约定

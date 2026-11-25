@@ -2,6 +2,8 @@
 
 Status: ready-for-agent
 
+**2026-11-25 变更：** 离线队列（#08）废弃，不做本地排队/回网自动补传；医院拍照改用系统相机，回家后从系统相册选择上传。本文中相关描述保留为历史设计记录，以 `.scratch/viz-and-client/issues/08-offline-queue.md` 的 Decision 为准。
+
 **依据文档：** 需求 `docs/design/2026-10-13-viz-and-client-spec.md`（v1.3）· 决策 `docs/design/2026-10-13-trust-first-family-archive.md` · `ADR-0005`（核对落库数据模型）· `ADR-0006`（局域网无鉴权）· 统一语言 `CONTEXT.md`（检查单 / 图像 / OCR 结果 / 报告 / 报告类别 / 指标项 / 成员 / 家长 / 核对 / 修正对——本 spec 沿用该词汇）。
 
 ## Problem Statement
